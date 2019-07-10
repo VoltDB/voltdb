@@ -78,3 +78,10 @@ CREATE TABLE T1_ENG_13603 (
 CREATE TABLE T2_ENG_13603 (
   ID INTEGER
 );
+
+-- ENG-15030
+create table rowkeys(dataset_id bigint, part int not null, value int, primary key (dataset_id, part, value));
+partition table rowkeys on column part;
+create table float_cells(attribute_id bigint, row_key int, value int, part int not null, primary key (attribute_id, part, row_key));
+partition table float_cells on column part;
+

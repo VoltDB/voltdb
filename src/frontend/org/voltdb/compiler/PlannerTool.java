@@ -87,7 +87,9 @@ public class PlannerTool {
     // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
     // we should ignore.
     private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
-            System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+            System.getenv("LARGE_MODE_RATIO").equals("-1")) ?
+            System.getProperty("LARGE_MODE_RATIO", "0") :
+            System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash) {
         assert(database != null);
@@ -186,8 +188,7 @@ public class PlannerTool {
             planner.parse();
             plan = planner.plan();
             assert(plan != null);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             /*
              * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
              * are at least somewhat expected.

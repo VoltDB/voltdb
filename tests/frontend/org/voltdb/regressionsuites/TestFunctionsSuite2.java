@@ -160,6 +160,11 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         super(name);
     }
 
+    private static String expectedErrorMessage(String fun) {
+        return USING_CALCITE ? String.format("Cannot apply '%s' to arguments of type", fun) :
+                "incompatible data type in operation";
+    }
+
     @Test
     public void testMod() throws Exception {
         System.out.println("STARTING testMod");
@@ -179,20 +184,23 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         // Edge case: MOD 0
         verifyStmtFails(client, "select MOD(-25,0) from R1", "division by zero");
 
-        validateTableOfScalarDecimals(client, "select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",  new BigDecimal[]{new BigDecimal("1.000000000000")});
-        validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{new BigDecimal("-0.020000000000")});
+        validateTableOfScalarDecimals(client,"select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",
+                new BigDecimal[]{new BigDecimal("1.000000000000")});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",
+                new BigDecimal[]{new BigDecimal("-0.020000000000")});
 
         // Test MOD with NULL values
-        validateTableOfScalarDecimals(client, "select MOD(NULL, CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
-        validateTableOfScalarDecimals(client, "select MOD(CAST(3.12 as decimal), NULL) from R1",  new BigDecimal[]{null});
-        validateTableOfScalarDecimals(client, "select MOD(CAST(NULL AS decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
-        verifyStmtFails(client, "select MOD(NULL, NULL) from R1", "data type cast needed for parameter or null literal");
+        validateTableOfScalarDecimals(client, "select MOD(NULL, CAST(ratio as decimal)) from R1", new BigDecimal[]{null});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(3.12 as decimal), NULL) from R1", new BigDecimal[]{null});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(NULL AS decimal), CAST(ratio as decimal)) from R1", new BigDecimal[]{null});
+        verifyStmtFails(client, "select MOD(NULL, NULL) from R1",
+                "data type cast needed for parameter or null literal");
 
         // Mix of decimal and ints
-        verifyStmtFails(client, "select MOD(25.32, 2) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD(2, 25.32) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "Cannot apply 'MOD' to arguments of type");
+        verifyStmtFails(client, "select MOD(25.32, 2) from R1", expectedErrorMessage("MOD"));
+        verifyStmtFails(client, "select MOD(2, 25.32) from R1", expectedErrorMessage("MOD"));
+        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", expectedErrorMessage("MOD"));
+        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", expectedErrorMessage("MOD"));
     }
 
     @Test
@@ -217,7 +225,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) );
         */
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
 
         VoltTable r;
         cr = client.callProcedure("@AdHoc", "SELECT -id from P1;");
@@ -231,7 +240,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals( 0, r.get("C1", VoltType.INTEGER));
 
         // invalid data type for unary minus
-        verifyStmtFails(client, "select -desc from P1", "Cannot apply '-' to arguments of type");
+        verifyStmtFails(client, "select -desc from P1", expectedErrorMessage("-"));
 
         // check -(-var) = var
         cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
@@ -241,15 +250,19 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals(r.get("NUM", VoltType.INTEGER), r.get("C2", VoltType.INTEGER));
 
         // unary minus returns NULL for NULL numeric values like other arithmetic operators
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'nulltest', NULL, 1.38145922788945552107e-01, NULL)");
-        cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='nulltest'");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (2, 'nulltest', NULL, 1.38145922788945552107e-01, NULL)");
+        cr = client.callProcedure("@AdHoc",
+                "select -num from P1 where desc='nulltest'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
         assertEquals( VoltType.NULL_INTEGER, r.get("C1", VoltType.INTEGER));
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (3, 'maxvalues', 0, " + Double.MAX_VALUE + " , NULL)");
-        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='maxvalues'");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (3, 'maxvalues', 0, " + Double.MAX_VALUE + " , NULL)");
+        cr = client.callProcedure("@AdHoc",
+                "select -ratio from P1 where desc='maxvalues'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -264,7 +277,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
 
         cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='minvalues'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -287,12 +301,14 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 
         VoltTable rA;
         VoltTable rB;
-        cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
+        cr = client.callProcedure("@AdHoc",
+                "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rA = cr.getResults()[0];
         assertEquals(1, rA.getRowCount());
 
-        cr = client.callProcedure("@AdHoc", "select 0-integernum, 0-tinynum, 0-smallnum, 0-bignum, 0-floatnum, 0-decimalnum from NUMBER_TYPES");
+        cr = client.callProcedure("@AdHoc",
+                "select 0-integernum, 0-tinynum, 0-smallnum, 0-bignum, 0-floatnum, 0-decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rB = cr.getResults()[0];
         assertEquals(1, rB.getRowCount());
@@ -315,13 +331,11 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
                 -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
 
-        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
+        client.callProcedure("@AdHoc",
+                "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
         //client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);
-        client.callProcedure("@AdHoc", "Insert into NUMBER_TYPES values(1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);");
-
-        /* for debugging */
-//        VoltTable[] rs = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults();
-//        System.out.println(rs[0]);
+        client.callProcedure("@AdHoc",
+                "Insert into NUMBER_TYPES values(1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);");
 
         cr = client.callProcedure("@AdHoc", "select -decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -330,7 +344,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals(1, r.getRowCount());
         r.advanceRow();
         // Java converts big numbers - so comparing strings which have the values preserved
-        assertEquals( "99999999999999999999999999.999999999999", r.get("C1", VoltType.DECIMAL).toString() );
+        assertEquals( "99999999999999999999999999.999999999999",
+                r.get("C1", VoltType.DECIMAL).toString());
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
@@ -349,11 +364,15 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                 PRIMARY KEY (ID) );
         */
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (6, 'WCfDDvZBPoqhanfGN', 1414568, 1.14383710279231887164e-01, NULL)");
-        cr = client.callProcedure("@AdHoc", "select (5.25 + NUM) from P1");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (6, 'WCfDDvZBPoqhanfGN', 1414568, 1.14383710279231887164e-01, NULL)");
+        cr = client.callProcedure("@AdHoc","select (5.25 + NUM) from P1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc", "SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -370,8 +389,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         Client client = getClient();
         initialLoad(client, "P1");
 
-        ClientResponse cr = null;
-        VoltTable result = null;
+        ClientResponse cr;
+        VoltTable result;
         /*
         CREATE TABLE P1 (
                 ID INTEGER DEFAULT '0' NOT NULL,
@@ -390,7 +409,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 
         // Do some rudimentary indexed queries -- the real challenge to string expression indexes is defining and loading/maintaining them.
         // TODO: For that reason, it might make sense to break them out into their own suite to make their specific issues easier to isolate.
-        cr = client.callProcedure("@AdHoc", "select ID from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 order by NUM, ID");
+        cr = client.callProcedure("@AdHoc",
+                "select ID from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 order by NUM, ID");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(5, result.getRowCount());
@@ -400,18 +420,20 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         long resultB;
 
         // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7");
+        cr = client.callProcedure("@AdHoc","select count(*) from P1 where ABS(ID+3) = 7");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -425,13 +447,15 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals(7, killCount);
 
         // Repeat the queries on updated indexes.
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -474,7 +498,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 );
         */
 
-        cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) = 9 and DESC > 'XYZ' order by ID");
+        cr = client.callProcedure("@AdHoc",
+                "select ID from R1 where ABS(ID) = 9 and DESC > 'XYZ' order by ID");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(0, result.getRowCount());
@@ -569,7 +594,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         for(int id=7; id < 15; id++) {
             client.callProcedure(callback, tableName+".insert",
                     - id, // ID
-                    "X"+String.valueOf(id)+paddedToNonInlineLength, // DESC
+                    "X"+ id +paddedToNonInlineLength, // DESC
                     10, // NUM
                     1.1, // RATIO
                     new Timestamp(100000000L)); // PAST
@@ -583,8 +608,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         Client client = getClient();
         initialLoad(client, "P1");
 
-        ClientResponse cr = null;
-        VoltTable r = null;
+        ClientResponse cr;
+        VoltTable r;
 
         // The next two queries used to fail due to ENG-3913,
         // abuse of compound indexes for partial GT filters.
@@ -799,14 +824,14 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r.advanceToRow(4);
         resultB = r.getLong(0);
         assertEquals(10, resultB);
+        final String expectedErrorMessage = expectedErrorMessage("ABS");
 
         boolean caught = false;
         try {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -816,8 +841,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 'ABC'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -835,7 +859,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         }
         // If the insert succeeds on VoltDB, the constraint failed to trigger.
         // If the insert fails on HSQL, the test is invalid -- HSQL should not detect the subtle constraint violation we are trying to trigger.
-        assertEquals( ! isHSQL(), caught);
+        assertEquals(! isHSQL(), caught);
     }
 
     @Test
@@ -844,8 +868,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         Client client = getClient();
         initialLoad(client, "P1");
 
-        ClientResponse cr = null;
-        VoltTable r = null;
+        ClientResponse cr;
+        VoltTable r;
 
         // test where support
         cr = client.callProcedure("WHERE_SUBSTRING2");
@@ -924,7 +948,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING (DESC FROM 2) >= '11'");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING (DESC FROM 2) >= '11'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -935,7 +960,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) >= '12'");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where not SUBSTRING( DESC FROM 2) >= '12'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -946,13 +972,15 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 2 FOR 1) >= '2'");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where SUBSTRING(DESC FROM 2 FOR 1) >= '2'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( SUBSTRING (DESC FROM 2) FROM 1 FOR 1) < '2'");
+        cr = client.callProcedure("@AdHoc",
+                "select count(*) from P1 where not SUBSTRING( SUBSTRING (DESC FROM 2) FROM 1 FOR 1) < '2'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -960,44 +988,46 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 
         boolean caught = false;
         try {
-            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
+            cr = client.callProcedure("@AdHoc",
+                    "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("incompatible data type"));
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        final String expectedErrorMessage = expectedErrorMessage("SUBSTRING");
+        try {
+            cr = client.callProcedure("@AdHoc",
+                    "select count(*) from P1 where not SUBSTRING (1 FROM 2) > 9");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
 
         caught = false;
         try {
-            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM 2) > 9");
+            cr = client.callProcedure("@AdHoc",
+                    "select count(*) from P1 where not SUBSTRING (1 FROM DESC) > '9'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
 
         caught = false;
         try {
-            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM DESC) > '9'");
+            cr = client.callProcedure("@AdHoc",
+                    "select count(*) from P1 where not SUBSTRING (DESC FROM DESC) > 'ABC'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
-            caught = true;
-        }
-        assertTrue(caught);
-
-        caught = false;
-        try {
-            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (DESC FROM DESC) > 'ABC'");
-            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
-        } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -1106,12 +1136,14 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
             // test AdHoc cast
-            cr = client.callProcedure("@AdHoc", "select cast('2014-07-04 00:00:00.000000' as timestamp) from R2 where id = 1;");
+            cr = client.callProcedure("@AdHoc",
+                    "select cast('2014-07-04 00:00:00.000000' as timestamp) from R2 where id = 1;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
             r.advanceRow();
             assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-04 00:00:00.000000");
-            cr = client.callProcedure("@AdHoc", "select cast('2014-07-05' as timestamp) from R2 where id = 1;");
+            cr = client.callProcedure("@AdHoc",
+                    "select cast('2014-07-05' as timestamp) from R2 where id = 1;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
             r.advanceRow();
@@ -1163,10 +1195,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 //        r = cr.getResults()[0];
 //        r.advanceRow();
-//        for (int i=0; i< 8; i++) {
-//            assertNull(r.getLong(i));
-//        }
-//        assertNull(r.getLong(8));
+//        assertNull(r.get(8, VoltType.TIMESTAMP));
 
 
         subtestExtract(client, "EXTRACT_TIMESTAMP");
@@ -1605,7 +1634,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         return cr;
     }
 
-    private FunctionTestCase[] displayFunctionRun(Client client, String fname, int rowCount, String expectedFormat) throws Exception {
+    private FunctionTestCase[] displayFunctionRun(
+            Client client, String fname, int rowCount, String expectedFormat) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -1653,14 +1683,11 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                 for (int kk = 1; kk < result.getColumnCount(); ++kk) {
                     if (result.getColumnType(kk) == VoltType.FLOAT) {
                         System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getDouble(kk));
-                    }
-                    else if (result.getColumnType(kk) == VoltType.DECIMAL) {
+                    } else if (result.getColumnType(kk) == VoltType.DECIMAL) {
                         System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getDecimalAsBigDecimal(kk));
-                    }
-                    else if (result.getColumnType(kk) == VoltType.STRING) {
+                    } else if (result.getColumnType(kk) == VoltType.STRING) {
                         System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getString(kk));
-                    }
-                    else {
+                    } else {
                         System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getLong(kk));
                     }
                 }
@@ -1963,10 +1990,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 
         if (!isHSQL()) {
             // Also verify that trig functions that produce non-finites throw an exception
-            String[] stmts = {
-                    "select cot(0.0) from number_types",
-                    "select csc(0.0) from number_types"
-            };
+            String[] stmts = {"select cot(0.0) from number_types", "select csc(0.0) from number_types"};
 
             for (String stmt : stmts) {
                 verifyStmtFails(getClient(), stmt, "Invalid result value");
@@ -2025,9 +2049,12 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         // Adhoc Queries
         Client client = getClient();
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (5, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (5, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
 
         // valid adhoc SQL query
         String sql = "select * from P1 where ID > LOG(1)";
@@ -2079,9 +2106,12 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         // Adhoc Queries
         Client client = getClient();
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (510, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (210, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (410, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (510, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (210, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO P1 VALUES (410, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
 
         // valid adhoc SQL query
         String sql = "select * from P1 where ID > LOG10(1)";
@@ -2350,10 +2380,12 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        // TODO ENG-15490 enable null & ? as UDF param
-//        result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
-//        assertTrue(result.advanceRow());
-//        assertEquals(null, result.getString(0));
+        if (! USING_CALCITE) {  // TODO ENG-15490 enable null & ? as UDF param
+            result = client.callProcedure("@AdHoc",
+                    "select trim(LEADING null from desc) from P1").getResults()[0];
+            assertTrue(result.advanceRow());
+            assertNull(result.getString(0));
+        }
 
         cr = client.callProcedure("TRIM_SPACE", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2545,14 +2577,10 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         if (!isHSQL()) {
             String expectedError = "VOLTDB ERROR: SQL ERROR\\s*+The result of the REPEAT function is larger than the maximum size allowed "
                     + "for strings \\(1048576 bytes\\)\\. Reduce either the string size or repetition count\\.";
-            verifyProcFails(client,
-                    expectedError,
-                    "REPEAT", 10000000, 1);
+            verifyProcFails(client, expectedError, "REPEAT", 10000000, 1);
             // The multiply needed to do the size check for this call to REPEAT will
             // overflow a 64-bit signed int.  This was ticket ENG-11559.
-            verifyProcFails(client,
-                    expectedError,
-                    "REPEAT", 4611686018427387903L, 1);
+            verifyProcFails(client, expectedError, "REPEAT", 4611686018427387903L, 1);
         }
 
         // Make sure that repeat of an empty string doesn't take a long time
@@ -2585,7 +2613,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             // NULL means empty string for Hsql
             assertEquals("f", result.getString(1));
         } else {
-            assertEquals(null, result.getString(1));
+            assertNull(result.getString(1));
         }
 
         result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
@@ -2594,7 +2622,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             // NULL means not change for the original string for Hsql
             assertEquals("foo", result.getString(1));
         } else {
-            assertEquals(null, result.getString(1));
+            assertNull(result.getString(1));
         }
 
         result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
@@ -2796,7 +2824,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
     private void bitwiseFunctionChecker(long pk, long bignum, long in) throws IOException, ProcCallException {
         VoltTable vt;
         Client client = getClient();
-        client.callProcedure("@AdHoc", String.format("insert into NUMBER_TYPES(INTEGERNUM, bignum) values(%d,%d);", pk, bignum));
+        client.callProcedure("@AdHoc",
+                String.format("insert into NUMBER_TYPES(INTEGERNUM, bignum) values(%d,%d);", pk, bignum));
 
         vt = client.callProcedure("BITWISE_AND_OR_XOR", in, in, in, pk).getResults()[0];
         validateBitwiseAndOrXor(vt, bignum, in);
@@ -2837,8 +2866,10 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         }
 
         // test bitwise function index usage
-        client.callProcedure("@AdHoc", String.format("INSERT INTO NUMBER_TYPES(INTEGERNUM, BIGNUM) VALUES(%d,%d);", 19, 6));
-        client.callProcedure("@AdHoc", String.format("INSERT INTO NUMBER_TYPES(INTEGERNUM, BIGNUM) VALUES(%d,%d);", 20, 14));
+        client.callProcedure("@AdHoc",
+                String.format("INSERT INTO NUMBER_TYPES(INTEGERNUM, BIGNUM) VALUES(%d,%d);", 19, 6));
+        client.callProcedure("@AdHoc",
+                String.format("INSERT INTO NUMBER_TYPES(INTEGERNUM, BIGNUM) VALUES(%d,%d);", 20, 14));
 
         sql = "select bignum from NUMBER_TYPES where bignum > -100 and bignum < 100 and bitand(bignum,3) = 2 order by bignum;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -2857,7 +2888,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         bitwiseFunctionChecker(22, Long.MIN_VALUE, Long.MAX_VALUE);
 
         // try the out of range exception
-        client.callProcedure("@AdHoc", "insert into NUMBER_TYPES(INTEGERNUM, bignum) values(50, ?);", Long.MIN_VALUE + 1);
+        client.callProcedure("@AdHoc",
+                "insert into NUMBER_TYPES(INTEGERNUM, bignum) values(50, ?);", Long.MIN_VALUE + 1);
         verifyStmtFails(client, "select BITAND(bignum, -2) from NUMBER_TYPES where INTEGERNUM = 50;",
                 "would produce INT64_MIN, which is reserved for SQL NULL values");
 
@@ -2890,8 +2922,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
          */
-        ClientResponse cr = null;
-        VoltTable vt = null;
+        ClientResponse cr;
+        VoltTable vt;
 
         cr = client.callProcedure("@AdHoc","INSERT INTO P1 (ID) VALUES(1)");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2934,340 +2966,597 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         // RuntimeException seems to stem from parser failure similar to ENG-2901
         // project.addStmtProcedure("ABS_OF_AGG", "select ABS(MIN(ID+9)) from P1");
 
-        project.addStmtProcedure("DISPLAY_CEILING", "select CEILING(INTEGERNUM), CEILING(TINYNUM), CEILING(SMALLNUM), CEILING(BIGNUM), CEILING(FLOATNUM), CEILING(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_CEILING",
+                "select CEILING(INTEGERNUM), CEILING(TINYNUM), CEILING(SMALLNUM), CEILING(BIGNUM), CEILING(FLOATNUM), CEILING(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("BITWISE_AND_OR_XOR",  "select bitand(bignum, ?), bitor(bignum, ?), bitxor(bignum, ?) from NUMBER_TYPES WHERE INTEGERNUM = ?");
+        project.addStmtProcedure("BITWISE_AND_OR_XOR",
+                "select bitand(bignum, ?), bitor(bignum, ?), bitxor(bignum, ?) from NUMBER_TYPES WHERE INTEGERNUM = ?");
 
-        project.addStmtProcedure("ORDER_CEILING_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(INTEGERNUM), INTEGERNUM");
-        project.addStmtProcedure("ORDER_CEILING_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(TINYNUM), TINYNUM");
-        project.addStmtProcedure("ORDER_CEILING_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CEILING(SMALLNUM), SMALLNUM");
-        project.addStmtProcedure("ORDER_CEILING_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CEILING(BIGNUM), BIGNUM");
-        project.addStmtProcedure("ORDER_CEILING_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CEILING(FLOATNUM), FLOATNUM");
-        project.addStmtProcedure("ORDER_CEILING_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(DECIMALNUM), DECIMALNUM");
+        project.addStmtProcedure("ORDER_CEILING_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(INTEGERNUM), INTEGERNUM");
+        project.addStmtProcedure("ORDER_CEILING_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(TINYNUM), TINYNUM");
+        project.addStmtProcedure("ORDER_CEILING_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(SMALLNUM), SMALLNUM");
+        project.addStmtProcedure("ORDER_CEILING_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(BIGNUM), BIGNUM");
+        project.addStmtProcedure("ORDER_CEILING_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(FLOATNUM), FLOATNUM");
+        project.addStmtProcedure("ORDER_CEILING_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CEILING(DECIMALNUM), DECIMALNUM");
 
-        project.addStmtProcedure("WHERE_CEILING_INTEGER",  "select count(*) from NUMBER_TYPES where CEILING(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_TINYINT",  "select count(*) from NUMBER_TYPES where CEILING(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_SMALLINT", "select count(*) from NUMBER_TYPES where CEILING(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_BIGINT",   "select count(*) from NUMBER_TYPES where CEILING(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_FLOAT",    "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_DECIMAL",  "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_INTEGER",
+                "select count(*) from NUMBER_TYPES where CEILING(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_TINYINT",
+                "select count(*) from NUMBER_TYPES where CEILING(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CEILING(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_BIGINT",
+                "select count(*) from NUMBER_TYPES where CEILING(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_FLOAT",
+                "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_DEGREES", "select DEGREES(INTEGERNUM), DEGREES(TINYNUM), DEGREES(SMALLNUM), DEGREES(BIGNUM), DEGREES(FLOATNUM), DEGREES(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_DEGREES",
+                "select DEGREES(INTEGERNUM), DEGREES(TINYNUM), DEGREES(SMALLNUM), DEGREES(BIGNUM), DEGREES(FLOATNUM), DEGREES(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_DEGREES_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_DEGREES_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(TINYNUM)");
-        project.addStmtProcedure("ORDER_DEGREES_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by DEGREES(SMALLNUM)");
-        project.addStmtProcedure("ORDER_DEGREES_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by DEGREES(BIGNUM)");
-        project.addStmtProcedure("ORDER_DEGREES_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by DEGREES(FLOATNUM)");
-        project.addStmtProcedure("ORDER_DEGREES_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(TINYNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(SMALLNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(BIGNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(FLOATNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by DEGREES(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_DEGREES_INTEGER",  "select count(*) from NUMBER_TYPES where DEGREES(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_DEGREES_TINYINT",  "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_DEGREES_SMALLINT", "select count(*) from NUMBER_TYPES where DEGREES(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_DEGREES_BIGINT",   "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_DEGREES_FLOAT",    "select count(*) from NUMBER_TYPES where DEGREES(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_DEGREES_DECIMAL",  "select count(*) from NUMBER_TYPES where DEGREES(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_INTEGER",
+                "select count(*) from NUMBER_TYPES where DEGREES(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_TINYINT",
+                "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_SMALLINT",
+                "select count(*) from NUMBER_TYPES where DEGREES(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_BIGINT",
+                "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_FLOAT",
+                "select count(*) from NUMBER_TYPES where DEGREES(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_DECIMAL",
+                "select count(*) from NUMBER_TYPES where DEGREES(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_EXP", "select EXP(INTEGERNUM), EXP(TINYNUM), EXP(SMALLNUM), EXP(BIGNUM), EXP(FLOATNUM), EXP(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_EXP",
+                "select EXP(INTEGERNUM), EXP(TINYNUM), EXP(SMALLNUM), EXP(BIGNUM), EXP(FLOATNUM), EXP(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_EXP_INTEGER",  "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_EXP_TINYINT",  "select INTEGERNUM, EXP(TINYNUM) from NUMBER_TYPES order by EXP(TINYNUM)");
-        project.addStmtProcedure("ORDER_EXP_SMALLINT", "select INTEGERNUM, EXP(SMALLNUM) from NUMBER_TYPES order by EXP(SMALLNUM)");
-        project.addStmtProcedure("ORDER_EXP_BIGINT",   "select INTEGERNUM, EXP(BIGNUM) from NUMBER_TYPES order by EXP(BIGNUM)");
-        project.addStmtProcedure("ORDER_EXP_FLOAT",    "select INTEGERNUM, EXP(FLOATNUM) from NUMBER_TYPES order by EXP(FLOATNUM)");
-        project.addStmtProcedure("ORDER_EXP_DECIMAL",  "select INTEGERNUM, EXP(DECIMALNUM) from NUMBER_TYPES order by EXP(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_EXP_INTEGER",
+                "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_EXP_TINYINT",
+                "select INTEGERNUM, EXP(TINYNUM) from NUMBER_TYPES order by EXP(TINYNUM)");
+        project.addStmtProcedure("ORDER_EXP_SMALLINT",
+                "select INTEGERNUM, EXP(SMALLNUM) from NUMBER_TYPES order by EXP(SMALLNUM)");
+        project.addStmtProcedure("ORDER_EXP_BIGINT",
+                "select INTEGERNUM, EXP(BIGNUM) from NUMBER_TYPES order by EXP(BIGNUM)");
+        project.addStmtProcedure("ORDER_EXP_FLOAT",
+                "select INTEGERNUM, EXP(FLOATNUM) from NUMBER_TYPES order by EXP(FLOATNUM)");
+        project.addStmtProcedure("ORDER_EXP_DECIMAL",
+                "select INTEGERNUM, EXP(DECIMALNUM) from NUMBER_TYPES order by EXP(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_EXP_INTEGER",  "select count(*) from NUMBER_TYPES where EXP(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_TINYINT",  "select count(*) from NUMBER_TYPES where EXP(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_SMALLINT", "select count(*) from NUMBER_TYPES where EXP(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_BIGINT",   "select count(*) from NUMBER_TYPES where EXP(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_FLOAT",    "select count(*) from NUMBER_TYPES where EXP(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_DECIMAL",  "select count(*) from NUMBER_TYPES where EXP(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_INTEGER",
+                "select count(*) from NUMBER_TYPES where EXP(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_TINYINT",
+                "select count(*) from NUMBER_TYPES where EXP(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_SMALLINT",
+                "select count(*) from NUMBER_TYPES where EXP(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_BIGINT",
+                "select count(*) from NUMBER_TYPES where EXP(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_FLOAT",
+                "select count(*) from NUMBER_TYPES where EXP(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_DECIMAL",
+                "select count(*) from NUMBER_TYPES where EXP(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_FLOOR", "select FLOOR(INTEGERNUM), FLOOR(TINYNUM), FLOOR(SMALLNUM), FLOOR(BIGNUM), FLOOR(FLOATNUM), FLOOR(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_FLOOR",
+                "select FLOOR(INTEGERNUM), FLOOR(TINYNUM), FLOOR(SMALLNUM), FLOOR(BIGNUM), FLOOR(FLOATNUM), FLOOR(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_FLOOR_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(INTEGERNUM), INTEGERNUM");
-        project.addStmtProcedure("ORDER_FLOOR_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(TINYNUM), TINYNUM");
-        project.addStmtProcedure("ORDER_FLOOR_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by FLOOR(SMALLNUM), SMALLNUM");
-        project.addStmtProcedure("ORDER_FLOOR_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by FLOOR(BIGNUM), BIGNUM");
-        project.addStmtProcedure("ORDER_FLOOR_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by FLOOR(FLOATNUM), FLOATNUM");
-        project.addStmtProcedure("ORDER_FLOOR_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(DECIMALNUM), DECIMALNUM");
+        project.addStmtProcedure("ORDER_FLOOR_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(INTEGERNUM), INTEGERNUM");
+        project.addStmtProcedure("ORDER_FLOOR_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(TINYNUM), TINYNUM");
+        project.addStmtProcedure("ORDER_FLOOR_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(SMALLNUM), SMALLNUM");
+        project.addStmtProcedure("ORDER_FLOOR_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(BIGNUM), BIGNUM");
+        project.addStmtProcedure("ORDER_FLOOR_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(FLOATNUM), FLOATNUM");
+        project.addStmtProcedure("ORDER_FLOOR_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by FLOOR(DECIMALNUM), DECIMALNUM");
 
-        project.addStmtProcedure("WHERE_FLOOR_INTEGER",  "select count(*) from NUMBER_TYPES where FLOOR(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_TINYINT",  "select count(*) from NUMBER_TYPES where FLOOR(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_SMALLINT", "select count(*) from NUMBER_TYPES where FLOOR(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_BIGINT",   "select count(*) from NUMBER_TYPES where FLOOR(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_FLOAT",    "select count(*) from NUMBER_TYPES where FLOOR(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_DECIMAL",  "select count(*) from NUMBER_TYPES where FLOOR(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_INTEGER",
+                "select count(*) from NUMBER_TYPES where FLOOR(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_TINYINT",
+                "select count(*) from NUMBER_TYPES where FLOOR(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_SMALLINT",
+                "select count(*) from NUMBER_TYPES where FLOOR(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_BIGINT",
+                "select count(*) from NUMBER_TYPES where FLOOR(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_FLOAT",
+                "select count(*) from NUMBER_TYPES where FLOOR(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_DECIMAL",
+                "select count(*) from NUMBER_TYPES where FLOOR(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_POWER7X", "select POWER(7, INTEGERNUM), POWER(7, TINYNUM), POWER(7, SMALLNUM), POWER(7, BIGNUM), POWER(7, FLOATNUM), POWER(7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_POWER7X",
+                "select POWER(7, INTEGERNUM), POWER(7, TINYNUM), POWER(7, SMALLNUM), POWER(7, BIGNUM), POWER(7, FLOATNUM), POWER(7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWER7X_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, INTEGERNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, TINYNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(7, SMALLNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(7, BIGNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(7, FLOATNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, DECIMALNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, INTEGERNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, TINYNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, SMALLNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, BIGNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, FLOATNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(7, DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_POWER7X_INTEGER",  "select count(*) from NUMBER_TYPES where POWER(7, INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_TINYINT",  "select count(*) from NUMBER_TYPES where POWER(7, TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_SMALLINT", "select count(*) from NUMBER_TYPES where POWER(7, SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_BIGINT",   "select count(*) from NUMBER_TYPES where POWER(7, BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_FLOAT",    "select count(*) from NUMBER_TYPES where POWER(7, FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_DECIMAL",  "select count(*) from NUMBER_TYPES where POWER(7, DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_INTEGER",
+                "select count(*) from NUMBER_TYPES where POWER(7, INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_TINYINT",
+                "select count(*) from NUMBER_TYPES where POWER(7, TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_SMALLINT",
+                "select count(*) from NUMBER_TYPES where POWER(7, SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_BIGINT",
+                "select count(*) from NUMBER_TYPES where POWER(7, BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_FLOAT",
+                "select count(*) from NUMBER_TYPES where POWER(7, FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_DECIMAL",
+                "select count(*) from NUMBER_TYPES where POWER(7, DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_POWER07X", "select POWER(0.7, INTEGERNUM), POWER(0.7, TINYNUM), POWER(0.7, SMALLNUM), POWER(0.7, BIGNUM), POWER(0.7, FLOATNUM), POWER(0.7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_POWER07X",
+                "select POWER(0.7, INTEGERNUM), POWER(0.7, TINYNUM), POWER(0.7, SMALLNUM), POWER(0.7, BIGNUM), POWER(0.7, FLOATNUM), POWER(0.7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWER07X_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, INTEGERNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, TINYNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, SMALLNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, BIGNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, FLOATNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, DECIMALNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, INTEGERNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, TINYNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, SMALLNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, BIGNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, FLOATNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_POWER07X_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, TINYNUM)   ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, SMALLNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, BIGNUM)    ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, FLOATNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_INTEGER",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_TINYINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, TINYNUM)   ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_SMALLINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, SMALLNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_BIGINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, BIGNUM)    ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_FLOAT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, FLOATNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_DECIMAL",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
-        project.addStmtProcedure("DISPLAY_POWERX7", "select POWER(INTEGERNUM, 7), POWER(TINYNUM, 7), POWER(SMALLNUM, 7), POWER(BIGNUM, 7), POWER(FLOATNUM, 7), POWER(DECIMALNUM, 7) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_POWERX7",
+                "select POWER(INTEGERNUM, 7), POWER(TINYNUM, 7), POWER(SMALLNUM, 7), POWER(BIGNUM, 7), POWER(FLOATNUM, 7), POWER(DECIMALNUM, 7) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWERX7_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 7)");
-        project.addStmtProcedure("ORDER_POWERX7_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    7)");
-        project.addStmtProcedure("ORDER_POWERX7_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   7)");
-        project.addStmtProcedure("ORDER_POWERX7_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     7)");
-        project.addStmtProcedure("ORDER_POWERX7_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   7)");
-        project.addStmtProcedure("ORDER_POWERX7_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 7)");
+        project.addStmtProcedure("ORDER_POWERX7_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 7)");
+        project.addStmtProcedure("ORDER_POWERX7_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    7)");
+        project.addStmtProcedure("ORDER_POWERX7_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   7)");
+        project.addStmtProcedure("ORDER_POWERX7_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     7)");
+        project.addStmtProcedure("ORDER_POWERX7_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   7)");
+        project.addStmtProcedure("ORDER_POWERX7_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 7)");
 
-        project.addStmtProcedure("WHERE_POWERX7_INTEGER",  "select count(*) from NUMBER_TYPES where POWER(INTEGERNUM, 7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_TINYINT",  "select count(*) from NUMBER_TYPES where POWER(TINYNUM,    7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_SMALLINT", "select count(*) from NUMBER_TYPES where POWER(SMALLNUM,   7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_BIGINT",   "select count(*) from NUMBER_TYPES where POWER(BIGNUM,     7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_FLOAT",    "select count(*) from NUMBER_TYPES where POWER(FLOATNUM,   7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_DECIMAL",  "select count(*) from NUMBER_TYPES where POWER(DECIMALNUM, 7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_INTEGER",
+                "select count(*) from NUMBER_TYPES where POWER(INTEGERNUM, 7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_TINYINT",
+                "select count(*) from NUMBER_TYPES where POWER(TINYNUM,    7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_SMALLINT",
+                "select count(*) from NUMBER_TYPES where POWER(SMALLNUM,   7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_BIGINT",
+                "select count(*) from NUMBER_TYPES where POWER(BIGNUM,     7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_FLOAT",
+                "select count(*) from NUMBER_TYPES where POWER(FLOATNUM,   7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_DECIMAL",
+                "select count(*) from NUMBER_TYPES where POWER(DECIMALNUM, 7) = ?");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.
-        project.addStmtProcedure("DISPLAY_POWERX07", "select POWER(INTEGERNUM, 0.7), POWER(TINYNUM, 0.7), POWER(SMALLNUM, 0.7), POWER(BIGNUM, 0.7), POWER(FLOATNUM, 0.7), POWER(DECIMALNUM, 0.7) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_POWERX07",
+                "select POWER(INTEGERNUM, 0.7), POWER(TINYNUM, 0.7), POWER(SMALLNUM, 0.7), POWER(BIGNUM, 0.7), POWER(FLOATNUM, 0.7), POWER(DECIMALNUM, 0.7) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWERX07_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 0.7)");
 
-        project.addStmtProcedure("WHERE_POWERX07_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(INTEGERNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(TINYNUM,    0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(SMALLNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_INTEGER",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(INTEGERNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_TINYINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(TINYNUM,    0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_SMALLINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(SMALLNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_BIGINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_FLOAT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_DECIMAL",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
-        project.addStmtProcedure("DISPLAY_RADIANS", "select RADIANS(INTEGERNUM), RADIANS(TINYNUM), RADIANS(SMALLNUM), RADIANS(BIGNUM), RADIANS(FLOATNUM), RADIANS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_RADIANS",
+                "select RADIANS(INTEGERNUM), RADIANS(TINYNUM), RADIANS(SMALLNUM), RADIANS(BIGNUM), RADIANS(FLOATNUM), RADIANS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_RADIANS_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_RADIANS_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(TINYNUM)");
-        project.addStmtProcedure("ORDER_RADIANS_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by RADIANS(SMALLNUM)");
-        project.addStmtProcedure("ORDER_RADIANS_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by RADIANS(BIGNUM)");
-        project.addStmtProcedure("ORDER_RADIANS_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by RADIANS(FLOATNUM)");
-        project.addStmtProcedure("ORDER_RADIANS_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(TINYNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(SMALLNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(BIGNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(FLOATNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by RADIANS(DECIMALNUM)");
         // These WHERE tests fails without the range in values so changed it like below.
-        project.addStmtProcedure("WHERE_RADIANS_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_RADIANS_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(TINYNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_RADIANS_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(SMALLNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_RADIANS_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(BIGNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_RADIANS_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(FLOATNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_INTEGER",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_TINYINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(TINYNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_SMALLINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(SMALLNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_BIGINT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(BIGNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_FLOAT",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(FLOATNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",
+                "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.
-        project.addStmtProcedure("DISPLAY_SQRT", "select SQRT(INTEGERNUM), SQRT(TINYNUM), SQRT(SMALLNUM), SQRT(BIGNUM), SQRT(FLOATNUM), SQRT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_SQRT",
+                "select SQRT(INTEGERNUM), SQRT(TINYNUM), SQRT(SMALLNUM), SQRT(BIGNUM), SQRT(FLOATNUM), SQRT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_SQRT_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_SQRT_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(TINYNUM)");
-        project.addStmtProcedure("ORDER_SQRT_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by SQRT(SMALLNUM)");
-        project.addStmtProcedure("ORDER_SQRT_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by SQRT(BIGNUM)");
-        project.addStmtProcedure("ORDER_SQRT_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by SQRT(FLOATNUM)");
-        project.addStmtProcedure("ORDER_SQRT_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_SQRT_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_SQRT_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(TINYNUM)");
+        project.addStmtProcedure("ORDER_SQRT_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(SMALLNUM)");
+        project.addStmtProcedure("ORDER_SQRT_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(BIGNUM)");
+        project.addStmtProcedure("ORDER_SQRT_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(FLOATNUM)");
+        project.addStmtProcedure("ORDER_SQRT_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by SQRT(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_SQRT_INTEGER",  "select count(*) from NUMBER_TYPES where SQRT(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_TINYINT",  "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_SMALLINT", "select count(*) from NUMBER_TYPES where SQRT(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_BIGINT",   "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_FLOAT",    "select count(*) from NUMBER_TYPES where SQRT(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_DECIMAL",  "select count(*) from NUMBER_TYPES where SQRT(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_INTEGER",
+                "select count(*) from NUMBER_TYPES where SQRT(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_TINYINT",
+                "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_SMALLINT",
+                "select count(*) from NUMBER_TYPES where SQRT(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_BIGINT",
+                "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_FLOAT",
+                "select count(*) from NUMBER_TYPES where SQRT(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_DECIMAL",
+                "select count(*) from NUMBER_TYPES where SQRT(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("DISPLAY_SIN", "select SIN(INTEGERNUM), SIN(TINYNUM), SIN(SMALLNUM), SIN(BIGNUM), SIN(FLOATNUM), SIN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("DISPLAY_COS", "select COS(INTEGERNUM), COS(TINYNUM), COS(SMALLNUM), COS(BIGNUM), COS(FLOATNUM), COS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("DISPLAY_TAN", "select TAN(INTEGERNUM), TAN(TINYNUM), TAN(SMALLNUM), TAN(BIGNUM), TAN(FLOATNUM), TAN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("DISPLAY_COT", "select COT(INTEGERNUM), COT(TINYNUM), COT(SMALLNUM), COT(BIGNUM), COT(FLOATNUM), COT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("DISPLAY_SEC", "select SEC(INTEGERNUM), SEC(TINYNUM), SEC(SMALLNUM), SEC(BIGNUM), SEC(FLOATNUM), SEC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("DISPLAY_CSC", "select CSC(INTEGERNUM), CSC(TINYNUM), CSC(SMALLNUM), CSC(BIGNUM), CSC(FLOATNUM), CSC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_SIN",
+                "select SIN(INTEGERNUM), SIN(TINYNUM), SIN(SMALLNUM), SIN(BIGNUM), SIN(FLOATNUM), SIN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_COS",
+                "select COS(INTEGERNUM), COS(TINYNUM), COS(SMALLNUM), COS(BIGNUM), COS(FLOATNUM), COS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_TAN",
+                "select TAN(INTEGERNUM), TAN(TINYNUM), TAN(SMALLNUM), TAN(BIGNUM), TAN(FLOATNUM), TAN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_COT",
+                "select COT(INTEGERNUM), COT(TINYNUM), COT(SMALLNUM), COT(BIGNUM), COT(FLOATNUM), COT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_SEC",
+                "select SEC(INTEGERNUM), SEC(TINYNUM), SEC(SMALLNUM), SEC(BIGNUM), SEC(FLOATNUM), SEC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_CSC",
+                "select CSC(INTEGERNUM), CSC(TINYNUM), CSC(SMALLNUM), CSC(BIGNUM), CSC(FLOATNUM), CSC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("DISPLAY_LN", "select LN(INTEGERNUM), LN(TINYNUM), LN(SMALLNUM), LN(BIGNUM), LN(FLOATNUM), LN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_LN",
+                "select LN(INTEGERNUM), LN(TINYNUM), LN(SMALLNUM), LN(BIGNUM), LN(FLOATNUM), LN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_LN_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by LN(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_LN_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by LN(TINYNUM)");
-        project.addStmtProcedure("ORDER_LN_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by LN(SMALLNUM)");
-        project.addStmtProcedure("ORDER_LN_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by LN(BIGNUM)");
-        project.addStmtProcedure("ORDER_LN_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by LN(FLOATNUM)");
-        project.addStmtProcedure("ORDER_LN_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by LN(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_LN_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_LN_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(TINYNUM)");
+        project.addStmtProcedure("ORDER_LN_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(SMALLNUM)");
+        project.addStmtProcedure("ORDER_LN_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(BIGNUM)");
+        project.addStmtProcedure("ORDER_LN_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(FLOATNUM)");
+        project.addStmtProcedure("ORDER_LN_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by LN(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_LN_INTEGER",  "select count(*) from NUMBER_TYPES where LN(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_LN_TINYINT",  "select count(*) from NUMBER_TYPES where LN(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LN_SMALLINT", "select count(*) from NUMBER_TYPES where LN(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_LN_BIGINT",   "select count(*) from NUMBER_TYPES where LN(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LN_FLOAT",    "select count(*) from NUMBER_TYPES where LN(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_LN_DECIMAL",  "select count(*) from NUMBER_TYPES where LN(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_INTEGER",
+                "select count(*) from NUMBER_TYPES where LN(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_TINYINT",
+                "select count(*) from NUMBER_TYPES where LN(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_SMALLINT",
+                "select count(*) from NUMBER_TYPES where LN(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_BIGINT",
+                "select count(*) from NUMBER_TYPES where LN(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_FLOAT",
+                "select count(*) from NUMBER_TYPES where LN(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_LN_DECIMAL",
+                "select count(*) from NUMBER_TYPES where LN(DECIMALNUM) = ?");
 
+        project.addStmtProcedure("DISPLAY_LOG",
+                "select LOG(INTEGERNUM), LOG(TINYNUM), LOG(SMALLNUM), LOG(BIGNUM), LOG(FLOATNUM), LOG(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("DISPLAY_LOG", "select LOG(INTEGERNUM), LOG(TINYNUM), LOG(SMALLNUM), LOG(BIGNUM), LOG(FLOATNUM), LOG(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("ORDER_LOG_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_LOG_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(TINYNUM)");
+        project.addStmtProcedure("ORDER_LOG_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(SMALLNUM)");
+        project.addStmtProcedure("ORDER_LOG_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(BIGNUM)");
+        project.addStmtProcedure("ORDER_LOG_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(FLOATNUM)");
+        project.addStmtProcedure("ORDER_LOG_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG(DECIMALNUM)");
 
-        project.addStmtProcedure("ORDER_LOG_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by LOG(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_LOG_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by LOG(TINYNUM)");
-        project.addStmtProcedure("ORDER_LOG_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by LOG(SMALLNUM)");
-        project.addStmtProcedure("ORDER_LOG_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by LOG(BIGNUM)");
-        project.addStmtProcedure("ORDER_LOG_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by LOG(FLOATNUM)");
-        project.addStmtProcedure("ORDER_LOG_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by LOG(DECIMALNUM)");
+        project.addStmtProcedure("WHERE_LOG_INTEGER",
+                "select count(*) from NUMBER_TYPES where LOG(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG_TINYINT",
+                "select count(*) from NUMBER_TYPES where LOG(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG_SMALLINT",
+                "select count(*) from NUMBER_TYPES where LOG(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG_BIGINT",
+                "select count(*) from NUMBER_TYPES where LOG(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG_FLOAT",
+                "select count(*) from NUMBER_TYPES where LOG(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG_DECIMAL",
+                "select count(*) from NUMBER_TYPES where LOG(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("WHERE_LOG_INTEGER",  "select count(*) from NUMBER_TYPES where LOG(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG_TINYINT",  "select count(*) from NUMBER_TYPES where LOG(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG_SMALLINT", "select count(*) from NUMBER_TYPES where LOG(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG_BIGINT",   "select count(*) from NUMBER_TYPES where LOG(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG_FLOAT",    "select count(*) from NUMBER_TYPES where LOG(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG_DECIMAL",  "select count(*) from NUMBER_TYPES where LOG(DECIMALNUM) = ?");
+        project.addStmtProcedure("DISPLAY_LOG10",
+                "select LOG10(INTEGERNUM), LOG10(TINYNUM), LOG10(SMALLNUM), LOG10(BIGNUM), LOG10(FLOATNUM), LOG10(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("ORDER_LOG10_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_LOG10_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(TINYNUM)");
+        project.addStmtProcedure("ORDER_LOG10_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(SMALLNUM)");
+        project.addStmtProcedure("ORDER_LOG10_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(BIGNUM)");
+        project.addStmtProcedure("ORDER_LOG10_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(FLOATNUM)");
+        project.addStmtProcedure("ORDER_LOG10_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by LOG10(DECIMALNUM)");
 
-        project.addStmtProcedure("DISPLAY_LOG10", "select LOG10(INTEGERNUM), LOG10(TINYNUM), LOG10(SMALLNUM), LOG10(BIGNUM), LOG10(FLOATNUM), LOG10(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
-        project.addStmtProcedure("ORDER_LOG10_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_LOG10_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(TINYNUM)");
-        project.addStmtProcedure("ORDER_LOG10_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by LOG10(SMALLNUM)");
-        project.addStmtProcedure("ORDER_LOG10_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by LOG10(BIGNUM)");
-        project.addStmtProcedure("ORDER_LOG10_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by LOG10(FLOATNUM)");
-        project.addStmtProcedure("ORDER_LOG10_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(DECIMALNUM)");
+        project.addStmtProcedure("WHERE_LOG10_INTEGER",
+                "select count(*) from NUMBER_TYPES where LOG10(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_TINYINT",
+                "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_SMALLINT",
+                "select count(*) from NUMBER_TYPES where LOG10(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_BIGINT",
+                "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_FLOAT",
+                "select count(*) from NUMBER_TYPES where LOG10(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_DECIMAL",
+                "select count(*) from NUMBER_TYPES where LOG10(DECIMALNUM) = ?");
 
-        project.addStmtProcedure("WHERE_LOG10_INTEGER",  "select count(*) from NUMBER_TYPES where LOG10(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG10_TINYINT",  "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG10_SMALLINT", "select count(*) from NUMBER_TYPES where LOG10(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG10_BIGINT",   "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG10_FLOAT",    "select count(*) from NUMBER_TYPES where LOG10(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_LOG10_DECIMAL",  "select count(*) from NUMBER_TYPES where LOG10(DECIMALNUM) = ?");
+        project.addStmtProcedure("DISPLAY_INTEGER",
+                "select CAST(INTEGERNUM AS INTEGER), CAST(TINYNUM AS INTEGER), CAST(SMALLNUM AS INTEGER), CAST(BIGNUM AS INTEGER), CAST(FLOATNUM AS INTEGER), CAST(DECIMALNUM AS INTEGER) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("DISPLAY_INTEGER", "select CAST(INTEGERNUM AS INTEGER), CAST(TINYNUM AS INTEGER), CAST(SMALLNUM AS INTEGER), CAST(BIGNUM AS INTEGER), CAST(FLOATNUM AS INTEGER), CAST(DECIMALNUM AS INTEGER) from NUMBER_TYPES order by INTEGERNUM");
-
-        project.addStmtProcedure("ORDER_INTEGER_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS INTEGER)");
-        project.addStmtProcedure("ORDER_INTEGER_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS INTEGER)");
-        project.addStmtProcedure("ORDER_INTEGER_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS INTEGER)");
-        project.addStmtProcedure("ORDER_INTEGER_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS INTEGER)");
         // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
-        project.addStmtProcedure("ORDER_INTEGER_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS INTEGER), INTEGERNUM");
-        project.addStmtProcedure("ORDER_INTEGER_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS INTEGER), INTEGERNUM");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS INTEGER), INTEGERNUM");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS INTEGER), INTEGERNUM");
 
-        project.addStmtProcedure("WHERE_INTEGER_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS INTEGER) = ?");
-        project.addStmtProcedure("WHERE_INTEGER_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS INTEGER) = ?");
-        project.addStmtProcedure("WHERE_INTEGER_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS INTEGER) = ?");
-        project.addStmtProcedure("WHERE_INTEGER_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS INTEGER) = ?");
-        project.addStmtProcedure("WHERE_INTEGER_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS INTEGER) = ?");
-        project.addStmtProcedure("WHERE_INTEGER_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS INTEGER) = ?");
 
-        project.addStmtProcedure("DISPLAY_TINYINT", "select CAST(INTEGERNUM AS TINYINT), CAST(TINYNUM AS TINYINT), CAST(SMALLNUM AS TINYINT), CAST(BIGNUM AS TINYINT), CAST(FLOATNUM AS TINYINT), CAST(DECIMALNUM AS TINYINT) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_TINYINT",
+                "select CAST(INTEGERNUM AS TINYINT), CAST(TINYNUM AS TINYINT), CAST(SMALLNUM AS TINYINT), CAST(BIGNUM AS TINYINT), CAST(FLOATNUM AS TINYINT), CAST(DECIMALNUM AS TINYINT) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_TINYINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS TINYINT)");
-        project.addStmtProcedure("ORDER_TINYINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS TINYINT)");
-        project.addStmtProcedure("ORDER_TINYINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS TINYINT)");
-        project.addStmtProcedure("ORDER_TINYINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS TINYINT)");
         // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
-        project.addStmtProcedure("ORDER_TINYINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS TINYINT), INTEGERNUM");
-        project.addStmtProcedure("ORDER_TINYINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS TINYINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS TINYINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS TINYINT), INTEGERNUM");
 
-        project.addStmtProcedure("WHERE_TINYINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS TINYINT) = ?");
-        project.addStmtProcedure("WHERE_TINYINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS TINYINT) = ?");
-        project.addStmtProcedure("WHERE_TINYINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS TINYINT) = ?");
-        project.addStmtProcedure("WHERE_TINYINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS TINYINT) = ?");
-        project.addStmtProcedure("WHERE_TINYINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS TINYINT) = ?");
-        project.addStmtProcedure("WHERE_TINYINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS TINYINT) = ?");
 
-        project.addStmtProcedure("DISPLAY_SMALLINT", "select CAST(INTEGERNUM AS SMALLINT), CAST(TINYNUM AS SMALLINT), CAST(SMALLNUM AS SMALLINT), CAST(BIGNUM AS SMALLINT), CAST(FLOATNUM AS SMALLINT), CAST(DECIMALNUM AS SMALLINT) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_SMALLINT",
+                "select CAST(INTEGERNUM AS SMALLINT), CAST(TINYNUM AS SMALLINT), CAST(SMALLNUM AS SMALLINT), CAST(BIGNUM AS SMALLINT), CAST(FLOATNUM AS SMALLINT), CAST(DECIMALNUM AS SMALLINT) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS SMALLINT)");
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS SMALLINT)");
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS SMALLINT)");
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS SMALLINT)");
         // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS SMALLINT), INTEGERNUM");
-        project.addStmtProcedure("ORDER_SMALLINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS SMALLINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS SMALLINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS SMALLINT), INTEGERNUM");
 
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS SMALLINT) = ?");
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS SMALLINT) = ?");
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS SMALLINT) = ?");
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS SMALLINT) = ?");
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS SMALLINT) = ?");
-        project.addStmtProcedure("WHERE_SMALLINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS SMALLINT) = ?");
 
-        project.addStmtProcedure("DISPLAY_BIGINT", "select CAST(INTEGERNUM AS BIGINT), CAST(TINYNUM AS BIGINT), CAST(SMALLNUM AS BIGINT), CAST(BIGNUM AS BIGINT), CAST(FLOATNUM AS BIGINT), CAST(DECIMALNUM AS BIGINT) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_BIGINT",
+                "select CAST(INTEGERNUM AS BIGINT), CAST(TINYNUM AS BIGINT), CAST(SMALLNUM AS BIGINT), CAST(BIGNUM AS BIGINT), CAST(FLOATNUM AS BIGINT), CAST(DECIMALNUM AS BIGINT) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_BIGINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS BIGINT)");
-        project.addStmtProcedure("ORDER_BIGINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS BIGINT)");
-        project.addStmtProcedure("ORDER_BIGINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS BIGINT)");
-        project.addStmtProcedure("ORDER_BIGINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS BIGINT)");
         // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
-        project.addStmtProcedure("ORDER_BIGINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS BIGINT), INTEGERNUM");
-        project.addStmtProcedure("ORDER_BIGINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS BIGINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS BIGINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS BIGINT), INTEGERNUM");
 
-        project.addStmtProcedure("WHERE_BIGINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS BIGINT) = ?");
-        project.addStmtProcedure("WHERE_BIGINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS BIGINT) = ?");
-        project.addStmtProcedure("WHERE_BIGINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS BIGINT) = ?");
-        project.addStmtProcedure("WHERE_BIGINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS BIGINT) = ?");
-        project.addStmtProcedure("WHERE_BIGINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS BIGINT) = ?");
-        project.addStmtProcedure("WHERE_BIGINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS BIGINT) = ?");
 
-        project.addStmtProcedure("DISPLAY_FLOAT", "select CAST(INTEGERNUM AS FLOAT), CAST(TINYNUM AS FLOAT), CAST(SMALLNUM AS FLOAT), CAST(BIGNUM AS FLOAT), CAST(FLOATNUM AS FLOAT), CAST(DECIMALNUM AS FLOAT) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_FLOAT",
+                "select CAST(INTEGERNUM AS FLOAT), CAST(TINYNUM AS FLOAT), CAST(SMALLNUM AS FLOAT), CAST(BIGNUM AS FLOAT), CAST(FLOATNUM AS FLOAT), CAST(DECIMALNUM AS FLOAT) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_FLOAT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS FLOAT)");
-        project.addStmtProcedure("ORDER_FLOAT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS FLOAT)");
-        project.addStmtProcedure("ORDER_FLOAT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS FLOAT)");
-        project.addStmtProcedure("ORDER_FLOAT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS FLOAT)");
-        project.addStmtProcedure("ORDER_FLOAT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS FLOAT)");
-        project.addStmtProcedure("ORDER_FLOAT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS FLOAT)");
 
-        project.addStmtProcedure("WHERE_FLOAT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS FLOAT) = ?");
-        project.addStmtProcedure("WHERE_FLOAT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS FLOAT) = ?");
-        project.addStmtProcedure("WHERE_FLOAT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS FLOAT) = ?");
-        project.addStmtProcedure("WHERE_FLOAT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS FLOAT) = ?");
-        project.addStmtProcedure("WHERE_FLOAT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS FLOAT) = ?");
-        project.addStmtProcedure("WHERE_FLOAT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS FLOAT) = ?");
 
-        project.addStmtProcedure("DISPLAY_DECIMAL", "select CAST(INTEGERNUM AS DECIMAL), CAST(TINYNUM AS DECIMAL), CAST(SMALLNUM AS DECIMAL), CAST(BIGNUM AS DECIMAL), CAST(FLOATNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_DECIMAL",
+                "select CAST(INTEGERNUM AS DECIMAL), CAST(TINYNUM AS DECIMAL), CAST(SMALLNUM AS DECIMAL), CAST(BIGNUM AS DECIMAL), CAST(FLOATNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS DECIMAL)");
 
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS DECIMAL) = ?");
 
-        project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
-        project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
+        project.addStmtProcedure("DISPLAY_SUBSTRING",
+                "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
+        project.addStmtProcedure("DISPLAY_SUBSTRING2",
+                "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
 
-        project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
-                "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_MONTH FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), " +
-                "EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST), " +
-                "EXTRACT(WEEK FROM PAST), EXTRACT(WEEKDAY FROM PAST) from P1 where ID = ?");
+        project.addStmtProcedure("EXTRACT_TIMESTAMP",
+                "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                        "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_MONTH FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), " +
+                        "EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST), " +
+                        "EXTRACT(WEEK FROM PAST), EXTRACT(WEEKDAY FROM PAST) from P1 where ID = ?");
 
         // Test that commas work just like keyword separators
-        project.addStmtProcedure("ALT_EXTRACT_TIMESTAMP", "select EXTRACT(YEAR, PAST), EXTRACT(MONTH, PAST), EXTRACT(DAY, PAST), " +
-                "EXTRACT(DAY_OF_WEEK, PAST), EXTRACT(DAY_OF_MONTH, PAST), EXTRACT(DAY_OF_YEAR, PAST), EXTRACT(QUARTER, PAST), " +
-                "EXTRACT(HOUR, PAST), EXTRACT(MINUTE, PAST), EXTRACT(SECOND, PAST), EXTRACT(WEEK_OF_YEAR, PAST), " +
-                "EXTRACT(WEEK, PAST), EXTRACT(WEEKDAY, PAST) from P1 where ID = ?");
+        project.addStmtProcedure("ALT_EXTRACT_TIMESTAMP",
+                "select EXTRACT(YEAR, PAST), EXTRACT(MONTH, PAST), EXTRACT(DAY, PAST), " +
+                        "EXTRACT(DAY_OF_WEEK, PAST), EXTRACT(DAY_OF_MONTH, PAST), EXTRACT(DAY_OF_YEAR, PAST), EXTRACT(QUARTER, PAST), " +
+                        "EXTRACT(HOUR, PAST), EXTRACT(MINUTE, PAST), EXTRACT(SECOND, PAST), EXTRACT(WEEK_OF_YEAR, PAST), " +
+                        "EXTRACT(WEEK, PAST), EXTRACT(WEEKDAY, PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
@@ -3283,21 +3572,34 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 
 
 
-        project.addStmtProcedure("DISPLAY_VARCHAR", "select CAST(INTEGERNUM AS VARCHAR), CAST(TINYNUM AS VARCHAR), CAST(SMALLNUM AS VARCHAR), CAST(BIGNUM AS VARCHAR), CAST(FLOATNUM AS VARCHAR), CAST(DECIMALNUM AS VARCHAR) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_VARCHAR",
+                "select CAST(INTEGERNUM AS VARCHAR), CAST(TINYNUM AS VARCHAR), CAST(SMALLNUM AS VARCHAR), CAST(BIGNUM AS VARCHAR), CAST(FLOATNUM AS VARCHAR), CAST(DECIMALNUM AS VARCHAR) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS VARCHAR)");
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS VARCHAR)");
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS VARCHAR)");
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS VARCHAR)");
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS VARCHAR)");
-        project.addStmtProcedure("ORDER_VARCHAR_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_INTEGER",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_TINYINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_SMALLINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_BIGINT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_FLOAT",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_DECIMAL",
+                "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS VARCHAR)");
 
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS VARCHAR) = ?");
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS VARCHAR) = ?");
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS VARCHAR) = ?");
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS VARCHAR) = ?");
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS VARCHAR) = ?");
-        project.addStmtProcedure("WHERE_VARCHAR_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_INTEGER",
+                "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_TINYINT",
+                "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_SMALLINT",
+                "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_BIGINT",
+                "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_FLOAT",
+                "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_DECIMAL",
+                "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS VARCHAR) = ?");
 
         project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
 
@@ -3318,8 +3620,10 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                         "where not SUBSTRING (DESC, 2, 1) > '13'");
 
         // Test GROUP BY by support
-        project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
-        project.addStmtProcedure("AGG_OF_SUBSTRING2", "select MIN(SUBSTRING (DESC FROM 2 FOR 2)) from P1 where ID < -7");
+        project.addStmtProcedure("AGG_OF_SUBSTRING",
+                "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
+        project.addStmtProcedure("AGG_OF_SUBSTRING2",
+                "select MIN(SUBSTRING (DESC FROM 2 FOR 2)) from P1 where ID < -7");
 
         // Test parameterizing functions
         // next one disabled until ENG-3486
@@ -3347,7 +3651,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
         // Test that commas work just like keyword separators
         project.addStmtProcedure("ALT_OVERLAY", "select id, OVERLAY(DESC, ?, ?, ?) from P1 where id = ?");
-        project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY_FULL_LENGTH",
+                "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
         // Test that commas work just like keyword separators
         project.addStmtProcedure("ALT_OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC, ?, ?) from P1 where id = ?");
 
@@ -3356,11 +3661,12 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
-        project.addStmtProcedure("TEST_SUBSTRING_INPROC", "SELECT * FROM INLINED_VC_VB_TABLE WHERE ABS(?) > 1 AND SUBSTRING(CAST(? AS VARCHAR),1,3) = 'str';");
+        project.addStmtProcedure("TEST_SUBSTRING_INPROC",
+                "SELECT * FROM INLINED_VC_VB_TABLE WHERE ABS(?) > 1 AND SUBSTRING(CAST(? AS VARCHAR),1,3) = 'str';");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
-        VoltServerConfig config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        VoltServerConfig config = new LocalCluster(
+                "fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestFunctionsSuite2.class);
         builder.addServerConfig(config);

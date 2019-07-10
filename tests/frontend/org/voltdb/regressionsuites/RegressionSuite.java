@@ -92,6 +92,13 @@ public class RegressionSuite extends TestCase {
     // shutdown the cluster completely after finishing the test.
     boolean m_completeShutdown;
     boolean m_fatalFailure;
+    /**
+     * We sometimes need to take different actions, i.e. skip a test, change error message, etc. depending on
+     * the actual parser/planner being in use. Eventually when we fully integrate with Calcite and replace our
+     * legacy planner, we don't need to take branches on those test logic.
+     */
+    final static boolean USING_CALCITE =
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false"));
 
     /**
      * Trivial constructor that passes parameter on to superclass.

@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -113,23 +114,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.drain();
             }
             VoltTable r1 = client.callProcedure("@AdHoc", "select count(*) from P1 where desc is null").getResults()[0];
-            //* enable for debugging */ System.out.println(r1);
             assertEquals(5, r1.asScalarLong());
 
             VoltTable r2 = client.callProcedure("@AdHoc", "select count(*) from P1 where not desc is null").getResults()[0];
-            //* enable for debugging */ System.out.println(r2);
             assertEquals(3, r2.asScalarLong());
 
             VoltTable r3 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=2 and desc is null)").getResults()[0];
-            //* enable for debugging */ System.out.println(r3);
             assertEquals(7, r3.asScalarLong());
 
             VoltTable r4 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=6 and desc is null)").getResults()[0];
-            //* enable for debugging */ System.out.println(r4);
             assertEquals(8, r4.asScalarLong());
 
             VoltTable r5 = client.callProcedure("@AdHoc", "select count(*) from P1 where id < 6 and NOT desc is null;").getResults()[0];
-            //* enable for debugging */ System.out.println(r5);
             assertEquals(1, r5.asScalarLong());
 
         }, "P1");
@@ -154,24 +150,26 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
                     client.drain();
 
-                    VoltTable r1 = client.callProcedure("@AdHoc", "select count(*) from ENG1850;").getResults()[0];
+                    VoltTable r1 = client.callProcedure("@AdHoc",
+                            "select count(*) from ENG1850;").getResults()[0];
                     assertEquals(1000, r1.asScalarLong());
 
-                    VoltTable r2 = client.callProcedure("@AdHoc", "select count(*) from ENG1850 where pid =2;").getResults()[0];
+                    VoltTable r2 = client.callProcedure("@AdHoc",
+                            "select count(*) from ENG1850 where pid =2;").getResults()[0];
                     assertEquals(100, r2.asScalarLong());
 
-                    VoltTable r3 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 limit 1;").getResults()[0];
-                    //* enable for debugging */ System.out.println("r3\n" + r3);
+                    VoltTable r3 = client.callProcedure("@AdHoc",
+                            "select * from ENG1850 where pid = 2 limit 1;").getResults()[0];
                     assertEquals(1, r3.getRowCount());
 
                     // this failed, returning 0 rows.
-                    VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
-                    //* enable for debugging */ System.out.println("r4\n:" + r4);
+                    VoltTable r4 = client.callProcedure("@AdHoc",
+                            "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
                     assertEquals(100, r4.getRowCount());
 
                     // this is the failing condition reported in the defect report (as above but with the limit)
-                    VoltTable r5 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
-                    //* enable for debugging */ System.out.println("r5\n" + r5);
+                    VoltTable r5 = client.callProcedure("@AdHoc",
+                            "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
                     assertEquals(1, r5.getRowCount());
                 },
                 "ENG1850");
@@ -199,20 +197,20 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("ENG1850.insert", 3, 2, 2, 0);
             client.callProcedure("ENG1850.insert", 4, 3, 3, 0);
 
-            VoltTable r1 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
-            //* enable for debugging */ System.out.println(r1);
+            VoltTable r1 = client.callProcedure("@AdHoc",
+                    "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
             assertEquals(isHSQL() ? 2 : 3, r1.getRowCount());
 
-            VoltTable r2 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by aid, pid").getResults()[0];
-            //* enable for debugging */ System.out.println(r2);
+            VoltTable r2 = client.callProcedure("@AdHoc",
+                    "select * from ENG1850 where pid = 2 order by aid, pid").getResults()[0];
             assertEquals(isHSQL() ? 2 : 3, r2.getRowCount());
 
-            VoltTable r3 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid > 1 order by pid, aid").getResults()[0];
-            //* enable for debugging */ System.out.println(r3);
+            VoltTable r3 = client.callProcedure("@AdHoc",
+                    "select * from ENG1850 where pid > 1 order by pid, aid").getResults()[0];
             assertEquals(isHSQL() ? 3 : 4, r3.getRowCount());
 
-            VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2").getResults()[0];
-            //* enable for debugging */ System.out.println(r4);
+            VoltTable r4 = client.callProcedure("@AdHoc",
+                    "select * from ENG1850 where pid = 2").getResults()[0];
             assertEquals(isHSQL() ? 2 : 3, r4.getRowCount());
         }, "ENG1850");
     }
@@ -479,8 +477,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         try {
             Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
                                                     ArrayUtils.toObject(Encoder.hexDecode("1E")) };
-            results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
-                        null, null, null).getResults();
+            client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
+                        null, null, null);
         } catch (Exception e) {
             errMsg = "org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
                     + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
@@ -489,10 +487,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(e.getMessage().contains(errMsg));
         }
 
-        String query =
-                String.format("select * from ENG_539");
-        results = client.callProcedure("@AdHoc", query).getResults();
-        System.out.println(results);
+        client.callProcedure("@AdHoc", "select * from ENG_539");
         }, "ENG_539");
     }
 
@@ -666,7 +661,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     private void nestLoopJoinPredicates_verifyid(VoltTable[] vts) {
         assertEquals(1, vts.length);
-        //* enable for debugging */ System.out.println("verifyid: " + vts[0]);
         assertEquals(5, vts[0].getRowCount());
 
         while(vts[0].advanceRow()) {
@@ -682,7 +676,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     private void nestLoopJoinPredicates_verify(VoltTable[] vts) {
         assertEquals(1, vts.length);
-        //* enable for debugging */ System.out.println(vts[0]);
         assertEquals(4, vts[0].getRowCount());
 
         // the id of the first should be (5-id) in the second
@@ -727,7 +720,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
     private void nestLoopJoinPredicatesWithExpressions_verify(
             VoltTable[] vts) {
         assertEquals(1, vts.length);
-        //* enable for debugging */ System.out.println(vts[0]);
         assertEquals(4, vts[0].getRowCount());
 
         // the id of the first should be (5-id) in the second once the addition
@@ -775,7 +767,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     private void nestLoopJoinPredicatesWithAliases_verify(VoltTable[] vts) {
         assertEquals(1, vts.length);
-        //* enable for debugging */ System.out.println(vts[0]);
         assertEquals(4, vts[0].getRowCount());
 
         // the id of the first should be (5-id) in the second once the addition
@@ -869,35 +860,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             String[] filterOps = new String[]{" <> ", " IS DISTINCT FROM "};
             for (String filterOp : filterOps) {
-//            long expected = " <> ".equals(filterOp) ? 4 : 0;
-//            String query;
-//            String start = "SELECT count(*) FROM R1 PARENT WHERE DESC NOT IN (";
-//            String end = " ON LHS.ID = RHS.ID " +
-//                    "WHERE LHS.ID " + filterOp + " PARENT.NUM);";
+                long expected = " <> ".equals(filterOp) ? 4 : 0;
+                String query;
+                String start = "SELECT count(*) FROM R1 PARENT WHERE DESC NOT IN (";
+                String end = " ON LHS.ID = RHS.ID " +
+                        "WHERE LHS.ID " + filterOp + " PARENT.NUM);";
                 // Zero result rows because values from R1 always have matches in
                 // R1 JOIN R1.
 
                 // ENG-15243
-//            query = start +
-//                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R1 RHS " + end;
-//            validateTableOfLongs(client, query, new long[][] {{0}});
-//            query = start +
-//                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R2 RHS " + end;
-//            validateTableOfLongs(client, query, new long[][] {{0}});
-                // An IS DISTINCT FROM bug in the HSQL backend causes it
-                // to always to return 0 rows,
-                // which is only correct for <>.
-                // Remove this condition when ENG-11256 is fixed.
-                // ENG-15243
-//            if (isHSQL() && expected != 0) {
-//                query = start +
-//                        "SELECT LHS.DESC FROM R2 LHS FULL JOIN R1 RHS " + end;
-//                validateTableOfLongs(client, query, new long[][] {{expected}});
-//            }
-                // ENG-15243
-//            query = start +
-//                    "SELECT LHS.DESC FROM R2 LHS FULL JOIN R2 RHS " + end;
-//            validateTableOfLongs(client, query, new long[][] {{4}});
+                if (!USING_CALCITE) {
+                    query = start + "SELECT LHS.DESC FROM R1 LHS FULL JOIN R1 RHS " + end;
+                    validateTableOfLongs(client, query, new long[][] {{0}});
+                    query = start + "SELECT LHS.DESC FROM R1 LHS FULL JOIN R2 RHS " + end;
+                    validateTableOfLongs(client, query, new long[][] {{0}});
+                    // An IS DISTINCT FROM bug in the HSQL backend causes it
+                    // to always to return 0 rows,
+                    // which is only correct for <>.
+                    // Remove this condition when ENG-11256 is fixed.
+                    if (isHSQL() && expected != 0) {
+                        query = start + "SELECT LHS.DESC FROM R2 LHS FULL JOIN R1 RHS " + end;
+                        validateTableOfLongs(client, query, new long[][] {{expected}});
+                    }
+                    query = start + "SELECT LHS.DESC FROM R2 LHS FULL JOIN R2 RHS " + end;
+                    validateTableOfLongs(client, query, new long[][] {{4}});
+                }
             }
         }, "R1", "R2");
     }
@@ -1191,7 +1178,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(3, results[0].getRowCount());
             for (int i = 100; results[0].advanceRow(); i += 100) {
                 assertEquals(i, results[0].getLong(0));
-                //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
             }
         }, tables);
     }
@@ -1211,7 +1197,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(1, results[0].getRowCount());
             results[0].advanceRow();
             assertEquals(2, results[0].getLong(0));
-            //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
         }, tables);
     }
 
@@ -1230,11 +1215,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(3, results[0].getRowCount());
             assertEquals(1, results[0].getColumnCount());
 
-            //* enable for debugging */ System.out.println(results[0].toFormattedString());
 
             for (int i = 0; results[0].advanceRow(); i++) {
                 assertEquals(i, results[0].getLong(0));
-                //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
             }
         }, tables);
     }
@@ -1257,7 +1240,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 for (int j = 0; j < 3; j++) {
                     results[0].advanceRow();
                     assertEquals(i, results[0].getLong(0));
-                    //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
                 }
             }
         }, tables);
@@ -1400,11 +1382,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // Further verify that inline varchar columns still properly handle potentially larger values
             // even after the temp tuple formatting fix for ENG-5926.
             response = client.callProcedure("Eng5926Insert", 5, "", 5.5);
-            assertTrue(response.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
             try {
                 client.callProcedure("Eng5926Insert", 7, "HOO", 7.5);
                 fail("Failed to throw ProcCallException for runtime varchar length exceeded.");
-            } catch (ProcCallException pce) {}
+            } catch (ProcCallException ignored) {}
             response = client.callProcedure("@AdHoc", "select * from PWEE ORDER BY ID DESC");
             result = response.getResults()[0];
             result.advanceRow();
@@ -1504,10 +1486,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
     public void testTicket5151_ColumnDefaultNull() throws IOException, InterruptedException, ProcCallException {
         runWithClient(getClient(), client -> {
             System.out.println("STARTING default null test...");
-            VoltTable result = null;
+            VoltTable result;
             // It used to throw errors from EE when inserting without giving explicit values for default null columns.
-            result = client.callProcedure("@AdHoc",
-                    " INSERT INTO DEFAULT_NULL(id) VALUES (1);").getResults()[0];
+            client.callProcedure("@AdHoc", " INSERT INTO DEFAULT_NULL(id) VALUES (1);");
 
             result = client.callProcedure("@AdHoc",
                     " select id, num1, num2, ratio from DEFAULT_NULL;").getResults()[0];
@@ -1577,7 +1558,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             client.callProcedure("@Explain",
                     "select count(*) from DEFAULT_NULL where num3 < 3;").getResults();
-            //* enable for debugging */ System.out.println(result);
 
             // Reverse scan, count(*)
             result = client.callProcedure("@AdHoc",
@@ -1596,7 +1576,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             try {
                 client.callProcedure("NO_JSON.insert", 1, "jpiekos1", "foo", "no json");
                 Assert.fail("Should have failed inserting non-json string into the table with field() index.");
-            } catch (ProcCallException e) { }
+            } catch (ProcCallException ignored) { }
             final VoltTable result = client.callProcedure("@AdHoc", "select id from no_json " +
                     "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
             assertFalse("Table with JSON field() index should be empty", result.advanceRow());
@@ -1651,7 +1631,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             // Test Default
             String[] sqls = sqlArray.split(";");
-            //* enable for debugging */ System.out.println(sqls);
             for (String sql : sqls) {
                 sql = sql.trim();
                 client.callProcedure("@AdHoc", sql).getResults();
@@ -1661,7 +1640,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             vt = client.callProcedure("@AdHoc", "SELECT SUM(V_SUM_RENT) FROM V_P3 HAVING SUM(V_G2) < 42").getResults()[0];
             validateTableOfLongs(vt, new long[][]{{90814}});
-            //* enable for debugging */ System.out.println(vt);
         }, "P3");
     }
 
@@ -1695,7 +1673,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             try {
                 // assert here that this two-character string decodes via UTF8 to a bytebuffer longer than 2 bytes.
                 assertEquals(2, var.length());
-                assertEquals(6, var.getBytes("UTF-8").length);
+                assertEquals(6, var.getBytes(StandardCharsets.UTF_8).length);
                 client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
                 fail();
             } catch (Exception ex) {
@@ -1806,16 +1784,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         "Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
             }
 
+            final String expectedPattern = String.format(
+                    "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                    var1.length() * 2, var1 + var1, 10);
             try {
                 client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2, repeat('" + var1 + "',2))");
                 fail();
             } catch (Exception ex) {
-                String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
-                        var1.length() * 2, var1 + var1, 10);
-                String errmsg = String.format("Expected '%s' to contain '%s'",
-                        ex.getMessage(),
-                        expected);
-                assertTrue(errmsg, ex.getMessage().contains(expected));
+                String errmsg = String.format("Expected '%s' to contain '%s'", ex.getMessage(), expectedPattern);
+                assertTrue(errmsg, ex.getMessage().contains(expectedPattern));
             }
 
             // Test upsert
@@ -1831,7 +1808,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "' || 'abc')");
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         "Value (" + var1 + "abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
             }
@@ -1841,7 +1817,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.insert", 1, var1, null, null, null);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
                                 var1.length(), var1, 10)));
@@ -1855,7 +1830,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.insert", 2, null, var2, null, null);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column 'VAR2'",
                                 174, var2.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
@@ -1868,7 +1842,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.insert", 21, null, var2, null, null);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR2'",
                                 86, var2, 80)));
@@ -1880,7 +1853,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "Update VARLENGTH set var2 = '" + var2 + "' where var2 = 'voltdb'");
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         "Value (" + var2 + ") is too wide for a constant varchar value of size 80 for column 'VAR2' in the table 'VARLENGTH'"));
             }
@@ -1889,10 +1861,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "Update VARLENGTH set var1 = repeat('" + var1 + "', 2) where var2 = 'voltdb'");
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
-                assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
-                                var1.length() * 2, var1 + var1, 10)));
+                assertTrue(ex.getMessage().contains(expectedPattern));
             }
 
             // Test varbinary
@@ -1902,7 +1871,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, bin1) VALUES (6,'" + bin1 + "')");
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         "Value (" + bin1 + ") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
             }
@@ -1912,7 +1880,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.insert", 7, null, null, bin1, null);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column 'BIN1'",
                                 bin1.length() / 2, 10)));
@@ -1926,7 +1893,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.insert", 2, null, null, null, bin2);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column 'BIN2'",
                                 bin2.length() / 2, 80)));
@@ -1938,7 +1904,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 client.callProcedure("VARLENGTH.update", 7, null, null, bin1, null, 7);
                 fail();
             } catch (Exception ex) {
-                //* enable for debugging */ System.out.println(ex.getMessage());
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
                                 bin1.length() / 2, 10)));
@@ -1976,9 +1941,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // Hash aggregation may have the same problem, so let's
             // test it here as well.
             String sql = "select var80, max(var2) as maxvar2, min(var2) as minvar2 " +
-                    "from VarcharTB " +
-                    "group by var80 " +
-                    "order by maxvar2, minvar2";
+                    "from VarcharTB group by var80 order by maxvar2, minvar2";
             cr = client.callProcedure("@AdHoc", sql);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
@@ -2122,12 +2085,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // aborting view processing when encountering an export table.
             client.callProcedure("TRANSACTION.insert", 1, 99, 100.0, "NH", "Manchester", new TimestampType(), 20);
 
-            validateTableOfLongs(client, "select count(*) from transaction",
-                    new long[][]{{1}});
+            validateTableOfLongs(client, "select count(*) from transaction", new long[][]{{1}});
 
             // The buggy behavior would show zero rows in the view.
-            validateTableOfLongs(client, "select count(*) from acct_vendor_totals",
-                    new long[][]{{1}});
+            validateTableOfLongs(client, "select count(*) from acct_vendor_totals", new long[][]{{1}});
         }, "TRANSACTION");
     }
 
@@ -2338,8 +2299,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
 
             // This should succeed
-            b = client.callProcedure(callback,
-                    "one_string_list_param", (Object) stringArgs);
+            b = client.callProcedure(callback, "one_string_list_param", (Object) stringArgs);
             assertTrue(b);
             client.drain();
             assertEquals(ClientResponse.SUCCESS, callback.getClientResponse().getStatus());
@@ -2351,22 +2311,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
             String adHocQueryWithScalarParam = "select id from P1 where desc in (?)";
 
             // Here's what happens with too many parameters
-            b = client.callProcedure(callback,
-                    "one_string_scalar_param", "dog", "cat");
+            b = client.callProcedure(callback, "one_string_scalar_param", "dog", "cat");
             // This is queued, but execution fails as it should.
             assertTrue(b);
             client.drain();
             assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-            assertTrue(callback.getClientResponse().getStatusString().contains(
-                    "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
+            assertTrue(callback.getClientResponse().getStatusString().contains("EXPECTS 1 PARAMS, BUT RECEIVED 2"));
 
             b = client.callProcedure(callback, "@AdHoc",
                     adHocQueryWithScalarParam, stringArgs);
             assertTrue(b);
             client.drain();
             assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-            assertTrue(callback.getClientResponse().getStatusString().contains(
-                    "Array / Scalar parameter mismatch"));
+            assertTrue(callback.getClientResponse().getStatusString().contains("Array / Scalar parameter mismatch"));
 
             // This should succeed, but doesn't (ENG-7604 again)
             b = client.callProcedure(callback, "@AdHoc",
@@ -2374,8 +2331,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(b);
             client.drain();
             assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-            assertTrue(callback.getClientResponse().getStatusString().contains(
-                    "Array / Scalar parameter mismatch"));
+            assertTrue(callback.getClientResponse().getStatusString().contains("Array / Scalar parameter mismatch"));
         }, "P1");
     }
 
@@ -2401,67 +2357,36 @@ public class TestFixedSQLSuite extends RegressionSuite {
     @Test
     public void testENG7480() throws IOException, InterruptedException, ProcCallException {
         runWithClient(getClient(), client -> {
-            String sql;
-            sql = "insert into R1 Values(1, 'MA', 2, 2.2);";
-            client.callProcedure("@AdHoc", sql);
+            client.callProcedure("@AdHoc", "insert into R1 Values(1, 'MA', 2, 2.2);");
             // query constants interpreted as DECIMAL
 
             //
             // operation between float and decimal
             //
-            sql = "SELECT 0.1 + (1-0.1) + ratio FROM R1";
-            runQueryGetDouble(client, sql, 3.2);
 
-            sql = "SELECT 0.1 + (1-0.1) - ratio FROM R1";
-            runQueryGetDouble(client, sql, -1.2);
-
-            sql = "SELECT 0.1 + (1-0.1) / ratio FROM R1";
-            runQueryGetDouble(client, sql, 0.509090909091);
-
-            sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
-            runQueryGetDouble(client, sql, 2.08);
-
+            runQueryGetDouble(client, "SELECT 0.1 + (1-0.1) + ratio FROM R1", 3.2);
+            runQueryGetDouble(client, "SELECT 0.1 + (1-0.1) - ratio FROM R1", -1.2);
+            runQueryGetDouble(client, "SELECT 0.1 + (1-0.1) / ratio FROM R1", 0.509090909091);
+            runQueryGetDouble(client, "SELECT 0.1 + (1-0.1) * ratio FROM R1", 2.08);
             // reverse order
-            sql = "SELECT 0.1 + ratio + (1-0.1) FROM R1";
-            runQueryGetDouble(client, sql, 3.2);
-
-            sql = "SELECT 0.1 + ratio - (1-0.1) FROM R1";
-            runQueryGetDouble(client, sql, 1.4);
-
-            sql = "SELECT 0.1 + ratio / (1-0.1) FROM R1";
-            runQueryGetDouble(client, sql, 2.544444444444);
-
-            sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
-            runQueryGetDouble(client, sql, 2.08);
-
+            runQueryGetDouble(client, "SELECT 0.1 + ratio + (1-0.1) FROM R1", 3.2);
+            runQueryGetDouble(client, "SELECT 0.1 + ratio - (1-0.1) FROM R1", 1.4);
+            runQueryGetDouble(client, "SELECT 0.1 + ratio / (1-0.1) FROM R1", 2.544444444444);
+            runQueryGetDouble(client, "SELECT 0.1 + ratio * (1-0.1) FROM R1", 2.08);
 
             //
             // operation between decimal and integer
             //
-            sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
-            runQueryGetDecimal(client, sql, 3.0);
-
-            sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
-            runQueryGetDecimal(client, sql, -1.0);
-
-            sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
-            runQueryGetDecimal(client, sql, 0.55);
-
-            sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
-            runQueryGetDecimal(client, sql, 1.9);
+            runQueryGetDecimal(client, "SELECT 0.1 + (1-0.1) + NUM FROM R1", 3.0);
+            runQueryGetDecimal(client, "SELECT 0.1 + (1-0.1) - NUM FROM R1", -1.0);
+            runQueryGetDecimal(client, "SELECT 0.1 + (1-0.1) / NUM FROM R1", 0.55);
+            runQueryGetDecimal(client, "SELECT 0.1 + (1-0.1) * NUM FROM R1", 1.9);
 
             // reverse order
-            sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
-            runQueryGetDecimal(client, sql, 3.0);
-
-            sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
-            runQueryGetDecimal(client, sql, 1.2);
-
-            sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
-            runQueryGetDecimal(client, sql, 2.322222222222);
-
-            sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
-            runQueryGetDecimal(client, sql, 1.9);
+            runQueryGetDecimal(client, "SELECT 0.1 + NUM + (1-0.1) FROM R1", 3.0);
+            runQueryGetDecimal(client, "SELECT 0.1 + NUM - (1-0.1) FROM R1", 1.2);
+            runQueryGetDecimal(client, "SELECT 0.1 + NUM / (1-0.1) FROM R1", 2.322222222222);
+            runQueryGetDecimal(client, "SELECT 0.1 + NUM * (1-0.1) FROM R1", 1.9);
 
 
             //
@@ -2469,12 +2394,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
             //
 
             // test overflow and any underflow decimal are rounded
-            sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
+            String sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
             if (isHSQL()) {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                final String expectedErrorMessage = USING_CALCITE ?
+                        "Numeric literal '111111111111111111111111111111111111111.1111' out of range" :
+                        "Precision of 111111111111111111111111111111111111113.1111 to the left of the decimal point is 39 and the max is 26";
+                verifyStmtFails(client, sql, expectedErrorMessage);
             } else {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                final String expectedErrorMessage = USING_CALCITE ?
+                        "Numeric literal '111111111111111111111111111111111111111.1111' out of range" :
+                        "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point";
+                verifyStmtFails(client, sql, expectedErrorMessage);
             }
 
             // ENG-15234
@@ -2485,7 +2415,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
             runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
 
             sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
-            verifyStmtFails(client, sql, "Numeric literal '1.1111111111111111111E368' out of range");
+            verifyStmtFails(client, sql, USING_CALCITE ?
+                    "Numeric literal '1.1111111111111111111E368' out of range" :
+                    "java.lang.NumberFormatException");
 
 
             // test stored procedure
@@ -2665,38 +2597,23 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // nested-loop and nested-loop-index joins
             for (String innerTable : new String[]{"t3", "t3_no_index"}) {
 
-                sql = "select t1.A "
-                        + "from t1 left join " + innerTable + " as t3 "
-                        + "on t3.A = t1.A "
-                        + "where t3.D is null and t1.B = 2 "
-                        + "order by t1.A;";
+                sql = "select t1.A from t1 left join " + innerTable + " as t3 "
+                        + "on t3.A = t1.A where t3.D is null and t1.B = 2 order by t1.A;";
                 validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-                sql = " select t1.A "
-                        + "from T1 left join " + innerTable + " as t3 "
-                        + "on t3.A = t1.A "
-                        + "where t3.D is null and t1.B = 2 "
-                        + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) "
+                sql = " select t1.A from T1 left join " + innerTable + " as t3 "
+                        + "on t3.A = t1.A where t3.D is null and t1.B = 2 and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) "
                         + "order by t1.a;";
                 validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-                sql = "select t1.A "
-                        + "from t1 inner join t2 on t2.B = t1.B "
-                        + "left join " + innerTable + " as t3 "
-                        + "on t3.A = t1.A "
-                        + "where t2.D is null and t3.D is null and t2.B = 2 "
-                        + "order by t1.a;";
+                sql = "select t1.A from t1 inner join t2 on t2.B = t1.B left join " + innerTable + " as t3 "
+                        + "on t3.A = t1.A where t2.D is null and t3.D is null and t2.B = 2 order by t1.a;";
                 validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-                sql = "select t1.b + t3.d as thesum "
-                        + "from t1 "
-                        + "left outer join " + innerTable + " as t3 "
-                        + "on t1.a = t3.a "
-                        + "where t1.b > 1 "
-                        + "order by thesum;";
+                sql = "select t1.b + t3.d as thesum from t1 left outer join " + innerTable + " as t3 "
+                        + "on t1.a = t3.a where t1.b > 1 order by thesum;";
                 System.out.println(client.callProcedure("@Explain", sql).getResults()[0]);
-                // ENG-15279, ENG-15234: Calcite did not promote INTEGER + INTEGER -> BIGINT, and it uses NULL value for INTEGER.
-                // validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
+                validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
             }
         }, "T1", "T2", "T3", "T3_NO_INDEX");
     }
@@ -2719,15 +2636,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             validateTableOfScalarLongs(client, stmt, new long[] {1});
         }
 
-        String sqlStmt =
-                "select "
-                + "  id, t_int "
-                + "from test1_eng_9533 "
-                + "  left join test2_eng_9533 "
-                + "  on t_id = id "
-                + "where "
-                + "  id <= 1 or t_int > 4 "
-                + "order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
+        String sqlStmt = "select id, t_int from test1_eng_9533 left join test2_eng_9533 on t_id = id "
+                + "where id <= 1 or t_int > 4 order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
 
         validateTableOfLongs(client, sqlStmt, new long[][] {
                 {0, Long.MIN_VALUE},
@@ -2821,51 +2731,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // Simplified version of query that caused a crash
         vt = client.callProcedure("@AdHoc",
-                "SELECT * "
-                        + "FROM P1 "
-                        + "WHERE EXISTS ("
-                        + "  SELECT SUM(ID) "
-                        + "  FROM R1 "
-                        + "  WHERE DESC = 'bar' "
-                        + "  GROUP BY NUM)").getResults()[0];
+                "SELECT * FROM P1 WHERE EXISTS (  SELECT SUM(ID)   FROM R1 "
+                        + "  WHERE DESC = 'bar' GROUP BY NUM)").getResults()[0];
         assertContentOfTable(new Object[][] {}, vt);
 
         // Subquery returns zero rows, so NOT EXISTS returns true
         vt = client.callProcedure("@AdHoc",
-                "SELECT * "
-                        + "FROM P1 "
-                        + "WHERE NOT EXISTS ("
-                        + "  SELECT SUM(ID) "
-                        + "  FROM R1 "
-                        + "  WHERE DESC = 'bar' "
-                        + "  GROUP BY NUM) "
-                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+                "SELECT * FROM P1 WHERE NOT EXISTS ("
+                        + "  SELECT SUM(ID) FROM R1 WHERE DESC = 'bar' GROUP BY NUM) ORDER BY 1, 2, 3, 4")
+                .getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // WHERE predicate in inner query sometimes returns true, sometimes false
         // (bug occurred when predicate was always false and pass through values were
         // uninitialized)
         vt = client.callProcedure("@AdHoc",
-                "SELECT * "
-                        + "FROM P1 "
-                        + "WHERE EXISTS ("
-                        + "  SELECT SUM(ID) "
-                        + "  FROM R1 "
-                        + "  WHERE DESC = 'baz' "
-                        + "  GROUP BY NUM) "
-                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+                "SELECT * FROM P1 WHERE EXISTS ("
+                        + "  SELECT SUM(ID) FROM R1 WHERE DESC = 'baz' GROUP BY NUM) ORDER BY 1, 2, 3, 4")
+                .getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // The original query
         vt = client.callProcedure("@AdHoc",
-                "SELECT * "
-                        + "FROM P1 T2 "
-                        + "WHERE NOT EXISTS ("
-                        + "  SELECT SUM(COT(ID)) "
-                        + "  FROM R1 T2 "
-                        + "  WHERE DESC <> DESC "
-                        + "  GROUP BY NUM, NUM) "
-                        + "OFFSET 9;").getResults()[0];
+                "SELECT * FROM P1 T2 WHERE NOT EXISTS ("
+                        + "  SELECT SUM(COT(ID)) FROM R1 T2 WHERE DESC <> DESC GROUP BY NUM, NUM) OFFSET 9;")
+                .getResults()[0];
         assertContentOfTable(new Object[][] {}, vt);
     }
 
@@ -2962,7 +2852,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         String sql;
         VoltTable vt;
-        final String vdbPlannerError = "Aggregate expression is illegal in ORDER BY clause of non-aggregating SELECT";
+        final String vdbPlannerError = USING_CALCITE ?
+                "Aggregate expression is illegal in ORDER BY clause of non-aggregating SELECT" :
+                "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list.";
         final String hsqlPlannerError = "invalid ORDER BY expression";
 
         // In this bug, both HSQL and VoltDB could not handle queries with:
@@ -2985,58 +2877,36 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{null}}, vt);
 
         // VoltDB complains about this one.
-        sql = "SELECT TOP 3  -699 AS CA4 " +
-                "FROM ENG_13852_R11, ENG_13852_VR5 " +
-                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
-        verifyStmtFails(client, sql, "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
+        sql = "SELECT TOP 3  -699 AS CA4 FROM ENG_13852_R11, ENG_13852_VR5 ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
+        verifyStmtFails(client, sql,
+                "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
 
         // This query has an agg on OB clause not on the SELECT list
         // BUT, because the
-        sql = "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
-                "FROM ENG_13852_P5 AS OUTER_TBL " +
+        sql = "SELECT 'foo' AS CA2, OUTER_TBL.TINY FROM ENG_13852_P5 AS OUTER_TBL " +
                 "WHERE VCHAR_INLINE != (" +
-                "  SELECT MAX(VCHAR) " +
-                "  FROM ENG_13852_R11 AS INNER_TBL " +
-                "  WHERE POINT != OUTER_TBL.POINT " +
-                "  ORDER BY COUNT(*)) " +
+                "  SELECT MAX(VCHAR) FROM ENG_13852_R11 AS INNER_TBL " +
+                "  WHERE POINT != OUTER_TBL.POINT ORDER BY COUNT(*)) " +
                 "ORDER BY NUM;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {}, vt);
 
-        sql = "SELECT 'foo' " +
-                "FROM ENG_13852_R11 T1 " +
-                "ORDER BY COUNT(*) DESC;";
-        verifyStmtFails(client, sql, vdbPlannerError);
+        verifyStmtFails(client, "SELECT 'foo' FROM ENG_13852_R11 T1 ORDER BY COUNT(*) DESC;", vdbPlannerError);
 
         // Aggregate functions in subexpressions of OB clause should also
         // be invalid:
-        sql = "SELECT 'foo' " +
-                "FROM ENG_13852_R11 T1 " +
-                "ORDER BY MAX(ID) / COUNT(*) DESC;";
-        verifyStmtFails(client, sql, vdbPlannerError);
-
-        sql = "SELECT 'foo' " +
-                "FROM ENG_13852_R11 T1 " +
-                "ORDER BY ABS(COUNT(*)) DESC;";
-        verifyStmtFails(client, sql, vdbPlannerError);
+        verifyStmtFails(client, "SELECT 'foo' FROM ENG_13852_R11 T1 ORDER BY MAX(ID) / COUNT(*) DESC;", vdbPlannerError);
+        verifyStmtFails(client, "SELECT 'foo' FROM ENG_13852_R11 T1 ORDER BY ABS(COUNT(*)) DESC;", vdbPlannerError);
 
         // Similar query with AVG
-        sql = "SELECT 79 AS const_num " +
-                "FROM ENG_13852_R11 T1 " +
-                "ORDER BY AVG(const_num);";
-        verifyStmtFails(client, sql, vdbPlannerError);
+        verifyStmtFails(client, "SELECT 79 AS const_num FROM ENG_13852_R11 T1 ORDER BY AVG(const_num);", vdbPlannerError);
 
         // Similar query with GB clause
-        sql = "SELECT 'foo' " +
-                "FROM ENG_13852_R11 T1 " +
-                "GROUP BY tiny " +
-                "ORDER BY COUNT(*)";
-        verifyStmtFails(client, sql, hsqlPlannerError);
+        verifyStmtFails(client, "SELECT 'foo' FROM ENG_13852_R11 T1 GROUP BY tiny ORDER BY COUNT(*)", hsqlPlannerError);
 
-        sql = "SELECT TOP 3  -699 AS CA4 " +
-                "FROM ENG_13852_R11 , ENG_13852_VR5     " +
-                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
-        verifyStmtFails(client, sql, "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
+        verifyStmtFails(client,
+                "SELECT TOP 3  -699 AS CA4 FROM ENG_13852_R11 , ENG_13852_VR5 ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;",
+                "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
     }
 
     static public junit.framework.Test suite() {
