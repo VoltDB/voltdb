@@ -1465,8 +1465,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
     if (lookupType != LOOKUP_FOR_UNDO &&
             m_schema->getUninlinedObjectColumnCount() != 0) {
         bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        while (ti.next(tableTuple)) {
             if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
                 return tableTuple;
             }
@@ -1484,8 +1483,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
         // Do an inline tuple byte comparison
         // to avoid matching duplicate tuples with different pointers to Object storage
         // -- which would cause erroneous releases of the wrong Object storage copy.
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        while (ti.next(tableTuple)) {
             char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
             char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
             if (::memcmp(tableTupleData, tupleData, tuple_length) == 0) {
@@ -2190,9 +2188,8 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 
     int64_t mispartitionedRows = 0;
 
-    while (iter.hasNext()) {
-        TableTuple tuple(schema());
-        iter.next(tuple);
+    TableTuple tuple(schema());
+    while (iter.next(tuple)) {
         int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
         if (newPartitionId != partitionId) {
             std::ostringstream buffer;
