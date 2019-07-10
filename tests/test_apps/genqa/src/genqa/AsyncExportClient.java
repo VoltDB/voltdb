@@ -206,6 +206,51 @@ public class AsyncExportClient
             }
         }
     }
+    
+    static class TableExportCallback implements ProcedureCallback
+    {
+        private final TxnIdWriter m_writer;
+        private final long m_type;
+        public TableExportCallback(TxnIdWriter writer, long type)
+        {
+            super();
+            m_type = type;
+            m_writer = writer;
+        }
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+            {
+                TrackingResults.incrementAndGet(0);
+                long txid = clientResponse.getResults()[0].asScalarLong();
+                final String trace = String.format("%d:%d:%d\n", m_type, txid, now);
+                try
+                {
+                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            else
+            {
+                TrackingResults.incrementAndGet(1);
+                final String trace = String.format("%d:-1:%d:%s\n", m_type, now,((ClientResponseImpl)clientResponse).toJSONString());
+                try
+                {
+                    m_writer.write(-1,trace);
+                }
+                catch (IOException e)
+                {
+                    log.error("Exception: " + e);
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
     // Connection configuration
     private final static class ConnectionConfig {
@@ -250,6 +295,7 @@ public class AsyncExportClient
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
     
     // If testing Table/Export, count inserts, deletes, update fore & aft
+    
     private static int INSERT = 1;
     private static int DELETE = 2;
     private static int UPDATE_OLD = 3;
