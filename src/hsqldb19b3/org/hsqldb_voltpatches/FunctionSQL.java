@@ -43,6 +43,7 @@ import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
+import org.voltdb.VoltType;
 
 import java.util.NoSuchElementException;
 
@@ -104,6 +105,22 @@ public class FunctionSQL extends Expression {
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
 
+    /************************* Volt DB Extensions *************************/
+
+    // FunctionCustom adds a few values to the range of FUNC_ constants above that should probably be
+    // kept unique. types.DTIType and Types add a few values to the range used by VoltDB for
+    // implementing EXTRACT variants. These are based on other ranges of constants that
+    // DO overlap with these FUNC_ constant, so they are dynamically adjusted with the
+    // following fixed offset when used as function ids. The Tokens.java constants that are used
+    // to parameterize the TRIM functions have a similar overlap issue and need their own offset.
+    private final static int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+    private final static int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
+
+    // Assume that 10000-19999 are available for VoltDB-specific use
+    // in specialized implementations of existing HSQL functions.
+    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
+    public final static int    FUNC_VOLT_INVALID = -1;
+
     //
     static final short[] noParamList              = new short[]{};
     static final short[] emptyParamList           = new short[] {
@@ -136,6 +153,30 @@ public class FunctionSQL extends Expression {
     //
     static IntValueHashMap valueFuncMap   = new IntValueHashMap();
     public static IntValueHashMap regularFuncMap = new IntValueHashMap();
+    public static IntValueHashMap fullFuncMap = new IntValueHashMap();
+
+    // TODO: expand fullFuncMap to include every function in regularFuncMap and its overloaded variants
+    static {
+        fullFuncMap.put(Tokens.T_SUBSTRING +
+                        "3" +
+                        VoltType.STRING +
+                        VoltType.INTEGER +
+                        VoltType.INTEGER,
+                        FUNC_SUBSTRING_CHAR);
+
+        fullFuncMap.put(Tokens.T_SUBSTRING +
+                        "3" +
+                        VoltType.VARBINARY +
+                        VoltType.INTEGER +
+                        VoltType.INTEGER,
+                        FUNC_SUBSTRING_CHAR);
+
+        fullFuncMap.put(Tokens.T_SUBSTRING +
+                        "2"  +
+                        VoltType.STRING +
+                        VoltType.INTEGER,
+                        FUNC_VOLT_SUBSTRING_CHAR_FROM);
+    }
 
     static {
         regularFuncMap.put(Tokens.T_POSITION, FUNC_POSITION_CHAR);
@@ -2140,22 +2181,6 @@ public class FunctionSQL extends Expression {
         return isValueFunction;
     }
 
-    /************************* Volt DB Extensions *************************/
-
-    // FunctionCustom adds a few values to the range of FUNC_ constants above that should probably be
-    // kept unique. types.DTIType and Types add a few values to the range used by VoltDB for
-    // implementing EXTRACT variants. These are based on other ranges of constants that
-    // DO overlap with these FUNC_ constant, so they are dynamically adjusted with the
-    // following fixed offset when used as function ids. The Tokens.java constants that are used
-    // to parameterize the TRIM functions have a similar overlap issue and need their own offset.
-    private final static int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
-    private final static int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
-
-    // Assume that 10000-19999 are available for VoltDB-specific use
-    // in specialized implementations of existing HSQL functions.
-    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
-    public final static int    FUNC_VOLT_INVALID = -1;
-
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -2638,6 +2663,18 @@ public class FunctionSQL extends Expression {
     public static int voltGetFunctionId(String functionName) {
         try {
             return regularFuncMap.get(functionName.toUpperCase());
+        } catch (NoSuchElementException ex) {
+            return FUNC_VOLT_INVALID;
+        }
+    }
+
+    public static int voltGetFunctionId(String functionName, VoltType[] operandTypes) {
+        try {
+            String query_enum = functionName.toUpperCase() + operandTypes.length;
+            for (VoltType operandType : operandTypes) {
+                query_enum += operandType;
+            }
+            return fullFuncMap.get(query_enum);
         } catch (NoSuchElementException ex) {
             return FUNC_VOLT_INVALID;
         }

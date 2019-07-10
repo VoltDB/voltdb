@@ -39,7 +39,15 @@ public class RexConverterHelper {
 
     public static AbstractExpression createFunctionExpression(
             RelDataType relDataType, String funcName, List<AbstractExpression> operands, String impliedArg) {
-        int functionId = FunctionSQL.voltGetFunctionId(funcName);
+        // TODO: merge the first function ID lookups by having one map that considers operand types
+        List<VoltType> operandTypes = new ArrayList<VoltType>();
+        for (AbstractExpression exp : operands) {
+            operandTypes.add(exp.getValueType());
+        }
+        int functionId = FunctionSQL.voltGetFunctionId(funcName, (VoltType[]) operandTypes.toArray());
+        if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
+            functionId = FunctionSQL.voltGetFunctionId(funcName);
+        }
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             functionId = FunctionForVoltDB.getFunctionID(funcName);
         }
