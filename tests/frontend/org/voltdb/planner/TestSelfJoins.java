@@ -107,7 +107,7 @@ public class TestSelfJoins  extends PlannerTestCase {
 
         // if no alias is used, self join should fail
         failToCompile("select * from R1 JOIN R1 USING(A)",
-                      "There should be at least 2 unique table/alias");
+                      "Use fully qualified names including the table name or alias to avoid ambiguous referencess");
     }
 
     public void testOuterSelfJoin() {
