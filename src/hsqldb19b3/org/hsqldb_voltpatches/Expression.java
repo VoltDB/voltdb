@@ -2061,7 +2061,6 @@ public class Expression {
         exp.children.clear();
 
         // There should be at least 2 columnref expressions
-        assert(uniqueColumnrefs.size() > 1);
         if (uniqueColumnrefs.size() <= 1) {
             throw Error.error(ErrorCode.X_42581, "There should be at least 2 unique table/alias");
         }
