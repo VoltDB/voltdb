@@ -455,8 +455,14 @@ public class ExportCoordinator {
                                 }
                             }
 
-                            // Get the EDS tracker (note, this is a duplicate)
-                            ExportSequenceNumberTracker tracker = m_eds.getTracker();
+                            // Try to get our normalized tracker first: in case the EDS tracker
+                            // is empty, a rejoining node might infer a leading gap that doesn't
+                            // exist (ENG-16589).
+                            ExportSequenceNumberTracker tracker = m_trackers.get(m_hostId);
+                            if (tracker == null) {
+                                // Otherwise, get the EDS tracker (note, this is a duplicate)
+                                tracker = m_eds.getTracker();
+                            }
                             lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
                             if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
                                 if (exportLog.isDebugEnabled()) {
@@ -1142,7 +1148,8 @@ public class ExportCoordinator {
 
     /**
      * Normalize the trackers to account for any host having a gap at the end; one
-     * of the other hosts will have a higher sequence number.
+     * of the other hosts will have a higher sequence number. Handle trackers already
+     * normalized to end at INFINITE_SEQNO.
      *
      * Normalize the trackers for gaps at the beginning.
      */
@@ -1151,22 +1158,32 @@ public class ExportCoordinator {
         long highestSeqNo = 0L;
         long lowestSeqNo = Long.MAX_VALUE;
 
+        // Find highest (unnormalized) and lowest seqNos across all trackers
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
                 continue;
             }
             lowestSeqNo = Math.min(lowestSeqNo, tracker.getFirstSeqNo());
-            highestSeqNo = Math.max(highestSeqNo, tracker.getLastSeqNo());
+            long lastSeqNo = tracker.getLastSeqNo();
+            highestSeqNo = lastSeqNo == INFINITE_SEQNO ? highestSeqNo : Math.max(highestSeqNo, lastSeqNo);
         }
         if (lowestSeqNo == Long.MAX_VALUE) {
             lowestSeqNo = 1L;
         }
+
+        // Normalize all trackers to start at lowest seqNo and end at INFINITE_SEQNO
+        // with potential trailing and leading gaps
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
                 tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
-                tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                if (tracker.getLastSeqNo() < INFINITE_SEQNO) {
+                    // Tracker is not already normalized to infinite,
+                    // extend it (potentially creating trailing gap).
+                    tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                }
                 if (tracker.getFirstSeqNo() > lowestSeqNo) {
+                    // Create a leading gap on tracker
                     tracker.addRange(lowestSeqNo, lowestSeqNo);
                 }
             }
