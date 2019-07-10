@@ -497,7 +497,7 @@ public:
     void relocateNonInlinedFields(std::ptrdiff_t offset);
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
+    bool equalsNoSchemaCheck(const TableTuple &other, const HiddenColumnFilter *hiddenColumnFilter = NULL) const;
 
     int compare(const TableTuple &other) const;
     int compareNullAsMax(const TableTuple &other) const;
@@ -1213,7 +1213,7 @@ inline bool TableTuple::equals(const TableTuple &other) const {
     return equalsNoSchemaCheck(other);
 }
 
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns) const {
+inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, const HiddenColumnFilter *hiddenColumnFilter) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
@@ -1221,14 +1221,15 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includ
             return false;
         }
     }
-    if (!includeHiddenColumns) {
-        return true;
-    }
-    for (int ii = 0; ii < m_schema->hiddenColumnCount(); ii++) {
-        const NValue lhs = getHiddenNValue(ii);
-        const NValue rhs = other.getHiddenNValue(ii);
-        if (lhs.op_notEquals(rhs).isTrue()) {
-            return false;
+    if (hiddenColumnFilter != NULL) {
+        for (int ii = 0; ii < m_schema->hiddenColumnCount(); ii++) {
+            if (hiddenColumnFilter->include(ii)) {
+                const NValue lhs = getHiddenNValue(ii);
+                const NValue rhs = other.getHiddenNValue(ii);
+                if (lhs.op_notEquals(rhs).isTrue()) {
+                    return false;
+                }
+            }
         }
     }
     return true;

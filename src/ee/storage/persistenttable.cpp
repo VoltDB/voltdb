@@ -1451,11 +1451,18 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
      */
     TableTuple tableTuple(m_schema);
     TableIterator ti(this, m_data.begin());
-    if (lookupType != LOOKUP_FOR_UNDO &&
-            m_schema->getUninlinedObjectColumnCount() != 0) {
-        bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
+
+    if (lookupType == LOOKUP_FOR_DR && m_schema->hiddenColumnCount()) {
+        // Force column compare for DR so we can easily use the filter
+        HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
         while (ti.next(tableTuple)) {
-            if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
+            if (tableTuple.equalsNoSchemaCheck(tuple, &filter)) {
+                return tableTuple;
+            }
+        }
+    } else if (lookupType != LOOKUP_FOR_UNDO && m_schema->getUninlinedObjectColumnCount() != 0) {
+        while (ti.next(tableTuple)) {
+            if (tableTuple.equalsNoSchemaCheck(tuple)) {
                 return tableTuple;
             }
         }
