@@ -19,6 +19,7 @@ package org.voltdb.plannerv2.sqlfunctions;
 
 import com.google.common.collect.ImmutableMultimap;
 import org.apache.commons.lang3.tuple.Triple;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.utils.Pair;
 
 /**
@@ -37,27 +38,50 @@ import org.voltcore.utils.Pair;
  * @since 9.1
  */
 public class VoltSqlFunctions {
-    // The map from method name to a triplet of objects representing the signature of
-    // volt extend sql functions. There are three components for each SQL function.
-    // 1. The first component is the static class the function is implemented in. (e.g. BitwiseFunctions)
-    // 2. The second component is the whether the function needs its argument to match its declaration exactly.
-    //    This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
-    // 3. The last component is an array of class objects that represents the argument types of the function.
-    public static final ImmutableMultimap<String, Triple<Class, Boolean, Class[]>> VOLT_SQL_FUNCTIONS =
-            ImmutableMultimap.<String, Triple<Class, Boolean, Class []>>builder()
-                    .put("migrating", Triple.of(MigrationFunctions.class, false, new Class[] {}))
-                    .put("bit_shift_left", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
-                    .put("bit_shift_right", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
-                    .put("bitAnd", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("bitNot", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class}))
-                    .put("bitOr", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("bitXor", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("inet6_aton", Triple.of(InternetFunctions.class, true, new Class[] {String.class}))
-                    .put("inet6_ntoa", Triple.of(InternetFunctions.class, true, new Class[] {byte[].class}))
-                    .put("inet_aton", Triple.of(InternetFunctions.class, true, new Class[] {String.class}))
-                    .put("inet_ntoa", Triple.of(InternetFunctions.class, true, new Class[] {long.class}))
-                    .put("hex", Triple.of(StringFunctions.class, false, new Class[] {long.class}))
-                    .put("substring", Triple.of(StringFunctions.class, false, new Class[] {String.class, int.class}))
+    // A POD holder for representing a SQL function
+    public static class FunctionDescriptor {
+        // The class that the function is implemented in
+        final private Class m_implementor;
+        // Whether the function needs its argument to match its declaration exactly.
+        // This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
+        final private boolean m_exactArgumentTypes;
+        // Classes of argument types
+        final private Class[] m_argumentTypes;
+
+        private FunctionDescriptor(Class implementor, boolean exactArgumentTypes, Class[] argumentTypes) {
+            m_implementor = implementor;
+            m_exactArgumentTypes = exactArgumentTypes;
+            m_argumentTypes = argumentTypes;
+        }
+
+        public Class getImplementor() {
+            return m_implementor;
+        }
+
+        public boolean isExactArgumentTypes() {
+            return m_exactArgumentTypes;
+        }
+
+        public Class[] getArgumentTypes() {
+            return m_argumentTypes;
+        }
+    }
+
+    // The map from method name to SQL FunctionDescriptor
+    public static final ImmutableMultimap<String, FunctionDescriptor> VOLT_SQL_FUNCTIONS =
+            ImmutableMultimap.<String, FunctionDescriptor>builder()
+                    .put("migrating", new FunctionDescriptor(MigrationFunctions.class, false, new Class[] {}))
+                    .put("bit_shift_left", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
+                    .put("bit_shift_right", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
+                    .put("bitAnd", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("bitNot", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class}))
+                    .put("bitOr", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("bitXor", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("inet6_aton", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {String.class}))
+                    .put("inet6_ntoa", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {byte[].class}))
+                    .put("inet_aton", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {String.class}))
+                    .put("inet_ntoa", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {long.class}))
+                    .put("hex", new FunctionDescriptor(StringFunctions.class, false, new Class[] {long.class}))
                     .build();
 
     //-------------------------------------------------------------
@@ -123,10 +147,6 @@ public class VoltSqlFunctions {
     // String functions
     public static class StringFunctions {
         public static String hex(long value) {
-            return "";
-        }
-
-        public static String substring(String s, int position) {
             return "";
         }
     }

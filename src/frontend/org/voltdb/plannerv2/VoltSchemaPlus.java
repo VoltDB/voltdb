@@ -57,13 +57,13 @@ public class VoltSchemaPlus {
         });
 
         // add Volt extend SQL functions to the SchemaPlus
-        for (Map.Entry<String, Triple<Class, Boolean, Class[]>> function :
+        for (Map.Entry<String, VoltSqlFunctions.FunctionDescriptor> function :
                 VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
             schema.add(function.getKey().toUpperCase(),
-                    ScalarFunctionImpl.create(function.getValue().getLeft(),
+                    ScalarFunctionImpl.create(function.getValue().getImplementor(),
                                               function.getKey(),
-                                              function.getValue().getMiddle(),
-                                              function.getValue().getRight()));
+                                              function.getValue().isExactArgumentTypes(),
+                                              function.getValue().getArgumentTypes()));
         }
 
         return schema;
