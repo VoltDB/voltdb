@@ -293,7 +293,7 @@ public class AsyncExportClient
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
-    
+
     // If testing Table/Export, count inserts, deletes, update fore & aft
     
     private static int INSERT = 1;
@@ -423,7 +423,7 @@ public class AsyncExportClient
                     e.printStackTrace();
                     System.exit(-1);
                 }
-                
+
                 // Table with Export
                 try {
                     clientRef.get().callProcedure(

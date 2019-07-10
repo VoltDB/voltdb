@@ -5,13 +5,19 @@
         <jsonapi enabled="true" />
     </httpd>
     <export>
-        <configuration enabled="true" target="ABC">
+        <configuration enabled="true" target="FOO">
             <property name="type">csv</property>
             <property name="with-schema">false</property>
             <property name="batched">false</property>
             <property name="nonce">zohan</property>
             <property name="period">1</property>
             <property name="outdir">exportdata</property>
+        </configuration>
+        <configuration enabled="true" target="ABC" type="custom"
+                   exportconnectorclass="org.voltdb.exportclient.loopback.LoopbackExportClient">
+            <property name="procedure">partitioned_table.insert</property>
+            <property name="skipinternals">false</property>
+            <property name="failurelogfile">/tmp/MyProcFailures.log</property>
         </configuration>
     </export>
 </deployment>
