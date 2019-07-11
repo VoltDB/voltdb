@@ -188,16 +188,17 @@ std::string NValue::debug() const {
 }
 
 int32_t NValue::serializedSize() const {
-    int32_t length = sizeof(int32_t);
     switch (m_valueType) {
        case VALUE_TYPE_VARCHAR:
        case VALUE_TYPE_VARBINARY:
+       case VALUE_TYPE_GEOGRAPHY:
           if (! isNull()) {
              int32_t valueLength;
              getObject_withoutNull(valueLength);
-             length += valueLength;
+             return sizeof(int32_t) + valueLength;
+          } else {
+              return sizeof(int32_t);
           }
-          return length;
        default:
           return getTupleStorageSize(m_valueType);
     }
