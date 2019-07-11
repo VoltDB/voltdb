@@ -292,61 +292,34 @@ public class VoltTrace implements Runnable {
 
 
     /**
-     * Indicator on whether the trace event filter is turned on
-     */
-    private static boolean filter_on = false;
-    /**
-     * enable the traceEvent filter
-     */
-    public static void enableTraceEventFilter() throws IOException {
-        // first check is tracer on
-        if (s_tracer == null) {
-            start();
-        }
-        // turn traceEvent filter
-        filter_on = true;
-        System.out.println("filter is enabled");
-    }
-    /**
-     * disable the traceEvent filter
-     */
-    public static void disableTraceEventFilter() {
-        if (s_tracer == null) {
-            return;
-        }
-        filter_on = false;
-        System.out.println("filter is disabled");
-    }
-
-    /**
-     * check if the filter is turned on
-     */
-    public static boolean isTraceEventFilterOn() {
-        return filter_on;
-    }
-
-    /**
+     * Trace event filter
      * Time interval for trace event filter
      * Unit: microseconds
      */
     private static double filter_time = 0;
+    private static boolean filter_on = false;
 
     /**
      * Set and reset the filter time
      * Unit: miliseconds
      */
-    public static void setFilterTime(double time) {
-        filter_time = time;
-        System.out.println("set filter time " + time);
-        if (time == 0) {
-            filter_on = false;
-            System.out.println("filter is turned off");
+    public static void setFilterTime(double time) throws IOException {
+        // first check is tracer on
+        if (s_tracer == null) {
+            start();
         }
+
+        filter_time = time;
+        filter_on = time > 0? true : false;
     }
 
-    public static void resetFiltertime() {
-        filter_time = 0;
+    /**
+     * check if the filter is turned on
+     */
+    public static boolean isFilterOn() {
+        return filter_on;
     }
+
 
     /**
      * Concurrent hash map to check the begin of a trace event
@@ -420,7 +393,6 @@ public class VoltTrace implements Runnable {
                     if (diff >= 0) {
                         m_events.add(d_beginWrapper);
                         m_events.add(s_eventWrapper);
-                        System.out.println("Diff = " + diff + ", -> Record DURATION_BEGIN_END events");
                     }
                 }
                 duration_events.removeLast();
@@ -444,7 +416,6 @@ public class VoltTrace implements Runnable {
                     if (diff >= 0) {
                         m_events.add(a_beginWrapper);
                         m_events.add(s_eventWrapper);
-                        System.out.println("Diff = " + diff);
                     }
                     async_events.remove(e_key);
                     return;
@@ -532,8 +503,11 @@ public class VoltTrace implements Runnable {
         return m_enabledCategories.contains(cat);
     }
 
+    /**
+     * when the buffer (m_traceEVents) is full, copy the trace events in the buffer to writeQueue
+     * and clear the buffer
+     */
     private void dumpToWriteMap() {
-        System.out.println("Buffer is full, dump to writeMap");
         TraceEventBatch eventBatch;
         while ((eventBatch = m_traceEvents.poll()) != null) {
             if (eventBatch.getTraceEventsList().isEmpty() || eventBatch.getTraceEventsList().size() == 0) {
@@ -553,27 +527,23 @@ public class VoltTrace implements Runnable {
                 writeMap.put(b_key, eventBatch);
             }
         }
-        System.out.println("writeMap size = " + writeMap.size());
         return;
     }
 
+    /**
+     * when "@Trace dump" is invoked, write the trace events temporrarily stored in the writeQueue back to the buffer
+     */
     private void writeBackToBuffer() {
-        System.out.println("Write back to buffer");
-        System.out.println("-> buffer size = " + m_traceEvents.size() + ", remainingCapacity = " + m_traceEvents.remainingCapacity());
-        // set a warning if overflow still happens when the threashold is too low
+        // may need to set a warning if overflow still happens when the threashold is too low
         for (Map.Entry<String, TraceEventBatch> entry : writeMap.entrySet()) {
-            //m_work.offer(() -> m_traceEvents.offer(entry.getValue()));
             m_traceEvents.offer(entry.getValue());
-            System.out.println("List size = " + entry.getValue().getTraceEventsList().size());
         }
-        System.out.println("-> buffer size = " + m_traceEvents.size() + ", remainingCapacity = " + m_traceEvents.remainingCapacity());
     }
 
     private void queueEvent(TraceEventBatch s) {
         // check whether m_traceEVents is full
         // if it is full, clear the queue and move the traceEventBatch to the writeMap
         // key is (category, thread_id)
-
         if (m_traceEvents.remainingCapacity() == 0) {
             dumpToWriteMap();
         }
@@ -585,19 +555,13 @@ public class VoltTrace implements Runnable {
         if (m_emptyQueue == null || m_traceEvents.isEmpty()) {
             return null;
         }
-        System.out.println("Dump Events");
+
         // dump the m_traceEvents
         dumpToWriteMap();
-        System.out.println("buffer size = " + m_traceEvents.size() + ", remainingCapacity = " + m_traceEvents.remainingCapacity());
         // write back from writeMap to m_traceEvents
         writeBackToBuffer();
-        System.out.println("buffer size = " + m_traceEvents.size() + ", remainingCapacity = " + m_traceEvents.remainingCapacity());
 
         final EvictingQueue<TraceEventBatch> writeQueue = m_traceEvents;
-        // XG
-        System.out.println("m_traceEvents size = " + m_traceEvents.size());
-        System.out.println("writeQueue size = " + writeQueue.size());
-
         m_traceEvents = m_emptyQueue;
         m_emptyQueue = null;
 

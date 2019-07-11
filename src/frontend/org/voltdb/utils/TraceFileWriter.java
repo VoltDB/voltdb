@@ -77,8 +77,6 @@ public class TraceFileWriter implements Runnable {
         if (fileWriter != null) {
             close(fileWriter);
         }
-        // XG
-        System.out.println("Wrote " + count + " trace events to " + m_path.getAbsolutePath());
 
         s_logger.info("Wrote " + count + " trace events to " + m_path.getAbsolutePath());
     }

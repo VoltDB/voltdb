@@ -280,6 +280,8 @@ function test-volt-trace() {
     sqlcmd --query="exec @Trace enable CI"
     sqlcmd --query="exec @Trace status"
     tracing-benchmark-showAll
+    sqlcmd --query="exec @Trace filter 0"
+    sqlcmd --query="exec @Trace status"
     sqlcmd --query="exec @Trace dump"
     sqlcmd --query="exec @Trace disable ALL"
     #sqlcmd --query="exec @Statistics procedureprofile 0"

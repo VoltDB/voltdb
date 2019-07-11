@@ -132,11 +132,15 @@ public class TraceAgent extends OpsAgent {
 
             String filterTime = paramsArray[1].toString();
             try {
-                double time = Double.parseDouble(filterTime);
+                double f_time = Double.parseDouble(filterTime);
+                if (f_time < 0) {
+                    return "Second argument of @Trace filter must be a non-negative numeric number";
+                }
             } catch (NumberFormatException | NullPointerException e) {
                 return "Incorrect type of second argument of @Trace filter " +
                         filterTime + " (It must be an double number)";
             }
+
             obj.put("subselector", subselector);
             obj.put("filterTime", filterTime);
             obj.put("interval", false);
@@ -149,9 +153,8 @@ public class TraceAgent extends OpsAgent {
     @Override
     protected void handleJSONMessage(JSONObject obj) throws Exception
     {
-        //VoltTable[] results = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.STRING),
-        //                                                     new VoltTable.ColumnInfo("FILTER", VoltType.STRING))};
-        VoltTable[] results = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.STRING))};
+        VoltTable[] results = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.STRING)),
+                                               new VoltTable(new VoltTable.ColumnInfo("FILTER", VoltType.STRING))};
 
         OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
         if (selector != OpsSelector.TRACE) {
@@ -176,27 +179,19 @@ public class TraceAgent extends OpsAgent {
                 VoltTrace.disableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
             }
         } else if (subselector.equalsIgnoreCase("filter")) {
-            VoltTrace.enableTraceEventFilter();
             double time = Double.parseDouble(obj.getString("filterTime"));
             VoltTrace.setFilterTime(time);
         } else if (subselector.equalsIgnoreCase("status")) {
             final Collection<VoltTrace.Category> enabledCategories = VoltTrace.enabledCategories();
             if (enabledCategories.isEmpty()) {
                 results[0].addRow("off");
-                /*
-                if (VoltTrace.isTraceEventFilterOn()) {
-                    results[0].addRow("off", "On");
-                } else {
-                    results[0].addRow("off", "Off");
-                }*/
             } else {
-                /*
-                if (VoltTrace.isTraceEventFilterOn()) {
-                    results[0].addRow(enabledCategories.toString(), "on");
-                } else {
-                    results[0].addRow(enabledCategories.toString(), "off");
-                }*/
                 results[0].addRow(enabledCategories.toString());
+            }
+            if (VoltTrace.isFilterOn()) {
+                results[1].addRow("On");
+            } else {
+                results[1].addRow("Off");
             }
         }
 
