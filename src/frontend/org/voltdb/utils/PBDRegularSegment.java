@@ -862,7 +862,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         @Override
         public boolean anyReadAndDiscarded() {
-            return m_discardCount > 0;
+            /*
+             * This method is called to determine whether the segment can be
+             * deleted; reply true if we have discarded at least the number of
+             * entries (ENG-16589)
+             */
+            return m_discardCount >= m_numOfEntries;
         }
 
         @Override

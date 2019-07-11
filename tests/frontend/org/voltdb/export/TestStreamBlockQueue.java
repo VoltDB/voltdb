@@ -604,4 +604,172 @@ public class TestStreamBlockQueue extends TestCase {
         assertTrue(m_sbq.isEmpty());
 
     }
+
+    /**
+     * This test attempts to mimick what would happen in {@code ExportDataSource}
+     * when buffers are polled for sending but a remote ack discards the StreamBlock before
+     * we discard the unreleased container.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testUnreleasedContainerDiscard() throws Exception {
+
+        int nBuffers = 660;
+
+        // Offer enough 2Mb buffers to fill more than one PBD segment
+        for (int ii = 0; ii < nBuffers; ii++) {
+            StreamBlock sb = getStreamBlockWithFill((byte) ii);
+            m_sbq.offer(sb);
+        }
+        m_sbq.sync();
+
+        // Simulate EDS polling buffers and creating unreleased containers
+        // and releasing StreamBlocks before the unreleased container
+        for (int ii = 0; ii < nBuffers; ii++) {
+
+            // This is the EDS polling behavior which creates an unreleased container
+            // (see ExportDataSource.pollImpl)
+            Iterator<StreamBlock> iterPoll = m_sbq.iterator();
+            StreamBlock sbPolled = iterPoll.next();
+            BBContainer cont = sbPolled.unreleasedContainer();
+
+            // Now simulate a remote ack that discards the StreamBlock before
+            // the unreleased container is discarded (see ExportDataSource.releaseExportBytes)
+            StreamBlock sbPeeked = m_sbq.peek();
+            m_sbq.pop();
+            sbPeeked.discard();
+
+            // Now discard the unreleasedContainer
+            cont.discard();
+        }
+        assertEquals(m_sbq.sizeInBytes(), 0);
+        assertTrue(m_sbq.isEmpty());
+    }
+
+    /**
+     * Test discarding unreleased containers after the next StreamBlock is discarded
+     * @throws Exception
+     */
+    @Test
+    public void testLastUnreleasedContainerDiscard() throws Exception {
+
+        int nBuffers = 662;
+
+        // Offer enough 2Mb buffers to fill more than one PBD segment
+        for (int ii = 0; ii < nBuffers; ii++) {
+            StreamBlock sb = getStreamBlockWithFill((byte) ii);
+            m_sbq.offer(sb);
+        }
+        m_sbq.sync();
+
+        // Simulate EDS polling buffers and creating unreleased containers.
+        // Releasing StreamBlocks AHEAD of the last the unreleased container
+        BBContainer contLast = null;
+        for (int ii = 0; ii < nBuffers; ii++) {
+
+            // This is the EDS polling behavior which creates an unreleased container
+            // (see ExportDataSource.pollImpl)
+            Iterator<StreamBlock> iterPoll = m_sbq.iterator();
+            StreamBlock sbPolled = iterPoll.next();
+            BBContainer cont = sbPolled.unreleasedContainer();
+
+            // Now simulate a remote ack that discards the StreamBlock before
+            // the unreleased container is discarded (see ExportDataSource.releaseExportBytes)
+            StreamBlock sbPeeked = m_sbq.peek();
+            m_sbq.pop();
+            sbPeeked.discard();
+
+            if (contLast != null) {
+                contLast.discard();
+            }
+            contLast = cont;
+        }
+        contLast.discard();
+        assertEquals(m_sbq.sizeInBytes(), 0);
+        assertTrue(m_sbq.isEmpty());
+    }
+
+    /**
+     * Test the case where the last buffer of a segment has an unreleased container,
+     * and we discard the first buffer of the following segment (ENG-16589)
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testOneUnreleasedContainerDiscard() throws Exception {
+
+        int nBuffers = 662;
+
+        // Offer enough 2Mb buffers to fill more than one PBD segment
+        for (int ii = 0; ii < nBuffers; ii++) {
+            StreamBlock sb = getStreamBlockWithFill((byte) ii);
+            m_sbq.offer(sb);
+        }
+        m_sbq.sync();
+
+        // Simulate EDS polling buffers: create unreleased container for the last of one segment.
+        // Release it only after all other SBs have been released
+        BBContainer contLast = null;
+        for (int ii = 0; ii < nBuffers; ii++) {
+
+            // This is the EDS polling behavior which creates an unreleased container
+            // (see ExportDataSource.pollImpl)
+            Iterator<StreamBlock> iterPoll = m_sbq.iterator();
+            StreamBlock sbPolled = iterPoll.next();
+            if (ii == 657) {
+                contLast = sbPolled.unreleasedContainer();
+            }
+
+            // Now simulate a remote ack that discards the StreamBlock
+            StreamBlock sbPeeked = m_sbq.peek();
+            m_sbq.pop();
+            sbPeeked.discard();
+        }
+        contLast.discard();
+        assertEquals(m_sbq.sizeInBytes(), 0);
+        assertTrue(m_sbq.isEmpty());
+    }
+
+    /**
+     * Discard all unreleased containers after all
+     * @throws Exception
+     */
+    @Test
+    public void testUnreleasedContainerDiscardAfterAllDiscards() throws Exception {
+
+        int nBuffers = 662;
+
+        // Offer enough 2Mb buffers to fill more than one PBD segment
+        for (int ii = 0; ii < nBuffers; ii++) {
+            StreamBlock sb = getStreamBlockWithFill((byte) ii);
+            m_sbq.offer(sb);
+        }
+        m_sbq.sync();
+
+        // Simulate EDS polling buffers and creating unreleased containers.
+        // Releasing StreamBlocks AHEAD of the last the unreleased container
+        ArrayList<BBContainer> conts = new ArrayList<>();
+        for (int ii = 0; ii < nBuffers; ii++) {
+
+            // This is the EDS polling behavior which creates an unreleased container
+            // (see ExportDataSource.pollImpl)
+            Iterator<StreamBlock> iterPoll = m_sbq.iterator();
+            StreamBlock sbPolled = iterPoll.next();
+            conts.add(sbPolled.unreleasedContainer());
+
+            // Now simulate a remote ack that discards the StreamBlock
+            StreamBlock sbPeeked = m_sbq.peek();
+            m_sbq.pop();
+            sbPeeked.discard();
+        }
+
+        // Now discard the unreleased containers
+        int i = 0;
+        for (BBContainer cont : conts) {
+            cont.discard();
+        }
+        assertEquals(m_sbq.sizeInBytes(), 0);
+        assertTrue(m_sbq.isEmpty());
+    }
 }
