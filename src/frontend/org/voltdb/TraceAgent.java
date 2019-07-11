@@ -105,14 +105,21 @@ public class TraceAgent extends OpsAgent {
             for (VoltTrace.Category cat : VoltTrace.Category.values()) {
                 if (cat.toString().equalsIgnoreCase(categoryItem)) {
                     obj.put("subselector", subselector);
-                    obj.put("categories", params.toArray()[1]);
+                    obj.put("categories", categoryItem);
                     obj.put("interval", false);
                     return null;
                 }
             }
 
+            if ("ALL".equalsIgnoreCase(categoryItem)) {
+                obj.put("subselector", subselector);
+                obj.put("categories", categoryItem);
+                obj.put("interval", false);
+                return null;
+            }
+
             return "Second argument to @Trace " +
-                    subselector + " must be a valid STRING category, instead was " +
+                    subselector + " must be a valid STRING category or 'ALL', instead was " +
                     categoryItem;
         }
 
@@ -162,7 +169,12 @@ public class TraceAgent extends OpsAgent {
         } else if (subselector.equalsIgnoreCase("enable")) {
             VoltTrace.enableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
         } else if (subselector.equalsIgnoreCase("disable")) {
-            VoltTrace.disableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
+            if (obj.getString("categories").equalsIgnoreCase("all")) {
+                // disable all categories and close the tracer
+                VoltTrace.disableAllCategories();
+            } else {
+                VoltTrace.disableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
+            }
         } else if (subselector.equalsIgnoreCase("filter")) {
             VoltTrace.enableTraceEventFilter();
             double time = Double.parseDouble(obj.getString("filterTime"));
