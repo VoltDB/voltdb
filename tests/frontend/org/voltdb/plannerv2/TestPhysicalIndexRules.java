@@ -210,8 +210,26 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is not applicable applicable - column order
         m_tester.sql("SELECT * FROM RI5 ORDER BY II, I")
         .transform("VoltPhysicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], split=[1])\n" +
-                    "  VoltPhysicalCalc(expr#0..2=[{inputs}], proj#0..2=[{exprs}], split=[1])\n" + 
+                    "  VoltPhysicalCalc(expr#0..2=[{inputs}], proj#0..2=[{exprs}], split=[1])\n" +
                     "    VoltPhysicalTableSequentialScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy10() {
+        // Index INDEX RI2_IND2 ON RI2 (i, bi). Sort is redundant
+        m_tester.sql("SELECT * FROM RI2 WHERE i = ? ORDER BY BI")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], expr#4=[?0], expr#5=[=($t0, $t4)], proj#0..3=[{exprs}], $condition=[$t5], index=[RI2_IND2_ASCGTE1_1])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy11() {
+        // I = BI is not an equality expression with a CONST. Sort is required
+        m_tester.sql("SELECT * FROM RI2 WHERE i = bi ORDER BY BI")
+        .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], split=[1])\n" +
+                    "  VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], expr#5=[=($t4, $t2)], proj#0..3=[{exprs}], $condition=[$t5], split=[1])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
         .pass();
     }
 
