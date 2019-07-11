@@ -55,7 +55,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import static org.voltdb.exportclient.ExportClientBase.rateLimitedLogError;
 
 public class JDBCExportClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
@@ -161,6 +160,8 @@ public class JDBCExportClient extends ExportClientBase {
         private boolean m_warnedOfUnsupportedOperation = false;
         private boolean m_supportsBatchUpdates;
         private boolean m_disableAutoCommits = true;
+        private long m_curGenId;
+        private ExportRowSchema m_curSchema;
 
         private final RefCountedDS m_ds;
 
@@ -180,6 +181,7 @@ public class JDBCExportClient extends ExportClientBase {
         public JDBCDecoder(AdvertisedDataSource source, RefCountedDS ds) {
             super(source);
 
+            m_curGenId = source.m_generation;
             m_ds = ds;
             m_es =
                     CoreUtils.getListeningSingleThreadExecutor(
@@ -530,6 +532,47 @@ public class JDBCExportClient extends ExportClientBase {
             }
         }
 
+        /**
+         * Detect whether the schema changed, and if yes, reset state for new statements.
+         * Optimize the changes by checking if schemas actually differ, because there are
+         * scenarios where the catalog changes (e.g. an export target is enabled) but the
+         * schemas are unchanged.
+         *
+         * @throws RestartBlockException
+         */
+        private void checkSchemas() throws RestartBlockException {
+            try {
+                ExportRowSchema curSchema = getExportRowSchema();
+                assert(curSchema != null);
+                if (m_curGenId != curSchema.generation &&
+                        !(m_curSchema != null && m_curSchema.sameSchema(curSchema))) {
+                    if (m_logger.isDebugEnabled()) {
+                        StringBuilder sb = new StringBuilder("Detected new schema: ")
+                                .append("old = ")
+                                .append(m_curGenId)
+                                .append(", new = ")
+                                .append(curSchema.generation);
+                        m_logger.debug(sb);
+                    }
+                    m_curGenId = curSchema.generation;
+                    m_curSchema = curSchema;
+                    if (pstmt != null) {
+                        try {
+                            pstmt.close();
+                        } catch (Exception e) {}
+                        finally {
+                            pstmt = null;
+                        }
+                    }
+                    m_preparedStmtStr = null;
+                    m_createTableStr = null;
+                }
+            } catch (Exception e) {
+                m_logger.warn("JDBC export unable to check schemas", e);
+                throw new RestartBlockException(true);
+            }
+        }
+
         @Override
         public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
@@ -549,6 +592,9 @@ public class JDBCExportClient extends ExportClientBase {
                     closeConnection();
                     throw new RestartBlockException(true);
                 }
+            }
+            if (!ignoreGenerations) {
+                checkSchemas();
             }
         }
 

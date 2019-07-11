@@ -156,6 +156,7 @@ SET (VOLTDB_SRC
   common/UndoLog.cpp
   common/UndoReleaseAction.cpp
   common/ValueFactory.cpp
+  common/debuglog.cpp
   common/executorcontext.cpp
   common/serializeio.cpp
   common/tabletuple.cpp

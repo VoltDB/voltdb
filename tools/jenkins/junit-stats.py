@@ -8,14 +8,15 @@
 import logging
 import os
 import sys
-
 import mysql.connector
 
 from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
 from numpy import std, mean
-from re import sub
+from re import search, sub
+from string import whitespace
+from traceback import format_exc
 from urllib2 import HTTPError, URLError, urlopen
 
 # Constants used in posting messages on Slack
@@ -29,6 +30,9 @@ DRY_RUN = False
 
 # Default is None (null); but once initialized, it may be reused
 JENKINSBOT = None
+
+# All possible failure "types", as detailed below
+ALL_FAILURE_TYPES = ['NEW', 'INTERMITTENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']
 
 # Constants used to determine which test failures are considered Consistent,
 # Intermittent or New failures
@@ -74,9 +78,15 @@ JIRA_LABEL_FOR_NEW_FAILURES          = 'junit-intermittent-failure'
 JIRA_LABEL_FOR_OLD_FAILURES          = 'junit-intermittent-failure'
 MAX_NUM_ATTACHMENTS_PER_JIRA_TICKET  = 8
 
+# Used to help prevent a Jira ticket from exceeding Jira's maximum
+# description size (32,767 characters, total)
+MAX_NUM_CHARS_PER_JIRA_DESCRIPTION  = 32767
+MAX_NUM_CHARS_PER_DESCRIPTION_PIECE = 2000
+
 # Used in Jira ticket descriptions:
-STACK_TRACE_LINE = '\n-------------------------\-Stack Trace\--------------------------\n\n'
-SEPARATOR_LINE   = '\n-------------------------------------------------------------\n\n'
+DASHES = '-------------------------'
+STACK_TRACE_LINE = '\n'+DASHES+'\-Stack Trace\-'+DASHES+'\n\n'
+SEPARATOR_LINE   = '\n'+DASHES+'--------------' +DASHES+'\n\n'
 JENKINS_JOB_NICKNAMES = {
     'branch-2-community-junit-master'         : 'community-junit',
     'branch-2-pro-junit-master'               : 'pro-junit',
@@ -87,6 +97,17 @@ JENKINS_JOB_NICKNAMES = {
     'test-nextrelease-nonflaky-pro-junit'     : 'nonflaky-pro',
     'test-nextrelease-pool-community-junit'   : 'pool-community',
     'test-nextrelease-pool-pro-junit'         : 'pool-pro',
+    }
+JENKINS_JOBS = {
+    'branch-2-community-junit-master'         : {'nickname' : 'community-junit',  'label' : 'junit-community-failure'},
+    'branch-2-pro-junit-master'               : {'nickname' : 'pro-junit',        'label' : 'junit-pro-failure'},
+    'test-nextrelease-debug-pro'              : {'nickname' : 'debug-pro',        'label' : 'junit-debug-failure'},
+    'test-nextrelease-memcheck-pro'           : {'nickname' : 'memcheck-pro',     'label' : 'junit-memcheck-debug-failure'},
+    'test-nextrelease-memcheck-nodebug-pro'   : {'nickname' : 'memcheck-nodebug', 'label' : 'junit-memcheck-failure'},
+    'test-nextrelease-fulljmemcheck-pro-junit': {'nickname' : 'fulljmemcheck',    'label' : 'junit-fulljmemcheck-failure'},
+    'test-nextrelease-nonflaky-pro-junit'     : {'nickname' : 'nonflaky-pro',     'label' : 'junit-nonflaky-failure'},
+    'test-nextrelease-pool-community-junit'   : {'nickname' : 'pool-community',   'label' : 'junit-pool-community-failure'},
+    'test-nextrelease-pool-pro-junit'         : {'nickname' : 'pool-pro',         'label' : 'junit-pool-pro-failure'},
     }
 
 # Used for getting the preferred URL prefix; we prefer the latter to the former,
@@ -223,25 +244,25 @@ class Stats(object):
         logging.info("starting... %s" % sys.argv)
 
 
-    def error(self, message, caused_by=None):
+    def error(self, message='', caused_by=None):
         """TODO
         :param 
         """
         global ERROR_COUNT
         ERROR_COUNT = ERROR_COUNT + 1
         if caused_by:
-            message = message + '\nCaused by:\n' + str(caused_by)
+            message += '\nCaused by:\n' + str(caused_by)
         logging.error(message)
 
 
-    def warn(self, message, caused_by=None):
+    def warn(self, message='', caused_by=None):
         """TODO
         :param 
         """
         global WARNING_COUNT
         WARNING_COUNT = WARNING_COUNT + 1
         if caused_by:
-            message = message + '\nCaused by:\n' + str(caused_by)
+            message += '\nCaused by:\n' + str(caused_by)
         logging.warn(message)
 
 
@@ -523,6 +544,352 @@ class Stats(object):
             return False  # do not close
 
 
+    def truncate_if_needed(self, text, truncate_in_middle=True,
+                           insert_text='\n...[truncated]...\n',
+                           max_num_chars=MAX_NUM_CHARS_PER_DESCRIPTION_PIECE):
+        """Takes a text string (typically part of a Jira ticket description),
+           and makes sure that it does not exceed a specified maximum number of
+           characters, and truncates it if it does. By default: the max_num_chars
+           is the constant MAX_NUM_CHARS_PER_DESCRIPTION_PIECE; it 'truncates'
+           the text in the middle, taking half the available characters from the
+           beginning and half from the end of the original text; and it adds
+           '\n...[truncated]...\n' in the middle. But by specifying the optional
+           parameters, you may change it to instead truncate the end of the text
+           (when truncate_in_middle=False); or to insert a different piece of
+           text to indicate the truncation; or to use a different maximum number
+           of characters.
+        """
+        if len(text) <= max_num_chars:
+            return text
+
+        logging.debug('  In junit-stats.truncate_if_needed:')
+        new_text = ''
+        insert_length = len(insert_text)
+
+        # "Truncate" the text in the middle
+        if truncate_in_middle:
+            half_length = int( (max_num_chars - insert_length) / 2 )
+            new_text = text[:half_length] + insert_text \
+                     + text[-half_length:]
+            logging.warn('Jira description piece of length %d characters '
+                         'truncated to %d characters:\n    %s'
+                         % (len(text), len(new_text), new_text) )
+
+        # Truncate the text at the end
+        else:
+            last_char_index = max_num_chars - insert_length
+            new_text = text[:last_char_index] + insert_text
+            logging.warn('Updated Jira description truncated to:\n    %s' % new_text)
+            logging.warn('This part was left out of the truncated Jira description:\n    %s'
+                         % text[last_char_index:] )
+
+        logging.debug('    new (truncated) text:\n    %s' % str(new_text))
+        return new_text
+
+
+    def combine_since_build_messages(self, description, new_since_build,
+                                     info_messages, jenkins_job_name=None,
+                                     build_type=None):
+        """If the current (Jira ticket) description includes 'since-build'
+           messages related to the current Jenkins job, compress them and the
+           new_since_build message into one, and return the resulting (Jira
+           ticket) description.
+        """
+        updated_description = False
+        if jenkins_job_name:
+            # Older formats of "since-build" messages:
+            format1_message = '\nFailing consistently since '+jenkins_job_name+' build #'
+            format2_message = '\nFailing intermittently since '+jenkins_job_name+' build #'
+            # Current format of "since-build" messages (omitting beginning):
+            format3_message = 'failure in '+jenkins_job_name+' since build #'
+            # Set initial values
+            found_old_version_of_same_message = False
+            old_build_number = sys.maxint  # an initial, very large value
+
+            for msg in [format1_message, format2_message, format3_message]:
+                count = 0
+                while msg in description and count < 10:
+                    count += 1  # just in case the text replacement does not work
+                    found_old_version_of_same_message = True
+
+                    # Get the index of the message's start - from the
+                    # beginning of the line
+                    message_start = description.index(msg)
+                    if description[message_start:message_start+1] != '\n':
+                        message_start = description.rfind('\n', 0, message_start)
+                    # Get the index of the message's end - to the beginning
+                    # of the next line (or of the entire description)
+                    message_end = description.find('\n', message_start+1)
+                    if message_end < 0:
+                        message_end = len(description)
+
+                    matching_message = description[message_start:message_end]
+                    msg_build_start  = matching_message.rfind('#') + 1
+                    msg_build_end    = len(matching_message)
+                    match = search('\D', matching_message[msg_build_start:])
+                    if match:
+                        msg_build_end = msg_build_start + match.start()
+
+                    logging.debug('  msg             : '+str(msg))
+                    logging.debug('  message_start   : '+str(message_start))
+                    logging.debug('  message_end     : '+str(message_end))
+                    logging.debug('  matching_message: '+matching_message)
+                    logging.debug('  msg_build_start : '+str(msg_build_start))
+                    logging.debug('  msg_build_end   : '+str(msg_build_end))
+                    logging.debug('  matching_message[msg_build_start:msg_build_end]: '
+                                  + matching_message[msg_build_start:msg_build_end])
+
+                    try:
+                        msg_build_number = int(matching_message[msg_build_start:msg_build_end])
+                        old_build_number = min(old_build_number, msg_build_number)
+                    except ValueError as e:
+                        self.error('While trying to get build number from old description '
+                                   '(index %d-%d):\n    %s\n    Found Exception:\n    %s'
+                                   % (msg_build_start, msg_build_end, matching_message, str(e)) )
+                        break
+                    description = description.replace(matching_message,'')
+                    updated_description = True
+
+            # For a Consistent failure, keep the build number in the new message,
+            # which is presumably the build at which the current Jenkins job started
+            # failing consistently; for others (Intermittent, Inconsistent, etc.),
+            # change it to the oldest build in which we've seen this failure
+            if found_old_version_of_same_message and build_type is not 'CONSISTENT':
+                msg_build_index = new_since_build.rfind('#') + 1
+                try:
+                    new_build_number = int(new_since_build[msg_build_index:])
+                except ValueError as e:
+                    self.error("While trying to get build number from new 'since-build' "
+                               "message (index %d):\n    %s\n    Found Exception:\n    %s"
+                               % (msg_build_index, new_since_build, str(e)) )
+                    new_build_number = sys.maxint
+                if old_build_number < new_build_number:
+                    new_since_build = new_since_build.replace(str(new_build_number),
+                                                              str(old_build_number))
+
+        if updated_description:
+            info_messages.append('since-build message updated to: %s' % new_since_build)
+        else:
+            info_messages.append('added since-build message: %s' % new_since_build)
+
+        return description + new_since_build
+
+
+    def get_modified_description(self, old_description, new_description_pieces,
+                                 jenkins_job_name=None, build_type=None,
+                                 issue_key=''):
+        """Combines an old description (if any) of a Jira ticket with new pieces
+           of text that we want to add to that description, if they are not
+           already there; in some cases, the old and new descriptions will be
+           combined in some way. Unlike the previous version, this method is
+           very aware of, and treats slightly differently, the 4 usual parts
+           (plus 'other') of an Auto-filer ticket description: the full name of
+           the failing test (including package name, which is omitted from the
+           Summary); a link to the failure history of this test (in a particular
+           Jenkings job); a stack trace; and a brief message saying how often
+           (in a Jenkings job) this test has failed, and since which build. Note
+           that, over time, multiple versions of each section may appear in the
+           same Jira ticket. For example, links to the failure history for each
+           Jenkins job in which the test has failed; or multiple stack traces,
+           if the stack trace is not always identical, etc.
+        """
+        logging.debug('In junit-stats.get_modified_description:')
+        logging.debug('  old_description:\n  %s' % str(old_description))
+        logging.debug('  new_description_pieces:\n  %s' % str(new_description_pieces))
+        logging.debug('  jenkins_job_name: %s' % str(jenkins_job_name))
+        logging.debug('  build_type      : %s' % str(build_type))
+        logging.debug('  issue_key       : %s' % str(issue_key))
+
+        new_description = ''
+
+        # Used to identify the relevant pieces of the old description
+        old_desc_pieces = {}
+        old_desc_pieces['failingtest'] = []
+        old_desc_pieces['failurehistory'] = []
+        old_desc_pieces['stacktrace'] = []
+        old_desc_pieces['sincebuild'] = []
+        old_desc_pieces['other'] = []
+
+        # Loop through sections of the old description, which are generally
+        # separated by a line of dashes
+        old_desc_index = 0
+        while old_desc_index < len(old_description):
+            stack_trace = False
+            # Initial guesses for where the next section starts and ends
+            next_section_start = old_desc_index
+            next_section_end   = old_description.find(DASHES, next_section_start)
+
+            logging.debug('  old_desc_index    : %d' % old_desc_index)
+            logging.debug('  next_section_start: %d' % next_section_start)
+            logging.debug('  next_section_end  : %d' % next_section_end)
+
+            # If the current section of the old_description starts with dashes,
+            # skip over that line, and any white space or dashes that follow
+            if next_section_start == next_section_end:
+                next_section_start = old_description.find('\n', next_section_start)
+                if next_section_start < 0:
+                    break  # if the last line starts with dashes, ignore it
+                while next_section_start < len(old_description) and (
+                        old_description[next_section_start:next_section_start+1]
+                        in whitespace+'-' ):
+                    next_section_start += 1
+                next_section_end = old_description.find(DASHES, next_section_start)
+
+                # Unlike other sections, a Stack Trace should include its dashes
+                # (if we have multiple Stack Traces, we want them separated)
+                if 'Stack Trace' in old_description[old_desc_index:next_section_start]:
+                    stack_trace = True
+                    next_section_start = old_desc_index
+
+            # If there are no more dashes, then this is the last section, so it
+            # ends at the end of the old_description
+            if next_section_end < 0:
+                next_section_end = len(old_description)
+
+            logging.debug('  stack_trace       : %s' % str(stack_trace))
+            logging.debug('  next_section_start: %d' % next_section_start)
+            logging.debug('  next_section_end  : %d' % next_section_end)
+
+            if next_section_start >= next_section_end:
+                self.warn('In get_modified_description, next_section_start (%d) '
+                          '>= next_section_end (%d): this should not normally '
+                          'happen; for comparison, old_description has length %d.'
+                          % (next_section_start, next_section_end, len(old_description)) )
+                break
+
+            old_desc_index = next_section_end
+            next_section = self.truncate_if_needed(
+                old_description[next_section_start:next_section_end] )
+
+            logging.debug('  next_section:\n  %s' % str(next_section))
+
+            if stack_trace:
+                old_desc_pieces['stacktrace'].append(next_section)
+                logging.debug('  - added as Stack Trace')
+            elif next_section.startswith('Failure history'):
+                old_desc_pieces['failurehistory'].append(next_section)
+                logging.debug('  - added as Failure history')
+            elif next_section.startswith('Failing Test:'):
+                old_desc_pieces['failingtest'].append(next_section)
+                logging.debug('  - added as Failing Test')
+            elif next_section.startswith('Failing') or any(
+                    next_section.startswith(ft) for ft in ALL_FAILURE_TYPES ):
+                old_desc_pieces['sincebuild'].append(next_section)
+                logging.debug('  - added as Since build')
+            else:
+                old_desc_pieces['other'].append(next_section)
+                logging.debug("  - added as 'other'")
+
+        logging.debug('  old_desc_pieces:\n  %s' % str(old_desc_pieces))
+
+        # Collect the various pieces of the old description
+        old_failing_test    = '\n'.join(sec for sec in old_desc_pieces['failingtest'])
+        old_failure_history = '\n'.join(sec for sec in old_desc_pieces['failurehistory'])
+        old_stack_trace     = '\n'.join(sec for sec in old_desc_pieces['stacktrace'])
+        old_other           = '\n'.join(sec for sec in old_desc_pieces['other'])
+        old_since_build     = '\n'.join(sec for sec in old_desc_pieces['sincebuild'])
+
+        # Collect the various pieces of the new description
+        new_failing_test    = self.truncate_if_needed(new_description_pieces.get('failingtest', ''))
+        new_failure_history = self.truncate_if_needed(new_description_pieces.get('failurehistory', ''))
+        new_stack_trace     = self.truncate_if_needed(new_description_pieces.get('stacktrace', ''))
+        new_other           = self.truncate_if_needed(new_description_pieces.get('other', ''))
+        new_since_build     = self.truncate_if_needed(new_description_pieces.get('sincebuild', ''))
+
+        logging.debug('  old_failing_test:   \n  %s' % str(old_failing_test.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  old_failure_history:\n  %s' % str(old_failure_history.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  old_stack_trace:    \n  %s' % str(old_stack_trace.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  old_other:          \n  %s' % str(old_other.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  old_since_build:    \n  %s' % str(old_since_build.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  new_failing_test:   \n  %s' % str(new_failing_test.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  new_failure_history:\n  %s' % str(new_failure_history.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  new_stack_trace:    \n  %s' % str(new_stack_trace.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  new_other:          \n  %s' % str(new_other.replace('\r', 'CR').replace('\n', 'LF\n')) )
+        logging.debug('  new_since_build:    \n  %s' % str(new_since_build.replace('\r', 'CR').replace('\n', 'LF\n')) )
+
+        # Combine the various pieces of the old and new descriptions, in the
+        # 'proper' order (regardless of how they used to be); ignore carriage
+        # returns, which Jira tends to add, when checking whether new
+        # description pieces are already found in the (old) description
+        new_description += old_failing_test
+        info_messages = []
+        if new_failing_test.strip().replace('\r', '') not in new_description.replace('\r', ''):
+            new_description += new_failing_test
+            info_messages.append('failing test')
+
+        new_description += SEPARATOR_LINE + old_failure_history
+        if new_failure_history.strip().replace('\r', '') not in new_description.replace('\r', ''):
+            new_description += new_failure_history
+            info_messages.append('failure history')
+
+        new_description += old_stack_trace
+        # Do not add new Stack Traces that are identical except for
+        # the line numbers (or other digits)
+        if (    sub('\d', 'x', new_stack_trace.replace('\r', '').strip()) not in
+                sub('\d', 'x', new_description.replace('\r', '')) ):
+            new_description += new_stack_trace
+            info_messages.append('stack trace')
+
+        if old_other or new_other:
+            new_description += SEPARATOR_LINE + old_other
+            if new_other.strip().replace('\r', '') not in new_description.replace('\r', ''):
+                new_description += new_other
+                info_messages.append('other description')
+
+        new_description += SEPARATOR_LINE + old_since_build
+        if new_since_build.strip().replace('\r', '') not in new_description.replace('\r', ''):
+            new_description = self.combine_since_build_messages(new_description, new_since_build,
+                                                                info_messages, jenkins_job_name,
+                                                                build_type)
+
+        # Make sure there are not too many new line (line feed) characters in a row
+        for i in range(10):
+            if '\n\n\n\n\n\n' in new_description.replace('\r', ''):
+                new_description = new_description.replace('\r', '').replace('\n\n\n\n\n\n', '\n\n\n')
+            else:
+                break
+
+        logging.debug('  new_description:\n  %s' % str(new_description))
+        if info_messages and old_description:
+            logging.info('Description of ticket %s modified, including: %s'
+                         % (issue_key, '; '.join(info_messages)) )
+
+        return self.truncate_if_needed(new_description, False, '\n[Truncated]',
+                                       MAX_NUM_CHARS_PER_JIRA_DESCRIPTION)
+
+
+    def get_modified_labels(self, old_labels, new_labels, description,
+                            jenkins_job_name=None):
+        """TODO
+        """
+        modified_labels = []
+        modified_labels.extend(old_labels)
+
+        for label in new_labels:
+            if label not in modified_labels:
+                modified_labels.append(label)
+            # A Jira ticket should not normally be labeled as both Consistent
+            # and Intermittent
+            if (label == JIRA_LABEL_FOR_CONSISTENT_FAILURES
+                    and  JIRA_LABEL_FOR_INTERMITTENT_FAILURES in modified_labels):
+                modified_labels.remove(JIRA_LABEL_FOR_INTERMITTENT_FAILURES)
+            elif (label == JIRA_LABEL_FOR_INTERMITTENT_FAILURES
+                    and    JIRA_LABEL_FOR_CONSISTENT_FAILURES in modified_labels):
+                modified_labels.remove(JIRA_LABEL_FOR_CONSISTENT_FAILURES)
+
+        if jenkins_job_name:
+            jenkins_job_label = JENKINS_JOBS.get(jenkins_job_name, {}).get('label')
+            if jenkins_job_label and jenkins_job_label not in modified_labels:
+                modified_labels.append(jenkins_job_label)
+
+        logging.debug('In get_modified_labels:')
+        logging.debug('  old_labels:\n  %s' % str(old_labels))
+        logging.debug('  new_labels:\n  %s' % str(new_labels))
+        logging.debug('  modified_labels:\n  %s' % str(modified_labels))
+
+        return modified_labels
+
+
     def file_jira_issue(self, issue, DRY_RUN=False, failing_consistently=False):
         global JENKINSBOT
         if not JENKINSBOT:
@@ -565,50 +932,76 @@ class Stats(object):
         history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
         failed_since = error_report.get('failedSince')
-        failure_percent = issue['failurePercent']
+        failure_percent = '{:02}'.format(int(issue['failurePercent']))
 #         summary = fullTestName + ' is failing ~' + failure_percent + '% of the time on ' + job + ' (' + issue['type'] + ')'
 
-        logging.debug('  failed_since : '+str(failed_since))
-        logging.debug('  failure_percent: '+str(failure_percent))
         logging.debug('  note         : '+str(note))
         logging.debug('  history(0)   : '+str(history))
 
         history = self.fix_url(history)
         logging.debug('  history(1)   : '+str(history))
+        logging.debug('  className            : '+str(issue['className']))
+        logging.debug('  testName             : '+str(issue['testName']))
+        logging.debug('  fullTestName         : '+str(fullTestName))
+        logging.debug('  issue[type]          : '+str(issue['type']))
+        logging.debug('  failure_percent      : '+str(failure_percent))
+        logging.debug('  jenkins_job_nickname : '+str(jenkins_job_nickname))
+        logging.debug('  failed_since         : '+str(failed_since))
+        logging.debug('  type(className)      : '+str(type(issue['className'])))
+        logging.debug('  type(testName)       : '+str(type(issue['testName'])))
+        logging.debug('  type(fullTestName)   : '+str(type(fullTestName)))
+        logging.debug('  type(issue[type])    : '+str(type(issue['type'])))
+        logging.debug('  type(failure_percent): '+str(type(failure_percent)))
+        logging.debug('  type(jenkins_job_nickname): '+str(type(jenkins_job_nickname)))
+        logging.debug('  type(failed_since)   : '+str(type(failed_since)))
 
-        summary = issue['type']+' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
-        descriptions = []
-        descriptions.append('Failing Test:\n' + fullTestName + '\n')
-        descriptions.append(SEPARATOR_LINE   + 'Failure history, in ' + jenkins_job_nickname + ':\n' + history + '\n')
+        # In the future, this may become more elaborate (like labels & description)
+        issue_type = issue['type']
+
+        summary = issue_type +' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
+
+        descriptions = {}
+        descriptions['failingtest'] = 'Failing Test:\n'+fullTestName+'\n'
+        descriptions['failurehistory'] = 'Failure history, in '+jenkins_job_nickname+':\n'+history+'\n'
         if error_report.get('errorStackTrace'):
-            descriptions.append(STACK_TRACE_LINE + str(error_report['errorStackTrace']))
+            descriptions['stacktrace'] = STACK_TRACE_LINE + str(error_report['errorStackTrace'])
         if failed_since:
-            consistently_or_intermittently = 'intermittently'
-            if failing_consistently:
-                consistently_or_intermittently = 'consistently'
-            descriptions.append('\nFailing %s since %s build #%s'
-                                % (consistently_or_intermittently,
-                                   jenkins_job_nickname, str(failed_since) ))
+            descriptions['sincebuild'] = ('\n%s %s%% failure in %s since build #%d'
+                                          % (str(issue_type), str(failure_percent),
+                                             jenkins_job_nickname, failed_since ))
+
+        issue_key = 'TBD'
+        old_description = ''
+        old_labels = []
+        if existing_ticket:
+            issue_key = existing_ticket.key
+            old_description = existing_ticket.fields.description
+            old_labels = existing_ticket.fields.labels
+        description = self.get_modified_description(old_description, descriptions,
+                                                    jenkins_job_nickname, issue_type,
+                                                    issue_key)
+        labels = self.get_modified_labels(old_labels, labels, description, jenkins_job)
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
 
         attachments = {
             # filename : location
-            jenkins_job + 'CountGraph.png' : error_url + '/history/countGraph/png?start=0&amp;end=25'
+            jenkins_job+'CountGraph.png' : error_url+'/history/countGraph/png?start=0&amp;end=25'
         }
 
         logging.debug('  summary      : '+str(summary))
-        logging.debug('  descriptions :\n'+str(descriptions))
         logging.debug('  current_version: '+str(current_version))
         logging.debug('  attachments  : '+str(attachments))
+        logging.debug('  descriptions :\n'+str(descriptions))
+        logging.debug('  description  :\n'+str(description))
 
         new_issue = None
         try:
             new_issue = JENKINSBOT.create_or_modify_jira_bug_ticket(
                             channel, summary_keys, summary,
                             jenkins_job, build_number,
-                            descriptions, current_version, labels,
+                            description, current_version, labels,
                             priority, attachments, existing_ticket,
                             max_num_attachments=MAX_NUM_ATTACHMENTS_PER_JIRA_TICKET,
                             DRY_RUN=DRY_RUN)
@@ -670,9 +1063,10 @@ class Stats(object):
             JENKINSBOT = JenkinsBot()
 
         summary_keys = [issue['className'], issue['testName']]
-        channel      = issue['channel']
-        labels       = issue['labels']
-        build_number = issue['build']
+        channel      = issue.get('channel')
+        jenkins_job  = issue.get('job', 'Unknown job')
+        build_number = issue.get('build', 'Unknown build')
+        labels       = issue.get('labels', [JIRA_LABEL_FOR_AUTO_FILING])
 
         closed_issue_url = None
         try:
@@ -684,7 +1078,6 @@ class Stats(object):
                 closed_issue_url = "https://issues.voltdb.com/browse/" + closed_issue.key
         except Exception as e:
             self.error('Error with closing issue', e)
-            closed_issue_url = None
 
         return closed_issue_url
 
@@ -749,8 +1142,12 @@ class Stats(object):
         cursor.execute(query_last_build)
         last_build_recorded = cursor.fetchone()[0]
         logging.info('Last build recorded (in qa database): %s' % last_build_recorded)
+        if not last_build_recorded:
+            last_build_recorded = sys.maxint  # initialized to a very large number
 
         try:
+            build_low  = -1
+            build_high = -2
             builds = build_range.split('-')
             if len(builds) > 1 and len(builds[1]) > 0:
                 build_high = int(builds[1])
@@ -761,8 +1158,10 @@ class Stats(object):
                 build_low = last_build_recorded + 1
                 build_high = latest_build
         except Exception as e:
-            self.error("Couldn't extrapolate build range, from %s, with latest %s, so %s - %s." \
-                              & (build_range, latest_build, build_low, build_high), e )
+            self.error("Couldn't extrapolate build range, from '%s': with latest "
+                       "build %s and last build recorded %s, we got: %d - %d." \
+                       % (build_range, latest_build, last_build_recorded,
+                          build_low, build_high), e )
             print(self.cmdhelp)
             return
 
@@ -883,7 +1282,7 @@ class Stats(object):
                 for run in job_report.get('runs', [job_report]):
 
                     run['url'] = self.fix_url(run.get('url'))
-                    logging.info('run:  number: %s;  url: %s'
+                    logging.info('run:  number: %s;  url:\n    %s'
                                  % (str(run.get('number')), str(run.get('url')) ))
 
                     # very strange but sometimes there is a run from a different build??
@@ -1047,8 +1446,8 @@ class Stats(object):
                             # We need to record 'FIXED' and 'FAILED' and 'REGRESSION'
                             # in the 'qa' database, but not 'PASSED'
                             if status != 'PASSED':
-                                logging.info('working on  : %s, %s, %s; %s; %s'
-                                             % (build, status, fullTestName, job, url) )
+                                logging.info('working on  : %s, %s; %s\n    %s\n    %s'
+                                             % (build, status, job, fullTestName, url) )
 
                                 # record test results to database (with issue url)
                                 # if an issue was filed, its url will be recorded in the database
@@ -1080,6 +1479,7 @@ class Stats(object):
                             labels = [JIRA_LABEL_FOR_AUTO_FILING]
 
                             previous_ticket_summary = None
+                            previous_ticket_description = ''
                             previous_ticket_failure_type = None
                             previous_ticket = JENKINSBOT.find_jira_bug_ticket(summary_keys, labels)
                             logging.debug('  previous_ticket             : '+str(previous_ticket))
@@ -1104,8 +1504,8 @@ class Stats(object):
                             # When no current, open Jira bug ticket exists
                             # (or the type is unrecognized), file a ticket,
                             # either of type 'NEW' or 'INTERMITTENT'
-                            if (not previous_ticket_failure_type) or (previous_ticket_failure_type not in
-                                        ['NEW', 'INTERMITTENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']):
+                            if (not previous_ticket_failure_type) or (
+                                    previous_ticket_failure_type not in ALL_FAILURE_TYPES ):
                                 if (status in ['REGRESSION', 'FAILED']):
                                     failure_percent = self.qualifies_as_intermittent_failure(
                                                                 cursor, fullTestName, job, build)
@@ -1217,11 +1617,13 @@ class Stats(object):
                                              % (count_test_cases, str(run.get('url'))) )
 
             except KeyError as ke:
-                self.error('Error retrieving test data for this particular build: %d\n' % build, ke)
+                self.error('Error retrieving test data for this particular build: %d\n' % build,
+                           format_exc() )
             except Exception as e:
                 # Catch all errors to avoid causing a failing build for the upstream job in case this is being
                 # called from the junit-test-branch on Jenkins
-                self.error('Catching unexpected errors to avoid causing a failing build for the upstream job', e)
+                self.error('Catching unexpected errors to avoid causing a failing build for the upstream job',
+                           format_exc() )
                 # re-raise the exception, cause the build to fail (until the bugs are worked out)
                 raise
 
@@ -1394,6 +1796,11 @@ if __name__ == '__main__':
                          post_to_slack, file_jira_ticket=not DRY_RUN)
 
     if ERROR_COUNT:
+        # Check for any /tmp/*.tmp files, which a JIRAError sometimes creates
+        for file in os.listdir('/tmp'):
+            if file.endswith('.tmp'):
+                contents = open('/tmp/'+file, 'r')
+                logging.info('Contents of %s:\n%s' % (str(file), contents.read()) )
         logging.info("Processing of Jenkins builds failed with %d ERROR(s) "
                      "(and %d WARNING(s))" % (ERROR_COUNT, WARNING_COUNT) )
         sys.exit(11)

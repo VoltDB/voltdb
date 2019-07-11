@@ -60,10 +60,10 @@ void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTupl
 
 void AbstractJoinExecutor::p_init_null_tuples(Table* outer_table, Table* inner_table) {
     if (m_joinType != JOIN_TYPE_INNER) {
-        assert(inner_table);
+        vassert(inner_table);
         m_null_inner_tuple.init(inner_table->schema());
         if (m_joinType == JOIN_TYPE_FULL) {
-            assert(outer_table);
+            vassert(outer_table);
             m_null_outer_tuple.init(outer_table->schema());
         }
     }
@@ -75,14 +75,14 @@ bool AbstractJoinExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("Init AbstractJoinExecutor Executor");
 
     AbstractJoinPlanNode* node = dynamic_cast<AbstractJoinPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     m_joinType = node->getJoinType();
-    assert(m_joinType == JOIN_TYPE_INNER || m_joinType == JOIN_TYPE_LEFT || m_joinType == JOIN_TYPE_FULL);
+    vassert(m_joinType == JOIN_TYPE_INNER || m_joinType == JOIN_TYPE_LEFT || m_joinType == JOIN_TYPE_FULL);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);

@@ -16,9 +16,8 @@
  */
 
 #include "ContiguousAllocator.h"
-
+#include "common/debuglog.h"
 #include "common/ThreadLocalPool.h"
-
 
 using namespace voltdb;
 
@@ -69,13 +68,13 @@ void *ContiguousAllocator::alloc() {
 
     // get a pointer to where the new alloc will live
     void *retval = m_tail->data + (m_allocationSize * blockOffset);
-    assert(retval == last());
+    vassert(retval == last());
     return retval;
 }
 
 void *ContiguousAllocator::last() const {
-    assert(m_count > 0);
-    assert(m_tail != NULL);
+    vassert(m_count > 0);
+    vassert(m_tail != NULL);
 
     // determine where in the current block the last alloc is
     int64_t blockOffset = (m_count - 1) % m_numberAllocationsPerBlock;
@@ -85,8 +84,8 @@ void *ContiguousAllocator::last() const {
 void ContiguousAllocator::trim() {
     // for debugging
     //memset(last(), 0, allocSize);
-    assert(m_count > 0);
-    assert(m_tail != NULL);
+    vassert(m_count > 0);
+    vassert(m_tail != NULL);
 
     m_count--;
 

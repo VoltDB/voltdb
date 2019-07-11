@@ -71,11 +71,11 @@ public:
             m_txnRowCount -= drRowCost;
         } else {
             // convenience to let us just throw away everything at once
-            assert(drRowCost == SIZE_MAX);
+            vassert(drRowCost == SIZE_MAX);
             m_txnRowCount = 0;
         }
         if (mark == m_committedUso) {
-            assert(m_txnRowCount == 0);
+            vassert(m_txnRowCount == 0);
             m_openSequenceNumber = m_committedSequenceNumber;
             m_opened = false;
         }
@@ -140,7 +140,7 @@ public:
         return (m_committedSequenceNumber >= 0);
     }
 
-    virtual void setDrProtocolVersion(uint8_t drProtocolVersion) {
+    void setDrProtocolVersion(uint8_t drProtocolVersion) {
         m_drProtocolVersion = drProtocolVersion;
     }
 

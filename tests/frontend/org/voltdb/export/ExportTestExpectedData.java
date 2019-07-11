@@ -113,6 +113,13 @@ public class ExportTestExpectedData {
         }
     }
 
+    public synchronized void ignoreRow(String tableName, long rowId) {
+        ServerListener listener = m_severSockets.get(tableName);
+        if (listener != null) {
+            listener.ignoreRow(rowId);
+        }
+    }
+
     private int getExpectedRowCount(String tableName) {
         return m_expectedRowCount.containsKey(tableName) ? m_expectedRowCount.get(tableName) : 0;
     }

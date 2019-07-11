@@ -158,12 +158,11 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
-    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
-        assert(executorsMap != NULL);
+    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>>* executorsMap) {
+        vassert(executorsMap != NULL);
         m_executorsMap = executorsMap;
-        assert(m_subqueryContextMap.empty());
-
-        assert(m_commonTableMap.empty());
+        vassert(m_subqueryContextMap.empty());
+        vassert(m_commonTableMap.empty());
     }
 
     static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
@@ -247,33 +246,26 @@ class ExecutorContext {
     }
 
     /** Executor List for a given sub statement id */
-    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
-    {
-        assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
-        return *m_executorsMap->find(subqueryId)->second;
+    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const {
+        vassert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
+        return m_executorsMap->find(subqueryId)->second;
     }
 
     /** Return pointer to a subquery context or NULL */
-    SubqueryContext* getSubqueryContext(int subqueryId)
-    {
-        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(subqueryId);
-        if (it != m_subqueryContextMap.end()) {
-            return &(it->second);
+    SubqueryContext* getSubqueryContext(int subqueryId) {
+        auto const it = m_subqueryContextMap.find(subqueryId);
+        if (it != m_subqueryContextMap.cend()) {
+            return &it->second;
         } else {
-            return NULL;
+            return nullptr;
         }
     }
 
     /** Set a new subquery context for the statement id. */
-    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
-    {
-        SubqueryContext fromCopy(lastParams);
-#ifndef NDEBUG
-        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
-#endif
-            m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
-        assert(result.second);
-        return &(m_subqueryContextMap.find(subqueryId)->second);
+    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams) {
+        auto const& r = m_subqueryContextMap.emplace(subqueryId, SubqueryContext(lastParams));
+        vassert(r.second);
+        return &r.first->second;
     }
 
     /**
@@ -290,8 +282,8 @@ class ExecutorContext {
      * performance, this method takes care of all cleanup
      * aotomatically.
      */
-    UniqueTempTableResult executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                           int subqueryId = 0);
+    UniqueTempTableResult executeExecutors(
+            const std::vector<AbstractExecutor*>& executorList, int subqueryId = 0);
 
     /**
      * Similar to above method.  Execute the executors associated with
@@ -356,8 +348,8 @@ class ExecutorContext {
 
     static Pool* getTempStringPool() {
         ExecutorContext* singleton = getExecutorContext();
-        assert(singleton != NULL);
-        assert(singleton->m_tempStringPool != NULL);
+        vassert(singleton != NULL);
+        vassert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
     }
 
@@ -373,7 +365,7 @@ class ExecutorContext {
     void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
     void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
     const int64_t getModifiedTupleCount() const {
-        assert(m_tuplesModifiedStack.size() > 0);
+        vassert(m_tuplesModifiedStack.size() > 0);
         return m_tuplesModifiedStack.top();
     }
     const size_t getModifiedTupleStackSize() const { return m_tuplesModifiedStack.size(); }
@@ -381,7 +373,7 @@ class ExecutorContext {
     /** DML executors call this to indicate how many tuples
          * have been modified */
     void addToTuplesModified(int64_t amount) {
-        assert(m_tuplesModifiedStack.size() > 0);
+        vassert(m_tuplesModifiedStack.size() > 0);
         m_tuplesModifiedStack.top() += amount;
     }
 
@@ -476,7 +468,7 @@ class ExecutorContext {
 
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
-    std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, std::vector<AbstractExecutor*>>* m_executorsMap;
     std::map<std::string, AbstractTempTable*> m_commonTableMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 

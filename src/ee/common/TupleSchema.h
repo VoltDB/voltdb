@@ -18,7 +18,7 @@
 #ifndef TUPLESCHEMA_H_
 #define TUPLESCHEMA_H_
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <stdint.h>
 #include <string>
@@ -91,7 +91,7 @@ public:
                                           const std::vector<int32_t>&   hiddenColumnSizes,
                                           const std::vector<bool>&      hiddenAllowNull,
                                           const std::vector<bool>&      hiddenColumnInBytes,
-                                          const bool isTableWithStream);
+                                          const bool isTableWithMigrate);
 
     /** Static factory method to create a TupleSchema for index keys */
     static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
@@ -152,7 +152,7 @@ public:
     inline uint16_t hiddenColumnCount() const;
 
     /** Return true if there is a hidden column on the table with stream. */
-    inline bool isTableWithStream() const;
+    inline bool isTableWithMigrate() const;
 
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
@@ -275,8 +275,8 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
-    // has a hidden column for table with stream
-    bool m_isTableWithStream;
+    // has a hidden column for table with migrate
+    bool m_isTableWithMigrate;
 
     /*
      * Data storage for:
@@ -296,7 +296,7 @@ private:
 ///////////////////////////////////
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
-    assert(index < totalColumnCount());
+    vassert(index < totalColumnCount());
     const ColumnInfo *columnInfo = getColumnInfoPrivate(index);
     const ColumnInfo *columnInfoPlusOne = getColumnInfoPrivate(index + 1);
     // calculate the real column length in raw bytes
@@ -311,8 +311,8 @@ inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
 }
 
-inline bool TupleSchema::isTableWithStream() const {
-    return m_isTableWithStream;
+inline bool TupleSchema::isTableWithMigrate() const {
+    return m_isTableWithMigrate;
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {
@@ -327,12 +327,12 @@ inline uint32_t TupleSchema::tupleLength() const {
 }
 
 inline size_t TupleSchema::offsetOfHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return getColumnInfoPrivate(columnCount())->offset;
 }
 
 inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return tupleLength() - offsetOfHiddenColumns();
 }
 
@@ -346,22 +346,22 @@ inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnInde
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    assert(columnIndex < totalColumnCount());
+    vassert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    assert(columnIndex < totalColumnCount());
+    vassert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) const {
-    assert(hiddenColumnIndex < m_hiddenColumnCount);
+    vassert(hiddenColumnIndex < m_hiddenColumnCount);
     return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) {
-    assert(hiddenColumnIndex < m_hiddenColumnCount);
+    vassert(hiddenColumnIndex < m_hiddenColumnCount);
     return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 

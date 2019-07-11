@@ -35,7 +35,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
                                 "Must not ask for object length on sql null object.");
         }
         int32_t length;
-        const char* buf = getObject_withoutNull(&length);
+        const char* buf = getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
@@ -54,7 +54,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
 
 /** implement the 2-argument forced SQL ERROR function (for test and example purposes) */
 template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const char* sqlstatecode;
     char msg_format_buffer[1024];
     char state_format_buffer[6];
@@ -79,7 +79,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
         int32_t length;
-        const char* buf = strValue.getObject_withoutNull(&length);
+        const char* buf = strValue.getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
@@ -112,7 +112,7 @@ namespace functionexpression {
    template<> NValue ConstantFunctionExpression<FUNC_VOLT_MIGRATING>::eval(
          const TableTuple* tuple1, const TableTuple*) const {
       // For MIGRATING(), check if we are evaluating on a migrating table (the table with a migrate target).
-      if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
+      if (tuple1 != NULL && tuple1->getSchema()->isTableWithMigrate()) {
          // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
          // and transaction id for migrating is always the last one.
          return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
@@ -148,7 +148,7 @@ namespace functionexpression {
          }
 
          NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
-            assert (m_child);
+            vassert(m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
          }
 
@@ -176,7 +176,7 @@ namespace functionexpression {
 
             virtual bool hasParameter() const override {
                for (size_t i = 0; i < m_args.size(); i++) {
-                  assert(m_args[i]);
+                  vassert(m_args[i]);
                   if (m_args[i]->hasParameter()) {
                      return true;
                   }
@@ -228,7 +228,7 @@ namespace functionexpression {
 
          bool hasParameter() const override {
             for (size_t i = 0; i < m_args.size(); i++) {
-               assert(m_args[i]);
+               vassert(m_args[i]);
                if (m_args[i]->hasParameter()) {
                   return true;
                }

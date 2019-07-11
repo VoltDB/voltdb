@@ -165,9 +165,16 @@ public class CSVWriter implements Closeable {
         this.lineEnd = lineEnd;
     }
 
+    // TSV writer escaping carriage return and newline characters
     public static CSVWriter getStrictTSVWriter(Writer writer) {
         CSVWriter retval = new CSVWriter(writer, '\t', NO_QUOTE_CHARACTER, '\\', DEFAULT_LINE_END);
         retval.extraEscapeChars = new char[] { '\r', '\n' };
+        return retval;
+    }
+
+    // TSV writer escaping nothing
+    public static CSVWriter getTSVWriter(Writer writer) {
+        CSVWriter retval = new CSVWriter(writer, '\t', NO_QUOTE_CHARACTER, NO_ESCAPE_CHARACTER, DEFAULT_LINE_END);
         return retval;
     }
 
@@ -280,19 +287,22 @@ public class CSVWriter implements Closeable {
                 sb.append(escapechar).append(nextChar);
                 continue;
             }
-            if (extraEscapeChars != null) {
+            if (escapechar != NO_ESCAPE_CHARACTER && extraEscapeChars != null) {
+                boolean matched = false;
                 for (char eec : extraEscapeChars) {
                     if (nextChar == eec) {
                         sb.append(escapechar).append(nextChar);
+                        matched = true;
                         break;
                     }
                 }
-                continue;
+                if (matched) {
+                    continue;
+                }
             }
-            // else
+            // else not escaped
             sb.append(nextChar);
         }
-
         return sb;
     }
 

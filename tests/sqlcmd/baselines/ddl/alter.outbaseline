@@ -99,3 +99,18 @@ Command succeeded.
 
 drop table dropable;
 Command succeeded.
+
+drop table migratable if exists;
+Command succeeded.
+
+create table migratable migrate to target tar (id int);
+Command succeeded.
+
+select * from migratable where not migrating;
+ID 
+---
+
+(Returned 0 rows in #.##s)
+
+drop table migratable;
+Command succeeded.

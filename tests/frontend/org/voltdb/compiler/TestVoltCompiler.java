@@ -23,7 +23,7 @@
 
 package org.voltdb.compiler;
 
-import static org.mockito.Matchers.contains;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
@@ -91,28 +91,35 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
     public void testExportTarget() throws Exception {
-        String ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE);\n";
+        String ddl = "create table foo EXPORT TO TARGET foo (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE_NEW);\n";
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE,UPDATE_NEW);\n";
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD,UPDATE_NEW);\n";
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD);\n" +
-        "alter table foo EXPORT TO TARGET foo ON(UPDATE_NEW);\n";
+        // cann't alter target
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+        "alter table foo  alter EXPORT TO TARGET foox ON UPDATE_NEW;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+                "alter table foo  alter EXPORT TO TARGET foo ON UPDATE_NEW;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
@@ -120,14 +127,14 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n" +
                      "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
@@ -143,7 +150,7 @@ public class TestVoltCompiler extends TestCase {
 
         // max_fequency must be positive integer
         ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-              "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
+              "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
@@ -3957,7 +3964,7 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
                 "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
-                "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20;\n";
+                "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         // does not alter target but other params
@@ -4006,6 +4013,20 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table ttl MIGRATE TO TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
                 "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a));\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // shouldn't have batch size here since it is a parameter for ttl
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "BATCH_SIZE 10;\n" +
                 "partition table ttl on column a;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);

@@ -64,7 +64,7 @@ class TupleValueExpression : public AbstractExpression {
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         if (tuple_idx == 0) {
-            assert(tuple1);
+            vassert(tuple1);
             if ( ! tuple1 ) {
                 throw SerializableEEException("TupleValueExpression::"
                                               "eval:"
@@ -73,7 +73,7 @@ class TupleValueExpression : public AbstractExpression {
             return tuple1->getNValue(value_idx);
         }
         else {
-            assert(tuple2);
+            vassert(tuple2);
             if ( ! tuple2 ) {
                 throw SerializableEEException("TupleValueExpression::"
                                               "eval:"

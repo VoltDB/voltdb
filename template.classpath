@@ -16,7 +16,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jcommon-1.0.16.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jfreechart-1.0.13.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/junit-dep-4.10.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/junit-4.12.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>

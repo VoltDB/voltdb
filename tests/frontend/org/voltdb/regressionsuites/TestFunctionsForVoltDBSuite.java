@@ -367,7 +367,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // negative tests
         verifyStmtFails(client, "select SQL_ERROR(123, 'abc') from P1", "abc");
         verifyStmtFails(client, "select SQL_ERROR('abc') from P1", "abc");
-        verifyStmtFails(client, "select SQL_ERROR(123, 123) from P1", ".*SQL ERROR\n.*VARCHAR.*");
+        verifyStmtFails(client, "select SQL_ERROR(123, 123) from P1", ".*SQL ERROR.*VARCHAR.*");
 
         verifyStmtFails(client, "select SQL_ERROR(123.5) from P1", "Type DECIMAL can't be cast as BIGINT");
         verifyStmtFails(client, "select SQL_ERROR(123.5E-2) from P1", "Type FLOAT can't be cast as BIGINT");
@@ -2468,10 +2468,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     private void invalidIPAddr(Client client, String tableName, String presentation) throws Exception {
-        ClientResponse cr;
-        VoltTable vt;
-
-        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName + ";");
+        ClientResponse cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName + ";");
         String ipVersion = tableName.startsWith("INET4_") ? "" : "6";
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         if (ipVersion.length() == 0) {
@@ -3178,7 +3175,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         final int numberOfValuesToTest = BadParamTypesForTimestamp.values.length;
         for (int procEntry = 0; procEntry < numberOfProcsToTest; procEntry++) {
             for (int valueIndexToTestWith = 0; valueIndexToTestWith < numberOfValuesToTest; valueIndexToTestWith++) {
-                verifyProcFails(client, "VOLTDB ERROR: SQL ERROR\n .* can't be cast as TIMESTAMP", "BadParamTypesForTimestamp", procEntry, valueIndexToTestWith);
+                verifyProcFails(client, "VOLTDB ERROR: SQL ERROR.* can't be cast as TIMESTAMP", "BadParamTypesForTimestamp", procEntry, valueIndexToTestWith);
             }
         }
     }

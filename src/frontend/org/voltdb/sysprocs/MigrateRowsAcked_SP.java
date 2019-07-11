@@ -28,6 +28,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.VoltType;
 
 /**
@@ -38,7 +39,6 @@ import org.voltdb.VoltType;
 public class MigrateRowsAcked_SP extends VoltSystemProcedure {
 
     VoltLogger exportLog = new VoltLogger("EXPORT");
-
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -54,26 +54,30 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable run(SystemProcedureExecutionContext context,
-                           int partitionParam,          // Partition parameter
-                           String tableName,            // Name of table that can have rows deleted
-                           long deletableTxnId,         // All rows with TxnIds before this can be deleted
-                           int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
+    /**
+    *
+    * @param ctx execution context
+    * @param partitionParam partition parameter
+    * @param tableName Name of table that can have rows deleted
+    * @param deletableTxnId All rows with this transaction or the first transaction before this can be deleted
+    * @return
+    */
+    public VoltTable run(SystemProcedureExecutionContext context, int partitionParam, String tableName, long deletableTxnId, int partitionId)
     {
-        VoltTable result = new VoltTable(new ColumnInfo("RowsRemainingDeleted", VoltType.BIGINT));
-        try {
-            final TransactionState txnState = m_runner.getTxnState();
-            int txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
-                    txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
-                    tableName, deletableTxnId, maxRowCount);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(String.format("MigrateRowsAcked_SP: batch size %d, remaining %d on table %s, txnId: %d",
-                        maxRowCount, txnRemainingDeleted, tableName, deletableTxnId));
-            }
-            result.addRow(txnRemainingDeleted);
-        } catch (Exception ex) {
-            exportLog.warn(String.format("Migrating delete error on table %s, error: %s", tableName, ex.getMessage()));
+        VoltTable result = new VoltTable(new ColumnInfo(MigrateRowsDeleterNT.ROWS_TO_BE_DELETED, VoltType.BIGINT));
+        // mis-partitioned, possibly in cluster grow and shrink.
+        if (m_site.getCorrespondingPartitionId() != partitionId) {
+            throw new MispartitionedException();
         }
+        final TransactionState txnState = m_runner.getTxnState();
+        boolean txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+                txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
+                tableName, deletableTxnId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(String.format("MigrateRowsAcked_SP: remaining %s on table %s, txnId: %d",
+                    Boolean.toString(txnRemainingDeleted), tableName, deletableTxnId));
+        }
+        result.addRow(txnRemainingDeleted ? 1: 0);
         return result;
     }
 }

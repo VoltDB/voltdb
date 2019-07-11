@@ -53,7 +53,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -71,7 +71,7 @@ public:
     }
 
     voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert(m_paramValue != NULL);
+        vassert(m_paramValue != NULL);
         return *m_paramValue;
     }
 

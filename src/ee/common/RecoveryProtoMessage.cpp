@@ -25,8 +25,8 @@ namespace voltdb {
 RecoveryProtoMsg::RecoveryProtoMsg(ReferenceSerializeInputBE *in) :
         m_in(in),  m_type(static_cast<RecoveryMsgType>(in->readByte())),
         m_tableId(in->readInt()) {
-    assert(m_in);
-    assert(m_type != RECOVERY_MSG_TYPE_SCAN_COMPLETE);
+    vassert(m_in);
+    vassert(m_type != RECOVERY_MSG_TYPE_SCAN_COMPLETE);
     int32_t totalTupleCount = in->readInt();
     m_totalTupleCount = *reinterpret_cast<uint32_t*>(&totalTupleCount);
     if (m_type == RECOVERY_MSG_TYPE_COMPLETE)

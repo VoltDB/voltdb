@@ -19,6 +19,9 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.TheHashinator;
+import org.voltdb.client.ClientResponse;
+
 /**
  * Exceptions thrown by native Execution Engine
  * when mispartitioned transactions must be detected and handled specially.
@@ -40,11 +43,26 @@ public class MispartitionedException extends SerializableException {
     }
 
     @Override
+    public void setClientResponseResults(org.voltdb.ClientResponseImpl cr) {
+        cr.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+    }
+
+    @Override
     protected int p_getSerializedSize() {
         return 0;
     }
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.TXN_MISPARTITIONED;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "TRANSACTION MISPARTITIONED";
     }
 }

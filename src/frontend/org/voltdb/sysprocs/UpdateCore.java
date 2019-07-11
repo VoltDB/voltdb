@@ -69,6 +69,13 @@ public class UpdateCore extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalog};
+    }
+
     /**
      * Use EE stats to get the row counts for all tables in this partition.
      * Check the provided list of tables that need to be empty against actual

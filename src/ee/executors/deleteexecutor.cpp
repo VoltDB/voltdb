@@ -53,29 +53,27 @@
 namespace voltdb {
 int64_t DeleteExecutor::s_modifiedTuples;
 
-bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
-                            const ExecutorVector& executorVector)
-{
+bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Delete Executor");
 
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
-    assert(m_node);
+    vassert(m_node);
 
     setDMLCountOutputTable(executorVector.limits());
 
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
     m_replicatedTableOperation = targetTable->isReplicatedTable();
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(m_node->getInputTableCount() == 0);
+        vassert(m_node->getInputTableCount() == 0);
         return true;
     }
 
-    assert(m_node->getInputTableCount() == 1);
+    vassert(m_node->getInputTableCount() == 1);
     m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
     return true;
@@ -86,13 +84,13 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     // update target table reference from table delegate
     // Note that the target table pointer in the node's tcd can change between p_init and p_execute
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
     TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 
     {
-        assert(targetTable->isReplicatedTable() ==
+        vassert(targetTable->isReplicatedTable() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
@@ -110,11 +108,10 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
                 // empty the table either by table swap or iteratively deleting tuple-by-tuple
                 targetTable->truncateTable(m_engine, m_replicatedTableOperation);
-            }
-            else {
-                assert(m_inputTable);
-                assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-                assert(targetTuple.columnCount() == targetTable->columnCount());
+            } else {
+                vassert(m_inputTable);
+                vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+                vassert(targetTuple.columnCount() == targetTable->columnCount());
                 TableIterator inputIterator = m_inputTable->iterator();
                 while (inputIterator.next(m_inputTuple)) {
                     //
@@ -142,17 +139,14 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = modified_tuples;
             }
-        }
-        else {
-            if (s_modifiedTuples == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                char msg[1024];
-                snprintf(msg, 1024, "Replicated table delete threw an unknown exception on other thread for table %s",
-                        targetTable->name().c_str());
-                VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-            }
+        } else if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            char msg[1024];
+            snprintf(msg, 1024, "Replicated table delete threw an unknown exception on other thread for table %s",
+                    targetTable->name().c_str());
+            VOLT_DEBUG("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
         }
     }
     if (m_replicatedTableOperation) {
@@ -164,15 +158,13 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
     // try to put the tuple into the output table
     if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(modified_tuples),
-                   m_node->getOutputTable()->name().c_str());
+        VOLT_ERROR("Failed to insert tuple count (%ld) into output table '%s'",
+                   static_cast<long int>(modified_tuples), m_node->getOutputTable()->name().c_str());
         return false;
+    } else {
+        m_engine->addToTuplesModified(modified_tuples);
+        return true;
     }
-    m_engine->addToTuplesModified(modified_tuples);
-
-    return true;
 }
 
 } // end namespace voltdb

@@ -122,96 +122,85 @@ std::string NValue::debug() const {
     std::ostringstream buffer;
     std::string out_val;
     const char* ptr;
-
+    int32_t length;
     buffer << getTypeName(type) << "::";
     if (isNull()) {
-        buffer << "<NULL>";
-        return buffer.str();
+       buffer << "<NULL>";
+       return buffer.str();
     }
 
     switch (type) {
-    case VALUE_TYPE_BOOLEAN:
-        buffer << (getBoolean() ? "true" : "false");
-        break;
-    case VALUE_TYPE_TINYINT:
-        buffer << static_cast<int32_t>(getTinyInt());
-        break;
-    case VALUE_TYPE_SMALLINT:
-        buffer << getSmallInt();
-        break;
-    case VALUE_TYPE_INTEGER:
-        buffer << getInteger();
-        break;
-    case VALUE_TYPE_BIGINT:
-        buffer << getBigInt();
-        break;
-    case VALUE_TYPE_DOUBLE:
-        buffer << getDouble();
-        break;
-    case VALUE_TYPE_VARCHAR:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
-        break;
+       case VALUE_TYPE_BOOLEAN:
+          buffer << (getBoolean() ? "true" : "false");
+          break;
+       case VALUE_TYPE_TINYINT:
+          buffer << static_cast<int32_t>(getTinyInt());
+          break;
+       case VALUE_TYPE_SMALLINT:
+          buffer << getSmallInt();
+          break;
+       case VALUE_TYPE_INTEGER:
+          buffer << getInteger();
+          break;
+       case VALUE_TYPE_BIGINT:
+          buffer << getBigInt();
+          break;
+       case VALUE_TYPE_DOUBLE:
+          buffer << getDouble();
+          break;
+       case VALUE_TYPE_VARCHAR:
+          ptr = getObject_withoutNull(length);
+          out_val = std::string(ptr, length);
+          buffer << "[" << length << "]";
+          buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
+          break;
+       case VALUE_TYPE_VARBINARY:
+          ptr = getObject_withoutNull(length);
+          out_val = std::string(ptr, length);
+          buffer << "[" << length << "]";
+          buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
+          break;
+       case VALUE_TYPE_DECIMAL:
+          buffer << createStringFromDecimal();
+          break;
+       case VALUE_TYPE_TIMESTAMP:
+          try {
+             std::stringstream ss;
+             streamTimestamp(ss);
+             buffer << ss.str();
+          } catch (const SQLException &) {
+             buffer << "<out of range timestamp:" << getBigInt() << ">";
+          } catch (...) {
+             buffer << "<exception when converting timestamp:" << getBigInt() << ">";
+          }
+          break;
+       case VALUE_TYPE_POINT:
+          buffer << getGeographyPointValue().toString();
+          break;
+       case VALUE_TYPE_GEOGRAPHY:
+          buffer << getGeographyValue().toString();
+          break;
+       default:
+          buffer << "(no details)";
+          break;
     }
-    case VALUE_TYPE_VARBINARY:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
-        break;
-    }
-    case VALUE_TYPE_DECIMAL:
-        buffer << createStringFromDecimal();
-        break;
-    case VALUE_TYPE_TIMESTAMP: {
-        try {
-            std::stringstream ss;
-            streamTimestamp(ss);
-            buffer << ss.str();
-        }
-        catch (const SQLException &) {
-            buffer << "<out of range timestamp:" << getBigInt() << ">";
-        }
-        catch (...) {
-            buffer << "<exception when converting timestamp:" << getBigInt() << ">";
-        }
-        break;
-    }
-    case VALUE_TYPE_POINT:
-        buffer << getGeographyPointValue().toString();
-        break;
-    case VALUE_TYPE_GEOGRAPHY:
-        buffer << getGeographyValue().toString();
-        break;
-    default:
-        buffer << "(no details)";
-        break;
-    }
-    std::string ret(buffer.str());
-    return (ret);
+    return buffer.str();
 }
 
 int32_t NValue::serializedSize() const {
     switch (m_valueType) {
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY: {
-            int32_t length = sizeof(int32_t);
-            if (! isNull()) {
-                int32_t valueLength;
-                getObject_withoutNull(&valueLength);
-                length += valueLength;
-            }
-            return length;
-        }
-    default:
-        return getTupleStorageSize(m_valueType);
+       case VALUE_TYPE_VARCHAR:
+       case VALUE_TYPE_VARBINARY:
+       case VALUE_TYPE_GEOGRAPHY:
+          if (! isNull()) {
+             int32_t valueLength;
+             getObject_withoutNull(valueLength);
+             return sizeof(int32_t) + valueLength;
+          } else {
+              return sizeof(int32_t);
+          }
+       default:
+          return getTupleStorageSize(m_valueType);
     }
 }
 
@@ -219,7 +208,7 @@ int32_t NValue::serializedSize() const {
  * Serialize sign and value using radix point (no exponent).
  */
 std::string NValue::createStringFromDecimal() const {
-    assert(!isNull());
+    vassert(!isNull());
     std::ostringstream buffer;
     TTInt scaledValue = getDecimal();
     if (scaledValue.IsSign()) {
@@ -451,12 +440,12 @@ void NValue::allocateANewNValueList(size_t length, ValueType elementType)
 
 void NValue::setArrayElements(std::vector<NValue> &args) const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
     // Assign each of the elements.
     int ii = (int)args.size();
-    assert(ii == listOfNValues->m_length);
+    vassert(ii == listOfNValues->m_length);
     while (ii--) {
         listOfNValues->m_values[ii] = args[ii];
     }
@@ -466,17 +455,17 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
 
 int NValue::arrayLength() const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
 const NValue& NValue::itemAtIndex(int index) const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
-    assert(index >= 0);
-    assert(index < listOfNValues->m_length);
+    vassert(index >= 0);
+    vassert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];
 }
 

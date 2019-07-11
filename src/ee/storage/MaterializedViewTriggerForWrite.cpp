@@ -153,7 +153,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
 #ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             const string& hexString = stmt->explainplan();
-            assert(hexString.length() % 2 == 0);
+            vassert(hexString.length() % 2 == 0);
             int bufferLength = (int)hexString.size() / 2 + 1;
             char* explanation = new char[bufferLength];
             boost::shared_array<char> memoryGuard(explanation);
@@ -229,7 +229,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
         // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
         // we can not use CoveringCellIndex for value comparison.
-        assert(selectedIndex->getKeySchema()->getColumnInfo(
+        vassert(selectedIndex->getKeySchema()->getColumnInfo(
                 static_cast<int>(m_groupByColumnCount))->getVoltType() !=
                VALUE_TYPE_POINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
@@ -373,7 +373,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     // executing the stored plan.
     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
     UniqueTempTableResult tbl = context->executeExecutors(executorList, 0);
-    assert(tbl);
+    vassert(tbl);
     // get the fallback value from the returned table.
     TableIterator iterator = tbl->iterator();
     TableTuple tuple(tbl->schema());
@@ -415,7 +415,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
     // obtain the current count of the number of tuples in the group
     NValue count;
     if ((int) m_countStarColumnIndex == -1) {
-        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        vassert(destTbl->schema()->hiddenColumnCount() == 1);
         count = m_existingTuple.getHiddenNValue(0).op_decrement();
     } else {
         count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
@@ -508,7 +508,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                     }
                     break;
                 default:
-                    assert(false); // Should have been caught when the matview was loaded.
+                    vassert(false); // Should have been caught when the matview was loaded.
                     // no break
             }
         }
@@ -520,7 +520,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
     if (numCountStar == 0) {
-        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        vassert(destTbl->schema()->hiddenColumnCount() == 1);
         m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_decrement());
     }
     // update the row

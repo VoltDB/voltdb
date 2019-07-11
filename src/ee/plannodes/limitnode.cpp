@@ -91,7 +91,7 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
         limitOut = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
-        assert(offsetOut == 0);
+        vassert(offsetOut == 0);
     }
 }
 

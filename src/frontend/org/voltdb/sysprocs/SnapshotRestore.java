@@ -17,6 +17,8 @@
 
 package org.voltdb.sysprocs;
 
+import static org.voltdb.ExtensibleSnapshotDigestData.DR_TUPLE_STREAM_STATE_INFO;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -92,6 +94,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
@@ -812,7 +815,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         DrRoleType.XDCR.value().equals(m_cluster.getDrrole())
                         && new_catalog_table.getIsdred();
                 final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
-                final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(new_catalog_table.getTabletype());
+                final boolean preserveMigrateHiddenColumn = TableType.needsShadowStream(new_catalog_table.getTabletype());
 
                 Boolean needsConversion = null;
                 while (savefile.hasMoreChunks()) {
@@ -1399,6 +1402,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
 
+        StreamStartAction action = isRecover ? StreamStartAction.RECOVER : StreamStartAction.SNAPSHOT_RESTORE;
+
         //Iterate the export tables
         for (Table t : db.getTables()) {
             if (!CatalogUtil.isTableExportOnly(db, t)) {
@@ -1406,6 +1411,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
 
             String name = t.getTypeName();
+
 
             //Sequence numbers for this table for every partition
             Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
@@ -1418,27 +1424,30 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            ExportSnapshotTuple sequences =
-                    sequenceNumberPerPartition.get(myPartitionId);
-            if (sequences == null) {
-                SNAP_LOG.warn("Could not find an export sequence number for table " + name +
-                        " partition " + myPartitionId +
-                        ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
-                        " which would not contain these sequence numbers (added in 1.3)." +
-                        " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
-                        " are reset to 0");
-                continue;
-            }
+            if (action == StreamStartAction.RECOVER) {
+                ExportSnapshotTuple sequences =
+                        sequenceNumberPerPartition.get(myPartitionId);
+                if (sequences == null) {
+                    SNAP_LOG.warn("Could not find an export sequence number for table " + name +
+                            " partition " + myPartitionId +
+                            ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
+                            " which would not contain these sequence numbers (added in 1.3)." +
+                            " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                            " are reset to 0");
+                    continue;
+                }
 
-            //Forward the sequence number to the EE
-            context.getSiteProcedureConnection().exportAction(
-                    true,
-                    sequences,
-                    myPartitionId,
-                    name);
+                //Forward the sequence number to the EE
+                context.getSiteProcedureConnection().exportAction(
+                        true,
+                        sequences,
+                        myPartitionId,
+                        name);
+            }
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
             ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, name,
-                    isRecover, false, sequenceNumberPerPartition, context.isLowestSiteId());
+                    action,
+                    sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }
 
@@ -1746,8 +1755,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         }
                     }
                 }
-                if (digest.has("drTupleStreamStateInfo")) {
-                    JSONObject stateInfo = digest.getJSONObject("drTupleStreamStateInfo");
+                if (digest.has(DR_TUPLE_STREAM_STATE_INFO)) {
+                    JSONObject stateInfo = digest.getJSONObject(DR_TUPLE_STREAM_STATE_INFO);
                     Iterator<String> keys = stateInfo.keys();
                     while (keys.hasNext()) {
                         String partitionIdString = keys.next();
@@ -2178,7 +2187,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final boolean preserveDRHiddenColumn =
             DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && newCatalogTable.getIsdred();
         final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(newCatalogTable);
-        final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(newCatalogTable.getTabletype());
+        final boolean preserveMigrateHiddenColumn = TableType.needsShadowStream(newCatalogTable.getTabletype());
 
         Boolean needsConversion = null;
         Map<Long, Integer> sitesToPartitions = null;
@@ -2399,7 +2408,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final boolean preserveDRHiddenColumn =
                 DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
             final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
-            final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(new_catalog_table.getTabletype());
+            final boolean preserveMigrateHiddenColumn = TableType.needsShadowStream(new_catalog_table.getTabletype());
             while (hasMoreChunks()) {
                 VoltTable table = null;
 

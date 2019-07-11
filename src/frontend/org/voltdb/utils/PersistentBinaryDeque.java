@@ -55,7 +55,6 @@ import com.google_voltpatches.common.base.Throwables;
  * @param M Type of extra header metadata stored in the PBD
  */
 public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
-
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
         private static final VoltLogger LOG = new VoltLogger("HOST");
 
@@ -304,7 +303,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
             m_cursorClosed = true;
         }
-
     }
 
     public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();
@@ -505,7 +503,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     // FIXME: reject this case for now
                     // FIXME: we could select the sequence that has the oldest entry and delete
                     // the other files
-                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
+                    StringBuilder sb = new StringBuilder();
+                    for (Deque<Long> seq : sequences) {
+                        sb.append("\nsequence:" + seq);
+                    }
+                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce +
+                            sb.toString() );
                 }
                 Deque<Long> sequence = sequences.getFirst();
                 long index = 1L;
@@ -1195,7 +1198,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         numObjects += segment.getNumEntries() - reader.readIndex();
                     }
                 }
-                assert numObjects == cursor.getNumObjects() : numObjects + " != " + cursor.getNumObjects();
+                assert numObjects == cursor.getNumObjects() :
+                    cursor.m_cursorId + " expects " + cursor.getNumObjects() + " entries but only found " + numObjects;
             } catch (Exception e) {
                 Throwables.throwIfUnchecked(e);
                 throw new RuntimeException(e);
@@ -1255,6 +1259,44 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         return;
+    }
+
+    @Override
+    public boolean deletePBDSegment(BinaryDequeValidator<M> validator) throws IOException
+    {
+        boolean segmentDeleted = false;
+        if (m_closed) {
+            throw new IOException("Cannot deletePBDSegment(): PBD has been closed");
+        }
+
+        assertions();
+        if (m_segments.isEmpty()) {
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("PBD " + m_nonce + " has no segments to delete.");
+            }
+            return segmentDeleted;
+        }
+
+        /*
+         * Iterator all the objects in all the segments and pass them to the scanner
+         */
+        Iterator<PBDSegment<M>> iter = m_segments.values().iterator();
+        while (iter.hasNext()) {
+            PBDSegment<M> segment = iter.next();
+            try {
+                int entriesToDelete = segment.validate(validator);
+                if (entriesToDelete != 0) {
+                    m_numObjects -= entriesToDelete;
+                    iter.remove();
+                    closeAndDeleteSegment(segment);
+                    segmentDeleted = true;
+                }
+            } catch (IOException e) {
+                m_usageSpecificLog.warn("Error validating segment: " + segment.file() + ". Quarantining segment.");
+                quarantineSegment(segment);
+            }
+        }
+        return segmentDeleted;
     }
 
     /**

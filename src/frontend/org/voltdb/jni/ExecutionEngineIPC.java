@@ -1586,8 +1586,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
         try {
             m_data.clear();
             m_data.putInt(Commands.DeleteMigratedRows.m_id);
@@ -1596,7 +1596,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(uniqueId);
             m_data.putLong(deletableTxnId);
             m_data.putLong(undoToken);
-            m_data.putInt(maxRowCount);
             m_data.putInt(tableName.getBytes("UTF-8").length);
             m_data.put(tableName.getBytes("UTF-8"));
             m_data.flip();
@@ -1607,7 +1606,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_connection.m_socketChannel.read(results);
             }
             results.flip();
-            return results.get();
+
+            return (results.getInt() == 1);
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
@@ -1739,7 +1739,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
         m_data.clear();
         m_data.putInt(Commands.ApplyBinaryLog.m_id);
         m_data.putLong(txnId);
@@ -1747,7 +1747,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putInt(remoteClusterId);
-        m_data.putLong(remoteTxnUniqueId);
         m_data.putLong(undoToken);
         m_data.put(logs.array());
 

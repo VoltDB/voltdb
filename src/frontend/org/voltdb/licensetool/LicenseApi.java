@@ -43,4 +43,14 @@ public interface LicenseApi {
     public boolean isDrReplicationAllowed();
     public boolean isDrActiveActiveAllowed();
     public boolean isCommandLoggingAllowed();
+    public String getSignature();
+    public String getLicenseType();
+    public boolean isUnrestricted();
+    public String getIssuerCompany();
+    public String getIssuerUrl();
+    public String getIssuerEmail();
+    public String getIssuerPhone();
+    public int getVersion();
+    public int getScheme();
+
 }

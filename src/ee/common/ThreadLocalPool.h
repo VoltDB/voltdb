@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef THREADLOCALPOOL_H_
-#define THREADLOCALPOOL_H_
+#pragma once
 
 #include "structures/CompactingPool.h"
 #ifdef VOLT_POOL_CHECKING
@@ -221,4 +220,3 @@ private:
 };
 }
 
-#endif /* THREADLOCALPOOL_H_ */

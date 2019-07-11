@@ -47,13 +47,36 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     private static int KFACTOR = 1;
     private static final String SCHEMA =
-            "CREATE TABLE T1 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO1 ON(INSERT, DELETE);" +
+            "CREATE TABLE T1 EXPORT TO TARGET FOO1 ON INSERT, DELETE (a integer not null, b integer not nulL);" +
             " PARTITION table T1 ON COLUMN a;" +
-            "CREATE TABLE T3 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO3 ON(UPDATE);";
+            "CREATE TABLE T3 EXPORT TO TARGET FOO3 ON UPDATE (a integer not null, b integer not nulL);";
 
     @Before
-    public void setUp() throws Exception
-    {
+    public void setUp() throws Exception {
+
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        if (m_cluster != null) {
+            System.out.println("Shutting down client and server");
+            for (Entry<String, ServerListener> entry : m_serverSockets.entrySet()) {
+                ServerListener serverSocket = entry.getValue();
+                if (serverSocket != null) {
+                    serverSocket.closeClient();
+                    serverSocket.close();
+                }
+            }
+            m_cluster.shutDown();
+            m_cluster = null;
+        }
+    }
+
+    @Test
+    public void testInsertDeleteUpdate() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
         resetDir();
         VoltFile.resetSubrootForThisProcess();
 
@@ -85,29 +108,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         m_verifier = new ExportTestExpectedData(m_serverSockets, false /*is replicated stream? */, true, KFACTOR + 1);
         m_verifier.m_verifySequenceNumber = false;
         m_verifier.m_verbose = false;
-    }
 
-    @After
-    public void tearDown() throws Exception {
-        if (m_cluster != null) {
-            System.out.println("Shutting down client and server");
-            for (Entry<String, ServerListener> entry : m_serverSockets.entrySet()) {
-                ServerListener serverSocket = entry.getValue();
-                if (serverSocket != null) {
-                    serverSocket.closeClient();
-                    serverSocket.close();
-                }
-            }
-            m_cluster.shutDown();
-            m_cluster = null;
-        }
-    }
-
-    @Test
-    public void testInsertDeleteUpdate() throws Exception {
-        if (!MiscUtils.isPro()) {
-            return;
-        }
         Client client = getClient(m_cluster);
 
         //add data to stream table
@@ -128,7 +129,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
-        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW,DELETE)");
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
@@ -175,45 +176,5 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             }
         }
         assert(false);
-    }
-
-    @Test
-    public void testMigrateExportLicensing() throws Exception {
-        if (MiscUtils.isPro()) {
-            return;
-        }
-        tearDown();
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        String stream3= "CREATE table T1 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO1;"
-                        + " CREATE table T2 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO2;"
-                        + " CREATE table T3 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO3";
-
-        project.addLiteralSchema(stream3);
-        LocalCluster cluster = new LocalCluster("testMigrateExportLicensing.jar", 4, 3, KFACTOR,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
-        cluster.setHasLocalServer(false);
-
-        // does not allow more than 2 streams
-        assert(!(cluster.compile(project)));
-    }
-
-    @Test
-    public void testChangeDataCaptureLicensing() throws Exception {
-        if (MiscUtils.isPro()) {
-            return;
-        }
-        tearDown();
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        String stream3= "CREATE table T1 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO1;"
-                        + " CREATE table T2 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO2;"
-                        + " CREATE table T3 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO3";
-
-        project.addLiteralSchema(stream3);
-        LocalCluster cluster = new LocalCluster("testChangeDataCaptureLicensing.jar", 4, 3, KFACTOR,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
-        cluster.setHasLocalServer(false);
-
-        // does not allow more than 2 streams
-        assert(!(cluster.compile(project)));
     }
 }

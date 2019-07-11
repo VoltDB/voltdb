@@ -2354,7 +2354,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
+         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes,migration,basic"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">

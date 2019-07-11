@@ -37,8 +37,8 @@ class ScopedDeltaTableContext {
 public:
     ScopedDeltaTableContext(PersistentTable *table)
         : m_table(table) {
-        assert(m_table->m_deltaTable);
-        assert(! m_table->m_deltaTableActive);
+        vassert(m_table->m_deltaTable);
+        vassert(! m_table->m_deltaTableActive);
         m_table->m_deltaTableActive = true;
     }
 

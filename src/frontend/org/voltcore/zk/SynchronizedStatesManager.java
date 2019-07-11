@@ -379,6 +379,10 @@ public class SynchronizedStatesManager {
             addIfMissing(m_lockPath, CreateMode.PERSISTENT, null);
             addIfMissing(m_barrierParticipantsPath, CreateMode.PERSISTENT, null);
             lockLocalState();
+            // Make sure the child count is correct so that an init does not race with a released lock where the
+            // results have not been processed yet. If it is non-zero, it means results still need to be collected
+            // by some nodes even if the distributed lock list is empty.
+            m_currentParticipants = m_zk.getChildren(m_barrierParticipantsPath, null).size();
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
@@ -410,8 +414,10 @@ public class SynchronizedStatesManager {
                 result[0] = (byte)(1);
                 addResultEntry(result);
                 m_lockWaitingOn = "bogus"; // Avoids call to notifyDistributedLockWaiter
-                m_log.info(m_stateMachineId + ": Initialized (first member) with State " +
-                        stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug(m_stateMachineId + ": Initialized (first member) with State " +
+                            stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                }
                 m_initializationCompleted = true;
                 cancelDistributedLock();
                 checkForBarrierParticipantsChange();
@@ -917,8 +923,10 @@ public class SynchronizedStatesManager {
                     // We were not yet participating in the state machine so but now we can
                     m_requestedInitialState = null;
                     m_pendingProposal = null;
-                    m_log.info(m_stateMachineId + ": Initialized (concensus) with State " +
-                            stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(m_stateMachineId + ": Initialized (concensus) with State " +
+                                stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                    }
                     m_initializationCompleted = true;
                     unlockLocalState();
                     try {
@@ -987,8 +995,10 @@ public class SynchronizedStatesManager {
                                 "Unexpected failure in StateMachine.", true, e);
                         success = false;
                     }
-                    m_log.info(m_stateMachineId + ": Proposed state " + (success?"succeeded ":"failed ") +
-                            stateToString(attemptedChange.asReadOnlyBuffer()));
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(m_stateMachineId + ": Proposed state " + (success?"succeeded ":"failed ") +
+                                stateToString(attemptedChange.asReadOnlyBuffer()));
+                    }
                     unlockLocalState();
                     // Notify the derived state machine engine of the current state
                     try {
@@ -1009,7 +1019,9 @@ public class SynchronizedStatesManager {
                     // Process the results of a TASK request
                     ByteBuffer taskRequest = m_pendingProposal.asReadOnlyBuffer();
                     m_pendingProposal = null;
-                    m_log.info(m_stateMachineId + ": All members completed task " + taskToString(taskRequest.asReadOnlyBuffer()));
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(m_stateMachineId + ": All members completed task " + taskToString(taskRequest.asReadOnlyBuffer()));
+                    }
                     if (m_currentRequestType == REQUEST_TYPE.CORRELATED_COORDINATED_TASK) {
                         Map<String, ByteBuffer> results = getCorrelatedResults(taskRequest, memberList);
                         if (m_stateChangeInitiator) {
@@ -1155,8 +1167,10 @@ public class SynchronizedStatesManager {
                     readOnlyResult = m_synchronizedState.asReadOnlyBuffer();
                     m_lastProposalVersion = lastProposal.getVersion();
                     m_pendingProposal = null;
-                    m_log.info(m_stateMachineId + ": Initialized (existing) with State " +
-                            stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(m_stateMachineId + ": Initialized (existing) with State " +
+                                stateToString(m_synchronizedState.asReadOnlyBuffer()));
+                    }
                     if (existingAndProposedStates.m_requestType != REQUEST_TYPE.INITIALIZING) {
                         staleTask = existingAndProposedStates.m_proposal.asReadOnlyBuffer();
                     }

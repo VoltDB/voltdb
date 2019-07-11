@@ -149,6 +149,13 @@ public class LeaderElector {
         }
     }
 
+    public int getLeaderId() {
+        if (node == null) {
+            throw new IllegalStateException("LeaderElector must be started");
+        }
+        return Integer.parseInt(node.substring(node.lastIndexOf('_') + 1));
+    }
+
     /**
      * Start participation in a leader election.
      *

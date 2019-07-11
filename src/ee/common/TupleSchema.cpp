@@ -125,7 +125,7 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
                                             const std::vector<int32_t>&   hiddenColumnSizes,
                                             const std::vector<bool>&      hiddenAllowNull,
                                             const std::vector<bool>&      hiddenColumnInBytes,
-                                            const bool isTableWithStream)
+                                            const bool isTableWithMigrate)
 {
     const uint16_t uninlineableObjectColumnCount =
       TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
@@ -144,7 +144,7 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
     retval->m_uninlinedObjectColumnCount = uninlineableObjectColumnCount;
     retval->m_hiddenColumnCount = hiddenColumnCount;
     retval->m_isHeaderless = false;
-    retval->m_isTableWithStream = isTableWithStream;
+    retval->m_isTableWithMigrate = isTableWithMigrate;
     uint16_t uninlinedObjectColumnIndex = 0;
     for (uint16_t ii = 0; ii < columnCount; ii++) {
         const ValueType type = columnTypes[ii];
@@ -196,8 +196,8 @@ TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema,
 
 TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *first,
                                             const TupleSchema *second) {
-    assert(first);
-    assert(second);
+    vassert(first);
+    vassert(second);
 
     std::vector<uint16_t> firstSet;
     std::vector<uint16_t> secondSet;
@@ -217,7 +217,7 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
                                const std::vector<uint16_t>& firstSet,
                                const TupleSchema *second,
                                const std::vector<uint16_t>& secondSet) {
-    assert(first);
+    vassert(first);
 
     const std::vector<uint16_t>::size_type offset = firstSet.size();
     const std::vector<uint16_t>::size_type combinedColumnCount = firstSet.size()
@@ -287,7 +287,7 @@ void TupleSchema::freeTupleSchema(TupleSchema *schema) {
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,
                                     uint16_t &uninlinedObjectColumnIndex, bool inBytes)
 {
-    assert(length <= COLUMN_MAX_VALUE_LENGTH);
+    vassert(length <= COLUMN_MAX_VALUE_LENGTH);
     uint32_t offset = 0;
 
     // set the type
@@ -331,7 +331,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
         nextColumnInfo = getColumnInfoPrivate(i);
         nextColumnInfo->offset = static_cast<uint32_t>(nextColumnInfo->offset + offset - oldsize);
     }
-    assert(index == 0 ? columnInfo->offset == 0 : true);
+    vassert(index == 0 ? columnInfo->offset == 0 : true);
 }
 
 std::string TupleSchema::ColumnInfo::debug() const {

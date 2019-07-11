@@ -203,9 +203,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
-        return 0;
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
+        return false;
     }
 
     @Override
@@ -233,7 +233,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
         throw new UnsupportedOperationException();
     }
 

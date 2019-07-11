@@ -392,7 +392,7 @@ inline bool ElasticIndex::add(const ElasticIndexKey &key)
     bool inserted = false;
     if (!exists(key)) {
         inserted = insert(key).second;
-        assert(inserted);
+        vassert(inserted);
     }
     return inserted;
 }

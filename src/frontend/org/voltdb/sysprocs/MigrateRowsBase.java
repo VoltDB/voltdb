@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.DefaultProcedureManager;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
@@ -35,6 +36,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.VoltTable.ColumnInfo;
 
@@ -190,7 +192,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getMigrateProcRunner(
-                tableName + ".autogenMigrate"+ op.toString(), catTable, column, op);
+                tableName + "." + DefaultProcedureManager.NIBBLE_MIGRATE_PROC, catTable, column, op);
 
         Procedure newCatProc = pr.getCatalogProcedure();
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
@@ -209,8 +211,9 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         long rowCount = result.asScalarLong();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Migrate on table " + tableName +
-                    (replicated ? "" : " on partition " + ctx.getPartitionId()) +
-                    " reported " + rowCount + " matching rows");
+                    " on partition " + ctx.getPartitionId() +
+                    " reported " + rowCount + " matching rows. txnid:" + TxnEgo.txnIdToString(m_runner.getTxnState().txnId) + " sphandle:" +
+                    m_runner.getTxnState().m_spHandle);
         }
 
         // If number of rows meet the criteria is more than chunk size, pick the column value

@@ -59,20 +59,20 @@ LargeOrderByExecutor::p_init(AbstractPlanNode* abstract_node,
                              const ExecutorVector& executorVector)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     // Order by nodes can be inlined into MergeReceive nodes,
     // but MP plans are not yet supported in large mode.
-    assert(!node->isInline());
+    vassert(!node->isInline());
 
-    assert(node->getInputTableCount() == 1);
-    assert(node->getChildren()[0] != NULL);
+    vassert(node->getInputTableCount() == 1);
+    vassert(node->getChildren()[0] != NULL);
 
     // Our output table should look exactly like our input table
     node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable()->name(),
                                                             node->getInputTable(),
                                                             executorVector));
-    assert(dynamic_cast<LargeTempTable*>(node->getOutputTable()));
+    vassert(dynamic_cast<LargeTempTable*>(node->getOutputTable()));
 
     // pick up an inlined limit, if one exists
     m_limitPlanNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
@@ -85,13 +85,13 @@ LargeOrderByExecutor::p_execute(const NValueArray &params) {
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     LargeTempTable* outputTable = dynamic_cast<LargeTempTable*>(node->getOutputTable());
-    assert(outputTable);
+    vassert(outputTable);
 
     LargeTempTable* inputTable = dynamic_cast<LargeTempTable*>(node->getInputTable());
-    assert(inputTable);
+    vassert(inputTable);
 
     int limit = -1;
     int offset = 0;

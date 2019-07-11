@@ -28,8 +28,8 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Materialized Scan Executor");
 
-    assert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
-    assert(abstract_node->getOutputSchema().size() == 1);
+    vassert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
+    vassert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -38,13 +38,13 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     MaterializedScanPlanNode* node = dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     // output table has one column
     Table* output_table = node->getOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
-    assert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert(output_table);
+    vassert((int)output_table->columnCount() == 1);
 
     // get the output type
     const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);
@@ -52,7 +52,7 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     bool outputCantBeNull = !columnInfo->allowNull;
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
-    assert(rowsExpression);
+    vassert(rowsExpression);
 
     // get array nvalue
     NValue arrayNValue = rowsExpression->eval();

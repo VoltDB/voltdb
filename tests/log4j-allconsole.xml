@@ -52,9 +52,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <logger name="EXPORT">
+    <!-- logger name="EXPORT">
         <level value="DEBUG"/>
-    </logger>
+    </logger -->
 
     <!-- logger name="REJOIN">
         <level value="INFO"/>

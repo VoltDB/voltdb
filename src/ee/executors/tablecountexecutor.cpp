@@ -28,10 +28,10 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Table Count Executor");
 
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubqueryScan() ||
+    vassert(dynamic_cast<TableCountPlanNode*>(abstract_node));
+    vassert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubqueryScan() ||
            dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
-    assert(abstract_node->getOutputSchema().size() == 1);
+    vassert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -41,17 +41,17 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool TableCountExecutor::p_execute(const NValueArray &params) {
     TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getPredicate() == NULL);
+    vassert(node);
+    vassert(node->getPredicate() == NULL);
 
     Table* output_table = node->getOutputTable();
-    assert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert(output_table);
+    vassert((int)output_table->columnCount() == 1);
 
     int64_t rowCounts = 0;
     if (node->isSubqueryScan()) {
         Table* input_table = node->getChildren()[0]->getOutputTable();
-        assert(input_table);
+        vassert(input_table);
         AbstractTempTable* temp_table = dynamic_cast<AbstractTempTable*>(input_table);
         if ( ! temp_table) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

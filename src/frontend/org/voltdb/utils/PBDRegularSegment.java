@@ -52,6 +52,7 @@ import com.google_voltpatches.common.base.Preconditions;
 class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
+    private static final String VALIDATOR_CURSOR = "__validator__";
     private static final int VERSION = 2;
     private static final Random RANDOM = new Random();
 
@@ -453,6 +454,22 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
     }
 
+    @Override
+    int validate(BinaryDeque.BinaryDequeValidator<M> validator) throws IOException
+    {
+        SegmentReader reader = openForRead(SCANNER_CURSOR);
+        try {
+            validateHeader();
+            M extraHeader = getExtraHeader();
+            if (validator.isStale(extraHeader)) {
+                return getNumEntries();
+            }
+            return 0;
+        } finally {
+            reader.purge();
+        }
+    }
+
     /**
      * Set or clear segment as 'final', i.e. whether segment is complete and logically immutable.
      *
@@ -554,6 +571,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             close();
         } finally {
             m_file.delete();
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Deleted PBD Segment " + m_file.getName());
+            }
         }
 
         m_numOfEntries = -1;

@@ -25,7 +25,7 @@
 #include "common/StreamPredicateList.h"
 #include "logging/LogManager.h"
 #include <algorithm>
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 
 namespace voltdb {
@@ -126,7 +126,7 @@ CopyOnWriteContext::handleReactivation(TableStreamType streamType)
  */
 int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                              std::vector<int> &retPositions) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_totalTuples != 0 && m_tuplesRemaining == 0) {
@@ -178,7 +178,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                  * delete and return the tuple if it iscop
                  */
                 if (tuple.isPendingDelete()) {
-                    assert(!tuple.isPendingDeleteOnUndoRelease());
+                    vassert(!tuple.isPendingDeleteOnUndoRelease());
                     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                     //Save the extra lookup if possible
                     m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
@@ -311,7 +311,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             if (hasMore) {
                 hasMore = m_iterator->next(tuple);
                 if (hasMore) {
-                    assert(false);
+                    vassert(false);
                 }
             }
             yield = true;
@@ -343,7 +343,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 }
 
 bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     if (tuple.isDirty() || m_finishedTableScan) {
         return true;
@@ -371,7 +371,7 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
@@ -414,7 +414,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 }
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
     if (m_finishedTableScan) {
         // There was a compaction while we are iterating through the m_backedUpTuples
         // TempTable. Don't do anything because the passed in block is a PersistentTable
@@ -444,8 +444,8 @@ bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
  * Only call it while m_finishedTableScan==false.
  */
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
-    assert(m_iterator.get() != NULL);
-    assert(!m_finishedTableScan);
+    vassert(m_iterator.get() != NULL);
+    vassert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
     TableIterator iter = m_backedUpTuples->iterator();

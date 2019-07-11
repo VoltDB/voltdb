@@ -31,6 +31,7 @@ catalog-report.html
 voltdbroot/
 log/
 voltipc.xcodeproj/
+tests/scripts/plannertester/reports/
 tests/test_apps/*/*.jar
 doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
