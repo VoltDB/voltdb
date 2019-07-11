@@ -496,7 +496,7 @@ public class VoltTrace implements Runnable {
     private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
     private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
 
-    // to temporarily store the traceEventBatch when the bounded buffer (m_traceEvents) is full
+    // To temporarily store the traceEventBatch when the bounded buffer (m_traceEvents) is full
     private ConcurrentHashMap<String, TraceEventBatch> writeMap = new ConcurrentHashMap<>(INIT_CAPACITY);
 
     private boolean isCategoryEnabled(Category cat) {
@@ -504,8 +504,8 @@ public class VoltTrace implements Runnable {
     }
 
     /**
-     * when the buffer (m_traceEVents) is full, copy the trace events in the buffer to writeQueue
-     * and clear the buffer
+     * When the buffer (m_traceEvents) is full,
+     * Copy the trace events in the buffer to writeQueue and clear the buffer.
      */
     private void dumpToWriteMap() {
         TraceEventBatch eventBatch;
@@ -531,7 +531,8 @@ public class VoltTrace implements Runnable {
     }
 
     /**
-     * when "@Trace dump" is invoked, write the trace events temporrarily stored in the writeQueue back to the buffer
+     * When "@Trace dump" is called,
+     * Write the trace events temporrarily stored in the writeQueue back to the buffer,
      */
     private void writeBackToBuffer() {
         // may need to set a warning if overflow still happens when the threashold is too low
