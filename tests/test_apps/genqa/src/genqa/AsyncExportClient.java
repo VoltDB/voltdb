@@ -221,10 +221,13 @@ public class AsyncExportClient
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
             long now = System.currentTimeMillis();
+            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
+                
                 TrackingResults.incrementAndGet(0);
-                TransactionCounts.incrementAndGet(type);
+                TransactionCounts.incrementAndGet(transType);
+                /*********
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_type, txid, now);
                 try
@@ -235,7 +238,9 @@ public class AsyncExportClient
                 {
                     e.printStackTrace();
                 }
+                *********/
             }
+            /*********
             else
             {
                 TrackingResults.incrementAndGet(1);
@@ -250,6 +255,7 @@ public class AsyncExportClient
                     e.printStackTrace();
                 }
             }
+            *********/
         }
     }
 
@@ -522,7 +528,9 @@ public class AsyncExportClient
                       , TrackingResults.get(0)+TrackingResults.get(1)
                       , TransactionCounts.get(INSERT)
                       , TransactionCounts.get(DELETE)
-                      , TransactionCounts.get(UPDATE_OLD)+TransactionCounts.get(UPDATE_OLD)
+                      , TransactionCounts.get(UPDATE_OLD)
+                      // old & new on each update so either = total updates, not the sum of the 2
+                      // +TransactionCounts.get(UPDATE_NEW)
                       );
             }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)

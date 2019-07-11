@@ -45,10 +45,10 @@ public class TableExport extends VoltProcedure {
     public VoltTable[] run(long rowid, long ignore)
     {
         long txid = getUniqueId();
-        final int  INSERT = 1;
-        final int  DELETE = 2;
-        final int  UPDATE = 3;
-        int returnType = 0;
+        final byte INSERT = 1;
+        final byte DELETE = 2;
+        final byte UPDATE = 3;
+        byte returnType = 0;
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = getSeededRandomNumberGenerator();
@@ -65,7 +65,7 @@ public class TableExport extends VoltProcedure {
             // Randomly decide whether to delete (or update) the record
             if (rand.nextBoolean())
             {
-                returnType = DELETE;
+                setAppStatusCode(DELETE);
                 voltQueueSQL(delete, rowid);
                 // Export deletion
                 VoltTableRow row = item.fetchRow(0);
@@ -98,7 +98,7 @@ public class TableExport extends VoltProcedure {
             }
             else
             {
-                returnType = UPDATE;
+                setAppStatusCode(UPDATE);
                 SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               update
@@ -129,7 +129,7 @@ public class TableExport extends VoltProcedure {
         else
         {
                 // Insert a new record
-                returnType = INSERT;
+                setAppStatusCode(INSERT);
                 SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               insert
@@ -162,6 +162,6 @@ public class TableExport extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Return to caller
-        return returnType;
+        return null;
     }
 }

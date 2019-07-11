@@ -14,8 +14,8 @@
             <property name="outdir">exportdata</property>
         </configuration>
         <configuration enabled="true" target="ABC" type="custom"
-                   exportconnectorclass="org.voltdb.exportclient.loopback.LoopbackExportClient">
-            <property name="procedure">partitioned_table.insert</property>
+               exportconnectorclass="org.voltdb.exportclient.loopback.LoopbackExportClient">
+            <property name="procedure">insert_with_metadata</property>
             <property name="skipinternals">false</property>
             <property name="failurelogfile">/tmp/MyProcFailures.log</property>
         </configuration>

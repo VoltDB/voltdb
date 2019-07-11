@@ -36,7 +36,7 @@ CREATE TABLE partitioned_table
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE partitioned_table ON COLUMN rowid;
+-- PARTITION TABLE partitioned_table ON COLUMN rowid;
 
 -- Index over rowid_group on Partitioned Data Table
 CREATE INDEX IX_partitioned_table_rowid_group
@@ -69,7 +69,7 @@ AS
 -- Export Table for Partitioned Data Table
 CREATE TABLE export_partitioned_table EXPORT TO TARGET abc ON insert, update, delete
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -98,7 +98,7 @@ PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 
 CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -125,7 +125,7 @@ CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO T
 
 CREATE TABLE export_partitioned_table2 EXPORT TO TARGET default1
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -153,7 +153,7 @@ PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
 
 CREATE TABLE export_mirror_partitioned_table
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -181,7 +181,7 @@ PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
 CREATE TABLE export_mirror_partitioned_table2
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -264,7 +264,7 @@ AS
 -- Export Table for Replicated Data Table deletions
 CREATE TABLE  export_replicated_table EXPORT TO TARGET abc ON insert, delete, update
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
@@ -338,14 +338,18 @@ CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid EXPORT 
 
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
-CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
+-- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
-CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
+-- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
-CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
+-- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 -- CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateExport;
 CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
@@ -449,6 +453,9 @@ CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PA
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;
 -- CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+-- CREATE PROCEDURE insert_with_metadata PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 7 as insert into partitioned_table values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+CREATE PROCEDURE insert_with_metadata as insert into partitioned_table values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 
 END_OF_BATCH
