@@ -62,8 +62,8 @@
 #include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
+#include "storage/tableiterator.h"
 #include "storage/TableStreamerInterface.h"
-#include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
 #include "storage/streamedtable.h"
@@ -403,6 +403,7 @@ public:
      * Return true on success or false if it was already active.
      */
     bool activateStream(TableStreamType streamType,
+                        HiddenColumnFilter::Type hiddenColumnFilterType,
                         int32_t partitionId,
                         CatalogId tableId,
                         ReferenceSerializeInputBE& serializeIn);
@@ -415,11 +416,6 @@ public:
     int64_t streamMore(TupleOutputStreamProcessor& outputStreams,
                        TableStreamType streamType,
                        std::vector<int>& retPositions);
-
-    /**
-     * Process the updates from a recovery message
-     */
-    void processRecoveryMessage(RecoveryProtoMsg* message, Pool* pool);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
@@ -465,12 +461,12 @@ public:
 
     /** Returns true if there is a hidden column in this table for the
         DR timestamp (used to resolve active/active conflicts) */
-    bool hasDRTimestampColumn() const { return m_drTimestampColumnIndex != -1; }
+    bool hasDRTimestampColumn() const { return m_schema->hasHiddenColumn(HiddenColumn::XDCR_TIMESTAMP); }
 
     /** Returns the index of the DR timestamp column (relative to the
         hidden columns for the table).  If there's no DR timestamp
         column, returns -1. */
-    int getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
+    int getDRTimestampColumnIndex() const { return m_schema->getHiddenColumnIndex(HiddenColumn::XDCR_TIMESTAMP); }
 
     // for test purpose
     void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }
@@ -571,11 +567,9 @@ public:
      * Used for snapshot restore and bulkLoad
      */
     void loadTuplesForLoadTable(SerializeInputBE& serialInput,
-                                Pool* stringPool = NULL,
-                                ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                                bool shouldDRStreamRows = false,
-                                bool ignoreTupleLimit = true,
-                                bool elastic = false);
+                                Pool* stringPool,
+                                ReferenceSerializeOutput* uniqueViolationOutput,
+                                const LoadTableCaller &caller);
 
     inline TableType getTableType() const {
         return m_tableType;
@@ -619,6 +613,7 @@ private:
      * Return true on success or false if it was already active.
      */
     bool activateWithCustomStreamer(TableStreamType streamType,
+                                    HiddenColumnFilter::Type hiddenColumnFilterType,
                                     boost::shared_ptr<TableStreamerInterface> tableStreamer,
                                     CatalogId tableId,
                                     std::vector<std::string>& predicateStrings,
@@ -715,7 +710,7 @@ private:
 
     /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * for loadNextDependency or processRecoveryMessage
+     * for loadNextDependency
      */
     virtual void processLoadedTuple(TableTuple& tuple,
                                     ReferenceSerializeOutput* uniqueViolationOutput,
@@ -743,7 +738,7 @@ private:
         return ec->drStream();
     }
 
-    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
+    void setDRTimestampForTuple(TableTuple& tuple, bool update);
     void computeSmallestUniqueIndex();
 
     void addViewHandler(MaterializedViewHandler* viewHandler);
@@ -851,8 +846,6 @@ private:
     TableIndex* m_smallestUniqueIndex;
 
     uint32_t m_smallestUniqueIndexCrc;
-
-    int m_drTimestampColumnIndex;
 
     // indexes
     std::vector<TableIndex*> m_indexes;

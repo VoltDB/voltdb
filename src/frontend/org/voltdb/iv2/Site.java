@@ -94,6 +94,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -106,6 +107,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -433,9 +435,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(final int tableId, TableStreamType type,
+                HiddenColumnFilter hiddenColumnFilter, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
+            return m_ee.activateTableStream(tableId, type, hiddenColumnFilter,
+                    undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -486,8 +490,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                     if (lastReceivedLogId >= logId) {
                         // This is a duplicate
+                        drLog.info(String.format("P%d binary log site idempotency check returning DUP. " +
+                                                  "Site's tracker lastReceivedLogId is %d while the logId is %d",
+                                                  producerPartitionId, lastReceivedLogId, logId));
                         return DRIdempotencyResult.DUPLICATE;
                     }
+                    drLog.info(String.format("P%d binary log site idempotency check returning GAP. " +
+                            "Site's tracker lastReceivedLogId %d while the logId %d",
+                            producerPartitionId, lastReceivedLogId, logId));
 
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
@@ -1052,11 +1062,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, isTruncation, extraSnapshotData);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, hiddenColumnFilter, tasks, txnId, isTruncation,
+                extraSnapshotData);
     }
 
     /*
@@ -1102,40 +1114,28 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, String clusterName, String databaseName,
-            String tableName, VoltTable data,
-            boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName,
+            VoltTable data, LoadTableCaller caller) throws VoltAbortException
     {
-        Cluster cluster = m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
-        }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
-        }
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = m_context.database.getTables().getIgnoreCase(tableName);
         if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database");
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo, false);
+        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, table.getRelativeIndex(), data, caller);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
-            VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo, boolean elastic)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                returnUniqueViolations,
-                shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
-                elastic);
+                caller.createUndoToken() ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                caller);
     }
 
     @Override

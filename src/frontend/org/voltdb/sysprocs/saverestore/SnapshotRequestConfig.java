@@ -35,37 +35,63 @@ import com.google_voltpatches.common.collect.Sets;
 
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+    public static final String JKEY_NEW_PARTITION_COUNT = "newPartitionCount";
+    public static final String JKEY_TRUNCATION_REQUEST_ID = "truncReqId";
+    public static final String JKEY_TABLES = "tables";
+    public static final String JKEY_SCHEMA_BUILDER = "schemaBuilder";
 
     public final boolean emptyConfig;
     public final Table[] tables;
     public final Integer newPartitionCount;
     public final String truncationRequestId;
+    public final HiddenColumnFilter hiddenColumnFilter;
+
+    public static HiddenColumnFilter getHiddenColumnFilter(JSONObject jsonObject) {
+        if (jsonObject != null) {
+            String schemaBuilderType = jsonObject.optString(JKEY_SCHEMA_BUILDER, null);
+            if (schemaBuilderType != null) {
+                return HiddenColumnFilter.valueOf(schemaBuilderType);
+            }
+        }
+        return HiddenColumnFilter.NONE;
+    }
 
     /**
      * @param tables    Tables to snapshot, cannot be null.
      */
-    public SnapshotRequestConfig(List<Table> tables)
-    {
-        this(Preconditions.checkNotNull(tables), null);
+    public SnapshotRequestConfig(List<Table> tables) {
+        this(Preconditions.checkNotNull(tables), (Integer) null);
+    }
+
+    public SnapshotRequestConfig(List<Table> tables, HiddenColumnFilter schemaFilterType) {
+        this(Preconditions.checkNotNull(tables), null, schemaFilterType);
     }
 
     public SnapshotRequestConfig(int newPartitionCount) {
-        this((Table[]) null, Integer.valueOf(newPartitionCount));
+        this((Table[]) null, Integer.valueOf(newPartitionCount), HiddenColumnFilter.NONE);
     }
 
     public SnapshotRequestConfig(int newPartitionCount, Database catalogDatabase) {
-        this(getTablesToInclude(null, catalogDatabase), Integer.valueOf(newPartitionCount));
+        this(getTablesToInclude(null, catalogDatabase), Integer.valueOf(newPartitionCount),
+                HiddenColumnFilter.NONE);
     }
 
     protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount) {
-        this(tables.toArray(new Table[tables.size()]), newPartitionCount);
+        this(tables.toArray(new Table[tables.size()]), newPartitionCount, HiddenColumnFilter.NONE);
     }
 
-    private SnapshotRequestConfig(Table[] tables, Integer newPartitionCount) {
+    protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount,
+            HiddenColumnFilter schemaFilterType) {
+        this(tables.toArray(new Table[tables.size()]), newPartitionCount, schemaFilterType);
+    }
+
+    private SnapshotRequestConfig(Table[] tables, Integer newPartitionCount,
+            HiddenColumnFilter schemaFilterType) {
         emptyConfig = false;
         this.tables = tables;
         this.newPartitionCount = newPartitionCount;
         truncationRequestId = null;
+        this.hiddenColumnFilter = schemaFilterType;
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
@@ -75,10 +101,12 @@ public class SnapshotRequestConfig {
             emptyConfig = true;
             newPartitionCount = null;
             truncationRequestId = null;
+            hiddenColumnFilter = HiddenColumnFilter.NONE;
         } else {
             emptyConfig = false;
-            newPartitionCount = (Integer) jsData.opt("newPartitionCount");
-            truncationRequestId = (String) jsData.opt("truncReqId");
+            newPartitionCount = (Integer) jsData.opt(JKEY_NEW_PARTITION_COUNT);
+            truncationRequestId = (String) jsData.opt(JKEY_TRUNCATION_REQUEST_ID);
+            hiddenColumnFilter = getHiddenColumnFilter(jsData);
         }
     }
 
@@ -90,7 +118,7 @@ public class SnapshotRequestConfig {
         Set<String> tableNamesToExclude = null;
 
         if (jsData != null) {
-            JSONArray tableNames = jsData.optJSONArray("tables");
+            JSONArray tableNames = jsData.optJSONArray(JKEY_TABLES);
             if (tableNames != null) {
                 tableNamesToInclude = Sets.newHashSet();
                 for (int i = 0; i < tableNames.length(); i++) {
@@ -154,7 +182,7 @@ public class SnapshotRequestConfig {
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         if (tables != null) {
-            stringer.key("tables");
+            stringer.key(JKEY_TABLES);
             stringer.array();
             for (Table table : tables) {
                 stringer.value(table.getTypeName());
@@ -162,7 +190,8 @@ public class SnapshotRequestConfig {
             stringer.endArray();
         }
         if (newPartitionCount != null) {
-            stringer.keySymbolValuePair("newPartitionCount", newPartitionCount.longValue());
+            stringer.keySymbolValuePair(JKEY_NEW_PARTITION_COUNT, newPartitionCount.longValue());
         }
+        stringer.keySymbolValuePair(JKEY_SCHEMA_BUILDER, hiddenColumnFilter.name());
     }
 }

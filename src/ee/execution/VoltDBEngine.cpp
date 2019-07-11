@@ -63,7 +63,6 @@
 #include "common/ElasticHashinator.h"
 #include "common/ExecuteWithMpMemory.h"
 #include "common/InterruptException.h"
-#include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 
@@ -1602,10 +1601,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
-                        bool returnConflictRows,
-                        bool shouldDRStream,
                         int64_t undoToken,
-                        bool elastic) {
+                        const LoadTableCaller &caller) {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
@@ -1618,7 +1615,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                                              uniqueId,
                                              false);
 
-    if (shouldDRStream) {
+    if (caller.shouldDrStream()) {
         m_executorContext->checkTransactionForDR();
     }
 
@@ -1677,14 +1674,12 @@ VoltDBEngine::loadTable(int32_t tableId,
         try {
             table->loadTuplesForLoadTable(serializeIn,
                                           NULL,
-                                          returnConflictRows ? &m_resultOutput : NULL,
-                                          shouldDRStream,
-                                          ExecutorContext::currentUndoQuantum() == NULL,
-                                          elastic);
+                                          caller.returnConflictRows() ? &m_resultOutput : NULL,
+                                          caller);
         }
         catch (const ConstraintFailureException &cfe) {
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;
-            if (returnConflictRows) {
+            if (caller.returnConflictRows()) {
                 // This should not happen because all errors are swallowed and constraint violations are returned
                 // as failed rows in the result
                 throw;
@@ -1708,7 +1703,7 @@ VoltDBEngine::loadTable(int32_t tableId,
             throwFatalException("%s", serializableExc.message().c_str());
         }
 
-        if (table->isReplicatedTable() && returnConflictRows) {
+        if (table->isReplicatedTable() && caller.returnConflictRows()) {
             // There may or may not have been conflicts but the call always succeeds. We need to copy the
             // lowest site result into the results of other sites so there are no hash mismatches.
             ExecuteWithAllSitesMemory execAllSites;
@@ -1725,7 +1720,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION) {
         // An constraint failure exception was thrown on the lowest site thread and
         // handle it on the other threads too.
-        if (!returnConflictRows) {
+        if (!caller.returnConflictRows()) {
             std::ostringstream oss;
             oss << "Replicated load table failed (constraint violation) on other thread for table \""
                 << table->name() << "\".\n";
@@ -2407,6 +2402,7 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        HiddenColumnFilter::Type hiddenColumnFilter,
         int64_t undoToken,
         ReferenceSerializeInputBE &serializeIn) {
     Table* found = getTableById(tableId);
@@ -2422,7 +2418,7 @@ bool VoltDBEngine::activateTableStream(
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(streamType, hiddenColumnFilter, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
@@ -2580,21 +2576,6 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
 
     return remaining;
-}
-
-/*
- * Apply the updates in a recovery message.
- */
-void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
-    CatalogId tableId = message->tableId();
-    Table* found = getTableById(tableId);
-    if (! found) {
-        throwFatalException(
-                "Attempted to process recovery message for tableId %d but the table could not be found", tableId);
-    }
-    PersistentTable *table = dynamic_cast<PersistentTable*>(found);
-    vassert(table);
-    table->processRecoveryMessage(message, NULL);
 }
 
 int64_t VoltDBEngine::exportAction(bool syncAction,
@@ -2892,8 +2873,6 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     m_currExecutorVec->setupContext(m_executorContext);
     m_executorContext->popModifiedTupleCounter();
 }
-
-static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);

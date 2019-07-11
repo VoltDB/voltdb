@@ -133,14 +133,14 @@ SET (VOLTDB_SRC
   catalog/tableref.cpp
   common/ExecuteWithMpMemory.cpp
   common/FatalException.cpp
+  common/HiddenColumn.cpp
   common/InterruptException.cpp
   common/LargeTempTableBlockCache.cpp
+  common/LoadTableCaller.cpp
   common/MiscUtil.cpp
   common/NValue.cpp
   common/PlannerDomValue.cpp
   common/Pool.cpp
-  common/RecoveryProtoMessage.cpp
-  common/RecoveryProtoMessageBuilder.cpp
   common/SQLException.cpp
   common/SegvException.cpp
   common/SerializableEEException.cpp
@@ -266,7 +266,6 @@ SET (VOLTDB_SRC
   storage/MaterializedViewTriggerForInsert.cpp
   storage/MaterializedViewTriggerForWrite.cpp
   storage/PersistentTableStats.cpp
-  storage/RecoveryContext.cpp
   storage/StreamedTableStats.cpp
   storage/TableCatalogDelegate.cpp
   storage/TableStats.cpp

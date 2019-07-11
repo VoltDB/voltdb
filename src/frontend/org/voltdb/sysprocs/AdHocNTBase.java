@@ -106,8 +106,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     abstract protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException;
     abstract protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params);
     // NOTE!!! Because we use reflection to find the run method of each concrete AdHocNTBase class, each of those
-    // concrete methods must declare and implement then run() method. If we simply using the default run() method,
-    // then the reflection would not find it. Each overriding run() method that matches this signature can safely just
+    // concrete methods must declare and implement the run() method. If instead we simply using run() from base class,
+    // the reflection would not find it. Each overriding run() method that matches this signature can safely just
     // call runInternal() method.
     abstract public CompletableFuture<ClientResponse> run(ParameterSet params);
     protected CompletableFuture<ClientResponse> runInternal(ParameterSet params) {

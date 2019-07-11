@@ -21,6 +21,8 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+
 /**
  * Defines the interface between a site and the snapshot
  * top-half.
@@ -29,6 +31,7 @@ public interface SiteSnapshotConnection
 {
     public void initiateSnapshots(
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
