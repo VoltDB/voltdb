@@ -497,7 +497,8 @@ public class VoltTrace implements Runnable {
     private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
 
     // To temporarily store the traceEventBatch when the bounded buffer (m_traceEvents) is full
-    private ConcurrentHashMap<String, TraceEventBatch> writeMap = new ConcurrentHashMap<>(INIT_CAPACITY);
+    //private ConcurrentHashMap<String, TraceEventBatch> writeMap = new ConcurrentHashMap<>(INIT_CAPACITY);
+    private EvictingQueue<TraceEventBatch> writeQueue = EvictingQueue.create(QUEUE_SIZE);
 
     private boolean isCategoryEnabled(Category cat) {
         return m_enabledCategories.contains(cat);
@@ -507,6 +508,7 @@ public class VoltTrace implements Runnable {
      * When the buffer (m_traceEvents) is full,
      * Copy the trace events in the buffer to writeQueue and clear the buffer.
      */
+    /*
     private void dumpToWriteMap() {
         TraceEventBatch eventBatch;
         while ((eventBatch = m_traceEvents.poll()) != null) {
@@ -528,25 +530,37 @@ public class VoltTrace implements Runnable {
             }
         }
         return;
+    }*/
+
+    private void dumpToWriteQueue() {
+        TraceEventBatch eventBatch;
+        while ((eventBatch = m_traceEvents.poll()) != null) {
+            if (!eventBatch.getTraceEventsList().isEmpty()) {
+                writeQueue.offer(eventBatch);
+            }
+        }
+        return;
     }
 
     /**
      * When "@Trace dump" is called,
      * Write the trace events temporrarily stored in the writeQueue back to the buffer,
      */
+    /*
     private void writeBackToBuffer() {
         // may need to set a warning if overflow still happens when the threashold is too low
         for (Map.Entry<String, TraceEventBatch> entry : writeMap.entrySet()) {
             m_traceEvents.offer(entry.getValue());
         }
-    }
+    }*/
 
     private void queueEvent(TraceEventBatch s) {
         // check whether m_traceEVents is full
         // if it is full, clear the queue and move the traceEventBatch to the writeMap
         // key is (category, thread_id)
         if (filter_on && m_traceEvents.remainingCapacity() == 0) {
-            dumpToWriteMap();
+            //dumpToWriteMap();
+            dumpToWriteQueue();
         }
         // add the TraceEventBatch to queue
         m_work.offer(() -> m_traceEvents.offer(s));
@@ -560,12 +574,16 @@ public class VoltTrace implements Runnable {
         // only when filter is on
         if (filter_on) {
             // dump the m_traceEvents
-            dumpToWriteMap();
+            dumpToWriteQueue();
             // write back from writeMap to m_traceEvents
-            writeBackToBuffer();
+            //writeBackToBuffer();
+        } else {
+            writeQueue = m_traceEvents;
         }
 
-        final EvictingQueue<TraceEventBatch> writeQueue = m_traceEvents;
+        //final EvictingQueue<TraceEventBatch> writeQueue = m_traceEvents;
+        //writeQueue = m_traceEvents;
+
         m_traceEvents = m_emptyQueue;
         m_emptyQueue = null;
 
@@ -639,6 +657,7 @@ public class VoltTrace implements Runnable {
             return null;
         }
     }
+
     /**
      * Creates a metadata trace event. This method does not queue the
      * event. Call {@link TraceEventBatch#add(Supplier)} to queue the event.
