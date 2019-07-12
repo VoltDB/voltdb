@@ -423,6 +423,8 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
                                 'ClassCastException',
                                 'SAXParseException',
                                 'RuntimeException',
+                                'IllegalStateException',
+                                'JSONException',
                                 'VoltTypeException']},
                     {'type':'ERROR', 'title':"'ERROR'",
                     'subtypes':['Error compiling query',
@@ -1394,6 +1396,9 @@ if __name__ == "__main__":
                             ['PARTITION has unknown COLUMN'],
                             ['Invalid use of PRIMARY KEY'],
                             ['Invalid use of UNIQUE'],
+                            ['Stream configured with materialized view without partitioned column'],
+                            ['Invalid parameter count for procedure'],
+                            ['Schema file ended mid-statement'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of

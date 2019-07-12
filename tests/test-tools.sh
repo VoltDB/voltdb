@@ -597,7 +597,7 @@ function test-tools-shutdown() {
     fi
 
     # Stop the VoltDB server (& kill any stragglers)
-    $VOLTDB_BIN_DIR/voltadmin shutdown
+    $VOLTDB_BIN_DIR/voltadmin shutdown --force
     code_tt_shutdown=$?
     cd $VOLTDB_COM_DIR
     ant killstragglers
