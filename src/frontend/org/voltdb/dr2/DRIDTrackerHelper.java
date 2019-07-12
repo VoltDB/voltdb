@@ -17,14 +17,6 @@
 
 package org.voltdb.dr2;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
-import org.voltcore.utils.Pair;
-import org.voltdb.DRConsumerDrIdTracker;
-import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
-import org.voltdb.SystemProcedureExecutionContext;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +25,14 @@ import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
+import org.voltdb.SystemProcedureExecutionContext;
 
 public class DRIDTrackerHelper {
 
