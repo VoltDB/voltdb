@@ -545,7 +545,7 @@ public class VoltTrace implements Runnable {
         // check whether m_traceEVents is full
         // if it is full, clear the queue and move the traceEventBatch to the writeMap
         // key is (category, thread_id)
-        if (m_traceEvents.remainingCapacity() == 0) {
+        if (filter_on && m_traceEvents.remainingCapacity() == 0) {
             dumpToWriteMap();
         }
         // add the TraceEventBatch to queue
@@ -557,10 +557,13 @@ public class VoltTrace implements Runnable {
             return null;
         }
 
-        // dump the m_traceEvents
-        dumpToWriteMap();
-        // write back from writeMap to m_traceEvents
-        writeBackToBuffer();
+        // only when filter is on
+        if (filter_on) {
+            // dump the m_traceEvents
+            dumpToWriteMap();
+            // write back from writeMap to m_traceEvents
+            writeBackToBuffer();
+        }
 
         final EvictingQueue<TraceEventBatch> writeQueue = m_traceEvents;
         m_traceEvents = m_emptyQueue;
