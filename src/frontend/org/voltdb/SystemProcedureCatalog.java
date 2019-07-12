@@ -46,6 +46,136 @@ public class SystemProcedureCatalog {
     // and ClientInterface has to check two lists at dispatch
     // time.
 
+    /**
+     * Builder class to simplify the construction of {@link Config} instances
+     */
+    static class Builder {
+        private final String className;
+        private boolean readOnly = false;
+        private final boolean singlePartition;
+        private final boolean everySite;
+        private final int partitionParam;
+        private final VoltType partitionParamType;
+        private boolean commercial = false;
+        private boolean terminatesReplication = false;
+        private boolean allowedInReplica = false;
+        private boolean durable = true;
+        private boolean allowedInShutdown = false;
+        private final boolean transactional;
+        private boolean restartable;
+
+        static Builder createSp(String className, VoltType partitionParamType) {
+            return createSp(className, 0, partitionParamType);
+        }
+
+        static Builder createSp(String className, int partitionParam, VoltType partitionParamType) {
+            return new Builder(className, true, false, partitionParam, partitionParamType, true, false);
+        }
+
+        static Builder createMp(String className) {
+            return new Builder(className, false, false, 0, VoltType.INVALID, true, true);
+        }
+
+        static Builder createNp(String className) {
+            return new Builder(className, false, false, 0, VoltType.INVALID, false, false).notDurable()
+                    .notRestartable();
+        }
+
+        static Builder createEverySite(String className, int partitionParam, VoltType partitionParamType) {
+            return new Builder(className, false, true, partitionParam, partitionParamType, true, false);
+        }
+
+        private Builder(String className, boolean singlePartition, boolean everySite, int partitionParam,
+                VoltType partitionParamType, boolean transactional, boolean restartable) {
+            this.className = className;
+            this.singlePartition = singlePartition;
+            this.everySite = everySite;
+            this.partitionParam = partitionParam;
+            this.partitionParamType = partitionParamType;
+            this.transactional = transactional;
+            this.restartable = restartable;
+        }
+
+        /**
+         * Mark this procedure as read only
+         *
+         * @return {@code this}
+         */
+        Builder readOnly() {
+            if (!singlePartition) {
+                throw new IllegalArgumentException("RO not supported for MP transactions");
+            }
+            readOnly = true;
+            return this;
+        }
+
+        /**
+         * Mark this procedure as part of the commercial product and not the community edition
+         *
+         * @return {@code this}
+         */
+        Builder commercial() {
+            commercial = true;
+            return this;
+        }
+
+        /**
+         * Mark this procedure as one that terminates replication
+         *
+         * @return {@code this}
+         */
+        Builder terminatesReplication() {
+            terminatesReplication = true;
+            return this;
+        }
+
+        /**
+         * Mark this procedure as allowed to be run on a read only replica system
+         *
+         * @return {@code this}
+         */
+        Builder allowedInReplica() {
+            allowedInReplica = true;
+            return this;
+        }
+
+        /**
+         * Mark this procedure to not be included in command logging
+         *
+         * @return {@code this}
+         */
+        Builder notDurable() {
+            durable = false;
+            return this;
+        }
+
+        /**
+         * Mark this procedure as being able to be executed while the system is shutting down
+         *
+         * @return {@code this}
+         */
+        Builder allowedInShutdown() {
+            allowedInShutdown = true;
+            return this;
+        }
+
+        /**
+         * Mark this MP procedure as not restartable if a node failure or leader change occurs while it is executing
+         *
+         * @return {@code this}
+         */
+        Builder notRestartable() {
+            restartable = false;
+            return this;
+        }
+
+        Config build() {
+            return new Config(className, singlePartition, readOnly, everySite, partitionParam, partitionParamType,
+                    commercial, terminatesReplication, allowedInReplica, durable, allowedInShutdown, transactional,
+                    restartable);
+        }
+    }
+
     /* Data about each registered procedure */
     public static class Config {
         public final String className;
@@ -70,8 +200,7 @@ public class SystemProcedureCatalog {
         // whether restartable
         public final boolean restartable;
 
-        public Config(
-                String className, boolean singlePartition, boolean readOnly, boolean everySite, int partitionParam,
+        Config(String className, boolean singlePartition, boolean readOnly, boolean everySite, int partitionParam,
                 VoltType partitionParamType, boolean commercial, boolean terminatesReplication, boolean allowedInReplica,
                 boolean durable, boolean allowedInShutdown, boolean transactional, boolean restartable) {
             this.className = className;
@@ -520,15 +649,11 @@ public class SystemProcedureCatalog {
                         false, false, false, true,
                         true, false, false));
         builder.put("@ElasticRemoveNT",
-                new Config("org.voltdb.sysprocs.ElasticRemoveNT",
-                        false, false, false, 0, VoltType.INVALID,
-                        true, false, true, false,
-                        false, false, false ));
-        builder.put("@ElasticRemove",
-                new Config("org.voltdb.sysprocs.ElasticRemove",
-                        false, false, false, 0, VoltType.INVALID,
-                        true, false, false, true,
-                        false, true, true));
+                Builder.createNp("org.voltdb.sysprocs.ElasticRemoveNT").commercial().allowedInReplica().build());
+        builder.put("@ElasticRemove", Builder.createMp("org.voltdb.sysprocs.ElasticRemove").commercial().build());
+        builder.put("@CollectDrSiteTrackers",
+                Builder.createMp("org.voltdb.sysprocs.CollectDrSiteTrackers").commercial().notDurable()
+                        .allowedInReplica().build());
         listing = builder.build();
     }
 
