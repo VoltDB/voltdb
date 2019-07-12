@@ -184,20 +184,10 @@ public class ZKDU {
                     connectString = args[i+1];
                 }
             }
-            if (arg.equals("-d1")) {
-                depth = 1;
-            }
-            if (arg.equals("-d2")) {
-                depth = 2;
-            }
-            if (arg.equals("-d3")) {
-                depth = 3;
-            }
-            if (arg.equals("-d4")) {
-                depth = 5;
-            }
-            if (arg.equals("-d5")) {
-                depth = 5;
+            if (arg.equals("-d")) {
+                if (args.length > i+1) {
+                    depth = Integer.valueOf(args[i+1]);
+                }
             }
             if (arg.equals("-v")) {
                 verbose = true;
