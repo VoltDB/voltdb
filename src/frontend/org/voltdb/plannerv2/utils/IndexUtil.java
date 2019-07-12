@@ -83,10 +83,12 @@ public class IndexUtil {
      *
      * @param scanNode Initial index scan plan.
      * @param path The access path to access the data in the table (index/scan/etc).
+     * @param tableIdx - 1 if a scan is an inner scan of the NJIJ. 0 otherwise.
+     *
      * @return An index scan plan node
      */
-    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path) {
-        return SubPlanAssembler.buildIndexAccessPlanForTable(scanNode, path);
+    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
+        return SubPlanAssembler.buildIndexAccessPlanForTable(scanNode, path, tableIdx);
     }
 
     /**

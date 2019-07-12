@@ -299,7 +299,7 @@ public class PlannerTool {
         CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
-        // TODO: enable when we are ready
+        // TODO Calcite ready: enable when we are ready
         throw new PlannerFallbackException("planSqlCalcite not ready");
         // return new AdHocPlannedStatement(plan, core);
     }

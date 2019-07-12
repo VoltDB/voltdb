@@ -120,7 +120,6 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
-
     private static List<Index> getIndexes(VolcanoPlanner planner) {
         final List<Table> tables = planner.getRelNodes().stream()
                 .flatMap(n -> n instanceof VoltLogicalTableScan ?

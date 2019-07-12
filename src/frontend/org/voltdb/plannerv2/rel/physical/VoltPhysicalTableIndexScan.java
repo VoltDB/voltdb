@@ -51,6 +51,16 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     private final AccessPath m_accessPath;
     private final RelCollation m_indexCollation;
 
+    // This is a hack, but I can't figure out a better way of doing it.
+    // This only required during the VoltPhysicalTableIndexScan conversion to
+    // its Volt counterpart IndexScanPlanNode to set SkipNullPredicate table index.
+    // Volt Planner resolves it using scan's persistent table schema but
+    // it's unavailable during the Calcite build. The table index must be explicitly
+    // passed in as a parameter.
+    // Since it's used after all the Calctite rules are applied, it doen't need to be copied around
+    // and be part of the digest
+    private int m_tableIdx = 0;
+
     /**
      *
      * @param cluster
@@ -126,7 +136,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         addAggregate(ispn);
 
         // At the moment this will override the predicate set by the addPredicate call
-        return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
+        return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath, m_tableIdx);
     }
 
     public Index getIndex() {
@@ -210,5 +220,9 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
 
     public RelCollation getIndexCollation() {
         return m_indexCollation;
+    }
+
+    public void setTableIdx(int tableIdx) {
+        m_tableIdx = tableIdx;
     }
 }

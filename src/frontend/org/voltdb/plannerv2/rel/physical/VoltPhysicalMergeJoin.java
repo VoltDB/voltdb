@@ -29,12 +29,17 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MergeJoinPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
@@ -108,13 +113,61 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         }
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
         mjpn.setJoinType(JoinType.INNER);
-        mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
-        mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));
+
+        // Outer node
+        AbstractPlanNode outerPlanNode = inputRelNodeToPlanNode(this, 0);
+        mjpn.addAndLinkChild(outerPlanNode);
+        RexProgram outerProgram = null;
+        if (getInput(0) instanceof VoltPhysicalTableIndexScan) {
+            outerProgram = ((VoltPhysicalTableIndexScan)getInput(0)).getProgram();
+        }
+
+        // Inline inner index scan
+        AbstractPlanNode innerScan = inputRelNodeToPlanNode(this, 1);
+        Preconditions.checkState(innerScan instanceof IndexScanPlanNode);
+        mjpn.addInlinePlanNode(innerScan);
         // Set join predicate
-        mjpn.setJoinPredicate(RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(), getCondition()));
+        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
+
+        mjpn.setJoinPredicate(RexConverter.convertJoinPred(
+                getInput(0).getRowType().getFieldCount(), getCondition(), outerProgram, innerIndexScan.getProgram()));
         // Inline LIMIT / OFFSET
         addLimitOffset(mjpn);
         // Set output schema
         return setOutputSchema(mjpn);
     }
+
+    @Override
+    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+        Preconditions.checkNotNull(node, "Plan node is null");
+        // An inner node has to be an index scan
+        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        // Since it's going to be inlined and MJ executor will be iterating directly over
+        // its persistent table all the expression references must be resolved
+        // in context of the persistent table
+        VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
+        RexProgram innerProgram = innerIndexScan.getProgram();
+        NodeSchema innerSchema = RexConverter.convertToVoltDBNodeSchema(innerProgram, 1);
+
+        // Outer node
+        NodeSchema outerSchema;
+        if (getInput(0) instanceof VoltPhysicalTableIndexScan) {
+            // If the outer node is an index scan all the refernces must be resolved
+            // using the persistent table similar to the inner node
+            VoltPhysicalTableIndexScan outerIndexScan = (VoltPhysicalTableIndexScan) getInput(0);
+            RexProgram outerProgram = outerIndexScan.getProgram();
+            outerSchema = RexConverter.convertToVoltDBNodeSchema(outerProgram, 0);
+        } else {
+            RelDataType outerRowType = getInput(0).getRowType();
+            outerSchema = RexConverter.convertToVoltDBNodeSchema(outerRowType, 0);
+        }
+        final NodeSchema schema = outerSchema.join(innerSchema);
+        node.setOutputSchemaPreInlineAgg(schema);
+        node.setOutputSchema(schema);
+        node.setHaveSignificantOutputSchema(true);
+
+        return node;
+    }
+
 }
