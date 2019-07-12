@@ -599,72 +599,74 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
     // Test more UDF's with two arguments; these UDF's have no null checking, so odd
     // things can happen, such as null plus one equals a number ...
-    // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
+    // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite. These tests now succeed
+    // even when running in Git branch name that contains "calcite-", because we catch CalciteContextException, and
+    // rerun the query using legacy parser/planner. Nevertheless, ENG-15490 need to be resolved.
 
-//    public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
-//    }
-//    public void testAdd2TinyintWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2TinyintWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
-//    }
-//    public void testAdd2TinyintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2TinyintBoxedWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
-//    }
-//    public void testAdd2TinyintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2TinyintBoxedWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
-//    }
-//
-//    public void testAdd2SmallintWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2SmallintWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
-//    }
-//    public void testAdd2SmallintWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2SmallintWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
-//    }
-//    public void testAdd2SmallintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2SmallintBoxedWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
-//    }
-//    public void testAdd2SmallintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2SmallintBoxedWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
-//    }
-//
-//    public void testAdd2IntegerWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2IntegerWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
-//    }
-//    public void testAdd2IntegerWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2IntegerWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
-//    }
-//    public void testAdd2IntegerBoxedWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2IntegerBoxedWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
-//    }
-//    public void testAdd2IntegerBoxedWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2IntegerBoxedWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
-//    }
-//
-//    public void testAdd2BigintWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2BigintWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
-//    }
-//    public void testAdd2BigintWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2BigintWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
-//    }
-//    public void testAdd2BigintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2BigintBoxedWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
-//    }
-//    public void testAdd2BigintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2BigintBoxedWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
-//    }
-//
-//    public void testAdd2FloatWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2FloatWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
-//    }
-//    public void testAdd2FloatWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2FloatWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
-//    }
-//    public void testAdd2FloatBoxedWithoutNullCheck1() throws IOException, ProcCallException {
-//        testFunction("add2FloatBoxedWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
-//    }
-//    public void testAdd2FloatBoxedWithoutNullCheck2() throws IOException, ProcCallException {
-//        testFunction("add2FloatBoxedWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
-//    }
+    public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2TinyintWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxedWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxedWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
+    }
+
+    public void testAdd2SmallintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2SmallintWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2SmallintWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxedWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxedWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
+    }
+
+    public void testAdd2IntegerWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2IntegerWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2IntegerWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxedWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxedWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
+    }
+
+    public void testAdd2BigintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2BigintWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2BigintWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxedWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxedWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
+    }
+
+    public void testAdd2FloatWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2FloatWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2FloatWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxedWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxedWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
+    }
 
     // Test concatenation UDF's with two, three or four arguments ...
 
