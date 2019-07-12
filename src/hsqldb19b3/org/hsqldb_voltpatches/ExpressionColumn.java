@@ -652,7 +652,10 @@ public class ExpressionColumn extends Expression {
                 return "*";
 
             case OpTypes.COALESCE :
-                return alias.getStatementName();
+                if (alias != null) {
+                    return alias.getStatementName();
+                }
+                return columnName;
 
             case OpTypes.VARIABLE :
             case OpTypes.PARAMETER :
