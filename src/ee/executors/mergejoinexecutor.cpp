@@ -55,9 +55,6 @@
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
 
-#include "boost/scoped_ptr.hpp"
-
-
 using namespace std;
 using namespace voltdb;
 
@@ -67,16 +64,16 @@ const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 // Helper class to iterate over either a temp table or
 // a persistent table using its index
 struct TableCursor {
-
     virtual ~TableCursor() {
     }
 
     // This is a helper function to get the "next tuple"
     virtual bool getNextTuple(TableTuple* tuple) = 0;
 
-    virtual TableCursor* clone() const = 0;
+    virtual std::unique_ptr<TableCursor> clone() const = 0;
 
-    virtual void populateJoinTuple(TableTuple& joinTuple, const TableTuple& childTuple, int startIndex) const {
+    virtual void populateJoinTuple(
+            TableTuple& joinTuple, const TableTuple& childTuple, int startIndex) const {
         joinTuple.setNValues(startIndex, childTuple, 0, getColumnCount());
     }
 
@@ -92,11 +89,9 @@ struct TableCursor {
         return table;
     }
 
-    protected:
-        TableCursor(Table* nodeTable) :
-            table(nodeTable) {}
-
-        Table* table;
+protected:
+    TableCursor(Table* nodeTable) : table(nodeTable) {}
+    Table* table;
 };
 
 // A Temp Table Cursor
@@ -105,133 +100,114 @@ struct TempTableCursor : public TableCursor {
     TempTableCursor(AbstractPlanNode* childNode, Table* childTable) :
         TableCursor(childTable),
         tempTableIterator(childTable->iteratorDeletingAsWeGo()) {
-        assert(childNode);
-        assert(childTable);
-
-        VOLT_TRACE(" <MJ Child PlanNode> %s", childNode->debug().c_str());
-        VOLT_TRACE ("<MJ Child table :\n %s", table->debug().c_str());
+        vassert(childNode);
+        vassert(childTable);
+        VOLT_TRACE("<MJ Child PlanNode> %s", childNode->debug().c_str());
+        VOLT_TRACE("<MJ Child table :\n %s>", table->debug().c_str());
     }
 
-    TempTableCursor(const TempTableCursor& other) :
-        TableCursor(other.getTable()),
-        tempTableIterator(other.tempTableIterator) {
-    }
-
-    bool getNextTuple(TableTuple* tuple) {
+    bool getNextTuple(TableTuple* tuple) override {
         return tempTableIterator.next(*tuple);
     }
 
-    TempTableCursor* clone() const {
-        return new TempTableCursor(*this);
+    std::unique_ptr<TableCursor> clone() const override {
+        return std::unique_ptr<TableCursor>(new TempTableCursor(*this));
     }
 
-    private:
-        // Temp Table data
-        TableIterator tempTableIterator;
-
+private:
+    TableIterator tempTableIterator;
 };
 
 // IndexScan Cursor
 struct IndexTableCursor : public TableCursor {
-
     IndexTableCursor(IndexScanPlanNode* indexNode, PersistentTable* persistTable):
-        TableCursor(persistTable),
-        tableIndex(persistTable->index(indexNode->getTargetIndexName())),
+        TableCursor(persistTable), tableIndex(persistTable->index(indexNode->getTargetIndexName())),
         indexCursor(tableIndex->getTupleSchema()),
-        projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION))),
-        numOfProjectColumns(-1) {
+        projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION))) {
         tableIndex->moveToEnd(true, indexCursor);
         if (projectionNode) {
-            numOfProjectColumns = static_cast<int> (projectionNode->getOutputColumnExpressions().size());
+            numOfProjectColumns = projectionNode->getOutputColumnExpressions().size();
         }
-        VOLT_TRACE(" <MJ Index Child PlanNode> %s", indexNode->debug().c_str());
-        VOLT_TRACE ("<MJ Index Child table :\n %s", table->debug().c_str());
+        VOLT_TRACE("<MJ Index Child PlanNode> %s", indexNode->debug().c_str());
+        VOLT_TRACE("<MJ Index Child table :\n %s>", table->debug().c_str());
     }
 
-    IndexTableCursor(const IndexTableCursor& other) :
-        TableCursor(other.getTable()),
-        tableIndex(other.tableIndex),
-        indexCursor(other.indexCursor),
-        projectionNode(other.projectionNode),
-        numOfProjectColumns(other.numOfProjectColumns) {
-    }
-
-    virtual void populateJoinTuple(TableTuple& joinTuple, const TableTuple& childTuple, int startIndex) const {
+    void populateJoinTuple(TableTuple& joinTuple, const TableTuple& childTuple, int startIndex) const override {
         if (numOfProjectColumns == -1) {
             joinTuple.setNValues(startIndex, childTuple, 0, getColumnCount());
         } else {
             for (int ctr = 0; ctr < numOfProjectColumns; ctr++) {
-                assert(startIndex + ctr < joinTuple.columnCount());
+                vassert(startIndex + ctr < joinTuple.columnCount());
                 NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&childTuple, NULL);
                 joinTuple.setNValue(startIndex + ctr, value);
             }
         }
     }
 
-    bool getNextTuple(TableTuple* tuple) {
+    bool getNextTuple(TableTuple* tuple) override {
         *tuple = tableIndex->nextValue(indexCursor);
         return ! tuple->isNullTuple();
     }
 
-    IndexTableCursor* clone() const {
-        return new IndexTableCursor(*this);
+    std::unique_ptr<TableCursor> clone() const override {
+        return std::unique_ptr<TableCursor>(new IndexTableCursor(*this));
     }
 
-    private:
-        // Persistent table
-        TableIndex *tableIndex;
-        IndexCursor indexCursor;
-        // Possible projection
-        ProjectionPlanNode* projectionNode;
-        int numOfProjectColumns;
+private:
+    // Persistent table
+    TableIndex *tableIndex;
+    IndexCursor indexCursor;
+    // Possible projection
+    ProjectionPlanNode* projectionNode;
+    int numOfProjectColumns = -1;
 };
 
 // Helper method to instantiate either an Index or Temp table's cursor
 // depending on the type of the node
-TableCursor* buildTableCursor(AbstractPlanNode* node, Table* nodeTable) {
+std::unique_ptr<TableCursor> buildTableCursor(AbstractPlanNode* node, Table* nodeTable) {
     if (node->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
-        IndexScanPlanNode* indexNode = dynamic_cast<IndexScanPlanNode*>(node);
-        assert(dynamic_cast<PersistentTable*>(indexNode->getTargetTable()));
-        PersistentTable* persistTable = static_cast<PersistentTable*>(indexNode->getTargetTable());
-        return new IndexTableCursor(indexNode, persistTable);
+        auto* indexNode = dynamic_cast<IndexScanPlanNode*>(node);
+        vassert(dynamic_cast<PersistentTable*>(indexNode->getTargetTable()));
+        return std::unique_ptr<TableCursor>(new IndexTableCursor(indexNode,
+                static_cast<PersistentTable*>(indexNode->getTargetTable())));
     } else {
-        return new TempTableCursor(node, nodeTable);
+        return std::unique_ptr<TableCursor>(new TempTableCursor(node, nodeTable));
     }
 }
 
 bool MergeJoinExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init MergeJoin Executor");
-
     // Init parent first
-    if (!AbstractJoinExecutor::p_init(abstractNode, executorVector)) {
-        return false;
-    }
+    return AbstractJoinExecutor::p_init(abstractNode, executorVector);
+}
 
-    return true;
+void tracePredicate(char const* name, AbstractExpression* expr) {
+    VOLT_TRACE("%s predicate: %s", name, expr == nullptr ? "NULL" : expr->debug(true).c_str());
 }
 
 bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing MergeJoin...");
 
-    MergeJoinPlanNode* node = dynamic_cast<MergeJoinPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getInputTableCount() == 1);
+    auto* node = dynamic_cast<MergeJoinPlanNode*>(m_abstractNode);
+    vassert(node);
+    vassert(node->getInputTableCount() == 1);
 
     // output table must be a temp table
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
 
     // Outer table can be either an IndexScan or another MJ. In the latter case we have to
     // iterarte over its output temp table
-    assert(!node->getChildren().empty());
+    vassert(!node->getChildren().empty());
     AbstractPlanNode* outerNode = node->getChildren()[0];
     Table* outerTable = node->getInputTable();
-    boost::scoped_ptr<TableCursor> outerCursorPtr(buildTableCursor(outerNode, outerTable));
+    auto outerCursorPtr = buildTableCursor(outerNode, outerTable);
 
     // inner table is guaranteed to be an index scan over a persistent table
-    assert(dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
-    IndexScanPlanNode* innerIndexNode = dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
-    assert(dynamic_cast<PersistentTable*>(innerIndexNode->getTargetTable()));
-    PersistentTable* persistTable = static_cast<PersistentTable*>(innerIndexNode->getTargetTable());
+    auto* innerIndexNode = dynamic_cast<IndexScanPlanNode*>(
+            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
+    vassert(innerIndexNode);
+    auto* persistTable = dynamic_cast<PersistentTable*>(innerIndexNode->getTargetTable());
+    vassert(persistTable);
 
     IndexTableCursor innerCursor(innerIndexNode, persistTable);
 
@@ -242,36 +218,32 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     // Pre Join Expression
     //
     AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
-    if (preJoinPredicate) {
-        VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
-                    "NULL" : preJoinPredicate->debug(true).c_str());
-    }
+    tracePredicate("Pred Join", preJoinPredicate);
     //
     // Equivalence Expression
     //
     AbstractExpression *equalJoinPredicate = node->getJoinPredicate();
-    assert(equalJoinPredicate != nullptr);
-    VOLT_TRACE ("Equality predicate: %s", equalJoinPredicate->debug(true).c_str());
+    vassert(equalJoinPredicate != nullptr);
+    tracePredicate("Equality", equalJoinPredicate);
     //
     // Less Expression
     //
     AbstractExpression *lessJoinPredicate = node->getLessJoinPredicate();
-    assert(lessJoinPredicate !=nullptr);
-    VOLT_TRACE ("Less predicate: %s", lessJoinPredicate->debug(true).c_str());
+    vassert(lessJoinPredicate != nullptr);
+    tracePredicate("Less", lessJoinPredicate);
     //
     // Where Expression
     //
     AbstractExpression *wherePredicate = node->getWherePredicate();
-    VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ? "NULL" : wherePredicate->debug(true).c_str());
+    tracePredicate("Where", wherePredicate);
 
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
     TableTupleFilter innerTableFilter;
-    if (m_joinType == JOIN_TYPE_FULL) {
-        // Prepopulate the view with all inner tuples
+    if (m_joinType == JOIN_TYPE_FULL) { // Prepopulate the view with all inner tuples
         innerTableFilter.init(innerCursor.getTable());
     }
 
-    LimitPlanNode* limitNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    auto* limitNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limitNode) {
@@ -287,14 +259,8 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
 
-    TableTuple joinTuple;
-    if (m_aggExec != NULL) {
-        VOLT_TRACE("Init inline aggregate...");
-        const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
-        joinTuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable, &postfilter);
-    } else {
-        joinTuple = m_tmpOutputTable->tempTuple();
-    }
+    TableTuple joinTuple = m_aggExec == nullptr ? m_tmpOutputTable->tempTuple() :
+        m_aggExec->p_execute_init(params, &pmp, node->getTupleSchemaPreAgg(), m_tmpOutputTable, &postfilter);
 
     // Move both iterators to the first rows if possible
     bool hasOuter = outerCursorPtr->getNextTuple(&outerTuple);
@@ -313,12 +279,11 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
             // For outer joins if outer tuple fails pre-join predicate
             // (join expression based on the outer table only)
             // it can't match any of inner tuples
-            if (preJoinPredicate == NULL || preJoinPredicate->eval(&outerTuple, NULL).isTrue()) {
+            if (preJoinPredicate == nullptr || preJoinPredicate->eval(&outerTuple, nullptr).isTrue()) {
                 if (equalJoinPredicate->eval(&outerTuple, &innerTuple).isTrue()) {
                     outerMatch = true;
                     // The inner tuple passed the join predicate
-                    if (m_joinType == JOIN_TYPE_FULL) {
-                        // Mark it as matched
+                    if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
                         innerTableFilter.updateTuple(innerTuple, MATCHED_TUPLE);
                     }
                     // Filter the joined tuple
@@ -330,13 +295,12 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
 
                     // Output further tuples that match the outerTuple
                     IndexTableCursor innerCursorTmp = innerCursor;
-                    TableTuple innerTupleTmp = innerTuple;
+                    TableTuple innerTupleTmp = innerTuple;  // TODO: can we spare this construction?
                     while (postfilter.isUnderLimit()
-                        && innerCursorTmp.getNextTuple(&innerTupleTmp)
-                        && equalJoinPredicate->eval(&outerTuple, &innerTupleTmp).isTrue()) {
+                            && innerCursorTmp.getNextTuple(&innerTupleTmp)
+                            && equalJoinPredicate->eval(&outerTuple, &innerTupleTmp).isTrue()) {
                         pmp.countdownProgress();
-                        if (m_joinType == JOIN_TYPE_FULL) {
-                            // Mark it as matched
+                        if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
                             innerTableFilter.updateTuple(innerTupleTmp, MATCHED_TUPLE);
                         }
                         // Filter the joined tuple
@@ -348,15 +312,14 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
                     }
 
                     // Output further tuples that match the innerTuple
-                    boost::scoped_ptr<TableCursor> outerCursorPtrTmp(outerCursorPtr->clone());
+                    auto outerCursorPtrTmp = outerCursorPtr->clone();
                     TableTuple outerTupleTmp = outerTuple;
                     innerCursor.populateJoinTuple(joinTuple, innerTuple, outerCols);
                     while (postfilter.isUnderLimit() &&
-                        outerCursorPtrTmp->getNextTuple(&outerTupleTmp) &&
-                        equalJoinPredicate->eval(&outerTupleTmp, &innerTuple).isTrue()) {
+                            outerCursorPtrTmp->getNextTuple(&outerTupleTmp) &&
+                            equalJoinPredicate->eval(&outerTupleTmp, &innerTuple).isTrue()) {
                         pmp.countdownProgress();
-                        if (m_joinType == JOIN_TYPE_FULL) {
-                            // Mark it as matched
+                        if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
                             innerTableFilter.updateTuple(innerTuple, MATCHED_TUPLE);
                         }
                         // Filter the joined tuple
@@ -370,30 +333,24 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
                     // Advance both cursors
                     hasOuter = outerCursorPtr->getNextTuple(&outerTuple);
                     hasInner = innerCursor.getNextTuple(&innerTuple);
-                } else if (lessJoinPredicate->eval(&outerTuple, &innerTuple).isTrue()) {
-                    // Advance outer
+                } else if (lessJoinPredicate->eval(&outerTuple, &innerTuple).isTrue()) { // Advance outer
                     hasOuter = outerCursorPtr->getNextTuple(&outerTuple);
-                } else {
-                    // Advance inner
+                } else { // Advance inner
                     hasInner = innerCursor.getNextTuple(&innerTuple);
                 }
-            } // END IF PRE JOIN CONDITION
-            else {
-                // Advance outer
+            } else { // Advance outer
                 hasOuter = outerCursorPtr->getNextTuple(&outerTuple);
             }
 
             //
             // Left Outer Join
             //
-            if (m_joinType != JOIN_TYPE_INNER && !outerMatch && postfilter.isUnderLimit()) {
-                // Still needs to pass the filter
-                if (postfilter.eval(&outerTuple, &nullInnerTuple)) {
-                    // Matched! Complete the joined tuple with the inner column values.
-                    innerCursor.populateJoinTuple(joinTuple, nullInnerTuple, outerCols);
-                    outputTuple(postfilter, joinTuple, pmp);
-                }
-            } // END IF LEFT OUTER JOIN
+            if (m_joinType != JOIN_TYPE_INNER && !outerMatch && postfilter.isUnderLimit() && // Still needs to pass the filter
+                    postfilter.eval(&outerTuple, &nullInnerTuple)) {
+                // Matched! Complete the joined tuple with the inner column values.
+                innerCursor.populateJoinTuple(joinTuple, nullInnerTuple, outerCols);
+                outputTuple(postfilter, joinTuple, pmp);
+            }
         } // END WHILE LOOP
 
         //
@@ -404,14 +361,13 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
             const TableTuple& nullOuterTuple = m_null_outer_tuple.tuple();
             outerCursorPtr->populateJoinTuple(joinTuple, nullOuterTuple, 0);
 
-            TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
-            for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
+            auto const endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
+            for (auto itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
                     itr != endItr && postfilter.isUnderLimit(); ++itr) {
                 // Restore the tuple value
-                uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
-                innerTuple.move((char *)tupleAddr);
+                innerTuple.move(reinterpret_cast<char*>(innerTableFilter.getTupleAddress(*itr)));
                 // Still needs to pass the filter
-                assert(innerTuple.isActive());
+                vassert(innerTuple.isActive());
                 if (postfilter.eval(&nullOuterTuple, &innerTuple)) {
                     // Passed! Complete the joined tuple with the inner column values.
                     innerCursor.populateJoinTuple(joinTuple, innerTuple, outerCols);
@@ -422,8 +378,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     } else if (hasOuter && m_joinType != JOIN_TYPE_INNER) {
         // This is an outer join but the inner table is empty
         // Add all outer tuples that pass the filter
-        while (postfilter.isUnderLimit() &&
-        outerCursorPtr->getNextTuple(&outerTuple)) {
+        while (postfilter.isUnderLimit() && outerCursorPtr->getNextTuple(&outerTuple)) {
             pmp.countdownProgress();
             if (postfilter.eval(&outerTuple, &nullInnerTuple)) {
                 // Matched! Complete the joined tuple with the inner column values.
@@ -445,12 +400,9 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
             }
             hasInner = innerCursor.getNextTuple(&innerTuple);
         }
-
     }
-
-    if (m_aggExec != NULL) {
+    if (m_aggExec != nullptr) {
         m_aggExec->p_execute_finish();
     }
-
-    return (true);
+    return true;
 }
