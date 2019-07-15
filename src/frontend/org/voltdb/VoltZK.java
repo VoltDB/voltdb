@@ -123,7 +123,7 @@ public class VoltZK {
         return builder.toString();
     }
 
-    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+    public static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
         builder.append(dir).append(":\t ");
         try {
             List<String> keys = zk.getChildren(dir, null);
