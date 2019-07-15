@@ -53,8 +53,8 @@ public class UserDefinedFunctionManager {
             "VoltDB was unable to load a function (%s) which was expected to be " +
             "in the catalog jarfile and will now exit.";
 
-    ImmutableMap<Integer, UserDefinedFunctionRunner> m_udfs = ImmutableMap.<Integer, UserDefinedFunctionRunner>builder().build();
-    ImmutableMap<Integer, UserDefinedAggregateFunctionRunner> m_udafs = ImmutableMap.<Integer, UserDefinedAggregateFunctionRunner>builder().build();
+    ImmutableMap<Integer, UserDefinedFunctionRunner> m_udfs = ImmutableMap.of();
+    ImmutableMap<Integer, UserDefinedAggregateFunctionRunner> m_udafs = ImmutableMap.of();
     
     public UserDefinedFunctionRunner getFunctionRunnerById(int functionId) {
         return m_udfs.get(functionId);
