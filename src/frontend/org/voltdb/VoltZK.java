@@ -526,7 +526,7 @@ public class VoltZK {
         }
 
         if (errorMsg != null) {
-            VoltZK.removeActionBlocker(zk, node, null);
+            VoltZK.removeActionBlocker(zk, node, hostLog);
             return "Can't do " + request + " " + errorMsg;
         }
 
@@ -535,24 +535,29 @@ public class VoltZK {
         return null;
     }
 
-    public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log)
-    {
+    public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log) {
+        if (log != null) {
+            log.info("Removing action blocker " + node);
+        }
         try {
             zk.delete(node, -1);
+            if (log != null) {
+                log.info("Action blocker " + node + " removed.");
+            }
+            return true;
         } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
-                if (log != null) {
-                    log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
-                }
-                return false;
+            if (e.code() == KeeperException.Code.NONODE) {
+                return true;
+            }
+            if (log != null) {
+                log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
             }
         } catch (InterruptedException e) {
-            return false;
+            if (log != null) {
+                log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+            }
         }
-        if (log != null) {
-            log.info("Remove action blocker " + node + " successfully.");
-        }
-        return true;
+        return false;
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
