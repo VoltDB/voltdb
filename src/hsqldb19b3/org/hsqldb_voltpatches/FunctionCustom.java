@@ -112,9 +112,9 @@ public class FunctionCustom extends FunctionSQL {
     private static final int FUNC_SIGN             = 115;
     private static final int FUNC_SIN              = 116;
     private static final int FUNC_TAN              = 117;
-    public static final int FUNC_BITAND           = 118;
-    public static final int FUNC_BITOR            = 119;
-    public static final int FUNC_BITXOR           = 120;
+    public static final int  FUNC_BITAND           = 118;
+    public static final int  FUNC_BITOR            = 119;
+    public static final int  FUNC_BITXOR           = 120;
     private static final int FUNC_ROUNDMAGIC       = 121;
     private static final int FUNC_ASCII            = 122;
     private static final int FUNC_CHAR             = 123;

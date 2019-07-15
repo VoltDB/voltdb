@@ -139,10 +139,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
 
-        public static final int FUNC_VOLT_BITNOT                 = 20026;
-        public static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
-        public static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
-        public static final int FUNC_VOLT_HEX                    = 20029;
+        public static final int FUNC_VOLT_BITNOT          = 20026;
+        public static final int FUNC_VOLT_BIT_SHIFT_LEFT  = 20027;
+        public static final int FUNC_VOLT_BIT_SHIFT_RIGHT = 20028;
+        public static final int FUNC_VOLT_HEX             = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
         static final int FUNC_VOLT_DATEADD                = 20031;
@@ -161,10 +161,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_STR                    = 20043;
 
         // our local functions for networking
-        public static final int FUNC_VOLT_INET_NTOA                   = 20044;
-        public static final int FUNC_VOLT_INET_ATON                   = 20045;
-        public static final int FUNC_VOLT_INET6_NTOA                  = 20046;
-        public static final int FUNC_VOLT_INET6_ATON                  = 20047;
+        public static final int FUNC_VOLT_INET_NTOA       = 20044;
+        public static final int FUNC_VOLT_INET_ATON       = 20045;
+        public static final int FUNC_VOLT_INET6_NTOA      = 20046;
+        public static final int FUNC_VOLT_INET6_ATON      = 20047;
 
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
