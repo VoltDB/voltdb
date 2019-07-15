@@ -104,6 +104,10 @@ public class TestSelfJoins  extends PlannerTestCase {
             TupleValueExpression tve = (TupleValueExpression) e;
             assertNotSame(-1, tve.getColumnIndex());
         }
+
+        // if no alias is used, self join should fail
+        failToCompile("select * from R1 JOIN R1 USING(A)",
+                      "Use fully qualified names including the table name or alias to avoid ambiguous references");
     }
 
     public void testOuterSelfJoin() {

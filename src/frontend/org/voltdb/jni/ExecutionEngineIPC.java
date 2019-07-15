@@ -48,6 +48,7 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
@@ -1191,10 +1192,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
             final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
-            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken, boolean elastic)
+            long undoToken, LoadTableCaller caller)
     throws EEException
     {
-        if (returnUniqueViolations) {
+        if (caller == LoadTableCaller.DR || caller == LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS
+                || caller == LoadTableCaller.BALANCE_PARTITIONS) {
             throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
@@ -1207,9 +1209,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(lastCommittedSpHandle);
             m_data.putLong(uniqueId);
             m_data.putLong(undoToken);
-            m_data.putInt(returnUniqueViolations ? 1 : 0);
-            m_data.putInt(shouldDRStream ? 1 : 0);
-            m_data.putInt(elastic ? 1 : 0);
+            m_data.put(caller.getId());
             verifyDataCapacity(m_data.position() + tableBytes.remaining());
         } while (m_data.position() == 0);
 
@@ -1450,12 +1450,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public boolean activateTableStream(
             int tableId,
             TableStreamType streamType,
+            HiddenColumnFilter hiddenColumnFilter,
             long undoQuantumToken,
             byte[] predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.put(hiddenColumnFilter.getId());
         m_data.putLong(undoQuantumToken);
         m_data.put(predicates); // predicates
 
@@ -1643,24 +1645,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         return retval;
-    }
-
-    @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long pointer) {
-        try {
-            m_data.clear();
-            m_data.putInt(Commands.RecoveryMessage.m_id);
-            m_data.putInt(buffer.remaining());
-            m_data.put(buffer);
-
-            m_data.flip();
-            m_connection.write();
-
-            m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
     }
 
     @Override

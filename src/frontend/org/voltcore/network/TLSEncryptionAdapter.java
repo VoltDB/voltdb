@@ -239,6 +239,9 @@ public class TLSEncryptionAdapter {
 
     // Called from synchronized block only
     void shutdown() {
+        if (m_isShutdown) { // make sure we only shutdown once.
+            return;
+        }
         m_isShutdown = true;
         try {
             int waitFor = 1 - Math.min(m_inFlight.availablePermits(), -4);
@@ -261,6 +264,7 @@ public class TLSEncryptionAdapter {
             }
 
             if (m_inflightMessages != null) {
+                assert (m_inflightMessages.m_messages != null && m_inflightMessages.m_messages.refCnt() > 0);
                 m_inflightMessages.m_messages.release();
             }
         } finally {

@@ -2031,7 +2031,7 @@ public class Expression {
 
     // A VoltDB extension to convert columnref expression for a column that is part of the USING clause
     // into a COALESCE expression
-    // columnref                    operation operator_case_when
+    //      columnref                   operation operator_case_when
     //      columnref T1.C      ->      operation is_null
     //      columnref T2.C                  columnref T1.C
     //                                  operation operator_alternative
@@ -2061,7 +2061,10 @@ public class Expression {
         exp.children.clear();
 
         // There should be at least 2 columnref expressions
-        assert(uniqueColumnrefs.size() > 1);
+        if (uniqueColumnrefs.size() < 2) {
+            throw Error.error(ErrorCode.X_42581, "Cannot distinguish column reference between two tables. "
+                    + "Use fully qualified names including the table name or alias to avoid ambiguous references");
+        }
         VoltXMLElement lastAlternativeExpr = null;
         VoltXMLElement resultColaesceExpr = null;
         while (true) {

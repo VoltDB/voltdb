@@ -728,7 +728,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_runEveryWhere) {
                     exportingRole = "XDCR";
                 } else {
-                    exportingRole = (m_coordinator.isMaster() ? "TRUE" : "FALSE");
+                    // Note that we are 'ACTIVE' == 'TRUE' only if we are export master AND we have
+                    // an export client configured
+                    exportingRole = (m_coordinator.isMaster() && m_client != null ? "TRUE" : "FALSE");
                 }
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
                         exportingRole, m_tupleCount, m_tuplesPending.get(),
@@ -915,6 +917,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (action == StreamStartAction.RECOVER || action == StreamStartAction.REJOIN) {
                         seqNo = sequenceNumber;
                     }
+                    m_coordinator.setInitialSequenceNumber(seqNo);
                     m_tupleCount = seqNo;
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(seqNo, action);

@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2235,6 +2236,14 @@ public class LocalCluster extends VoltServerConfig {
         File retval[] = new File[m_subRoots.size()];
         for (int ii = 0; ii < m_subRoots.size(); ii++) {
             retval[ii] = new File(m_subRoots.get(ii), path.getPath());
+        }
+        return retval;
+    }
+
+    public Path[] getPathInSubroots(String path) {
+        Path retval[] = new Path[m_subRoots.size()];
+        for (int ii = 0; ii < m_subRoots.size(); ii++) {
+            retval[ii] = Paths.get(m_subRoots.get(ii).getPath(), path);
         }
         return retval;
     }

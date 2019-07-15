@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -33,6 +32,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -49,6 +49,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
     }
 
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{SysProcFragmentId.PF_distribute};
+    }
 
     @Override
     public DependencyPair executePlanFragment(
@@ -73,12 +77,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             result.addRow(currentPartition);
             try {
                 // voltLoadTable is void. Assume success or exception.
-                DeprecatedProcedureAPIAccess.voltLoadTable(
-                                    this,
-                                    context.getCluster().getTypeName(),
-                                    context.getDatabase().getTypeName(),
-                                    tableName,
-                                    toInsert, false, true, true);
+                context.getSiteProcedureConnection().loadTable(m_runner.getTxnState(), tableName, toInsert,
+                        LoadTableCaller.CLIENT);
                 // return the number of rows inserted
                 result.addRow(toInsert.getRowCount());
             }

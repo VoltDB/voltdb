@@ -72,6 +72,7 @@ TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSur
  */
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TableStreamType streamType,
+                                   const HiddenColumnFilter &filter,
                                    const std::vector<std::string> &predicateStrings)
 {
     bool failed = false;
@@ -99,13 +100,8 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
                     context.reset(
-                        new CopyOnWriteContext(m_table, surgeon, m_partitionId,
+                        new CopyOnWriteContext(m_table, surgeon, m_partitionId, filter,
                                                predicateStrings, m_table.activeTupleCount()));
-                    break;
-
-                case TABLE_STREAM_RECOVERY:
-                    context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
-                                                      m_tableId));
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX:

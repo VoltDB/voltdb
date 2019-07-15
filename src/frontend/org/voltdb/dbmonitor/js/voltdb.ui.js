@@ -1018,9 +1018,10 @@ var loadPage = function (serverName, portid) {
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
+                $("#tdLicenseType").html(licInfo.type);
+                $("#tdExpiration").html(licInfo.expiration);
                 $("#tdHostCount").html(licInfo.hostcount);
                 $("#tdWanReplication").html(licInfo.wanreplication == undefined ? '' : licInfo.wanreplication.toString());
-                $("#tdExpiration").html(licInfo.expiration);
                 $("#tdCommandLogging").html(licInfo.commandlogging == undefined ? '' : licInfo.commandlogging.toString());
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {

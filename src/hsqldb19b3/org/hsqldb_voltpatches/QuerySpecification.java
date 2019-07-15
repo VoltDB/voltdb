@@ -626,6 +626,10 @@ public class QuerySpecification extends QueryExpression {
             throw Error.error(ErrorCode.X_42576);
         }
 
+        if (e.getDataType() == null) {
+            return;
+        }
+
         if (e.getType() != OpTypes.VALUE) {
             return;
         }

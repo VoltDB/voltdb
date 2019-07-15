@@ -61,6 +61,11 @@ public class ExecuteTask extends VoltSystemProcedure
     }
 
     @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[] { SysProcFragmentId.PF_executeTask};
+    }
+
+    @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
@@ -77,13 +82,15 @@ public class ExecuteTask extends VoltSystemProcedure
             {
                 TupleStreamStateInfo stateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
                 result = createDRTupleStreamStateResultTable();
-                result.addRow(context.getHostId(), context.getPartitionId(), 0,
-                        stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
-                        stateInfo.drVersion);
-                if (stateInfo.containsReplicatedStreamInfo) {
-                    result.addRow(context.getHostId(), context.getPartitionId(), 1,
-                            stateInfo.replicatedInfo.drId, stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                if (stateInfo != null) {
+                    result.addRow(context.getHostId(), context.getPartitionId(), 0, stateInfo.partitionInfo.drId,
+                            stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
                             stateInfo.drVersion);
+                    if (stateInfo.containsReplicatedStreamInfo) {
+                        result.addRow(context.getHostId(), context.getPartitionId(), 1, stateInfo.replicatedInfo.drId,
+                                stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                                stateInfo.drVersion);
+                    }
                 }
                 break;
             }

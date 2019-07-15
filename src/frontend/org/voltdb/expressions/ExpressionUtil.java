@@ -54,6 +54,8 @@ public final class ExpressionUtil {
        put("greaterthanorequalto", ExpressionType.COMPARE_GREATERTHANOREQUALTO);
        put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
        put("equal", ExpressionType.COMPARE_EQUAL);
+       put("notequal", ExpressionType.COMPARE_NOTEQUAL);
+       put("notdistinct", ExpressionType.COMPARE_NOTDISTINCT);
        put("in", ExpressionType.COMPARE_IN);
        put("not", ExpressionType.OPERATOR_NOT);
        put("exists", ExpressionType.OPERATOR_EXISTS);
@@ -91,6 +93,7 @@ public final class ExpressionUtil {
                 case COMPARE_LESSTHAN:
                 case COMPARE_EQUAL:
                 case COMPARE_NOTEQUAL:
+                case COMPARE_NOTDISTINCT:
                 case COMPARE_GREATERTHANOREQUALTO:
                 case COMPARE_LESSTHANOREQUALTO:
                 case OPERATOR_PLUS:
@@ -249,6 +252,7 @@ public final class ExpressionUtil {
                 case COMPARE_LESSTHAN:
                 case COMPARE_EQUAL:
                 case COMPARE_NOTEQUAL:
+                case COMPARE_NOTDISTINCT:
                 case COMPARE_GREATERTHANOREQUALTO:
                 case COMPARE_LESSTHANOREQUALTO: {
                     final ComparisonExpression expr = new ComparisonExpression(op,

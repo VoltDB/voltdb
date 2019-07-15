@@ -571,8 +571,8 @@ function test-tools-server-pro() {
 
 # Start the VoltDB server ('community'), only if not already running
 function test-tools-server-if-needed() {
-    if jps -l | grep -q org.voltdb.VoltDB; then
-        echo -e "\nNot (re-)starting a VoltDB server, because 'jps -l' now includes a VoltDB process."
+    if ps -ef | grep -v "grep" | grep -c "org.voltdb.VoltDB"; then
+        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
         #echo -e "    DEBUG: jps -l:" $(jps -l | grep org.voltdb.VoltDB)
     else
         test-tools-server
@@ -581,8 +581,8 @@ function test-tools-server-if-needed() {
 
 # Start the VoltDB 'pro' server, only if not already running
 function test-tools-server-pro-if-needed() {
-    if jps -l | grep -q org.voltdb.VoltDB; then
-        echo -e "\nNot (re-)starting a VoltDB server, because 'jps -l' now includes a VoltDB process."
+    if ps -ef | grep -v "grep" | grep -c "org.voltdb.VoltDB"; then
+        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
         #echo -e "    DEBUG: jps -l:" $(jps -l | grep org.voltdb.VoltDB)
     else
         test-tools-server-pro

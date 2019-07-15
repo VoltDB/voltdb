@@ -271,10 +271,10 @@ public:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(0, 64*1024),
-        m_drReplicatedStream(16383, 64*1024),
-        m_drStreamReplica(0, 64*1024),
-        m_drReplicatedStreamReplica(16383, 64*1024),
+      : m_drStream(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drStreamReplica(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStreamReplica(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
         m_undoToken(0),
         m_spHandleReplica(0)
     {
@@ -329,19 +329,13 @@ public:
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
         columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
 
-        std::vector<ValueType> hiddenTypes;
-        std::vector<int32_t> hiddenColumnLengths;
-        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, false);
-        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+        std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT,HiddenColumn::XDCR_TIMESTAMP);
 
-        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-
-
-        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
         columnAllowNull[0] = false;
-        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
 
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_BIGINT", "C_DECIMAL",

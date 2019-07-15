@@ -19,6 +19,7 @@
 #define TABLE_STREAMER_INTERFACE_H
 
 #include <boost/shared_ptr.hpp>
+#include "common/HiddenColumnFilter.h"
 #include "common/types.h"
 #include "storage/TupleBlock.h"
 #include "storage/TableStreamerContext.h"
@@ -40,6 +41,7 @@ class PersistentTableSurgeon;
          */
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                     TableStreamType streamType,
+                                    const HiddenColumnFilter &filter,
                                     const std::vector<std::string> &predicateStrings) = 0;
 
         /**

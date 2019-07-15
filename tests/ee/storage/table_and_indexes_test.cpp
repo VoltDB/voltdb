@@ -92,8 +92,8 @@ private:
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest()
-            : drStream(44, 64*1024),
-              drReplicatedStream(16383, 64*1024) {
+            : drStream(44, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+              drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION) {
             mockEngine = new MockVoltDBEngine();
             eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;

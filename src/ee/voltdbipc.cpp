@@ -35,7 +35,6 @@
 
 #include "common/debuglog.h"
 #include "common/ElasticHashinator.h"
-#include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
 #include "common/SynchronizedThreadLock.h"
@@ -191,8 +190,6 @@ private:
 
     int8_t loadTable(struct ipc_command *cmd);
 
-    int8_t processRecoveryMessage( struct ipc_command *cmd);
-
     void tableHashCode( struct ipc_command *cmd);
 
     void hashinate(struct ipc_command* cmd);
@@ -283,9 +280,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
-    int32_t returnUniqueViolations;
-    int32_t shouldDRStream;
-    int32_t elastic;
+    int8_t callerId;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -314,6 +309,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    voltdb::HiddenColumnFilter::Type hiddenColumnFilterType;
     int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
@@ -545,9 +541,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 20:
         exportAction(cmd);
         result = kErrorCode_None;
-        break;
-      case 21:
-          result = processRecoveryMessage(cmd);
         break;
       case 22:
           tableHashCode(cmd);
@@ -1002,9 +995,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
-    const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
-    const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
-    const bool elastic = loadTableCommand->elastic != 0;
+    const LoadTableCaller &caller = LoadTableCaller::get(static_cast<LoadTableCaller::Id>(loadTableCommand->callerId));
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -1012,8 +1003,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
 
         bool success = m_engine->loadTable(tableId, serialize_in,
-                                           txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream, undoToken, elastic);
+                                           txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken, caller);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1389,7 +1379,8 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, activateTableStreamCommand->hiddenColumnFilterType,
+                undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -1492,15 +1483,6 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
-}
-
-int8_t VoltDBIPC::processRecoveryMessage( struct ipc_command *cmd) {
-    recovery_message *recoveryMessage = (recovery_message*) cmd;
-    const int32_t messageLength = ntohl(recoveryMessage->messageLength);
-    ReferenceSerializeInputBE input(recoveryMessage->message, messageLength);
-    RecoveryProtoMsg message(&input);
-    m_engine->processRecoveryMessage(&message);
-    return kErrorCode_Success;
 }
 
 void VoltDBIPC::tableHashCode( struct ipc_command *cmd) {

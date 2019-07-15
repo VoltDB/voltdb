@@ -24,18 +24,28 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.ParameterConverter;
+import org.voltdb.TableType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTypeUtil;
 
 public abstract class SavedTableConverter
 {
 
-    public static Boolean needsConversion(VoltTable inputTable,
+    public static boolean needsConversion(VoltTable inputTable, Table outputTableSchema, String DrRole,
+            boolean isRecover) throws VoltTypeException {
+        return needsConversion(inputTable, outputTableSchema,
+                outputTableSchema.getIsdred() && DrRoleType.XDCR.value().equals(DrRole),
+                CatalogUtil.needsViewHiddenColumn(outputTableSchema),
+                TableType.isPersistentMigrate(outputTableSchema.getTabletype()), isRecover);
+    }
+
+    static boolean needsConversion(VoltTable inputTable,
                                           Table outputTableSchema,
                                           boolean preserveDRHiddenColumn,
                                           boolean preserveViewHiddenColumn,
@@ -102,6 +112,14 @@ public abstract class SavedTableConverter
     }
 
     public static VoltTable convertTable(VoltTable inputTable,
+            Table outputTableSchema, String DrRole, boolean isRecover) throws VoltTypeException {
+        return convertTable(inputTable, outputTableSchema,
+                outputTableSchema.getIsdred() && DrRoleType.XDCR.value().equals(DrRole),
+                CatalogUtil.needsViewHiddenColumn(outputTableSchema),
+                TableType.isPersistentMigrate(outputTableSchema.getTabletype()), isRecover);
+    }
+
+    static VoltTable convertTable(VoltTable inputTable,
                                          Table outputTableSchema,
                                          boolean preserveDRHiddenColumn,
                                          boolean preserveViewHiddenColumn,

@@ -229,13 +229,11 @@ public class SnapshotCompletionMonitor {
             final JSONObject exportSequenceJSON = jsonObj.getJSONObject(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBER_ARR);
             final ImmutableMap.Builder<String, Map<Integer, ExportSnapshotTuple>> builder =
                     ImmutableMap.builder();
-            @SuppressWarnings("unchecked")
             final Iterator<String> tableKeys = exportSequenceJSON.keys();
             while (tableKeys.hasNext()) {
                 final String tableName = tableKeys.next();
                 final JSONObject tableSequenceNumbers = exportSequenceJSON.getJSONObject(tableName);
                 ImmutableMap.Builder<Integer, ExportSnapshotTuple> tableBuilder = ImmutableMap.builder();
-                @SuppressWarnings("unchecked")
                 final Iterator<String> partitionKeys = tableSequenceNumbers.keys();
                 while (partitionKeys.hasNext()) {
                     final String partitionString = partitionKeys.next();

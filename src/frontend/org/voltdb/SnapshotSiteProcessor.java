@@ -56,6 +56,7 @@ import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
@@ -216,9 +217,12 @@ public class SnapshotSiteProcessor {
      */
     public static void populateExternalStreamsStatesFromSites(SystemProcedureExecutionContext context) {
         Database database = context.getDatabase();
+        SiteProcedureConnection spc = context.getSiteProcedureConnection();
+
         for (Table t : database.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(database, t))
+            if (!CatalogUtil.isTableExportOnly(database, t)) {
                 continue;
+            }
 
             Map<Integer, ExportSnapshotTuple> sequenceNumbers = s_exportSequenceNumbers.get(t.getTypeName());
             if (sequenceNumbers == null) {
@@ -226,8 +230,7 @@ public class SnapshotSiteProcessor {
                 s_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] usoAndSequenceNumber =
-                    context.getSiteProcedureConnection().getUSOForExportTable(t.getTypeName());
+            long[] usoAndSequenceNumber = spc.getUSOForExportTable(t.getTypeName());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             new ExportSnapshotTuple(
@@ -235,13 +238,16 @@ public class SnapshotSiteProcessor {
                                 usoAndSequenceNumber[1],
                                 usoAndSequenceNumber[2]));
         }
-        TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
-        s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
-        if (drStateInfo.containsReplicatedStreamInfo) {
-            s_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+
+        TupleStreamStateInfo drStateInfo = spc.getDRTupleStreamStateInfo();
+        if (drStateInfo != null) {
+            s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
+            if (drStateInfo.containsReplicatedStreamInfo) {
+                s_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+            }
         }
 
-        if (!context.getSiteProcedureConnection().externalStreamsEnabled()) {
+        if (!spc.externalStreamsEnabled()) {
             s_disabledStreams.add(context.getPartitionId());
         }
     }
@@ -401,6 +407,7 @@ public class SnapshotSiteProcessor {
     public void initiateSnapshots(
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
@@ -422,7 +429,7 @@ public class SnapshotSiteProcessor {
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
             int tableId = tablePredicates.getKey();
             TableStreamer streamer =
-                    new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+                    new TableStreamer(tableId, format.getStreamType(), hiddenColumnFilter, m_snapshotTableTasks.get(tableId));
             if (!streamer.activate(context, tablePredicates.getValue())) {
                 VoltDB.crashLocalVoltDB("Failed to activate snapshot stream on table " +
                                         CatalogUtil.getTableNameFromId(context.getDatabase(), tableId), false, null);
@@ -526,7 +533,9 @@ public class SnapshotSiteProcessor {
             if (desired > available) {
                 return null;
             }
-            if (m_availableSnapshotBuffers.compareAndSet(available, available - desired)) break;
+            if (m_availableSnapshotBuffers.compareAndSet(available, available - desired)) {
+                break;
+            }
         }
 
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());

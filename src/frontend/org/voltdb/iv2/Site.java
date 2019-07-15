@@ -72,6 +72,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -93,6 +94,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -105,7 +107,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -433,9 +435,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(final int tableId, TableStreamType type,
+                HiddenColumnFilter hiddenColumnFilter, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
+            return m_ee.activateTableStream(tableId, type, hiddenColumnFilter,
+                    undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -932,7 +936,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m);
-                if (!filter(tibm)) {
+                if(allowInitiateTask(m)) {
                     m_currentTxnId = t.getTxnId();
                     m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
@@ -955,7 +959,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
                 }
 
-                if (!filter(tibm)) {
+                if (allowFragmentTask(m)) {
                     m_currentTxnId = t.getTxnId();
                     m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
@@ -971,9 +975,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
-                    if (!filter(tibm)) {
-                        t.runFromTaskLog(this);
-                    }
+                    t.runFromTaskLog(this);
                 }
             }
             else {
@@ -993,26 +995,26 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return tibm != null;
     }
 
-    static boolean filter(TransactionInfoBaseMessage tibm)
-    {
+    public static boolean allowFragmentTask(FragmentTaskMessage msg) {
         // don't log sysproc fragments or iv2 initiate task messages.
         // this is all jealously; should be refactored to ask tibm
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
-        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
-        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
-                return true;
-            }
+        // Multi part AdHoc Does not need to be checked because its an alias and runs procedure as planned.
+        if (!msg.isSysProcTask()) {
+            return true;
         }
-        else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
-            // All durable sysprocs and non-sysprocs should not get filtered.
-            return sysproc != null && !sysproc.isDurable();
-        }
-        return false;
+
+        // fragId is not always available before FragmentTask is executed. In this case, check sysproc name.
+        long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
+        return (SystemProcedureCatalog.isAllowableInTaskLog(fragId, msg));
+    }
+
+    public static boolean allowInitiateTask(Iv2InitiateTaskMessage msg){
+        final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(msg.getStoredProcedureName());
+        // All durable sysprocs and non-sysprocs should not get filtered.
+        return(sysproc == null || sysproc.isDurable());
     }
 
     public void startShutdown()
@@ -1054,11 +1056,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, isTruncation, extraSnapshotData);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, hiddenColumnFilter, tasks, txnId, isTruncation,
+                extraSnapshotData);
     }
 
     /*
@@ -1104,40 +1108,28 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, String clusterName, String databaseName,
-            String tableName, VoltTable data,
-            boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName,
+            VoltTable data, LoadTableCaller caller) throws VoltAbortException
     {
-        Cluster cluster = m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
-        }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
-        }
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = m_context.database.getTables().getIgnoreCase(tableName);
         if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database");
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo, false);
+        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, table.getRelativeIndex(), data, caller);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
-            VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo, boolean elastic)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                returnUniqueViolations,
-                shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
-                elastic);
+                caller.createUndoToken() ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                caller);
     }
 
     @Override
@@ -1260,6 +1252,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
+        if (m_drGateway == null || !m_drGateway.isActive()) {
+            return null;
+        }
         // Set the psetBuffer buffer capacity and clear the buffer
         m_ee.getParamBufferForExecuteTask(0);
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
@@ -1269,7 +1264,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
-        TupleStreamStateInfo info = null;
+        TupleStreamStateInfo info;
         if (hasReplicatedStateInfo != 0) {
             long replicatedSequenceNumber = resultBuffer.getLong();
             long replicatedSpUniqueId = resultBuffer.getLong();
