@@ -23,6 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -33,26 +34,41 @@ public class TestCalciteJoinsSuite extends RegressionSuite {
         super(name);
     }
 
-    private static final String[] TABLES =
-            new String[] { "R1", "R2", "R3", "R4", "R5", "R6" };
+    private static final String[] TABLES = new String[] { "R1", "R2", "R3", "R4", "R5", "R6" };
 
-
+    @Test
     public void testMergeJoins() throws Exception {
         Client client = getClient();
-        truncateTables(client, TABLES);
-        subtestEmptyTablesMergeJoin(client);
-        truncateTables(client, TABLES);
-        subtestNonEmptyTablesMergeJoin(client);
-        truncateTables(client, TABLES);
-        subtestCompoundIndexMergeJoin(client);
+        try {
+            subtestEmptyTablesMergeJoin(client);
+        } finally {
+            truncateTables(client, TABLES);
+        }
+        try {
+            subtestNonEmptyTablesMergeJoin(client);
+        } finally {
+            truncateTables(client, TABLES);
+        }
+        try {
+            subtestCompoundIndexMergeJoin(client);
+        } finally {
+            truncateTables(client, TABLES);
+        }
     }
 
+    @Test
     public void testNLIJs() throws Exception {
         Client client = getClient();
-        truncateTables(client, TABLES);
-        subtestEmptyTablesNLIJ(client);
-        truncateTables(client, TABLES);
-        subtestNonEmptyTablesNLIJJoin(client);
+        try {
+            subtestEmptyTablesNLIJ(client);
+        } finally {
+            truncateTables(client, TABLES);
+        }
+        try {
+            subtestNonEmptyTablesNLIJJoin(client);
+        } finally {
+            truncateTables(client, TABLES);
+        }
     }
 
     private void subtestEmptyTablesMergeJoin(Client client) throws Exception {

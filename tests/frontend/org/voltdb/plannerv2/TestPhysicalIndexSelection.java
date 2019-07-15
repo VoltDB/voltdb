@@ -91,7 +91,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         // TODO: Volt Planner picks IDX_1_HASH index
         m_tester.sql("select a from t where a = ? and b = ? and c = ? and d = ? " +
                 "and e >= ? and e <= ?")
-                .transform("\n");
+                .transform("");
     }
 
     // This tests recognition of prefix parameters and constants to prefer an index that
@@ -102,7 +102,10 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     public void testEng2541Plan() {
         m_tester.sql("select * from l where lname=? and b=0 order by id asc limit ?")
                 .transform("VoltPhysicalLimit(split=[1], limit=[?1])\n" +
-                            "  VoltPhysicalTableIndexScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], expr#4=[?0], expr#5=[=($t1, $t4)], expr#6=[CAST($t3):INTEGER NOT NULL], expr#7=[0], expr#8=[=($t6, $t7)], expr#9=[AND($t5, $t8)], proj#0..3=[{exprs}], $condition=[$t9], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_LOG_ASCGTE1_1])\n")
+                        "  VoltPhysicalTableIndexScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], " +
+                        "expr#4=[?0], expr#5=[=($t1, $t4)], expr#6=[CAST($t3):INTEGER NOT NULL], expr#7=[0], " +
+                        "expr#8=[=($t6, $t7)], expr#9=[AND($t5, $t8)], proj#0..3=[{exprs}], $condition=[$t9], " +
+                        "index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_LOG_ASCGTE1_1])\n")
                 .pass();
     }
 
@@ -113,7 +116,9 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         m_tester.sql("select id from a where deleted=? and updated_date <= ? order by id limit ?")
                 .transform("VoltPhysicalLimit(split=[1], limit=[?2])\n" +
-                            "  VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], expr#3=[?0], expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], $condition=[$t7], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
+                        "  VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], expr#3=[?0], " +
+                        "expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], " +
+                        "$condition=[$t7], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
                 .pass();
     }
 
