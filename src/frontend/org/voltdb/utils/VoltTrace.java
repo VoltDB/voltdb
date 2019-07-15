@@ -16,6 +16,8 @@
  */
 package org.voltdb.utils;
 
+import org.voltdb.VoltDB;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -537,6 +539,13 @@ public class VoltTrace implements Runnable {
         while ((eventBatch = m_traceEvents.poll()) != null) {
             if (!eventBatch.getTraceEventsList().isEmpty()) {
                 writeQueue.offer(eventBatch);
+                // if the writeQueue is full, dump it to file
+                if (writeQueue.remainingCapacity() == 0) {
+                    try {
+                        String filePath = VoltTrace.dump(new File(VoltDB.instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath());
+                        System.out.println("Traced events written to: " + filePath);
+                    } catch (IOException e) {}
+                }
             }
         }
         return;
