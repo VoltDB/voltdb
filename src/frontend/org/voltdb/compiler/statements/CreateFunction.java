@@ -31,6 +31,8 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 /**
  * This is the base class for CreateFunctionFromMethod and CreateAggregateFunctionFromClass
  */
@@ -43,27 +45,10 @@ public abstract class CreateFunction extends StatementProcessor {
     protected static VoltLogger m_logger = new VoltLogger("UDF");
 
     static int ID_NOT_DEFINED = -1;
-    static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
-
-    static {
-        m_allowedDataTypes.add(byte.class);
-        m_allowedDataTypes.add(byte[].class);
-        m_allowedDataTypes.add(short.class);
-        m_allowedDataTypes.add(int.class);
-        m_allowedDataTypes.add(long.class);
-        m_allowedDataTypes.add(double.class);
-        m_allowedDataTypes.add(Byte.class);
-        m_allowedDataTypes.add(Byte[].class);
-        m_allowedDataTypes.add(Short.class);
-        m_allowedDataTypes.add(Integer.class);
-        m_allowedDataTypes.add(Long.class);
-        m_allowedDataTypes.add(Double.class);
-        m_allowedDataTypes.add(BigDecimal.class);
-        m_allowedDataTypes.add(String.class);
-        m_allowedDataTypes.add(TimestampType.class);
-        m_allowedDataTypes.add(GeographyPointValue.class);
-        m_allowedDataTypes.add(GeographyValue.class);
-    }
+    static final ImmutableSet<Class<?>> m_allowedDataTypes = ImmutableSet.of(byte.class, byte[].class, 
+            short.class, int.class, double.class, Byte.class, Byte[].class, Short.class,
+            Integer.class, Long.class, Double.class, BigDecimal.class, String.class,
+            TimestampType.class, GeographyPointValue.class, GeographyValue.class);
 
      /**
      * Find out if the function is defined.  It might be defined in the
