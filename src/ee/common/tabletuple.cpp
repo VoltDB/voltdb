@@ -80,14 +80,9 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
 
         for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
-            const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
-            if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-            } else {
-                buffer << getHiddenNValue(ctr).debug();
-            }
-            buffer << ")";
+            const TupleSchema::HiddenColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
+            vassert(!isVariableLengthType(colInfo->getVoltType()));
+            buffer << getHiddenNValue(ctr).debug() << ")";
         }
     }
 

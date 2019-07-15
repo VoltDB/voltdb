@@ -37,6 +37,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
+        const HiddenColumnFilter &hiddenColumnFilter,
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
@@ -52,7 +53,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_skippedDirtyRows(0),
              m_skippedInactiveRows(0),
-             m_replicated(table.isReplicatedTable())
+             m_replicated(table.isReplicatedTable()),
+             m_hiddenColumnFilter(hiddenColumnFilter)
 {
     if (m_replicated) {
         // There is a corner case where a replicated table is streamed from a thread other than the lowest
@@ -168,7 +170,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
             bool deleteTuple = false;
-            yield = outputStreams.writeRow(tuple, &deleteTuple);
+            yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
             /*
              * May want to delete tuple if processing the actual table.
              */
@@ -310,9 +312,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
             if (hasMore) {
                 hasMore = m_iterator->next(tuple);
-                if (hasMore) {
-                    vassert(false);
-                }
+                vassert(!hasMore);
             }
             yield = true;
         }

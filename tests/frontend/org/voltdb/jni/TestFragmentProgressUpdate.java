@@ -23,7 +23,7 @@
 
 package org.voltdb.jni;
 
-import static org.mockito.Matchers.contains;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
@@ -44,6 +44,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -105,7 +106,8 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN, false);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, WRITE_TOKEN,
+                LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -161,7 +163,8 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, Long.MAX_VALUE,
+                LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -280,7 +283,8 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN, false);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, WRITE_TOKEN,
+                LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -444,7 +448,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
         }
 
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, 0, false, false, WRITE_TOKEN, false);
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, 0, WRITE_TOKEN, LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         assertEquals(numRowsToInsert, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
         System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 

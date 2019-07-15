@@ -23,14 +23,13 @@
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamerContext.h"
 #include "storage/TupleBlock.h"
+#include "storage/TableStreamer.h"
 
 class DummyElasticTableStreamer;
 class CopyOnWriteTest;
 
 namespace voltdb {
 
-class PersistentTable;
-class TableStreamer;
 class TupleOutputStreamProcessor;
 
 class ElasticContext : public TableStreamerContext

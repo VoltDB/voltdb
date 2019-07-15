@@ -1219,6 +1219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
                 jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
                 jo.put("expiration", sdf.format(m_licenseApi.expires().getTime()));
+                jo.put("type", m_licenseApi.getLicenseType());
                 m_licenseInformation = jo.toString();
             } catch (JSONException ex) {
                 //Ignore

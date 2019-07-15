@@ -455,7 +455,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 
-        target.deserializeFrom(serialInput, stringPool);
+        target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
 
         processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
     }

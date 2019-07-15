@@ -61,6 +61,7 @@ public:
      */
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TableStreamType streamType,
+                                const HiddenColumnFilter &filter,
                                 const std::vector<std::string> &predicateStrings);
 
     /**
