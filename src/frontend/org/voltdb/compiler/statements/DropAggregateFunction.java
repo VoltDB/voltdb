@@ -56,8 +56,10 @@ public class DropAggregateFunction extends StatementProcessor {
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
                     m_tracker.addDroppedFunction(functionName);
-                    m_logger.debug(String.format("Removed XML for"
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug(String.format("Removed XML for"
                             + " function named %s", functionName));
+                    }
                     return true;
                 }
             }
