@@ -1469,6 +1469,11 @@ public class ExportOnServerVerifier {
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
 
+        System.out.println("Rabbit: "
+                    + row.length + " Row:" + Arrays.toString(row));
+        System.out.println("Generated sample: "
+                    + row.length + " Row:" + Arrays.toString(row));
+
         // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
         if (rowid_group != valid.rowid_group)

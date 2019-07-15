@@ -24,6 +24,7 @@ package genqa.procedures;
 
 import java.util.Random;
 
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -44,15 +45,14 @@ public class JiggleExportGeoSinglePartition extends VoltProcedure {
 
     public long run(long rowid, int reversed)
     {
-
-         long txid = getUniqueId();
+        @SuppressWarnings("deprecation")
+        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = getSeededRandomNumberGenerator();
+        Random rand = new Random(txid);
 
         // Insert a new record
         SampleGeoRecord record = new SampleGeoRecord(rowid, rand);
-
         /*
           Uncomment this to duplicate the export data in memory.
           Useful for debugging export data correctness, but not useful
@@ -61,7 +61,7 @@ public class JiggleExportGeoSinglePartition extends VoltProcedure {
 
         voltQueueSQL(
                       insert
-                    , txid
+                    , DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                     , rowid
                     , record.rowid_group
                     , record.type_null_tinyint
