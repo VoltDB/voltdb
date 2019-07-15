@@ -103,7 +103,7 @@ class Topend {
     // buffer shared by the top end and the EE.
     // The VoltDBEngine will serialize them into the buffer before calling this function.
     virtual int32_t callJavaUserDefinedFunction() = 0;
-    virtual int32_t callJavaUserDefinedAggregateStart() = 0;
+    virtual int32_t callJavaUserDefinedAggregateStart(int functionId) = 0;
     virtual int32_t callJavaUserDefinedAggregateAssemble() = 0;
     virtual int32_t callJavaUserDefinedAggregateCombine() = 0;
     virtual int32_t callJavaUserDefinedAggregateWorkerEnd() = 0;
@@ -164,7 +164,7 @@ public:
     virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
-    int32_t callJavaUserDefinedAggregateStart();
+    int32_t callJavaUserDefinedAggregateStart(int functionId);
     int32_t callJavaUserDefinedAggregateAssemble();
     int32_t callJavaUserDefinedAggregateCombine();
     int32_t callJavaUserDefinedAggregateWorkerEnd();

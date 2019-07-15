@@ -74,7 +74,7 @@ public:
     bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
-    int32_t callJavaUserDefinedAggregateStart();
+    int32_t callJavaUserDefinedAggregateStart(int functionId);
     int32_t callJavaUserDefinedAggregateAssemble();
     int32_t callJavaUserDefinedAggregateCombine();
     int32_t callJavaUserDefinedAggregateWorkerEnd();

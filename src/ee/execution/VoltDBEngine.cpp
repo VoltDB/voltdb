@@ -693,12 +693,11 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     // Estimate the size of the buffer we need. We will put:
     //   * size of the buffer (function ID + parameters)
     //   * function ID (int32_t)
-    //   * column index (int32_t)
+    //   * udaf index (int32_t)
     //   * parameters.
 
-    // if the udafIndex is -1, this is the start method. So we do not need to serialize the udafIndex.
-    // On the other hand, we would need the udafIndex to know which column we are working on
-    int32_t bufferSizeNeeded = udafIndex == -1 ? 2 * sizeof(int32_t) : 3 * sizeof(int32_t);
+    // three int32_t: size of the buffer, function id, and udaf index
+    int32_t bufferSizeNeeded = 3 * sizeof(int32_t);
     NValue cast_argument;
     if (type != VALUE_TYPE_INVALID) {
         cast_argument = argument.castAs(type);
@@ -717,9 +716,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     // Serialize buffer size, function ID.
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
-    if (udafIndex != -1) {
-        m_udfOutput.writeInt(udafIndex);
-    }
+    m_udfOutput.writeInt(udafIndex);
 
     if (type != VALUE_TYPE_INVALID) {
         cast_argument.serializeTo(m_udfOutput);
@@ -766,10 +763,9 @@ NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, Valu
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, -1);
     // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart();
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart(functionId);
     checkReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
 }
 

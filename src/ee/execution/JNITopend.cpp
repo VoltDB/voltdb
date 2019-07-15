@@ -67,8 +67,16 @@ class JNILocalFrameBarrier {
 };
 
 void JNITopend::initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name) {
-    method = m_jniEnv->GetMethodID(
+    // if this is the start method, we are going to pass in the functionId
+    if (strcmp(name, "callJavaUserDefinedAggregateStart") == 0) {
+        method = m_jniEnv->GetMethodID(
+        jniClass, name, "(I)I");
+    }
+    // if this is not the start method, we do not have to pass in any parameter
+    else {
+        method = m_jniEnv->GetMethodID(
         jniClass, name, "()I");
+    }
     if (method == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(false);
@@ -493,9 +501,10 @@ int32_t JNITopend::callJavaUserDefinedFunction() {
                                             m_callJavaUserDefinedFunctionMID);
 }
 
-int32_t JNITopend::callJavaUserDefinedAggregateStart() {
+int32_t JNITopend::callJavaUserDefinedAggregateStart(int functionId) {
     return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateStartMID);
+                                            m_callJavaUserDefinedAggregateStartMID,
+                                            functionId);
 }
 
 int32_t JNITopend::callJavaUserDefinedAggregateAssemble() {

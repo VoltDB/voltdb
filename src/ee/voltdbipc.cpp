@@ -211,7 +211,7 @@ private:
 
     int callJavaUserDefinedFunction();
 
-    int callJavaUserDefinedAggregateStart();
+    int callJavaUserDefinedAggregateStart(int functionId);
 
     int callJavaUserDefinedAggregateAssemble();
 
@@ -979,7 +979,7 @@ int VoltDBIPC::callJavaUserDefinedFunction() {
     return retval;
 }
 
-int VoltDBIPC::callJavaUserDefinedAggregateStart() {
+int VoltDBIPC::callJavaUserDefinedAggregateStart(int functionId) {
     // Send a special status code indicating that a UDAF invocation request is coming on the wire.
     int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateStart);
     writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));

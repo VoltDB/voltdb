@@ -919,8 +919,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
     }
 
-    public int callJavaUserDefinedAggregateStart() {
-        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+    public int callJavaUserDefinedAggregateStart(int functionId) {
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
         try {
             assert(udafRunner != null);
             // Call the user-defined function start method

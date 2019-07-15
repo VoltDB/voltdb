@@ -175,7 +175,7 @@ namespace voltdb {
         return 0;
     }
 
-    int32_t DummyTopend::callJavaUserDefinedAggregateStart() {
+    int32_t DummyTopend::callJavaUserDefinedAggregateStart(int functionId) {
         return 0;
     }
 
