@@ -726,28 +726,33 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     assert(bufferSizeNeeded == m_udfOutput.position());
 }
 
-void VoltDBEngine::checkInfo(UserDefinedFunctionInfo *info, int32_t functionId) {
+void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, int32_t functionId) {
     if (info == NULL) {
         // There must be serious inconsistency in the catalog if this could happen.
         throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
     }
 }
 
-void VoltDBEngine::checkReturnCode(int32_t returnCode, std::string name) {
+void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, std::string name) {
     if (returnCode != 0) {
         throw SQLException(SQLException::volt_user_defined_function_error,
             name + " failed");
     }
 }
 
-NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, ValueType type) {
+NValue VoltDBEngine::udfResultHelper(int32_t returnCode, bool partition_table, ValueType type) {
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     if (returnCode == 0) {
         // After the the invocation, read the return value from the buffer.
         NValue retval;
         if (partition_table) {
+            // if this is a partitioned table, the returnType here
+            // is a varbinary since we serialized the worker's
+            // output on the java side
             retval = ValueFactory::getNValueOfType(VALUE_TYPE_VARBINARY);
         } else {
+            // if this is a replicated table, the returnType will just be
+            // the final returnType in the end method
             retval = ValueFactory::getNValueOfType(type);
         }
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
@@ -762,36 +767,38 @@ NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, Valu
 
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkInfo(info, functionId);
+    checkUserDefinedFunctionInfo(info, functionId);
     // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart(functionId);
-    checkReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkInfo(info, functionId);
+    checkUserDefinedFunctionInfo(info, functionId);
     serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front(), udafIndex);
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
-    checkReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkInfo(info, functionId);
+    checkUserDefinedFunctionInfo(info, functionId);
+    // the argument here is of the type varbinary because this is the serialized byte
+    // array after the worker end method
     serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, udafIndex);
     // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
-    checkReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkInfo(info, functionId);
+    checkUserDefinedFunctionInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
     bool partition_table = agg_type == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER ? true : false;
     serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
@@ -800,17 +807,17 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
-    return resultHelper(returnCode, partition_table, info->returnType);
+    return udfResultHelper(returnCode, partition_table, info->returnType);
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkInfo(info, functionId);
+    checkUserDefinedFunctionInfo(info, functionId);
     serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
     // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
-    return resultHelper(returnCode, false, info->returnType);
+    return udfResultHelper(returnCode, false, info->returnType);
 }
 
 
