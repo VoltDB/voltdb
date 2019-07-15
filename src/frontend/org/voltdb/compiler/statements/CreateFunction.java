@@ -45,7 +45,7 @@ public abstract class CreateFunction extends StatementProcessor {
     protected static VoltLogger m_logger = new VoltLogger("UDF");
 
     static int ID_NOT_DEFINED = -1;
-    static final ImmutableSet<Class<?>> m_allowedDataTypes = ImmutableSet.of(byte.class, byte[].class, 
+    static final ImmutableSet<Class<?>> m_allowedDataTypes = ImmutableSet.of(byte.class, byte[].class,
             short.class, int.class, double.class, Byte.class, Byte[].class, Short.class,
             Integer.class, Long.class, Double.class, BigDecimal.class, String.class,
             TimestampType.class, GeographyPointValue.class, GeographyValue.class);
