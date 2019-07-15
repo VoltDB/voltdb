@@ -114,7 +114,7 @@ private:
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
-    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name);
+    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &methodId, const char* name);
 };
 
 }

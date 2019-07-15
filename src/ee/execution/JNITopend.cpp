@@ -66,18 +66,16 @@ class JNILocalFrameBarrier {
     }
 };
 
-void JNITopend::initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name) {
+void JNITopend::initJavaUserDefinedMethod(jclass jniClass, jmethodID &methodId, const char* name) {
     // if this is the start method, we are going to pass in the functionId
     if (strcmp(name, "callJavaUserDefinedAggregateStart") == 0) {
-        method = m_jniEnv->GetMethodID(
-        jniClass, name, "(I)I");
+        methodId = m_jniEnv->GetMethodID(jniClass, name, "(I)I");
     }
     // if this is not the start method, we do not have to pass in any parameter
     else {
-        method = m_jniEnv->GetMethodID(
-        jniClass, name, "()I");
+        methodId = m_jniEnv->GetMethodID(jniClass, name, "()I");
     }
-    if (method == NULL) {
+    if (methodId == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(false);
         throw std::exception();
