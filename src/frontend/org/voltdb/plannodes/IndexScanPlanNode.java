@@ -191,19 +191,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             nullExprIndex = searchKeySize - 1;
         }
 
-        m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
-                                                       tableIdx, m_searchkeyExpressions, m_compareNotDistinct);
+        m_skip_null_predicate = buildSkipNullPredicate(
+                nullExprIndex, m_catalogIndex, m_tableScan, tableIdx, m_searchkeyExpressions, m_compareNotDistinct);
     }
 
     public void setSkipNullPredicate(int nullExprIndex) {
-        m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
-                                                        m_searchkeyExpressions, m_compareNotDistinct);
+        m_skip_null_predicate = buildSkipNullPredicate(
+                nullExprIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions, m_compareNotDistinct);
     }
 
-    public static AbstractExpression buildSkipNullPredicate(
+    static AbstractExpression buildSkipNullPredicate(
             int nullExprIndex, Index catalogIndex, StmtTableScan tableScan,
             List<AbstractExpression> searchkeyExpressions, List<Boolean> compareNotDistinct) {
-        return buildSkipNullPredicate(nullExprIndex, catalogIndex, tableScan, 0, searchkeyExpressions, compareNotDistinct);
+        return buildSkipNullPredicate(
+                nullExprIndex, catalogIndex, tableScan, 0, searchkeyExpressions, compareNotDistinct);
     }
 
     private static AbstractExpression buildSkipNullPredicate(
@@ -240,7 +241,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // For a partial index extract all TVE expressions from it predicate if it's NULL-rejecting expression
         // These TVEs do not need to be added to the skipNUll predicate because it's redundant.
         AbstractExpression indexPredicate = null;
-        Set<TupleValueExpression> notNullTves = null;
+        Set<TupleValueExpression> notNullTves = new HashSet<>();
         String indexPredicateJson = catalogIndex.getPredicatejson();
         if (!StringUtil.isEmpty(indexPredicateJson)) {
             try {
@@ -251,14 +252,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 assert(false);
             }
             if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
-                notNullTves = new HashSet<>();
                 notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
             }
         }
 
         AbstractExpression nullExpr = indexedExprs.get(nullExprIndex);
         AbstractExpression skipNullPredicate = null;
-        if (notNullTves == null || !notNullTves.contains(nullExpr)) {
+        if (! notNullTves.contains(nullExpr)) {
             List<AbstractExpression> exprs = new ArrayList<>();
             for (int i = 0; i < nullExprIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
@@ -274,7 +274,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // or m_compareNotDistinct flag says it should ignore null values,
             // then we add "nullExpr IS NULL" to the expression for matching tuples to skip. (ENG-11096)
             if (nullExprIndex == searchkeyExpressions.size()
-                    || compareNotDistinct.get(nullExprIndex) == false) { // nullExprIndex == m_searchkeyExpressions.size() - 1
+                    || !compareNotDistinct.get(nullExprIndex)) { // nullExprIndex == m_searchkeyExpressions.size() - 1
                 AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
                 exprs.add(expr);
             }
