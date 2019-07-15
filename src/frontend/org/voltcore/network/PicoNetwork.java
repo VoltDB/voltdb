@@ -149,9 +149,9 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
         }
         if (isSecondary) {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
+            m_threadName = remoteHost + "(s)";
         } else {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort;
+            m_threadName = remoteHost;
         }
 
         m_thread = new Thread(this, "Pico Network - " + m_threadName);
