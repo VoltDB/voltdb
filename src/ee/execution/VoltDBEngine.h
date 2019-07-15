@@ -233,10 +233,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Call user-defined function
         NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
         void callJavaUserDefinedAggregateStart(int32_t functionId);
-        void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument);
-        void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument);
-        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type);
-        NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId);
+        void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int columnIndex);
+        void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int columnIndex);
+        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type, int columnIndex);
+        NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int columnIndex);
 
 
         // Created to transition existing unit tests to context abstraction.
@@ -634,7 +634,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                int64_t timestamp);
 
         // user defined aggregate functions helper functions
-        void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type);
+        void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t columnIndex);
         void checkInfo(UserDefinedFunctionInfo *info, int32_t functionId);
         void checkReturnCode(int32_t returnCode, std::string name);
         NValue resultHelper(int32_t returnCode, bool partition_table, ValueType type);

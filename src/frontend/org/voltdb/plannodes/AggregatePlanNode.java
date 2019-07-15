@@ -257,12 +257,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
-    public int getUserAggregateId() {
+    public int getUserAggregateId(int index) {
         if (m_userAggregateId.size() > 0) {
-            return m_userAggregateId.get(0);
+            return m_userAggregateId.get(index);
         } else {
             return -1;
         }
+    }
+
+    public int getUserAggregateIdSize() {
+        return m_userAggregateId.size();
     }
 
     public void setOutputSchema(NodeSchema schema) {

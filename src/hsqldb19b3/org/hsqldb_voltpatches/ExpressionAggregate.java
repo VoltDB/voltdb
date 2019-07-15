@@ -270,7 +270,7 @@ public class ExpressionAggregate extends Expression {
 
     @Override
     public int hashCode() {
-        return super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate);
+        return (super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate)) * 1048573 + user_aggregate_id;
     }
 
     @Override

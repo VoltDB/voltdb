@@ -3019,10 +3019,10 @@ public class PlanAssembler {
         List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
         for (int i = 0; i < coordAggTypes.size(); ++i) {
             coordNode.updateWorkerOrCoordinator(i);
-            if (coordNode.getUserAggregateId() != -1) {
-                String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId()).getNameString();
+            if (coordNode.getUserAggregateId(i) != -1) {
+                String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId(i)).getNameString();
                 VoltType returnType = VoltType.typeFromString(typeName);
-                coordNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
+                coordNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
                 distNode.updateAggregate(i, ExpressionType.USER_DEFINE_WORKER);
             }
         }
@@ -3123,10 +3123,12 @@ public class PlanAssembler {
         else {
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
-            if (rootAggNode.getUserAggregateId() != -1) {
-            	String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId()).getNameString();
-                VoltType returnType = VoltType.typeFromString(typeName);
-                rootAggNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
+            for (int i = 0; i < rootAggNode.getAggregateTypesSize(); ++i) {
+                if (rootAggNode.getUserAggregateId(i) != -1) {
+                    String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId(i)).getNameString();
+                    VoltType returnType = VoltType.typeFromString(typeName);
+                    rootAggNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
+                }
             }
         }
 

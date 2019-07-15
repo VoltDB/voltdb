@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Vector;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
@@ -60,7 +61,7 @@ public class UserDefinedFunctionManager {
     }
     
     public UserDefinedAggregateFunctionRunner getAggregateFunctionRunnerById(int functionId) {
-    	return m_udafs.get(functionId);
+        return m_udafs.get(functionId);
     }
 
     // Load all the UDFs recorded in the catalog. Instantiate and register them in the system.
@@ -112,10 +113,10 @@ public class UserDefinedFunctionManager {
             }
             assert(funcInstance != null);
             if (catalogFunction.getMethodname() == null) {
-            	// no_method_here -> aggregate function 
+                // no_method_here -> aggregate function
                 builderAgg.put(catalogFunction.getFunctionid(), new UserDefinedAggregateFunctionRunner(catalogFunction, funcClass));
             } else {
-            	// There is a methodName -> scalar function
+                // There is a methodName -> scalar function
                 builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
             }
         }
@@ -142,7 +143,7 @@ public class UserDefinedFunctionManager {
      *
      */
     public static class UserDefinedAggregateFunctionRunner {
-    	final String m_functionName;
+        final String m_functionName;
         final int m_functionId;
         final String m_className;
         Method m_startMethod;
@@ -151,6 +152,7 @@ public class UserDefinedFunctionManager {
         Method m_endMethod;
         Class<?> m_funcClass;
         Object m_functionInstance;
+        Vector<Object> m_functionInstances;
         final VoltType[] m_paramTypes;
         final boolean[] m_boxUpByteArray;
         final VoltType m_returnType;
@@ -159,21 +161,22 @@ public class UserDefinedFunctionManager {
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
         
         public UserDefinedAggregateFunctionRunner(Function catalogFunction, Class<?> funcClass) {
-        	this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
-        			catalogFunction.getClassname(), funcClass);
+            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
+                    catalogFunction.getClassname(), funcClass);
         }
         
         public UserDefinedAggregateFunctionRunner(String functionName, int functionId, String className, Class<?> funcClass) {
-        	m_functionName = functionName;
-        	m_functionId = functionId;
-        	m_className = className;
-        	initFunctionInstance(funcClass);
-        	m_funcClass = funcClass;
-        	m_startMethod = initFunctionMethod("start");
-        	m_assembleMethod = initFunctionMethod("assemble");
-        	m_combineMethod = initFunctionMethod("combine");
-        	m_endMethod = initFunctionMethod("end");
-        	Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
+            m_functionName = functionName;
+            m_functionId = functionId;
+            m_className = className;
+            initFunctionInstance(funcClass);
+            m_functionInstances = new Vector<Object>();
+            m_funcClass = funcClass;
+            m_startMethod = initFunctionMethod("start");
+            m_assembleMethod = initFunctionMethod("assemble");
+            m_combineMethod = initFunctionMethod("combine");
+            m_endMethod = initFunctionMethod("end");
+            Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
             m_boxUpByteArray = new boolean[m_paramCount];
@@ -201,10 +204,20 @@ public class UserDefinedFunctionManager {
             }
         }
         
+        private void addFunctionInstance(Class<?> funcClass) {
+            try {
+                Object tempFunctionInstance = funcClass.newInstance();
+                m_functionInstances.add(tempFunctionInstance);
+            }
+            catch (InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
+            }
+        }
+
         private Method initFunctionMethod(String methodName) {
             Method temp_method = null;
             //Object functionInstance = initFunctionInstance(m_funcClass);
-        	for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
+            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
                 if (m.getName().equals(methodName)) {
                     if (! Modifier.isPublic(m.getModifiers())) {
                         continue;
@@ -216,12 +229,12 @@ public class UserDefinedFunctionManager {
                     // but end function cannot be void
                     if (!methodName.equals("end")) {
                         if (!m.getReturnType().equals(Void.TYPE)) {
-                        	continue;
+                            continue;
                         }
                     }
                     else {
                         if (m.getReturnType().equals(Void.TYPE)) {
-                        	continue;
+                            continue;
                         }
                     }
                     temp_method = m;
@@ -229,7 +242,7 @@ public class UserDefinedFunctionManager {
                 }
 
             }
-        	if (temp_method == null) {
+            if (temp_method == null) {
                 throw new RuntimeException(
                         String.format("Error loading function %s: cannot find the %s() method.",
                                 m_functionName, methodName));
@@ -375,11 +388,11 @@ public class UserDefinedFunctionManager {
         }
         
         public void start() throws Throwable {
-            initFunctionInstance(m_funcClass);
-            m_startMethod.invoke(m_functionInstance);
+            addFunctionInstance(m_funcClass);
+            m_startMethod.invoke(m_functionInstances.lastElement());
         }
 
-        public void assemble(ByteBuffer udfBuffer) throws Throwable {
+        public void assemble(ByteBuffer udfBuffer, int columnIndex) throws Throwable {
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
@@ -387,25 +400,34 @@ public class UserDefinedFunctionManager {
                     paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
                 }
             }
-            m_assembleMethod.invoke(m_functionInstance, paramsIn);
+            m_assembleMethod.invoke(m_functionInstances.get(columnIndex), paramsIn);
         }
 
-        public void combine(Object other) throws Throwable {
-            m_combineMethod.invoke(m_functionInstance, other);
+        public void combine(Object other, int columnIndex) throws Throwable {
+            m_combineMethod.invoke(m_functionInstances.get(columnIndex), other);
         }
 
-        public Object end() throws Throwable {
-            return m_endMethod.invoke(m_functionInstance);
+        public Object end(int columnIndex) throws Throwable {
+            Object result = m_endMethod.invoke(m_functionInstances.get(columnIndex));
+            if (columnIndex == m_functionInstances.size() - 1) {
+                m_functionInstances.clear();
+            }
+            return result;
         }
         
         public VoltType getReturnType() {
             return m_returnType;
         }
 
-        public Object getFunctionInstance() {
-            return m_functionInstance;
+        public Object getFunctionInstance(int columnIndex) {
+            return m_functionInstances.get(columnIndex);
         }
         
+        public void clearFunctionInstance(int columnIndex) {
+            if (columnIndex == m_functionInstances.size() - 1) {
+                m_functionInstances.clear();
+            }
+        }
     }
     
     /**
@@ -425,12 +447,12 @@ public class UserDefinedFunctionManager {
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
 
         public UserDefinedFunctionRunner(Function catalogFunction, Object funcInstance) {
-        	this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
+            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
                     catalogFunction.getMethodname(), funcInstance);
         }
 
         public UserDefinedFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
-        	m_functionName = functionName;
+            m_functionName = functionName;
             m_functionId = functionId;
             m_functionInstance = funcInstance;
             m_functionMethod = null;

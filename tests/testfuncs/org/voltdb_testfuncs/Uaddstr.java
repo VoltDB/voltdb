@@ -1,8 +1,6 @@
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
+package org.voltdb_testfuncs;
+
 import java.io.Serializable;
-import java.io.IOException;
 import java.lang.String;
 
 public class Uaddstr implements Serializable {

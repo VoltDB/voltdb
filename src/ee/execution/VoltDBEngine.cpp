@@ -689,12 +689,16 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type) {
+void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t columnIndex) {
     // Estimate the size of the buffer we need. We will put:
     //   * size of the buffer (function ID + parameters)
     //   * function ID (int32_t)
+    //   * column index (int32_t)
     //   * parameters.
-    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+
+    // if the columnIndex is -1, this is the start method. So we do not need to serialize the columnIndex.
+    // On the other hand, we would need the columnIndex to know which column we are working on
+    int32_t bufferSizeNeeded = columnIndex == -1 ? 2 * sizeof(int32_t) : 3 * sizeof(int32_t);
     NValue cast_argument;
     if (type != VALUE_TYPE_INVALID) {
         cast_argument = argument.castAs(type);
@@ -705,21 +709,24 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     // Adjust the buffer size when needed.
     // Note that bufferSizeNeeded does not include its own size.
     // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
-    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
-        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    if (bufferSizeNeeded > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded);
     }
     resetUDFOutputBuffer();
 
     // Serialize buffer size, function ID.
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
+    if (columnIndex != -1) {
+        m_udfOutput.writeInt(columnIndex);
+    }
 
     if (type != VALUE_TYPE_INVALID) {
         cast_argument.serializeTo(m_udfOutput);
     }
 
     // Make sure we did the correct size calculation.
-    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+    assert(bufferSizeNeeded == m_udfOutput.position());
 }
 
 void VoltDBEngine::checkInfo(UserDefinedFunctionInfo *info, int32_t functionId) {
@@ -759,39 +766,39 @@ NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, Valu
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, -1);
     // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart();
     checkReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
 }
 
-void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument) {
+void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int32_t columnIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front());
+    serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front(), columnIndex);
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
     checkReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
 }
 
-void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument) {
+void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int32_t columnIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY);
+    serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, columnIndex);
     // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
     checkReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
 }
 
-NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type) {
+NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type, int32_t columnIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
     bool partition_table = agg_type == EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER ? true : false;
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, columnIndex);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
     m_udfOutput.writeBool(partition_table);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
@@ -800,10 +807,10 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     return resultHelper(returnCode, partition_table, info->returnType);
 }
 
-NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId) {
+NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t columnIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, columnIndex);
     // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
