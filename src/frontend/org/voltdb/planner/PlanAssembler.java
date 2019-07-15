@@ -2753,7 +2753,7 @@ public class PlanAssembler {
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
                                  agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
-                                 agg_expression_type != ExpressionType.USER_DEFINE_AGGREGATE) {
+                                 agg_expression_type != ExpressionType.USER_DEFINED_AGGREGATE_COORD) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -3023,7 +3023,7 @@ public class PlanAssembler {
                 String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId(i)).getNameString();
                 VoltType returnType = VoltType.typeFromString(typeName);
                 coordNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
-                distNode.updateAggregate(i, ExpressionType.USER_DEFINE_WORKER);
+                distNode.updateAggregate(i, ExpressionType.USER_DEFINED_AGGREGATE_WORKER);
             }
         }
 

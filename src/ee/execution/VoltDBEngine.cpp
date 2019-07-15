@@ -793,7 +793,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
-    bool partition_table = agg_type == EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER ? true : false;
+    bool partition_table = agg_type == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER ? true : false;
     serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
     m_udfOutput.writeBool(partition_table);

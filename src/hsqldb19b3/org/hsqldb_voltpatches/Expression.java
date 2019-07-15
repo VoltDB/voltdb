@@ -1395,7 +1395,7 @@ public class Expression {
             return;
         }
 
-        if (e.opType == OpTypes.USER_DEFINE_AGGREGATE || e.opType == OpTypes.USER_DEFINE_WORKER) {
+        if (e.opType == OpTypes.USER_DEFINED_AGGREGATE_COORD || e.opType == OpTypes.USER_DEFINED_AGGREGATE_WORKER) {
             return;
         }
 
@@ -1576,8 +1576,8 @@ public class Expression {
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
 
         // user defined aggregate function
-        prototypes.put(OpTypes.USER_DEFINE_AGGREGATE, (new VoltXMLElement("aggregation")).withValue("optype", "user_define_aggregate"));
-        prototypes.put(OpTypes.USER_DEFINE_WORKER, (new VoltXMLElement("aggregation")).withValue("optype", "user_define_worker"));
+        prototypes.put(OpTypes.USER_DEFINED_AGGREGATE_COORD, (new VoltXMLElement("aggregation")).withValue("optype", "user_defined_aggregate_coord"));
+        prototypes.put(OpTypes.USER_DEFINED_AGGREGATE_WORKER, (new VoltXMLElement("aggregation")).withValue("optype", "user_defined_aggregate_worker"));
     }
 
     /**
@@ -1699,7 +1699,7 @@ public class Expression {
         exp = exp.duplicate();
         exp.attributes.put("id", getUniqueId(context.m_session));
 
-        if (opType == OpTypes.USER_DEFINE_AGGREGATE) {
+        if (opType == OpTypes.USER_DEFINED_AGGREGATE_COORD) {
             if (this instanceof ExpressionAggregate) {
                 ExpressionAggregate tempExpr = (ExpressionAggregate) this;
                 exp.attributes.put("user_aggregate_id", Integer.toString(tempExpr.getUserAggregateId()));
@@ -1791,7 +1791,7 @@ public class Expression {
             FunctionSQL fn = (FunctionSQL)this;
             return fn.voltAnnotateFunctionXML(exp);
 
-        case OpTypes.USER_DEFINE_AGGREGATE:
+        case OpTypes.USER_DEFINED_AGGREGATE_COORD:
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 

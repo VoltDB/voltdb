@@ -725,7 +725,7 @@ public class ParserBase {
         expressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
         expressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
         expressionTypeMap.put(Tokens.ROW_NUMBER, OpTypes.WINDOWED_ROW_NUMBER);
-        expressionTypeMap.put(Tokens.X_IDENTIFIER, OpTypes.USER_DEFINE_AGGREGATE);
+        expressionTypeMap.put(Tokens.X_IDENTIFIER, OpTypes.USER_DEFINED_AGGREGATE_COORD);
         // Windowed aggregate operators go here
         // as well as in the expression type map
         // above.

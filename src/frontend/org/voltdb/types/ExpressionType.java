@@ -178,8 +178,8 @@ public enum ExpressionType {
     // -----------------------------
     // User define function
     // -----------------------------
-    USER_DEFINE_AGGREGATE      	 (AggregateExpression.class, 106, "USER_DEFINE_AGGREGATE"),
-    USER_DEFINE_WORKER           (AggregateExpression.class, 107, "USER_DEFINE_WORKER"),
+    USER_DEFINED_AGGREGATE_COORD   (AggregateExpression.class, 106, "USER_DEFINED_AGGREGATE_COORD"),
+    USER_DEFINED_AGGREGATE_WORKER  (AggregateExpression.class, 107, "USER_DEFINED_AGGREGATE_WORKER"),
     ;
 
     private final int m_value;

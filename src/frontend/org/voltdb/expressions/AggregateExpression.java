@@ -113,7 +113,7 @@ public class AggregateExpression extends AbstractExpression {
             expr.m_valueType = VoltType.VARBINARY;
             expr.m_valueSize = 65537;
             break;
-        case USER_DEFINE_WORKER:
+        case USER_DEFINED_AGGREGATE_WORKER:
             expr.m_valueType = VoltType.VARBINARY;
             expr.m_valueSize = 1048576;
             break;
@@ -122,7 +122,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_MIN:
         case AGGREGATE_WINDOWED_MIN:
         case AGGREGATE_WINDOWED_MAX:
-        case USER_DEFINE_AGGREGATE:
+        case USER_DEFINED_AGGREGATE_COORD:
             //
             // It's always whatever the base type is
             //

@@ -568,8 +568,8 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
-    case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
-    case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
+    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_COORD:
+    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER:
         return new (memoryPool) UserDefineAgg(agg_id, is_worker, agg_type, udafIndex);
     default:
         {
