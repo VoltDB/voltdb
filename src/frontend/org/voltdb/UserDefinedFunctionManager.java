@@ -392,7 +392,7 @@ public class UserDefinedFunctionManager {
             m_startMethod.invoke(m_functionInstances.lastElement());
         }
 
-        public void assemble(ByteBuffer udfBuffer, int columnIndex) throws Throwable {
+        public void assemble(ByteBuffer udfBuffer, int udafIndex) throws Throwable {
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
@@ -400,16 +400,16 @@ public class UserDefinedFunctionManager {
                     paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
                 }
             }
-            m_assembleMethod.invoke(m_functionInstances.get(columnIndex), paramsIn);
+            m_assembleMethod.invoke(m_functionInstances.get(udafIndex), paramsIn);
         }
 
-        public void combine(Object other, int columnIndex) throws Throwable {
-            m_combineMethod.invoke(m_functionInstances.get(columnIndex), other);
+        public void combine(Object other, int udafIndex) throws Throwable {
+            m_combineMethod.invoke(m_functionInstances.get(udafIndex), other);
         }
 
-        public Object end(int columnIndex) throws Throwable {
-            Object result = m_endMethod.invoke(m_functionInstances.get(columnIndex));
-            if (columnIndex == m_functionInstances.size() - 1) {
+        public Object end(int udafIndex) throws Throwable {
+            Object result = m_endMethod.invoke(m_functionInstances.get(udafIndex));
+            if (udafIndex == m_functionInstances.size() - 1) {
                 m_functionInstances.clear();
             }
             return result;
@@ -419,12 +419,12 @@ public class UserDefinedFunctionManager {
             return m_returnType;
         }
 
-        public Object getFunctionInstance(int columnIndex) {
-            return m_functionInstances.get(columnIndex);
+        public Object getFunctionInstance(int udafIndex) {
+            return m_functionInstances.get(udafIndex);
         }
         
-        public void clearFunctionInstance(int columnIndex) {
-            if (columnIndex == m_functionInstances.size() - 1) {
+        public void clearFunctionInstance(int udafIndex) {
+            if (udafIndex == m_functionInstances.size() - 1) {
                 m_functionInstances.clear();
             }
         }

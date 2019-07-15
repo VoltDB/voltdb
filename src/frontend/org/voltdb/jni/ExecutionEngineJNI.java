@@ -942,11 +942,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateAssemble() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        int columnIndex = m_udfBuffer.getInt();
+        int udafIndex = m_udfBuffer.getInt();
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
-            udafRunner.assemble(m_udfBuffer, columnIndex);
+            udafRunner.assemble(m_udfBuffer, udafIndex);
             m_udfBuffer.clear();
             return 0;
         }
@@ -963,7 +963,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateCombine() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        int columnIndex = m_udfBuffer.getInt();
+        int udafIndex = m_udfBuffer.getInt();
         Object workerObject = null;
         try {
             assert(udafRunner != null);
@@ -981,7 +981,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 }
             }
             // call the combine method with the deserialized worker object
-            udafRunner.combine(workerObject, columnIndex);
+            udafRunner.combine(workerObject, udafIndex);
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
             return 0;
@@ -999,7 +999,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateWorkerEnd() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        int columnIndex = m_udfBuffer.getInt();
+        int udafIndex = m_udfBuffer.getInt();
         // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
         boolean isForPartitionTable = (m_udfBuffer.get() != 0);
         Object returnValue = null;
@@ -1009,7 +1009,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // if there is a coordinator, we serialized the object to a byte array
             // and the return type for a worker is a varbinary
             if (isForPartitionTable) {
-                Object workerInstance = udafRunner.getFunctionInstance(columnIndex);
+                Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 ObjectOutput out = null;
                 try {
@@ -1025,12 +1025,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     }
                 }
                 returnType = VoltType.VARBINARY;
-                udafRunner.clearFunctionInstance(columnIndex);
+                udafRunner.clearFunctionInstance(udafIndex);
             }
             // However, if there is no coordinator, this worker will simply call the end method
             // and return the original type
             else {
-                returnValue = udafRunner.end(columnIndex);
+                returnValue = udafRunner.end(udafIndex);
                 returnType = udafRunner.getReturnType();
             }
             resizeUDAFBuffer(returnValue, returnType);
@@ -1052,12 +1052,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateCoordinatorEnd() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        int columnIndex = m_udfBuffer.getInt();
+        int udafIndex = m_udfBuffer.getInt();
         Object returnValue = null;
         try {
             assert(udafRunner != null);
             // call the end method to terminate the entire aggregate function process
-            returnValue = udafRunner.end(columnIndex);
+            returnValue = udafRunner.end(udafIndex);
             VoltType returnType = udafRunner.getReturnType();
             resizeUDAFBuffer(returnValue, returnType);
             m_udfBuffer.clear();

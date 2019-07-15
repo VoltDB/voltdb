@@ -490,8 +490,8 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, bool is_worker, ExpressionType agg_type_in, int columnIndex_in)
-        : functionId(id), isWorker(is_worker), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine()), columnIndex(columnIndex_in)
+    UserDefineAgg(int id, bool is_worker, ExpressionType agg_type_in, int udafIndex_in)
+        : functionId(id), isWorker(is_worker), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndex_in)
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
@@ -500,11 +500,11 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will accumulate the data of its columns
         if (isWorker) {
-            engine->callJavaUserDefinedAggregateAssemble(functionId, val, columnIndex);
+            engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
         }
         // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
         else {
-            engine->callJavaUserDefinedAggregateCombine(functionId, val, columnIndex);
+            engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
         }
     }
 
@@ -512,11 +512,11 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
         if (isWorker) {
-            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type, columnIndex);
+            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type, udafIndex);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
-            return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, columnIndex);
+            return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, udafIndex);
         }
     }
 
@@ -531,14 +531,14 @@ private:
     bool isWorker;
     ExpressionType agg_type;
     VoltDBEngine* engine;
-    int columnIndex;
+    int udafIndex;
 };
 
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, bool is_worker, int columnIndex)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, bool is_worker, int udafIndex)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -570,7 +570,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
-        return new (memoryPool) UserDefineAgg(agg_id, is_worker, agg_type, columnIndex);
+        return new (memoryPool) UserDefineAgg(agg_id, is_worker, agg_type, udafIndex);
     default:
         {
             char message[128];
@@ -741,9 +741,9 @@ inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, const
 inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
-    std::unordered_map<int, int> column_indexes;
+    std::unordered_map<int, int> udaf_indexes;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii], column_indexes[m_aggregateIds[ii]]++);
+        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii], udaf_indexes[m_aggregateIds[ii]]++);
     }
 }
 
