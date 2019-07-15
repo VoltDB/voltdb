@@ -29,12 +29,16 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.schema.Function;
+import org.apache.calcite.schema.impl.ReflectiveFunctionBase;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.IntervalSqlType;
+import org.apache.calcite.sql.validate.SqlUserDefinedFunction;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
@@ -52,7 +56,6 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 import java.math.BigDecimal;
-import java.sql.Ref;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -317,7 +320,27 @@ public class RexConverter {
                 }
                 break;
             case OTHER_FUNCTION:
-                ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName().toLowerCase(), aeOperands, null);
+                int functionId = FunctionSQL.FUNC_VOLT_INVALID;
+                if (call.op instanceof SqlUserDefinedFunction) {
+                    Function udf = ((SqlUserDefinedFunction) call.op).getFunction();
+                    if (udf instanceof ReflectiveFunctionBase)  {
+                        functionId = ((ReflectiveFunctionBase) udf).getFunctionId();
+                    }
+                }
+                if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
+                    ae = RexConverterHelper.createFunctionExpression(
+                            call.getType(),
+                            call.op.getName().toLowerCase(),
+                            aeOperands,
+                            null);
+                } else {
+                    ae = RexConverterHelper.createFunctionExpression(
+                            call.getType(),
+                            call.op.getName().toLowerCase(),
+                            functionId,
+                            aeOperands,
+                            null);
+                }
                 RexConverter.setType(ae, call.getType());
                 break;
             default:

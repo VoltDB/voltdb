@@ -18,9 +18,9 @@
 package org.voltdb.plannerv2.sqlfunctions;
 
 import com.google.common.collect.ImmutableMultimap;
-import org.apache.commons.lang3.tuple.Triple;
+import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.voltcore.utils.Pair;
+import org.hsqldb_voltpatches.FunctionSQL;
 
 /**
  * Implementation of calls to VoltDB SQL functions through Calcite.
@@ -47,11 +47,15 @@ public class VoltSqlFunctions {
         final private boolean m_exactArgumentTypes;
         // Classes of argument types
         final private Class[] m_argumentTypes;
+        // Function ID
+        final private int m_functionId;
 
-        private FunctionDescriptor(Class implementor, boolean exactArgumentTypes, Class[] argumentTypes) {
+        private FunctionDescriptor(Class implementor, boolean exactArgumentTypes,
+                                   Class[] argumentTypes, int functionId) {
             m_implementor = implementor;
             m_exactArgumentTypes = exactArgumentTypes;
             m_argumentTypes = argumentTypes;
+            m_functionId = functionId;
         }
 
         public Class getImplementor() {
@@ -65,23 +69,90 @@ public class VoltSqlFunctions {
         public Class[] getArgumentTypes() {
             return m_argumentTypes;
         }
+
+        public int getFunctionId() {
+            return m_functionId;
+        }
     }
 
     // The map from method name to SQL FunctionDescriptor
     public static final ImmutableMultimap<String, FunctionDescriptor> VOLT_SQL_FUNCTIONS =
             ImmutableMultimap.<String, FunctionDescriptor>builder()
-                    .put("migrating", new FunctionDescriptor(MigrationFunctions.class, false, new Class[] {}))
-                    .put("bit_shift_left", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
-                    .put("bit_shift_right", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
-                    .put("bitAnd", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("bitNot", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class}))
-                    .put("bitOr", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("bitXor", new FunctionDescriptor(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
-                    .put("inet6_aton", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {String.class}))
-                    .put("inet6_ntoa", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {byte[].class}))
-                    .put("inet_aton", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {String.class}))
-                    .put("inet_ntoa", new FunctionDescriptor(InternetFunctions.class, true, new Class[] {long.class}))
-                    .put("hex", new FunctionDescriptor(StringFunctions.class, false, new Class[] {long.class}))
+                    .put("migrating", new FunctionDescriptor(
+                        MigrationFunctions.class,
+                        false,
+                        new Class[] {},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING))
+                    .put("bit_shift_left", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class, int.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_LEFT))
+                    .put("bit_shift_right", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class, int.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_RIGHT))
+                    .put("bitAnd", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class, long.class},
+                        FunctionCustom.FUNC_BITAND))
+                    .put("bitNot", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BITNOT))
+                    .put("bitOr", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class, long.class},
+                        FunctionCustom.FUNC_BITOR))
+                    .put("bitXor", new FunctionDescriptor(
+                        BitwiseFunctions.class,
+                        true,
+                        new Class[] {long.class, long.class},
+                        FunctionCustom.FUNC_BITXOR))
+                    .put("inet6_aton", new FunctionDescriptor(
+                        InternetFunctions.class,
+                        true,
+                        new Class[] {String.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_ATON))
+                    .put("inet6_ntoa", new FunctionDescriptor(
+                        InternetFunctions.class,
+                        true,
+                        new Class[] {byte[].class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_NTOA))
+                    .put("inet_aton", new FunctionDescriptor(
+                        InternetFunctions.class,
+                        true,
+                        new Class[] {String.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
+                    .put("inet_ntoa", new FunctionDescriptor(
+                        InternetFunctions.class,
+                        true,
+                        new Class[] {long.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
+                    .put("hex", new FunctionDescriptor(
+                        StringFunctions.class,
+                        false,
+                        new Class[] {long.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_HEX))
+                    .put("substring", new FunctionDescriptor(
+                        StringFunctions.class,
+                        false,
+                        new Class[] {String.class, int.class, int.class},
+                        FunctionSQL.FUNC_SUBSTRING_CHAR))
+                    .put("substring", new FunctionDescriptor(
+                        StringFunctions.class,
+                        false,
+                        new Class[] {byte[].class, int.class, int.class},
+                        FunctionSQL.FUNC_SUBSTRING_BINARY))
+                    .put("substring", new FunctionDescriptor(
+                        StringFunctions.class,
+                        false,
+                        new Class[] {String.class, int.class},
+                        FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM))
                     .build();
 
     //-------------------------------------------------------------
@@ -147,6 +218,18 @@ public class VoltSqlFunctions {
     // String functions
     public static class StringFunctions {
         public static String hex(long value) {
+            return "";
+        }
+
+        public static String substring(String s, int position, int length) {
+            return "";
+        }
+
+        public static String substring(byte[] b, int position, int length) {
+            return "";
+        }
+
+        public static String substring(String s, int position) {
             return "";
         }
     }

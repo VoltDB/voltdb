@@ -74,7 +74,7 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_FLOOR                            = 16;
     private final static int   FUNC_CEILING                          = 17;
     private final static int   FUNC_WIDTH_BUCKET                     = 20;
-    protected final static int FUNC_SUBSTRING_CHAR                   = 21;    // string
+    public final static int    FUNC_SUBSTRING_CHAR                   = 21;    // string
     private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
     private final static int   FUNC_SUBSTRING_REGEX                  = 23;
     protected final static int FUNC_FOLD_LOWER                       = 24;
@@ -85,7 +85,7 @@ public class FunctionSQL extends Expression {
     protected final static int FUNC_TRIM_CHAR                        = 29;
     final static int           FUNC_OVERLAY_CHAR                     = 30;
     private final static int   FUNC_CHAR_NORMALIZE                   = 31;
-    private final static int   FUNC_SUBSTRING_BINARY                 = 32;
+    public final static int    FUNC_SUBSTRING_BINARY                 = 32;
     private final static int   FUNC_TRIM_BINARY                      = 33;
     private final static int   FUNC_OVERLAY_BINARY                   = 40;
     protected final static int FUNC_CURRENT_DATE                     = 41;    // datetime
@@ -118,7 +118,7 @@ public class FunctionSQL extends Expression {
 
     // Assume that 10000-19999 are available for VoltDB-specific use
     // in specialized implementations of existing HSQL functions.
-    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
+    public final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
     public final static int    FUNC_VOLT_INVALID = -1;
 
     //
@@ -153,32 +153,6 @@ public class FunctionSQL extends Expression {
     //
     static IntValueHashMap valueFuncMap   = new IntValueHashMap();
     public static IntValueHashMap regularFuncMap = new IntValueHashMap();
-    public static IntValueHashMap fullFuncMap = new IntValueHashMap();
-
-    // TODO: expand fullFuncMap to include every function in regularFuncMap and its overloaded variants
-    // Register functions with overloading possibilities:
-    // <Function_Name> + <Operand_Count> + <Operand_Types> -> <Function_Enum>
-    static {
-        fullFuncMap.put(Tokens.T_SUBSTRING +
-                        "3" +
-                        VoltType.STRING +
-                        VoltType.INTEGER +
-                        VoltType.INTEGER,
-                        FUNC_SUBSTRING_CHAR);
-
-        fullFuncMap.put(Tokens.T_SUBSTRING +
-                        "3" +
-                        VoltType.VARBINARY +
-                        VoltType.INTEGER +
-                        VoltType.INTEGER,
-                        FUNC_SUBSTRING_BINARY);
-
-        fullFuncMap.put(Tokens.T_SUBSTRING +
-                        "2"  +
-                        VoltType.STRING +
-                        VoltType.INTEGER,
-                        FUNC_VOLT_SUBSTRING_CHAR_FROM);
-    }
 
     static {
         regularFuncMap.put(Tokens.T_POSITION, FUNC_POSITION_CHAR);
@@ -2665,18 +2639,6 @@ public class FunctionSQL extends Expression {
     public static int voltGetFunctionId(String functionName) {
         try {
             return regularFuncMap.get(functionName.toUpperCase());
-        } catch (NoSuchElementException ex) {
-            return FUNC_VOLT_INVALID;
-        }
-    }
-
-    public static int voltGetFunctionId(String functionName, VoltType[] operandTypes) {
-        try {
-            String query_enum = functionName.toUpperCase() + operandTypes.length;
-            for (VoltType operandType : operandTypes) {
-                query_enum += operandType;
-            }
-            return fullFuncMap.get(query_enum);
         } catch (NoSuchElementException ex) {
             return FUNC_VOLT_INVALID;
         }
