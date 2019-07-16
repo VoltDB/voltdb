@@ -151,7 +151,7 @@ public class UserDefinedFunctionManager {
         Method m_combineMethod;
         Method m_endMethod;
         Class<?> m_funcClass;
-        Object m_functionInstance;
+        Method[] m_functionMethods;
         Vector<Object> m_functionInstances;
         final VoltType[] m_paramTypes;
         final boolean[] m_boxUpByteArray;
@@ -169,7 +169,7 @@ public class UserDefinedFunctionManager {
             m_functionName = functionName;
             m_functionId = functionId;
             m_className = className;
-            initFunctionInstance(funcClass);
+            initFunctionMethods(funcClass);
             m_functionInstances = new Vector<Object>();
             m_funcClass = funcClass;
             m_startMethod = initFunctionMethod("start");
@@ -195,9 +195,10 @@ public class UserDefinedFunctionManager {
             FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
         }
         
-        private void initFunctionInstance(Class<?> funcClass) {
+        private void initFunctionMethods(Class<?> funcClass) {
             try {
-                m_functionInstance = funcClass.newInstance();
+                Object functionInstance = funcClass.newInstance();
+                m_functionMethods = functionInstance.getClass().getDeclaredMethods();
             }
             catch (InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
@@ -216,8 +217,7 @@ public class UserDefinedFunctionManager {
 
         private Method initFunctionMethod(String methodName) {
             Method temp_method = null;
-            //Object functionInstance = initFunctionInstance(m_funcClass);
-            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
+            for (final Method m : m_functionMethods) {
                 if (m.getName().equals(methodName)) {
                     if (! Modifier.isPublic(m.getModifiers())) {
                         continue;
