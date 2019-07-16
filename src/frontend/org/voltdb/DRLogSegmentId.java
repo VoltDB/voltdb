@@ -86,6 +86,16 @@ public class DRLogSegmentId implements Serializable {
         return ((drId >>> 63) == 1L) && (drId != -1);
     }
 
+    // Constructing InitialAckDRId changes the clusterId in the DrId.
+    // To correctly say if a DRId is an initial ack id, we need the clusterId as well.
+    public static boolean isInitialAckDRId(long drId, byte clusterId) {
+        if (drId == -1 && clusterId == 0) {
+            return true;
+        }
+        drId += 1;
+        return (clusterId == getClusterIdFromDRId(drId) && (getSequenceNumberFromDRId(drId) == 0));
+    }
+
     /*
      * Initial Ack DR Id is used as initial value for DR Idempotency filter
      */
@@ -98,8 +108,12 @@ public class DRLogSegmentId implements Serializable {
         return false;
     }
 
-    public static boolean seqIsBeforeZero(long drId) {
-        return (getSequenceNumberFromDRId(-1L) == getSequenceNumberFromDRId(drId));
+    public static boolean seqIsBeforeZero(long drId, byte clusterId) {
+        if (drId == -1 && clusterId == 0) {
+            return true;
+        } else {
+            return getClusterIdFromDRId(drId) == (clusterId - 1);
+        }
     }
 
     public static int getClusterIdFromDRId(long drId) {
