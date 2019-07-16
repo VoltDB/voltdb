@@ -3016,6 +3016,36 @@ public class PlanAssembler {
             }
         }
 
+        if (hasApproxCountDistinct) {
+            // Now, patch up any APPROX_COUNT_DISTINCT on the coordinating node.
+            List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
+            for (int i = 0; i < coordAggTypes.size(); ++i) {
+                ExpressionType et = coordAggTypes.get(i);
+                if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_HYPERLOGLOGS_TO_CARD);
+                }
+            }
+        }
+    }
+
+    /**
+     * This function is called once it's been determined that we can push down
+     * an aggregation plan node.
+     *
+     * If an USER_DEFINED_AGGREGATE_COORD aggregate is distributed, then we need to
+     * convert the distributed aggregate function to USER_DEFINED_AGGREGATE_WORKER,
+     * and updata the return type for the coordinated aggregate function.
+     *
+     * @param distNode    The aggregate node executed on each partition
+     * @param coordNode   The aggregate node executed on the coordinator
+     */
+    private static void fixDistributedUserDefinedAggregate(
+            AggregatePlanNode distNode,
+            AggregatePlanNode coordNode) {
+
+        assert (distNode != null);
+        assert (coordNode != null);
+
         List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
         for (int i = 0; i < coordAggTypes.size(); ++i) {
             coordNode.updateWorkerOrCoordinator(i);
@@ -3024,16 +3054,6 @@ public class PlanAssembler {
                 VoltType returnType = VoltType.typeFromString(typeName);
                 coordNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
                 distNode.updateAggregate(i, ExpressionType.USER_DEFINED_AGGREGATE_WORKER);
-            }
-        }
-
-        if (hasApproxCountDistinct) {
-            // Now, patch up any APPROX_COUNT_DISTINCT on the coordinating node.
-            for (int i = 0; i < coordAggTypes.size(); ++i) {
-                ExpressionType et = coordAggTypes.get(i);
-                if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
-                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_HYPERLOGLOGS_TO_CARD);
-                }
             }
         }
     }
@@ -3113,6 +3133,9 @@ public class PlanAssembler {
             // Now that we're certain the aggregate will be pushed down
             // (no turning back now!), fix any APPROX_COUNT_DISTINCT aggregates.
             fixDistributedApproxCountDistinct(distNode, coordNode);
+            // convert the distributed aggregate function to USER_DEFINED_AGGREGATE_WORKER,
+            // and update the return type for the coordinated aggregate function
+            fixDistributedUserDefinedAggregate(distNode, coordNode);
 
             // Put the send/receive pair back into place
             accessPlanTemp.getChild(0).addAndLinkChild(distNode);
@@ -3124,6 +3147,8 @@ public class PlanAssembler {
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
             for (int i = 0; i < rootAggNode.getAggregateTypesSize(); ++i) {
+                // if this is an user-defined aggregate function,
+                // we need to update the return type to be the final return type
                 if (rootAggNode.getUserAggregateId(i) != -1) {
                     String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId(i)).getNameString();
                     VoltType returnType = VoltType.typeFromString(typeName);
