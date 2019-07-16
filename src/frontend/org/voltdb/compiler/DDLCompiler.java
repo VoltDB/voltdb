@@ -211,7 +211,7 @@ public class DDLCompiler {
         m_mvProcessor = new MaterializedViewProcessor(m_compiler, m_hsql);
         m_voltStatementProcessor = new VoltDBStatementProcessor(this);
         m_voltStatementProcessor.addNextProcessor(new CreateAggregateFunctionFromClass(this))
-        						.addNextProcessor(new CreateProcedureFromClass(this))
+                                .addNextProcessor(new CreateProcedureFromClass(this))
                                 .addNextProcessor(new CreateProcedureAsScript(this))
                                 .addNextProcessor(new CreateProcedureAsSQL(this))
                                 .addNextProcessor(new CreateFunctionFromMethod(this))
