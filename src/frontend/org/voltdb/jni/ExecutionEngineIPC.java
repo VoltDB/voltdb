@@ -38,7 +38,7 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
+import org.voltdb.UserDefinedFunctionManager.UserDefinedScalarFunctionRunner;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
@@ -339,7 +339,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 udfBuffer.flip();
 
                 int functionId = udfBuffer.getInt();
-                UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
+                UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
                 assert(udfRunner != null);
                 Throwable throwable = null;
                 Object returnValue = null;
@@ -350,7 +350,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // Put the status code for success (zero) into the buffer.
                     m_data.putInt(0);
                     // Write the result to the buffer.
-                    UserDefinedFunctionRunner.writeValueToBuffer(m_data, udfRunner.getReturnType(), returnValue);
+                    UserDefinedScalarFunctionRunner.writeValueToBuffer(m_data, udfRunner.getReturnType(), returnValue);
                     m_data.flip();
                     m_connection.write();
                     return;

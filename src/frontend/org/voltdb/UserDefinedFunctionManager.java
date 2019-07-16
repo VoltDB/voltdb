@@ -53,10 +53,10 @@ public class UserDefinedFunctionManager {
             "VoltDB was unable to load a function (%s) which was expected to be " +
             "in the catalog jarfile and will now exit.";
 
-    ImmutableMap<Integer, UserDefinedFunctionRunner> m_udfs = ImmutableMap.of();
+    ImmutableMap<Integer, UserDefinedScalarFunctionRunner> m_udfs = ImmutableMap.of();
     ImmutableMap<Integer, UserDefinedAggregateFunctionRunner> m_udafs = ImmutableMap.of();
     
-    public UserDefinedFunctionRunner getFunctionRunnerById(int functionId) {
+    public UserDefinedScalarFunctionRunner getFunctionRunnerById(int functionId) {
         return m_udfs.get(functionId);
     }
     
@@ -68,8 +68,8 @@ public class UserDefinedFunctionManager {
     public void loadFunctions(CatalogContext catalogContext) {
         final CatalogMap<Function> catalogFunctions = catalogContext.database.getFunctions();
         // Remove obsolete tokens (scalar)
-        for (UserDefinedFunctionRunner runner : m_udfs.values()) {
-            // The function that the current UserDefinedFunctionRunner is referring to
+        for (UserDefinedScalarFunctionRunner runner : m_udfs.values()) {
+            // The function that the current UserDefinedScalarFunctionRunner is referring to
             // does not exist in the catalog anymore, we need to remove its token.
             if (catalogFunctions.get(runner.m_functionName) == null) {
                 FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
@@ -77,15 +77,15 @@ public class UserDefinedFunctionManager {
         }
         // Remove obsolete tokens (aggregate)
         for (UserDefinedAggregateFunctionRunner runner : m_udafs.values()) {
-            // The function that the current UserDefinedFunctionRunner is referring to
+            // The function that the current UserDefinedAggregateFunctionRunner is referring to
             // does not exist in the catalog anymore, we need to remove its token.
             if (catalogFunctions.get(runner.m_functionName) == null) {
                 FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
             }
         }
         // Build new UDF runners
-        ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder =
-                            ImmutableMap.<Integer, UserDefinedFunctionRunner>builder();
+        ImmutableMap.Builder<Integer, UserDefinedScalarFunctionRunner> builder =
+                            ImmutableMap.<Integer, UserDefinedScalarFunctionRunner>builder();
         ImmutableMap.Builder<Integer, UserDefinedAggregateFunctionRunner> builderAgg = 
                             ImmutableMap.<Integer, UserDefinedAggregateFunctionRunner>builder();
         for (final Function catalogFunction : catalogFunctions) {
@@ -117,7 +117,7 @@ public class UserDefinedFunctionManager {
                 builderAgg.put(catalogFunction.getFunctionid(), new UserDefinedAggregateFunctionRunner(catalogFunction, funcClass));
             } else {
                 // There is a methodName -> scalar function
-                builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
+                builder.put(catalogFunction.getFunctionid(), new UserDefinedScalarFunctionRunner(catalogFunction, funcInstance));
             }
         }
 
@@ -126,12 +126,12 @@ public class UserDefinedFunctionManager {
         m_udafs = builderAgg.build();
     }
 
-    private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
+    private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedScalarFunctionRunner> builder) {
         // define the function objects
         String[] functionNames = {"format_timestamp"};
         for (String functionName : functionNames) {
             int functionID = FunctionForVoltDB.getFunctionID(functionName);
-            builder.put(functionID, new UserDefinedFunctionRunner(functionName,
+            builder.put(functionID, new UserDefinedScalarFunctionRunner(functionName,
                     functionID, functionName, new JavaBuiltInFunctions()));
         }
     }
@@ -434,7 +434,7 @@ public class UserDefinedFunctionManager {
      * This class maintains the necessary information for each UDF including the class instance and
      * the method ID for the UDF implementation. We run UDFs from this runner.
      */
-    public static class UserDefinedFunctionRunner {
+    public static class UserDefinedScalarFunctionRunner {
         final String m_functionName;
         final int m_functionId;
         final Object m_functionInstance;
@@ -446,12 +446,12 @@ public class UserDefinedFunctionManager {
 
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
 
-        public UserDefinedFunctionRunner(Function catalogFunction, Object funcInstance) {
+        public UserDefinedScalarFunctionRunner(Function catalogFunction, Object funcInstance) {
             this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
                     catalogFunction.getMethodname(), funcInstance);
         }
 
-        public UserDefinedFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
+        public UserDefinedScalarFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
             m_functionName = functionName;
             m_functionId = functionId;
             m_functionInstance = funcInstance;

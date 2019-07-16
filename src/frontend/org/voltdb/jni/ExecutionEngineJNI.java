@@ -41,7 +41,7 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
+import org.voltdb.UserDefinedFunctionManager.UserDefinedScalarFunctionRunner;
 import org.voltdb.UserDefinedFunctionManager.UserDefinedAggregateFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -782,7 +782,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_udfBuffer.clear();
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
         int functionId = m_udfBuffer.getInt();
-        UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
+        UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         Object returnValue = null;
         Throwable throwable = null;
     	try {
@@ -823,7 +823,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            UserDefinedScalarFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
         }
@@ -1061,7 +1061,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             VoltType returnType = udafRunner.getReturnType();
             resizeUDAFBuffer(returnValue, returnType);
             m_udfBuffer.clear();
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
         }
