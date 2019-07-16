@@ -29,7 +29,6 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -60,7 +59,7 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     protected final RexNode m_offset;
     protected final RexNode m_limit;
 
-    public VoltPhysicalJoin(
+    VoltPhysicalJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
@@ -86,12 +85,13 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        double outerRowCount = getInput(0).estimateRowCount(mq);
-        double innerRowCount = getInput(1).estimateRowCount(mq);
+        final double outerRowCount = getInput(0).estimateRowCount(mq);
+        final double innerRowCount = getInput(1).estimateRowCount(mq);
         // Give it a discount based on the number of join expressions
-        double rowCount = PlanCostUtil.discountJoinRowCount(outerRowCount * innerRowCount, getCondition());
         // Give it a discount based on the limit / offset
-        return PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
+        return PlanCostUtil.discountLimitOffsetRowCount(
+                PlanCostUtil.discountJoinRowCount(outerRowCount * innerRowCount, getCondition()),
+                m_offset, m_limit);
     }
 
     abstract public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit);
@@ -111,16 +111,13 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         return 1;
     }
 
-    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+    protected void setOutputSchema(AbstractJoinPlanNode node) {
         Preconditions.checkNotNull(node, "Plan node is null");
-        RelDataType outerRowType = getInput(0).getRowType();
-        RelDataType innerRowType = getInput(1).getRowType();
-        final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(outerRowType, 0)
-                .join(RexConverter.convertToVoltDBNodeSchema(innerRowType, 1));
+        final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getInput(0).getRowType(), 0)
+                .join(RexConverter.convertToVoltDBNodeSchema(getInput(1).getRowType(), 1));
         node.setOutputSchemaPreInlineAgg(schema);
         node.setOutputSchema(schema);
         node.setHaveSignificantOutputSchema(true);
-        return node;
     }
 
     /**

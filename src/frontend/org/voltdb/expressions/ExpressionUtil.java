@@ -440,7 +440,7 @@ public final class ExpressionUtil {
      */
     public static List<AbstractExpression> uncombinePredicate(AbstractExpression expr) {
         if (expr == null) {
-            return Collections.emptyList();
+            return Lists.newArrayList();
         } else if (expr instanceof ConjunctionExpression) {
             ConjunctionExpression conj = (ConjunctionExpression)expr;
             if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {

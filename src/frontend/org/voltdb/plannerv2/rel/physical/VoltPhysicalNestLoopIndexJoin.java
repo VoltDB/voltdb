@@ -109,7 +109,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         nlipn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         // Set inner node table index to "1" prior to its conversion to AbstractPlanNode
         // The table index will be propagated to the inlined index scan's SkippNullPredicate.
-        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        assert getInput(1) instanceof VoltPhysicalTableIndexScan;
         ((VoltPhysicalTableIndexScan) getInput(1)).setTableIdx(1);
         final AbstractPlanNode innerNode = inputRelNodeToPlanNode(this, 1);
         assert(innerNode instanceof IndexScanPlanNode);
@@ -131,12 +131,11 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         addLimitOffset(nlipn);
         // Set output schema
         setOutputSchema(nlipn);
-
         return nlipn;
     }
 
     @Override
-    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+    protected void setOutputSchema(AbstractJoinPlanNode node) {
         Preconditions.checkNotNull(node, "Plan node is null");
         // An inner node has to be an index scan
         // Since it's going to be inlined and NLIJ executor will be iterating directly over
@@ -153,8 +152,6 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         node.setOutputSchemaPreInlineAgg(joinSchema);
         node.setOutputSchema(joinSchema);
         node.setHaveSignificantOutputSchema(true);
-
-        return node;
     }
 
     @Override

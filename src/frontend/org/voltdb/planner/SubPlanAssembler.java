@@ -317,7 +317,7 @@ public abstract class SubPlanAssembler {
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
-        scanNode.setSkipNullPredicateCalcite(tableIdx);
+        scanNode.setSkipNullPredicate(tableIdx);
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         IndexUseForOrderBy indexUse = scanNode.indexUse();
         indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
@@ -1990,7 +1990,7 @@ public abstract class SubPlanAssembler {
             // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
             // iteration after it had to initially settle for starting at "greater than a prefix key".
             scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
-            scanNode.setSkipNullPredicate();
+            scanNode.setSkipNullPredicate(0);
             scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
             final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
             indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);

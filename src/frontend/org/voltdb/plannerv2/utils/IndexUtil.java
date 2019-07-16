@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -87,7 +88,8 @@ public class IndexUtil {
      *
      * @return An index scan plan node
      */
-    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
+    public static AbstractPlanNode buildIndexAccessPlanForTable(
+            IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
         return SubPlanAssembler.buildIndexAccessPlanForTable(scanNode, path, tableIdx);
     }
 
@@ -98,13 +100,12 @@ public class IndexUtil {
      * @param index
      * @return Pair<List<AbstractExpression>, List<Integer>>
      */
-    public static List<RelFieldCollation> getIndexCollationFields(Table table, Index index, RexProgram program)
-            throws JSONException {
+    static List<RelFieldCollation> getIndexCollationFields(
+            Table table, Index index, RexProgram program) throws JSONException {
         final String json = index.getExpressionsjson();
         if (json.isEmpty()) {
-            return CatalogUtil.getSortedCatalogItems(index.getColumns(), "index")
-                    .stream().map(cr -> new RelFieldCollation(cr.getColumn().getIndex()))
-                    .collect(Collectors.toList());
+            return Lists.transform(CatalogUtil.getSortedCatalogItems(index.getColumns(), "index"),
+                    cr -> new RelFieldCollation(cr.getColumn().getIndex()));
         } else {
             final StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
             final List<Column> columns = CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");

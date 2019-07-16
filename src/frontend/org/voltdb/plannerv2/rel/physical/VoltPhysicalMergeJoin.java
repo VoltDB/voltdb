@@ -135,39 +135,37 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         // Inline LIMIT / OFFSET
         addLimitOffset(mjpn);
         // Set output schema
-        return setOutputSchema(mjpn);
+        setOutputSchema(mjpn);
+        return mjpn;
     }
 
     @Override
-    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+    protected void setOutputSchema(AbstractJoinPlanNode node) {
         Preconditions.checkNotNull(node, "Plan node is null");
         // An inner node has to be an index scan
-        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        assert getInput(1) instanceof VoltPhysicalTableIndexScan;
         // Since it's going to be inlined and MJ executor will be iterating directly over
         // its persistent table all the expression references must be resolved
         // in context of the persistent table
-        VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
-        RexProgram innerProgram = innerIndexScan.getProgram();
-        NodeSchema innerSchema = RexConverter.convertToVoltDBNodeSchema(innerProgram, 1);
+        final VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
+        final RexProgram innerProgram = innerIndexScan.getProgram();
+        final NodeSchema innerSchema = RexConverter.convertToVoltDBNodeSchema(innerProgram, 1);
 
         // Outer node
-        NodeSchema outerSchema;
+        final NodeSchema outerSchema;
         if (getInput(0) instanceof VoltPhysicalTableIndexScan) {
-            // If the outer node is an index scan all the refernces must be resolved
+            // If the outer node is an index scan, then all the references must be resolved
             // using the persistent table similar to the inner node
-            VoltPhysicalTableIndexScan outerIndexScan = (VoltPhysicalTableIndexScan) getInput(0);
-            RexProgram outerProgram = outerIndexScan.getProgram();
-            outerSchema = RexConverter.convertToVoltDBNodeSchema(outerProgram, 0);
+            outerSchema = RexConverter.convertToVoltDBNodeSchema(
+                    ((VoltPhysicalTableIndexScan) getInput(0)).getProgram(), 0);
         } else {
-            RelDataType outerRowType = getInput(0).getRowType();
-            outerSchema = RexConverter.convertToVoltDBNodeSchema(outerRowType, 0);
+            outerSchema = RexConverter.convertToVoltDBNodeSchema(
+                    getInput(0).getRowType(), 0);
         }
         final NodeSchema schema = outerSchema.join(innerSchema);
         node.setOutputSchemaPreInlineAgg(schema);
         node.setOutputSchema(schema);
         node.setHaveSignificantOutputSchema(true);
-
-        return node;
     }
 
 }

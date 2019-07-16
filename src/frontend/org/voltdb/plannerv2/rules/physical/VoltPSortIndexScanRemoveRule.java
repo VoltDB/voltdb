@@ -37,13 +37,13 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
     public static final VoltPSortIndexScanRemoveRule INSTANCE_SORT_INDEXSCAN =
             new VoltPSortIndexScanRemoveRule(operand(VoltPhysicalSort.class,
                     operand(VoltPhysicalTableIndexScan.class, none())),
-                    "VoltDBPSortIndexScanRemoveRule_1");
+                    "VoltDBPSortIndexScanRemoveRule_SortIscan");
 
     public static final VoltPSortIndexScanRemoveRule INSTANCE_SORT_CALC_INDEXSCAN =
             new VoltPSortIndexScanRemoveRule(operand(VoltPhysicalSort.class,
                     operand(VoltPhysicalCalc.class,
                             operand(VoltPhysicalTableIndexScan.class, none()))),
-                    "VoltDBPSortIndexScanRemoveRule_2");
+                    "VoltDBPSortIndexScanRemoveRule_SortCalcIscan");
 
     private VoltPSortIndexScanRemoveRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);
@@ -70,7 +70,8 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
                 return;
             }
             scan = call.rel(2);
-            calcScanProgram = VoltRexUtil.mergeProgram(scan.getProgram(), calc.getProgram(), scan.getCluster().getRexBuilder());
+            calcScanProgram = VoltRexUtil.mergeProgram(scan.getProgram(),
+                    calc.getProgram(), scan.getCluster().getRexBuilder());
         }
 
         final RelCollation indexCollation = scan.getIndexCollation();

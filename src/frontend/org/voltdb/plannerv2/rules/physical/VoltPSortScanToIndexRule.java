@@ -87,7 +87,8 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
                 return;
             }
             scan = call.rel(2);
-            calcScanProgram = VoltRexUtil.mergeProgram(scan.getProgram(), calc.getProgram(), scan.getCluster().getRexBuilder());
+            calcScanProgram = VoltRexUtil.mergeProgram(scan.getProgram(),
+                    calc.getProgram(), scan.getCluster().getRexBuilder());
         }
         final Table catTable = scan.getVoltTable().getCatalogTable();
 
@@ -102,12 +103,12 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
                 RelCollation indexCollation = null;
                 try {
                     indexCollation = VoltRexUtil.createIndexCollation(index, catTable, builder, program);
-                } catch (JSONException e) { }
+                } catch (JSONException ignored) { }
                 Preconditions.checkNotNull(indexCollation);
                 final SortDirectionType sortDirection = VoltRexUtil.areCollationsCompatible(
                         scanSortCollation, indexCollation, calcScanProgram);
                 //@TODO Cutting corner here. Should probably use something similar to
-                // the SubPlanAssembler.WindowFunctionScoreboard
+                // {@code org.voltdb.planner.WindowFunctionScoreboard}
                 if (SortDirectionType.INVALID != sortDirection) {
                     final AccessPath accessPath = new AccessPath(
                             index,

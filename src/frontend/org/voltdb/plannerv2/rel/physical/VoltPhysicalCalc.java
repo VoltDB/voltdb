@@ -104,10 +104,9 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
             throw new CalcitePlanningException(
                     "VoltDBCalc(with Condition).toPlanNode is not implemented.");
         }
-        AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
-        NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(program, 0);
-        ProjectionPlanNode ppn = new ProjectionPlanNode(schema);
-        ppn.addAndLinkChild(child);
+        final ProjectionPlanNode ppn = new ProjectionPlanNode(
+                RexConverter.convertToVoltDBNodeSchema(program, 0));
+        ppn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         return ppn;
     }
 }
