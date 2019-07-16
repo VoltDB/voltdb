@@ -113,24 +113,44 @@ public class VoltSqlFunctions {
                         true,
                         new Class[] {long.class, long.class},
                         FunctionCustom.FUNC_BITXOR))
+                    .put("array_element", new FunctionDescriptor(
+                        JsonFunctions.class,
+                        false,
+                        new Class[] {String.class, int.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_ELEMENT))
+                    .put("array_length", new FunctionDescriptor(
+                        JsonFunctions.class,
+                        false,
+                        new Class[] {String.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_LENGTH))
+                    .put("field", new FunctionDescriptor(
+                        JsonFunctions.class,
+                        false,
+                        new Class[] {String.class, String.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_FIELD))
+                    .put("set_field", new FunctionDescriptor(
+                        JsonFunctions.class,
+                        false,
+                        new Class[] {String.class, String.class, String.class},
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SET_FIELD))
                     .put("inet6_aton", new FunctionDescriptor(
                         InternetFunctions.class,
-                        true,
+                        false,
                         new Class[] {String.class},
                         FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_ATON))
                     .put("inet6_ntoa", new FunctionDescriptor(
                         InternetFunctions.class,
-                        true,
+                        false,
                         new Class[] {byte[].class},
                         FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_NTOA))
                     .put("inet_aton", new FunctionDescriptor(
                         InternetFunctions.class,
-                        true,
+                        false,
                         new Class[] {String.class},
                         FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
                     .put("inet_ntoa", new FunctionDescriptor(
                         InternetFunctions.class,
-                        true,
+                        false,
                         new Class[] {long.class},
                         FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
                     .put("hex", new FunctionDescriptor(
@@ -212,6 +232,25 @@ public class VoltSqlFunctions {
 
         public static String inet_ntoa(long ip) {
             return null;
+        }
+    }
+
+    // JSON functions
+    public static class JsonFunctions {
+        public static String array_element(String array, int position) {
+            return "";
+        }
+
+        public static int array_length(String array) {
+            return 0;
+        }
+
+        public static String field(String jsonString, String fieldName) {
+            return "";
+        }
+
+        public static String set_field(String colName, String fieldName, String fieldValue) {
+            return "";
         }
     }
 
