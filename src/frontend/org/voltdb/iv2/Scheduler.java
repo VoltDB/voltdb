@@ -24,6 +24,7 @@ import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -33,6 +34,7 @@ import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.messaging.DumpMessage;
@@ -238,6 +240,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         }
     }
 
+    protected static void printActionBlockers(StringBuilder builder) {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        VoltZK.printZKDir(zk, VoltZK.actionBlockers, builder);
+        VoltZK.printZKDir(zk, VoltZK.actionLock, builder);
+    }
     protected static void dumpStackTraceOnFirstSiteThread(DumpMessage message, StringBuilder threadDumps) {
         synchronized(s_threadDumpLock) {
             if (message.getTxnId() > s_txnIdForSiteThreadDump) {
@@ -249,5 +256,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
         threadDumps.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
         generateSiteThreadDump(threadDumps);
         threadDumps.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+        threadDumps.append("\nACTION BLOCKERS ON ZK:\n");
+        printActionBlockers(threadDumps);
+        threadDumps.append("\nEND OF ACTION BLOCKERS ON ZK");
     }
 }
