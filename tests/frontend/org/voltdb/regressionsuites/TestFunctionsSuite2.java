@@ -972,8 +972,6 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
-        cr = client.callProcedure("@AdHoc",
-                "select count(*) from P1 where SUBSTRING(DESC FROM 2 FOR 1) >= '2'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
@@ -3557,7 +3555,6 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                         "EXTRACT(DAY_OF_WEEK, PAST), EXTRACT(DAY_OF_MONTH, PAST), EXTRACT(DAY_OF_YEAR, PAST), EXTRACT(QUARTER, PAST), " +
                         "EXTRACT(HOUR, PAST), EXTRACT(MINUTE, PAST), EXTRACT(SECOND, PAST), EXTRACT(WEEK_OF_YEAR, PAST), " +
                         "EXTRACT(WEEK, PAST), EXTRACT(WEEKDAY, PAST) from P1 where ID = ?");
-
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
                 "select PAST, CAST(DESC AS TIMESTAMP), DESC, CAST(PAST AS VARCHAR) from R2 " +
