@@ -1216,8 +1216,8 @@ public abstract class AbstractParsedStmt {
 
     private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("optype");
-        String user_aggregate_id = exprNode.attributes.get("user_aggregate_id");
-        String function_name = exprNode.attributes.get("name");
+        String userAggregateId = exprNode.attributes.get("user_aggregate_id");
+        String functionName = exprNode.attributes.get("name");
         ExpressionType exprType = ExpressionType.get(type);
 
         if (exprType == ExpressionType.INVALID) {
@@ -1242,7 +1242,7 @@ public abstract class AbstractParsedStmt {
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
 
-        AggregateExpression expr = new AggregateExpression(exprType, user_aggregate_id, function_name);
+        AggregateExpression expr = new AggregateExpression(exprType, userAggregateId, functionName);
         expr.setLeft(childExpr);
 
         String node;

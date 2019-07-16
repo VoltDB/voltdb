@@ -49,8 +49,8 @@ public class ExpressionAggregate extends Expression {
 
     boolean isDistinctAggregate;
     // if it's a user-defined aggregate function, we will give it an id and a name
-    private int user_aggregate_id;
-    private String name;
+    private int m_userAggregateId;
+    private String m_name;
 
 
     ExpressionAggregate(int type, boolean distinct, Expression e) {
@@ -68,8 +68,8 @@ public class ExpressionAggregate extends Expression {
 
         isDistinctAggregate = e.isDistinctAggregate;
         nodes               = e.nodes;
-        user_aggregate_id   = e.user_aggregate_id;
-        name				= e.name;
+        m_userAggregateId   = e.m_userAggregateId;
+        m_name				= e.m_name;
     }
 
     ExpressionAggregate(int type, boolean distinct, Expression e, int id, String n) {
@@ -79,8 +79,8 @@ public class ExpressionAggregate extends Expression {
         nodes               = new Expression[UNARY];
         isDistinctAggregate = distinct;
         nodes[LEFT]         = e;
-        user_aggregate_id   = id;
-        name                = n;
+        m_userAggregateId   = id;
+        m_name                = n;
     }
 
     @Override
@@ -262,7 +262,7 @@ public class ExpressionAggregate extends Expression {
         }
 
         if (opType == OpTypes.USER_DEFINED_AGGREGATE_COORD) {
-            dataType = FunctionDescriptor.fn_by_name(name).getDataType();
+            dataType = FunctionDescriptor.fn_by_name(m_name).getDataType();
         } else {
             dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
         }
@@ -270,7 +270,7 @@ public class ExpressionAggregate extends Expression {
 
     @Override
     public int hashCode() {
-        return (super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate)) * 1048573 + user_aggregate_id;
+        return (super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate)) * 1048573 + m_userAggregateId;
     }
 
     @Override
@@ -329,10 +329,10 @@ public class ExpressionAggregate extends Expression {
     }
 
     public int getUserAggregateId() {
-        return user_aggregate_id;
+        return m_userAggregateId;
     }
 
     public String getName() {
-        return name;
+        return m_name;
     }
 }
