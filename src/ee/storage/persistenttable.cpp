@@ -2094,7 +2094,7 @@ bool PersistentTable::doForcedCompaction() {
         snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
                 "and compacted to the point that the compaction predicate was "
                 "satisfied after %d failed attempts", failedCompactionCountBefore);
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
+        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
         m_failedCompactionCount = 0;
     }
 
