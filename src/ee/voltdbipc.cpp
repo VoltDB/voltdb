@@ -209,6 +209,8 @@ private:
 
     void sendPerFragmentStatsBuffer();
 
+    int callJavaUserDefinedHelper(int kErrorCode);
+
     int callJavaUserDefinedFunction();
 
     int callJavaUserDefinedAggregateStart(int functionId);
@@ -946,9 +948,9 @@ void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::strin
     }
 }
 
-int VoltDBIPC::callJavaUserDefinedFunction() {
+int VoltDBIPC::callJavaUserDefinedHelper(int kErrorCode) {
     // Send a special status code indicating that a UDF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedFunction);
+    int8_t statusCode = static_cast<int8_t>(kErrorCode);
     writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
 
     // Get the UDF buffer size.
@@ -977,171 +979,30 @@ int VoltDBIPC::callJavaUserDefinedFunction() {
     bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
     checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
     return retval;
+}
+
+int VoltDBIPC::callJavaUserDefinedFunction() {
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedFunction);
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateStart(int functionId) {
-    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateStart);
-    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
-
-    // Get the UDF buffer size.
-    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
-    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
-    // Send the whole UDF buffer to the wire.
-    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
-    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
-
-    // Wait for the UDF result.
-
-    int32_t retval, udfBufferSizeToRecv;
-    // read buffer length
-    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
-    // The buffer size should exclude the size of the buffer size value
-    // and the returning status code value (2 * sizeof(int32_t)).
-    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
-
-    // read return value, 0 means success, failure otherwise.
-    bytes = read(m_fd, &retval, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
-    retval = ntohl(retval);
-
-    // read buffer content, includes the return value of the UDF.
-    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
-    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
-    return retval;
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateStart);
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateAssemble() {
-    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateAssemble);
-    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
-
-    // Get the UDF buffer size.
-    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
-    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
-    // Send the whole UDF buffer to the wire.
-    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
-    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
-
-    // Wait for the UDF result.
-
-    int32_t retval, udfBufferSizeToRecv;
-    // read buffer length
-    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
-    // The buffer size should exclude the size of the buffer size value
-    // and the returning status code value (2 * sizeof(int32_t)).
-    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
-
-    // read return value, 0 means success, failure otherwise.
-    bytes = read(m_fd, &retval, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
-    retval = ntohl(retval);
-
-    // read buffer content, includes the return value of the UDF.
-    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
-    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
-    return retval;
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateAssemble);
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateCombine() {
-    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateCombine);
-    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
-
-    // Get the UDF buffer size.
-    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
-    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
-    // Send the whole UDF buffer to the wire.
-    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
-    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
-
-    // Wait for the UDF result.
-
-    int32_t retval, udfBufferSizeToRecv;
-    // read buffer length
-    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
-    // The buffer size should exclude the size of the buffer size value
-    // and the returning status code value (2 * sizeof(int32_t)).
-    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
-
-    // read return value, 0 means success, failure otherwise.
-    bytes = read(m_fd, &retval, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
-    retval = ntohl(retval);
-
-    // read buffer content, includes the return value of the UDF.
-    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
-    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
-    return retval;
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateCombine);
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateWorkerEnd() {
-    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateWorkerEnd);
-    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
-
-    // Get the UDF buffer size.
-    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
-    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
-    // Send the whole UDF buffer to the wire.
-    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
-    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
-
-    // Wait for the UDF result.
-
-    int32_t retval, udfBufferSizeToRecv;
-    // read buffer length
-    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
-    // The buffer size should exclude the size of the buffer size value
-    // and the returning status code value (2 * sizeof(int32_t)).
-    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
-
-    // read return value, 0 means success, failure otherwise.
-    bytes = read(m_fd, &retval, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
-    retval = ntohl(retval);
-
-    // read buffer content, includes the return value of the UDF.
-    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
-    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
-    return retval;
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateWorkerEnd);
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateCoordinatorEnd() {
-    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd);
-    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
-
-    // Get the UDF buffer size.
-    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
-    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
-    // Send the whole UDF buffer to the wire.
-    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
-    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
-
-    // Wait for the UDF result.
-
-    int32_t retval, udfBufferSizeToRecv;
-    // read buffer length
-    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
-    // The buffer size should exclude the size of the buffer size value
-    // and the returning status code value (2 * sizeof(int32_t)).
-    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
-
-    // read return value, 0 means success, failure otherwise.
-    bytes = read(m_fd, &retval, sizeof(int32_t));
-    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
-    retval = ntohl(retval);
-
-    // read buffer content, includes the return value of the UDF.
-    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
-    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
-    return retval;
+    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd);
 }
 
 void VoltDBIPC::sendException(int8_t errorCode) {
