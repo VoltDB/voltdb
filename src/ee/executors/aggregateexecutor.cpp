@@ -490,8 +490,8 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, bool is_worker, ExpressionType agg_type_in, int udafIndex_in)
-        : functionId(id), isWorker(is_worker), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndex_in)
+    UserDefineAgg(int id, bool isWorkerIn, ExpressionType aggTypeIn, int udafIndexIn)
+        : functionId(id), isWorker(isWorkerIn), aggType(aggTypeIn), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndexIn)
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
@@ -512,7 +512,7 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
         if (isWorker) {
-            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type, udafIndex);
+            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, aggType, udafIndex);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
@@ -529,7 +529,7 @@ private:
     int functionId;
     // worker or coordinator
     bool isWorker;
-    ExpressionType agg_type;
+    ExpressionType aggType;
     VoltDBEngine* engine;
     int udafIndex;
 };
@@ -538,9 +538,9 @@ private:
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, bool is_worker, int udafIndex)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct, int aggId, bool isWorker, int udafIndex)
 {
-    switch (agg_type) {
+    switch (aggType) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
         return new (memoryPool) CountStarAgg();
     case EXPRESSION_TYPE_AGGREGATE_MIN:
@@ -570,11 +570,11 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_COORD:
     case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER:
-        return new (memoryPool) UserDefineAgg(agg_id, is_worker, agg_type, udafIndex);
+        return new (memoryPool) UserDefineAgg(aggId, isWorker, aggType, udafIndex);
     default:
         {
             char message[128];
-            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
+            snprintf(message, sizeof(message), "Unknown aggregate type %d", aggType);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
