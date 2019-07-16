@@ -26,24 +26,19 @@ public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
     private boolean m_distinct = false;
-    protected String user_aggregate_id;
-    protected String name;
+    protected final String m_userAggregateId;
+    protected final String m_name;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
+        m_userAggregateId = "-1";
+        m_name = "notUDAF";
     }
 
     public AggregateExpression(ExpressionType type, String id, String n) {
         super(type);
-        user_aggregate_id = id;
-        name = n;
-    }
-
-    public AggregateExpression() {
-        //
-        // This is needed for serialization
-        //
-        super();
+        m_userAggregateId = id;
+        m_name = n;
     }
 
     public void setDistinct() { m_distinct = true; }
@@ -53,14 +48,7 @@ public class AggregateExpression extends AbstractExpression {
      * @return user aggregate id
      */
     public String getUserAggregateId() {
-        return user_aggregate_id;
-    }
-
-    /**
-     * @param user aggregate id
-     */
-    public void setUserAggregateId(String id) {
-        user_aggregate_id = id;
+        return m_userAggregateId;
     }
 
     @Override
@@ -170,14 +158,14 @@ public class AggregateExpression extends AbstractExpression {
     }
 
     public boolean isUserDefined() {
-        if (user_aggregate_id != null) {
-            return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(user_aggregate_id));
+        if (m_userAggregateId != null) {
+            return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(m_userAggregateId));
         } else {
             return false;
         }
     }
 
     public String getFunctionName() {
-        return name;
+        return m_name;
     }
 }

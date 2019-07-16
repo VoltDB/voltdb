@@ -103,6 +103,9 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
                 int id = aggregateColumnValue.valueForKey("USER_AGGREGATE_ID").asInt();
                 m_aggregateIds.push_back(id);
             }
+            else {
+                m_aggregateIds.push_back(-1);
+            }
             if (aggregateColumnValue.hasNonNullKey("WORKER_OR_COORDINATOR")) {
                 string worc = aggregateColumnValue.valueForKey("WORKER_OR_COORDINATOR").asStr();
                 m_workerOrCoordinator.push_back(worc == "WORKER");
