@@ -1166,7 +1166,7 @@ public class VoltDB {
         }
         String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
         try {
-            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
+            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + "-log.txt");
             writer.println(message);
             printStackTraces(writer);
             writer.flush();
