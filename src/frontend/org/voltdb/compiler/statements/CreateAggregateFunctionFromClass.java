@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler.statements;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.regex.Matcher;
@@ -80,6 +81,11 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         "Cannot load class for user-defined aggregate function: %s",
                         className), cause);
             }
+        }
+
+        if (!Serializable.class.isAssignableFrom(funcClass)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Cannot define a aggregate function without implementing Serializable in the class declaration"));
         }
 
         if (Modifier.isAbstract(funcClass.getModifiers())) {
