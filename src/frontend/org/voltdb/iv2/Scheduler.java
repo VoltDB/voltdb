@@ -244,6 +244,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         VoltZK.printZKDir(zk, VoltZK.actionBlockers, builder);
         VoltZK.printZKDir(zk, VoltZK.actionLock, builder);
+        VoltZK.printZKDir(zk, VoltZK.leaders_initiators, builder);
     }
     protected static void dumpStackTraceOnFirstSiteThread(DumpMessage message, StringBuilder threadDumps) {
         synchronized(s_threadDumpLock) {
@@ -256,8 +257,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
         threadDumps.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
         generateSiteThreadDump(threadDumps);
         threadDumps.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
-        threadDumps.append("\nACTION BLOCKERS ON ZK:\n");
+        threadDumps.append("\nCONTENTS ON ZK:\n");
         printActionBlockers(threadDumps);
-        threadDumps.append("\nEND OF ACTION BLOCKERS ON ZK");
+        threadDumps.append("\nEND OF CONTENTS ON ZK");
     }
 }
