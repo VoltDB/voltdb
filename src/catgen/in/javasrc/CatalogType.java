@@ -243,7 +243,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return getCatalogPath().compareTo(o.getCatalogPath());
     }
 
-    abstract void copyFields(CatalogType obj);
+    abstract public void copyFields(CatalogType obj);
 
     CatalogType deepCopy(Catalog catalog, CatalogMap<? extends CatalogType> parentMap) {
 

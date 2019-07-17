@@ -616,20 +616,4 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             } catch (Exception e) { }
         }
     }
-
-    private void createSchema(VoltDB.Configuration config,
-                              String ddl,
-                              final int sitesPerHost,
-                              final int hostCount,
-                              final int replication) throws Exception
-    {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(ddl);
-        builder.setUseDDLSchema(true);
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        boolean success = builder.compile(config.m_pathToCatalog, sitesPerHost, hostCount, replication);
-        assertTrue("Schema compilation failed", success);
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-        MiscUtils.copyFile(builder.getPathToDeployment(), config.m_pathToDeployment);
-    }
 }

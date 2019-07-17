@@ -25,6 +25,7 @@ package org.voltdb.planner;
 
 import java.util.List;
 
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public class TestPlansMatView extends PlannerTestCase {

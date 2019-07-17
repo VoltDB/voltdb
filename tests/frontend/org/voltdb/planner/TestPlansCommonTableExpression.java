@@ -56,6 +56,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannodes.PlanNodeList;
 import org.w3c.dom.Document;
 
@@ -241,7 +242,8 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R"
                 + ") "
                 + "SELECT * FROM P_EMPLOYEES, RT";
-            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+
+            compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
             fail("Expected failure with partitioned common tables, MP query.");
         } catch (PlanningErrorException ex) {
             assertTrue(ex.getMessage().contains(NPErrorMessage));
