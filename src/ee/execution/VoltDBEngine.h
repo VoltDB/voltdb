@@ -636,7 +636,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // user defined aggregate functions helper functions
         void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
         void checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, int32_t functionId);
-        void checkJavaFunctionReturnCode(int32_t returnCode, std::string name);
+        void checkJavaFunctionReturnCode(int32_t returnCode, const char* name);
         NValue udfResultHelper(int32_t returnCode, bool partition_table, ValueType type);
 
         // -------------------------------------------------

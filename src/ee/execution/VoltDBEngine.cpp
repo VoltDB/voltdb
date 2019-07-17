@@ -689,7 +689,17 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex) {
+// Four parameters for this function:
+// * functionId is the id of the user-defined aggregate function
+// * argument is a value in the table for the specified column (assemble method), or it can be the byte array
+// that represents the output from a worker (combine method), or it can be NULL value (end method)
+// * type is similar to argument. It can be the type for the specified column (assemble method), or it can be
+// varbinary (combine method), or invalid (end method)
+// * udafIndex represents the index for the same user-defined aggregate function in a query.
+// For example, for "SELECT udf(b), avg(c), udf(a) FROM t", udf(b) has an udafIndex of 1,
+// udf(a) has an udafIndex of 1
+void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument,
+                                                ValueType type, int32_t udafIndex) {
     // Estimate the size of the buffer we need. We will put:
     //   * size of the buffer (function ID + parameters)
     //   * function ID (int32_t)
@@ -706,8 +716,6 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
 
     // Check buffer size here.
     // Adjust the buffer size when needed.
-    // Note that bufferSizeNeeded does not include its own size.
-    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
     if (bufferSizeNeeded > m_udfBufferCapacity) {
         m_topend->resizeUDFBuffer(bufferSizeNeeded);
     }
@@ -733,10 +741,12 @@ void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, i
     }
 }
 
-void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, std::string name) {
+void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
     if (returnCode != 0) {
+        char buf[128];
+        sprintf(buf, "%s failed", name);
         throw SQLException(SQLException::volt_user_defined_function_error,
-            name + " failed");
+            buf);
     }
 }
 
