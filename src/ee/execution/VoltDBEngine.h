@@ -634,9 +634,23 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                int64_t timestamp);
 
         // user defined aggregate functions helper functions
+        /*
+         * put buffer size needed, function id, udaf index, and parameters (if there is any) 
+         * into the buffers, so that the java side would receive them
+         */
         void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
+        /*
+         * if the info related to this functionId is not found, throw an exception
+         */
         void checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, int32_t functionId);
+        /*
+         * if the return code from java is not 0 (something went wrong), throw an exception
+         */
         void checkJavaFunctionReturnCode(int32_t returnCode, const char* name);
+        /*
+         * convert the return value from java side to its correct type. If something went wrong
+         * for the conversion, throw an exception.
+         */
         NValue udfResultHelper(int32_t returnCode, bool partition_table, ValueType type);
 
         // -------------------------------------------------
