@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -75,7 +75,7 @@ CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGE
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
+CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -102,7 +102,7 @@ CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO T
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid export to target default
+CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid export to target file_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -185,12 +185,12 @@ CREATE TABLE export_mirror_partitioned_table2
 );
 PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
+CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -240,7 +240,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
+CREATE STREAM  export_replicated_table EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -267,7 +267,7 @@ CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_replicated_table_foo EXPORT TO TARGET foo
+CREATE STREAM export_replicated_table_foo EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -295,19 +295,19 @@ CREATE STREAM export_replicated_table_foo EXPORT TO TARGET foo
 );
 
 
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
+CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid export to target default
+CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid export to target file_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -334,7 +334,7 @@ CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_tabl
 -- CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportDoneTable;
 
 -- Export Stream with extra Geo columns
-CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -400,7 +400,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 );
 PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
