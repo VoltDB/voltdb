@@ -73,6 +73,11 @@ public class DRLogSegmentId implements Serializable {
         return makeDRIdFromComponents(clusterId, 0L) - 1L;
     }
 
+    public static boolean isMaxDrIdForCluster(long drId, byte clusterId) {
+        return (clusterId == getClusterIdFromDRId(drId) &&
+                MAX_SEQUENCE_NUMBER == getSequenceNumberFromDRId(drId));
+    }
+
     /*
      * Empty DR Id is used as a sentinel
      * 1) in EndOfSnapshotBuffer to indicate the partition doesn't have any snapshot buffer,
