@@ -456,6 +456,8 @@ public class FunctionForVoltDB extends FunctionSQL {
          * This is the lookup table for user defined SQL functions.
          */
         private static Map<String, FunctionDescriptor> m_defined_functions = new HashMap<>();
+        private static Map<Integer, FunctionDescriptor> m_defined_functions_by_id = new HashMap<>();
+        private static Map<String, Integer> m_names_to_ids = new HashMap<>();
         /**
          * This is a saved set of user defined SQL functions.
          * <ol>
@@ -498,12 +500,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         public static Type getReturnType(int functionId) {
-            for (FunctionDescriptor func : FunctionDescriptor.m_defined_functions.values()) {
-                if (func.getId() == functionId) {
-                    return func.getDataType();
-                }
-            }
-            return null;
+            return m_defined_functions_by_id.get(functionId).getDataType();
         }
 
 
@@ -511,12 +508,17 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_typeParameter;
         }
 
-        public static void addDefinedFunction(String functionName, FunctionDescriptor oldFd) {
-            FunctionDescriptor.m_defined_functions.put(functionName, oldFd);
+        public static void addDefinedFunction(String functionName, int functionId, FunctionDescriptor oldFd) {
+            m_defined_functions.put(functionName, oldFd);
+            m_defined_functions_by_id.put(functionId, oldFd);
+            m_names_to_ids.put(functionName, functionId);
         }
 
         public static void removeOneDefinedFunction(String functionName) {
-            FunctionDescriptor.m_defined_functions.remove(functionName);
+            m_defined_functions.remove(functionName);
+            Integer functionId = m_names_to_ids.get(functionName);
+            m_names_to_ids.remove(functionName);
+            m_defined_functions_by_id.remove(functionId);
         }
 
         public static void clearSavedFunctions() {
@@ -1058,7 +1060,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         FunctionDescriptor oldFd = findFunction(functionName, hsqlReturnType, hsqlParameterTypes);
         if (oldFd != null) {
             // This may replace functionName with itself. This will not be an error.
-            FunctionDescriptor.addDefinedFunction(functionName, oldFd);
+            FunctionDescriptor.addDefinedFunction(functionName, functionId, oldFd);
             retFunctionId = oldFd.getId();
             // If we were given a non-negative function id, it
             // was defined in the catalog.  Our re-verification here
@@ -1080,7 +1082,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                                                             hsqlReturnType, hsqlParameterTypes, isAggregate);
             // if the function id belongs to UDF, put it into the defined_function map
             if (isUserDefinedFunctionId(retFunctionId)) {
-                FunctionDescriptor.addDefinedFunction(functionName, fd);
+                FunctionDescriptor.addDefinedFunction(functionName, functionId, fd);
             }
             m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
                                         functionName, retFunctionId, voltParameterTypes.length));
