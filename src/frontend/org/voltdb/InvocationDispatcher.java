@@ -65,6 +65,8 @@ import org.voltdb.common.Permission;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
@@ -875,27 +877,30 @@ public final class InvocationDispatcher {
      * @param txnId
      * @param partitionId
      */
-    public final void sendSentinel(long txnId, int partitionId) {
+    public final void sendSentinel(long uniqueId, int partitionId, long txnId) {
         final Long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
         if (initiatorHSId == null) {
             log.error("InvocationDispatcher.sendSentinel: Master does not exist for partition: " + partitionId);
         } else {
-            sendSentinel(txnId, initiatorHSId, -1, -1, true);
+            sendSentinel(uniqueId, initiatorHSId, -1, -1, true, txnId);
         }
     }
 
-    private final void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
-                              long connectionId, boolean forReplay) {
+    private final void sendSentinel(long uniqueId, long initiatorHSId, long ciHandle,
+                              long connectionId, boolean forReplay, long txnId) {
         //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
                         m_siteId,
                         initiatorHSId,
-                        txnId,
+                        uniqueId,
                         ciHandle,
                         connectionId,
                         false,  // isReadOnly
                         forReplay);  // isForReplay
+        hostLog.info("sendSentinel in replay: uniqueId " + uniqueId + "(" + UniqueIdGenerator.toShortString(uniqueId) +
+                ") txnId " + txnId + "(" + TxnEgo.txnIdToString(txnId) +
+                ") to " + CoreUtils.hsIdToString(initiatorHSId) + " ciHandle " + ciHandle);
         m_mailbox.send(initiatorHSId, mppm);
     }
 

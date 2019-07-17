@@ -95,8 +95,8 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
-    public void sendSentinel(long uniqueId, int partitionId) {
-        m_ci.sendSentinel(uniqueId, partitionId);
+    public void sendSentinel(long uniqueId, int partitionId, long txnId) {
+        m_ci.sendSentinel(uniqueId, partitionId, txnId);
     }
 
     @Override
