@@ -23,6 +23,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
+import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -56,14 +57,25 @@ public class VoltSchemaPlus {
         });
 
         // add Volt extend SQL functions to the SchemaPlus
-        for (Map.Entry<String, VoltSqlFunctions.FunctionDescriptor> function :
+        for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :
                 VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
-            schema.add(function.getKey().toUpperCase(),
-                    ScalarFunctionImpl.create(function.getValue().getImplementor(),
-                                              function.getKey(),
-                                              function.getValue().isExactArgumentTypes(),
-                                              function.getValue().getFunctionId(),
-                                              function.getValue().getArgumentTypes()));
+            switch(function.getValue().getType()){
+                case SCALAR:
+                    ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
+                    schema.add(scalarFunction.getImplementor().toUpperCase(),
+                            ScalarFunctionImpl.create(
+                                    function.getKey(),
+                                    scalarFunction.getImplementor(),
+                                    scalarFunction.isExactArgumentTypes(),
+                                    scalarFunction.getFunctionId(),
+                                    scalarFunction.getArgumentTypes()));
+                    break;
+                case AGGREGATE:
+                    // TODO
+                    break;
+                default:
+                    break;
+            }
         }
 
         return schema;

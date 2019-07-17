@@ -327,20 +327,12 @@ public class RexConverter {
                         functionId = ((ReflectiveFunctionBase) udf).getFunctionId();
                     }
                 }
-                if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
-                    ae = RexConverterHelper.createFunctionExpression(
-                            call.getType(),
-                            call.op.getName().toLowerCase(),
-                            aeOperands,
-                            null);
-                } else {
-                    ae = RexConverterHelper.createFunctionExpression(
-                            call.getType(),
-                            call.op.getName().toLowerCase(),
-                            functionId,
-                            aeOperands,
-                            null);
-                }
+                ae = RexConverterHelper.createFunctionExpression(
+                    call.getType(),
+                    call.op.getName().toLowerCase(),
+                    functionId,
+                    aeOperands,
+                    null);
                 RexConverter.setType(ae, call.getType());
                 break;
             default:
