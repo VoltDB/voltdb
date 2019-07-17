@@ -89,6 +89,7 @@ private:
      * if this is NULL, VoltDBEngine will fail to call sendDependency().
     */
     jobject m_javaExecutionEngine;
+    jclass m_jniClass;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
     jmethodID m_traceLogMID;
@@ -114,7 +115,7 @@ private:
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
-    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &methodId, const char* name);
+    jmethodID initJavaUserDefinedMethod(const char* name);
 };
 
 }
