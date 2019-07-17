@@ -30,6 +30,12 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar;
 } 2> /dev/null | paste -sd ':' - )
 
+CLASSPATH=/home/opt/rabbitmq/rabbitmq.jar:/home/test/jdbc/vertica-jdbc.jar:/home/test/jdbc/postgresql-9.4.1207.jar:$CLASSPATH
+echo CLASSPATH $CLASSPATH
+echo VOLTDB_BASE $VOLTDB_BASE
+echo VOLTDB_LIB "$VOLTDB_BASE/lib"
+echo VOLTDB_VOLTDB $VOLTDB_VOLTDB
+
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}

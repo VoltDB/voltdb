@@ -24,22 +24,24 @@ package genqa.procedures;
 
 import java.util.Random;
 
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class JiggleExportMultiPartition extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt("INSERT INTO export_replicated_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO export_replicated_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)");
 
     public long run(long rowid, long ignore)
     {
-
-        long txid = getUniqueId();
+        @SuppressWarnings("deprecation")
+        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = getSeededRandomNumberGenerator();
+        Random rand = new Random(txid);
+
 
         // Insert a new record
-        SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
+        SampleRecord record = new SampleRecord(rowid, rand);
         voltQueueSQL(
                       insert
                     , txid
@@ -54,7 +56,7 @@ public class JiggleExportMultiPartition extends VoltProcedure {
                     , record.type_null_bigint
                     , record.type_not_null_bigint
                     , record.type_null_timestamp
-                    , record.type_not_null_timestamp
+                    // , record.type_not_null_timestamp
                     , record.type_null_float
                     , record.type_not_null_float
                     , record.type_null_decimal

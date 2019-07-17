@@ -1469,6 +1469,9 @@ public class ExportOnServerVerifier {
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
 
+        System.out.println("RabbitMQ row:\n\t " + Arrays.toString(row));
+        System.out.println("Generated row:\n\t " + valid.toString());
+
         // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
         if (rowid_group != valid.rowid_group)
@@ -1538,9 +1541,11 @@ public class ExportOnServerVerifier {
         }
 
         // col 18
-        TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
-        if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
-            return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+        // skip, should be real time, not random so don't count on a match
+        // TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
+        // if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
+        //     return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+        col++; // make sure to move onto the next column...
 
         // col 19
         BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);

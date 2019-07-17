@@ -35,7 +35,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.time.LocalTime;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -43,7 +42,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.iv2.TxnEgo;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * This verifier connects to kafka and consumes messsages from a topic, it then
@@ -61,8 +59,6 @@ import org.voltcore.logging.VoltLogger;
  *
  */
 public class KafkaClientVerifier {
-
-    static VoltLogger log = new VoltLogger("KafkaClientVerifier");
 
     public static long VALIDATION_REPORT_INTERVAL = 1000;
     private final int consumerTimeoutSecs;
@@ -109,7 +105,7 @@ public class KafkaClientVerifier {
         Integer consumers = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
-        Integer timeout = 300;
+        Integer timeout = 30;
 
         @Override
         public void validate() {
@@ -154,7 +150,7 @@ public class KafkaClientVerifier {
 
         @Override
         public void run() {
-            log.info("Consumer waiting count: " + m_cdl.getCount());
+            System.out.println("Consumer waiting count: " + m_cdl.getCount());
             int retries = timeoutSec;
             long recordCnt = 0;
             while (true) {
@@ -162,7 +158,7 @@ public class KafkaClientVerifier {
                 consumedRows.addAndGet(records.count());
                 recordCnt = +records.count();
                 if (records.count() == 0) {
-                    // if we don't get any records for "timeout" seconds or we reach the
+                    // if we don't get any records for 30seconds or we reach the
                     // max number of
                     // expected
                     // records, break;
@@ -172,7 +168,7 @@ public class KafkaClientVerifier {
                     retries = timeoutSec;
                 }
                 if (retries == 0) {
-                    log.info("No more records in the stream, this consumer found " + recordCnt + " records");
+                    System.out.println("No more records in the stream, this consumer found " + recordCnt + " records");
                     break;
                 }
 
@@ -182,18 +178,16 @@ public class KafkaClientVerifier {
                     Integer mrs = Math.max(maxRecordSize.get(), smsg.getBytes().length);
                     maxRecordSize.set(mrs);
                     String row[] = RoughCSVTokenizer.tokenize(smsg);
-                    // System.out.println("Row: " + smsg);
                     Long rowTxnId = Long.parseLong(row[m_uniqueFieldNum].trim());
-                    Long sequenceNum = Long.parseLong(row[m_sequenceFieldNum]);
-
+                    Long rowNum = Long.parseLong(row[m_sequenceFieldNum]);
                     // the number of expected rows should match the max of the
-                    // field that contains the sequence field
-                    long maxRow = Math.max(expectedRows.get(), sequenceNum);
+                    // field that contains the seqeuence field
+                    long maxRow = Math.max(expectedRows.get(), rowNum);
                     expectedRows.set(maxRow);
-                    foundRowIds.add(sequenceNum);
+                    foundRowIds.add(rowNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
-                        log.info("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
-                                + " Last export sequence num: " + row[m_sequenceFieldNum] + ", txnid " + row[m_uniqueFieldNum] + ","
+                        System.out.println("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
+                                + " Last row num: " + row[m_sequenceFieldNum] + ", txnid" + row[m_uniqueFieldNum] + ","
                                 + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
                     }
 
@@ -201,7 +195,7 @@ public class KafkaClientVerifier {
                         Integer partition = Integer.parseInt(row[m_partitionFieldNum].trim());
 
                         if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                            log.error("ERROR mismatched exported partition for txid " + rowTxnId
+                            System.err.println("ERROR mismatched exported partition for txid " + rowTxnId
                                     + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
                                     + ", while export record says " + partition);
 
@@ -213,7 +207,7 @@ public class KafkaClientVerifier {
 
             if (m_cdl != null) {
                 m_cdl.countDown();
-                log.info("Consumers still remaining: " + m_cdl.getCount());
+                System.out.println("Consumers still remaining: " + m_cdl.getCount());
             }
         }
     }
@@ -267,16 +261,16 @@ public class KafkaClientVerifier {
         for (KafkaConsumer<String, String> consumer : consumerGroup) {
 
             consumer.subscribe(Arrays.asList(topic));
-            log.info("Creating consumer for " + topic);
+            System.out.println("Creating consumer for " + topic);
             TopicReader reader = new TopicReader(consumer, consumersLatch, uniqueIndexFieldNum, sequenceFieldNum,
                     partitionFieldNum, consumerTimeoutSecs, testGood);
             executor.execute(reader);
         }
 
-        log.info("All Consumer Creation Done...Waiting for EOS");
+        System.out.println("All Consumer Creation Done...Waiting for EOS");
 
         // Wait for all consumers to consume and timeout.
-        log.info("Wait for drain of consumers.");
+        System.out.println("Wait for drain of consumers.");
         long cnt = 0;
         long wtime = System.currentTimeMillis();
         while (true) {
@@ -285,11 +279,11 @@ public class KafkaClientVerifier {
             if (cnt != consumedRows.get()) {
                 long delta = consumedRows.get() - cnt;
                 wtime = System.currentTimeMillis();
-                log.info("Train is still running, got " + delta + " more records");
+                System.out.println("Train is still running, got " + delta + " more records");
                 continue;
             }
             if ((System.currentTimeMillis() - wtime) > 60000) {
-                log.info("Waited long enough looks like train has stopped.");
+                System.out.println("Waited long enough looks like train has stopped.");
                 break;
             }
             if (consumersLatch.getCount() == 0) {
@@ -298,17 +292,17 @@ public class KafkaClientVerifier {
         }
 
         consumersLatch.await();
-        log.info("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
+        System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
         if (consumedRows.get() == 0) {
-            log.error("No rows were consumed.");
+            System.err.println("ERROR No rows were consumed.");
             testGood.set(false);
         } else if (consumedRows.get() < expectedRows.get()) {
             // we will calculate the details of this below.
-            log.info("WARNING Consumed row count: '" + consumedRows.get()
+            System.out.println("WARNING Consumed row count: '" + consumedRows.get()
                     + "' is less then the expected number given by the client: '" + expectedRows.get() + "'");
         }
 
-        log.info("Checking for missing rows");
+        System.out.println("Checking for missing rows");
 
         Long[] sortedIds = foundRowIds.toArray(new Long[0]);
         Arrays.sort(sortedIds);
@@ -325,7 +319,7 @@ public class KafkaClientVerifier {
 
             // We may expect to have missing values in the sequence
             // because of failed txn's in the client, if we do make sure the
-            // number of missing adds up to the expected row count.
+            // number of missing add's up to the expected row count.
             if (lastId < id - 1) {
                 while (lastId < id) {
                     missingCnt++;
@@ -341,14 +335,22 @@ public class KafkaClientVerifier {
             }
         }
         // # received - duplicates + missing rows = LastId
-        // long realMissing = lastId - ids.size() - duplicateCnt + missingCnt;
-        log.info("");
-        log.info("Total messages in Kafka = " + ids.size());
-        log.info("Total missing client row IDs in Kafka = " + missingCnt);
-        log.info("Total duplicates discovered in Kafka = " + duplicateCnt);
-        log.info("Total attempted rows submitted from client (max client row ID) = " + lastId);
-        log.info("max row ID number should = received count - duplicates + missing row ids");
-        log.info(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
+        long realMissing = lastId - (ids.size() - duplicateCnt + missingCnt);
+        System.out.println("");
+        System.out.println("Total messages in Kafka = " + ids.size());
+        System.out.println("Total missing sequence numbers in Kafka = " + missingCnt);
+        System.out.println("Total duplicates discovered in Kafka = " + duplicateCnt);
+        System.out.println("Total attempted rows submitted from client (max sequence) = " + lastId);
+        System.out.println("max sequence number should = received count - duplicates + missing sequences ids");
+        System.out.println(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
+        System.out.println("unexpected missing records: " + realMissing );
+
+        if (realMissing > 0) {
+            System.err.println("\nERROR There are '" + realMissing + "' missing rows");
+            testGood.set(false);
+        } else {
+            System.out.println("There were no missing rows");
+        }
 
         // duplicates may be expected in some situations where only part of a buffer was transferred before
         // a failure and we and  volt re-submits the entire buffer
@@ -359,10 +361,10 @@ public class KafkaClientVerifier {
             // the amount of duplicates shouldn't
             // exceed 60 MB ( max size of a .pbd) from retransmitting the entire .pbd .
             if ( missingCnt > 0 && duplicateCnt > 60 * 1024 * 1024) {
-                log.error("there were " + duplicateCnt + " duplicate ids using "+duplicate_size+ " bytes of space, it shouldn't exceed 60MB");
+                System.err.println("ERROR there were '" + duplicateCnt + "' duplicate ids using "+duplicate_size+ " bytes of space, it shouldn't exceed 60MB");
                 testGood.set(false);
             } else {
-                log.warn("there were " + duplicateCnt + " duplicate ids");
+                System.out.println("WARN there were '" + duplicateCnt + "' duplicate ids");
             }
         }
     }
@@ -379,7 +381,6 @@ public class KafkaClientVerifier {
 
     public static void main(String[] args) throws Exception {
 
-        VoltLogger log = new VoltLogger("KafkaClientVerifier.main");
         VerifierCliConfig config = new VerifierCliConfig();
         config.parse(KafkaClientVerifier.class.getName(), args);
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
@@ -387,27 +388,25 @@ public class KafkaClientVerifier {
         try {
             verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield);
         } catch (IOException e) {
-            log.error(e.toString());
+            System.err.println("ERROR " + e.toString());
             e.printStackTrace(System.err);
+
             System.exit(-1);
         } catch (ValidationErr e) {
-            log.error("in Validation: " + e.toString());
+            System.err.println("ERROR in Validation: " + e.toString());
             e.printStackTrace(System.err);
             System.exit(-1);
         } catch (Exception e) {
-            log.error("in Application: " + e.toString());
+            System.err.println("ERROR in Application: " + e.toString());
             e.printStackTrace(System.err);
             System.exit(-1);
         }
 
-        if (verifier.testGood.get()) {
-            log.info("SUCCESS -- exit 0");
+        if (verifier.testGood.get())
             System.exit(0);
-        } else {
-            log.error("There were missing records");
-        }
+        else
+            System.err.println("ERROR There were missing records");
 
-        log.info("FAILURE -- exit -1");
         System.exit(-1);
 
     }
