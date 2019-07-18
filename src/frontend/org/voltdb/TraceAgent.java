@@ -180,7 +180,6 @@ public class TraceAgent extends OpsAgent {
             }
         } else if (subselector.equalsIgnoreCase("filter")) {
             double time = Double.parseDouble(obj.getString("filterTime"));
-            //VoltTrace.setFilterTime(time);
             if (time > 0) {
                 VoltTrace.turnOnFilter(time);
             } else {
