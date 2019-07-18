@@ -62,10 +62,10 @@ public class VoltSchemaPlus {
             switch(function.getValue().getType()){
                 case SCALAR:
                     ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
-                    schema.add(scalarFunction.getImplementor().toUpperCase(),
+                    schema.add(scalarFunction.getFunctionName().toUpperCase(),
                             ScalarFunctionImpl.create(
                                     function.getKey(),
-                                    scalarFunction.getImplementor(),
+                                    scalarFunction.getFunctionName(),
                                     scalarFunction.isExactArgumentTypes(),
                                     scalarFunction.getFunctionId(),
                                     scalarFunction.getArgumentTypes()));

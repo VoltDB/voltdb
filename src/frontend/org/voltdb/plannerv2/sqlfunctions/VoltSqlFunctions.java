@@ -211,7 +211,7 @@ public class VoltSqlFunctions {
                         "substring",
                         false,
                         new Class[] {String.class, int.class},
-                        FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM,))
+                        FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM))
                     .build();
 
     //-------------------------------------------------------------
