@@ -2753,7 +2753,7 @@ public class PlanAssembler {
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
                                  agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
-                                 agg_expression_type != ExpressionType.USER_DEFINED_AGGREGATE_COORD) {
+                                 agg_expression_type != ExpressionType.USER_DEFINED_AGGREGATE) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -3032,9 +3032,9 @@ public class PlanAssembler {
      * This function is called once it's been determined that we can push down
      * an aggregation plan node.
      *
-     * If an USER_DEFINED_AGGREGATE_COORD aggregate is distributed, then we need to
-     * convert the distributed aggregate function to USER_DEFINED_AGGREGATE_WORKER,
-     * and updata the return type for the coordinated aggregate function.
+     * If an USER_DEFINED_AGGREGATE aggregate is distributed, then we need to
+     * update the return type of the distNode to be varbinary, change the isWorker to be false
+     * for the coordNode and updata the return type for the coordNode.
      *
      * @param distNode    The aggregate node executed on each partition
      * @param coordNode   The aggregate node executed on the coordinator
@@ -3053,7 +3053,7 @@ public class PlanAssembler {
                 String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId(i)).getNameString();
                 VoltType returnType = VoltType.typeFromString(typeName);
                 coordNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
-                distNode.updateAggregate(i, ExpressionType.USER_DEFINED_AGGREGATE_WORKER);
+                distNode.updateUserDefinedAggregate(i);
             }
         }
     }
@@ -3133,8 +3133,8 @@ public class PlanAssembler {
             // Now that we're certain the aggregate will be pushed down
             // (no turning back now!), fix any APPROX_COUNT_DISTINCT aggregates.
             fixDistributedApproxCountDistinct(distNode, coordNode);
-            // convert the distributed aggregate function to USER_DEFINED_AGGREGATE_WORKER,
-            // and update the return type for the coordinated aggregate function
+            // change the return type for the distNode to be varbinary, update the isWorker for
+            // the coordNode to be false and update the return type for the coordinated aggregate function
             fixDistributedUserDefinedAggregate(distNode, coordNode);
 
             // Put the send/receive pair back into place
@@ -3150,6 +3150,7 @@ public class PlanAssembler {
                 // if this is an user-defined aggregate function,
                 // we need to update the return type to be the final return type
                 if (rootAggNode.getUserAggregateId(i) != -1) {
+                    rootAggNode.updatePartitionOrReplicate(i);
                     String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId(i)).getNameString();
                     VoltType returnType = VoltType.typeFromString(typeName);
                     rootAggNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);

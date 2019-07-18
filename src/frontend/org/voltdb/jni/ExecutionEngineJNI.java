@@ -1001,48 +1001,34 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
         // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
-        boolean isForPartitionTable = (m_udfBuffer.get() != 0);
         Object returnValue = null;
         VoltType returnType = null;
         try {
             assert(udafRunner != null);
-            // if there is a coordinator, we serialized the object to a byte array
+            // we serialized the object to a byte array
             // and the return type for a worker is a varbinary
-            if (isForPartitionTable) {
-                Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutput out = null;
+            Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutput out = null;
+            try {
+                out = new ObjectOutputStream(bos);
+                out.writeObject(workerInstance);
+                out.flush();
+                returnValue = bos.toByteArray();
+            } finally {
                 try {
-                    out = new ObjectOutputStream(bos);
-                    out.writeObject(workerInstance);
-                    out.flush();
-                    returnValue = bos.toByteArray();
-                } finally {
-                    try {
-                        bos.close();
-                    } catch (IOException ex) {
-                    // ignore close exception
-                    }
+                    bos.close();
+                } catch (IOException ex) {
+                // ignore close exception
                 }
-                returnType = VoltType.VARBINARY;
-                udafRunner.clearFunctionInstance(udafIndex);
             }
-            // However, if there is no coordinator, this worker will simply call the end method
-            // and return the original type
-            else {
-                returnValue = udafRunner.end(udafIndex);
-                returnType = udafRunner.getReturnType();
-            }
+            returnType = VoltType.VARBINARY;
+            udafRunner.clearFunctionInstance(udafIndex);
             resizeUDAFBuffer(returnValue, returnType);
             m_udfBuffer.clear();
             UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
-        }
-        catch (InvocationTargetException ex1) {
-            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
-            // We need to get its cause and throw that to the user.
-            handleUDAFError(ex1.getCause());
         }
         catch (Throwable ex2) {
             handleUDAFError(ex2);

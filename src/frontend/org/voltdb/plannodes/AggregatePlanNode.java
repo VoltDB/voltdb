@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -39,7 +40,6 @@ import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
-import org.hsqldb_voltpatches.ParserBase;
 
 public class AggregatePlanNode extends AbstractPlanNode {
 
@@ -54,7 +54,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         GROUPBY_EXPRESSIONS,
         PARTIAL_GROUPBY_COLUMNS,
         USER_AGGREGATE_ID,
-        WORKER_OR_COORDINATOR
+        IS_WORKER,
+        IS_PARTITION
         ;
     }
 
@@ -66,8 +67,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
     // a list of IDs for user define aggregate functions
     protected List<Integer> m_userAggregateId = new ArrayList<>();
-    // a list of strings that represent whether it is a worker or a coordinator
-    protected List<String> m_workerOrCoordinator = new ArrayList<>();
+    // a list of booleans that represent whether it is a worker or a coordinator
+    protected List<Boolean> m_isWorker = new ArrayList<>();
+    // a list of booleans that represent whether it is a partioned table or a replicated table
+    protected List<Boolean> m_isPartition = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
@@ -396,7 +399,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add(aggInputExpr.clone());
         }
-        m_workerOrCoordinator.add("WORKER");
+        m_isWorker.add(true);
+        m_isPartition.add(true);
     }
 
     public void updateAggregate(
@@ -417,8 +421,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_aggregateTypes.set(index, aggType);
     }
 
+    public void updateUserDefinedAggregate(int index) {
+        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
+        AbstractExpression schemaExpr = schemaCol.getExpression();
+        schemaExpr.setValueType(VoltType.VARBINARY);
+        schemaExpr.setValueSize(1048576);
+    }
+
     public void updateWorkerOrCoordinator(int index) {
-        m_workerOrCoordinator.set(index, "COORDINATOR");
+        m_isWorker.set(index, false);
+    }
+
+    public void updatePartitionOrReplicate(int index) {
+        m_isPartition.set(index, false);
     }
 
     public void addGroupByExpression(AbstractExpression expr)
@@ -440,7 +456,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             if (m_userAggregateId.size() > ii) {
                 stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
             }
-            stringer.keySymbolValuePair(Members.WORKER_OR_COORDINATOR.name(), m_workerOrCoordinator.get(ii));
+            stringer.keySymbolValuePair(Members.IS_WORKER.name(), m_isWorker.get(ii));
+            stringer.keySymbolValuePair(Members.IS_PARTITION.name(), m_isPartition.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));

@@ -701,8 +701,8 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
 void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument,
                                                 ValueType type, int32_t udafIndex) {
     // Estimate the size of the buffer we need. We will put:
-    //   * size of the buffer (function ID + parameters)
-    //   * function ID (int32_t)
+    //   * buffer size needed
+    //   * function id (int32_t)
     //   * udaf index (int32_t)
     //   * parameters.
 
@@ -806,18 +806,14 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const
     checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
 }
 
-NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type, int32_t udafIndex) {
+NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    // check whether this table is a partition table or a replicated table
-    bool partition_table = agg_type == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER ? true : false;
     serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
-    // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
-    m_udfOutput.writeBool(partition_table);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
-    return udfResultHelper(returnCode, partition_table, info->returnType);
+    return udfResultHelper(returnCode, true, info->returnType);
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {

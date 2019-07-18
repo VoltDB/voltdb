@@ -318,8 +318,7 @@ enum ExpressionType {
     // -----------------------------
     // User-defined Aggregates
     // -----------------------------
-    EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_COORD    = 106,
-    EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER   = 107,
+    EXPRESSION_TYPE_USER_DEFINED_AGGREGATE    = 106,
 
     // -----------------------------
     // Windowed Expression Aggregates.

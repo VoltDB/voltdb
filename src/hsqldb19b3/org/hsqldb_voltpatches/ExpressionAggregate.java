@@ -261,7 +261,7 @@ public class ExpressionAggregate extends Expression {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (opType == OpTypes.USER_DEFINED_AGGREGATE_COORD) {
+        if (opType == OpTypes.USER_DEFINED_AGGREGATE) {
             dataType = FunctionDescriptor.fn_by_name(m_name).getDataType();
         } else {
             dataType = SetFunction.getType(opType, nodes[LEFT].dataType);

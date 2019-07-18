@@ -109,9 +109,13 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             else {
                 m_aggregateIds.push_back(-1);
             }
-            if (aggregateColumnValue.hasNonNullKey("WORKER_OR_COORDINATOR")) {
-                string worc = aggregateColumnValue.valueForKey("WORKER_OR_COORDINATOR").asStr();
-                m_workerOrCoordinator.push_back(worc == "WORKER");
+            if (aggregateColumnValue.hasNonNullKey("IS_WORKER")) {
+                bool isWorker = aggregateColumnValue.valueForKey("IS_WORKER").asBool();
+                m_isWorker.push_back(isWorker);
+            }
+            if (aggregateColumnValue.hasNonNullKey("IS_PARTITION")) {
+                bool isPartition = aggregateColumnValue.valueForKey("IS_PARTITION").asBool();
+                m_isPartition.push_back(isPartition);
             }
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {

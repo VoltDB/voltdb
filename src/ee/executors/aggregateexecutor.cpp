@@ -490,31 +490,27 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, bool isWorkerIn, ExpressionType aggTypeIn, int udafIndexIn)
-        : functionId(id), isWorker(isWorkerIn), aggType(aggTypeIn), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndexIn)
+    UserDefineAgg(int id, bool isWorkerIn, int udafIndexIn, bool isPartitionIn)
+        : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndexIn), isPartition(isPartitionIn)
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
 
     virtual void advance(const NValue& val)
     {
-        // if this is a worker, it will accumulate the data of its columns
-        if (isWorker) {
-            engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
-        }
-        // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
-        else {
+        if (isPartition && !isWorker) {
             engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
+        }
+        else {
+            engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
         }
     }
 
     virtual NValue finalize(ValueType type)
     {
-        // if this is a worker, it will serialize its output and send it to the coordinator.
-        if (isWorker) {
-            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, aggType, udafIndex);
+        if (isPartition && isWorker) {
+            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, udafIndex);
         }
-        // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
             return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, udafIndex);
         }
@@ -529,16 +525,17 @@ private:
     int functionId;
     // worker or coordinator
     bool isWorker;
-    ExpressionType aggType;
     VoltDBEngine* engine;
     int udafIndex;
+    // partitioned or replicated
+    bool isPartition;
 };
 
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct, int aggId, bool isWorker, int udafIndex)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct, int aggId, bool isWorker, int udafIndex, bool isPartition)
 {
     switch (aggType) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -568,9 +565,8 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
-    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_COORD:
-    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE_WORKER:
-        return new (memoryPool) UserDefineAgg(aggId, isWorker, aggType, udafIndex);
+    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE:
+        return new (memoryPool) UserDefineAgg(aggId, isWorker, udafIndex, isPartition);
     default:
         {
             char message[128];
@@ -619,6 +615,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_aggregateIds = node->getAggregateIds();
     m_distinctAggs = node->getDistinctAggregates();
     m_isWorker = node->getIsWorker();
+    m_isPartition = node->getPartition();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
@@ -743,7 +740,7 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     std::unordered_map<int, int> udaf_indexes;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii], udaf_indexes[m_aggregateIds[ii]]++);
+        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii], udaf_indexes[m_aggregateIds[ii]]++, m_isPartition[ii]);
     }
 }
 
