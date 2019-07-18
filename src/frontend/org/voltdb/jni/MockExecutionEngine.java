@@ -36,6 +36,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -142,9 +143,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long spHandle, final long lastCommittedTxnId, long uniqueId,
-        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken, boolean elastic)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
+            final long lastCommittedTxnId, long uniqueId, long undoToken, LoadTableCaller caller)
     throws EEException
     {
         return null;
@@ -187,7 +187,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
+    public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+            long undoQuantumToken, byte[] predicates) {
         return false;
     }
 
@@ -211,10 +212,6 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public long[] getUSOForExportTable(String streamName) {
         return null;
-    }
-
-    @Override
-    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
     }
 
     @Override

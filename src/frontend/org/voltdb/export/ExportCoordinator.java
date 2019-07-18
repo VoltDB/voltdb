@@ -355,7 +355,6 @@ public class ExportCoordinator {
                                 exportLog.debug(getNewLeaderMessage());
                             }
 
-                            m_isMaster = isPartitionLeader();
                             // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
                             // Note: cannot initiate a coordinator task directly from here, must go
                             // through another runnable and the invocation path.
@@ -455,8 +454,14 @@ public class ExportCoordinator {
                                 }
                             }
 
-                            // Get the EDS tracker (note, this is a duplicate)
-                            ExportSequenceNumberTracker tracker = m_eds.getTracker();
+                            // Try to get our normalized tracker first: in case the EDS tracker
+                            // is empty, a rejoining node might infer a leading gap that doesn't
+                            // exist (ENG-16589).
+                            ExportSequenceNumberTracker tracker = m_trackers.get(m_hostId);
+                            if (tracker == null) {
+                                // Otherwise, get the EDS tracker (note, this is a duplicate)
+                                tracker = getInitialTracker();
+                            }
                             lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
                             if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
                                 if (exportLog.isDebugEnabled()) {
@@ -709,6 +714,9 @@ public class ExportCoordinator {
     private boolean m_isMaster = false;
     private long m_safePoint = 0L;
 
+    private ExportSequenceNumberTracker m_initialTracker;
+    private long m_initialSeqNo = 0L;
+
     // For JUnit test support
     private AtomicBoolean m_testReady;
 
@@ -727,6 +735,32 @@ public class ExportCoordinator {
     private void resetSafePoint() {
         m_isMaster = isPartitionLeader();
         m_safePoint = 0L;
+    }
+
+    private ExportSequenceNumberTracker getInitialTracker() {
+        if (m_initialTracker == null) {
+            m_initialTracker = m_eds.getTracker();
+            if (m_initialTracker.isEmpty()) {
+                m_initialTracker.addRange(m_initialSeqNo + 1, INFINITE_SEQNO);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Initial tracker was empty: " + m_initialTracker);
+                }
+            } else {
+                long lastSeqNo = m_initialTracker.getLastSeqNo();
+                if (lastSeqNo < m_initialSeqNo) {
+                    m_initialTracker.addRange(m_initialSeqNo + 1, INFINITE_SEQNO);
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Initial tracker has trailing gap: " + m_initialTracker);
+                    }
+                } else {
+                    m_initialTracker.addRange(lastSeqNo + 1, INFINITE_SEQNO);
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Initial tracker has no trailing gap: " + m_initialTracker);
+                    }
+                }
+            }
+        }
+        return m_initialTracker;
     }
 
     /**
@@ -812,6 +846,17 @@ public class ExportCoordinator {
 
     private boolean isReplicated() {
         return m_state == State.REPLICATED;
+    }
+
+    /**
+     * Must be called by EDS with initial sequence number from snapshot before initializing
+     * the coordinator.
+     *
+     * @param seqNo sequence number from snapshot
+     */
+    public void setInitialSequenceNumber(long seqNo) {
+        assert !mustBeShutdown();
+        m_initialSeqNo = seqNo;
     }
 
     /**
@@ -1141,34 +1186,30 @@ public class ExportCoordinator {
     }
 
     /**
-     * Normalize the trackers to account for any host having a gap at the end; one
-     * of the other hosts will have a higher sequence number.
-     *
-     * Normalize the trackers for gaps at the beginning.
+     * Normalize the trackers for gaps at the beginning. Assert that every incoming tracker
+     * is normalized at the end
      */
     private void normalizeTrackers() {
 
-        long highestSeqNo = 0L;
         long lowestSeqNo = Long.MAX_VALUE;
 
+        // Find lowest seqNos across all trackers
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
                 continue;
             }
             lowestSeqNo = Math.min(lowestSeqNo, tracker.getFirstSeqNo());
-            highestSeqNo = Math.max(highestSeqNo, tracker.getLastSeqNo());
+            assert tracker.getLastSeqNo() == INFINITE_SEQNO;
         }
         if (lowestSeqNo == Long.MAX_VALUE) {
             lowestSeqNo = 1L;
         }
+
+        // Normalize all trackers to start at lowest seqNo with potential leading gaps
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
-            if (tracker.isEmpty()) {
-                tracker.append(lowestSeqNo, INFINITE_SEQNO);
-            } else {
-                tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
-                if (tracker.getFirstSeqNo() > lowestSeqNo) {
-                    tracker.addRange(lowestSeqNo, lowestSeqNo);
-                }
+            if (tracker.getFirstSeqNo() > lowestSeqNo) {
+                // Create a leading gap on tracker
+                tracker.addRange(lowestSeqNo, lowestSeqNo);
             }
         }
     }

@@ -176,6 +176,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         generateRealOutputSchema(db);
     }
 
+    public void setOutputSchemaPreInlineAgg(NodeSchema schema) {
+        m_outputSchemaPreInlineAgg = schema;
+    }
+
+    NodeSchema getOutputSchemaPreInlineAgg() {
+        return m_outputSchemaPreInlineAgg;
+    }
+
     protected void generateRealOutputSchema(Database db) {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {

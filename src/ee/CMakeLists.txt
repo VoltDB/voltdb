@@ -133,14 +133,14 @@ SET (VOLTDB_SRC
   catalog/tableref.cpp
   common/ExecuteWithMpMemory.cpp
   common/FatalException.cpp
+  common/HiddenColumn.cpp
   common/InterruptException.cpp
   common/LargeTempTableBlockCache.cpp
+  common/LoadTableCaller.cpp
   common/MiscUtil.cpp
   common/NValue.cpp
   common/PlannerDomValue.cpp
   common/Pool.cpp
-  common/RecoveryProtoMessage.cpp
-  common/RecoveryProtoMessageBuilder.cpp
   common/SQLException.cpp
   common/SegvException.cpp
   common/SerializableEEException.cpp
@@ -182,6 +182,7 @@ SET (VOLTDB_SRC
   executors/materializedscanexecutor.cpp
   executors/materializeexecutor.cpp
   executors/mergereceiveexecutor.cpp
+  executors/mergejoinexecutor.cpp
   executors/migrateexecutor.cpp
   executors/nestloopexecutor.cpp
   executors/nestloopindexexecutor.cpp
@@ -226,6 +227,7 @@ SET (VOLTDB_SRC
   plannodes/limitnode.cpp
   plannodes/materializedscanplannode.cpp
   plannodes/materializenode.cpp
+  plannodes/mergejoinnode.cpp
   plannodes/mergereceivenode.cpp
   plannodes/migratenode.cpp
   plannodes/nestloopindexnode.cpp
@@ -264,7 +266,6 @@ SET (VOLTDB_SRC
   storage/MaterializedViewTriggerForInsert.cpp
   storage/MaterializedViewTriggerForWrite.cpp
   storage/PersistentTableStats.cpp
-  storage/RecoveryContext.cpp
   storage/StreamedTableStats.cpp
   storage/TableCatalogDelegate.cpp
   storage/TableStats.cpp

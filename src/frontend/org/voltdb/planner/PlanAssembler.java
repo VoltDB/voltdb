@@ -31,6 +31,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -280,7 +281,7 @@ public class PlanAssembler {
                 // Convert RIGHT joins to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
             }
-            m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+            m_subAssembler = new SelectSubPlanAssembler(m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             if (isPartitionColumnInGroupbyList(m_parsedSelect.groupByColumns())) {
@@ -367,7 +368,7 @@ public class PlanAssembler {
             Collection<StmtTableScan> scans = parsedStmt.allScans();
             m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
         }
-        m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        m_subAssembler = new WriterSubPlanAssembler(parsedStmt, m_partitioning);
     }
 
     private boolean isPartitionColumnInWindowedAggregatePartitionByList() {
@@ -578,7 +579,8 @@ public class PlanAssembler {
             if (scan instanceof StmtCommonTableScan) {
                 StmtCommonTableScan ctScan = (StmtCommonTableScan)scan;
                 if ( ! ctScan.getIsReplicated()) {
-                    throw new PlanningErrorException("The query defining a common table in a multi-partitioned query can only use replicated tables.");
+                    throw new PlanningErrorException(
+                            "The query defining a common table in a multi-partitioned query can only use replicated tables.");
                 }
             }
         }
@@ -644,10 +646,6 @@ public class PlanAssembler {
 
         for (AbstractExpression expr : subqueryExprs) {
             assert(expr instanceof SelectSubqueryExpression);
-            if (!(expr instanceof SelectSubqueryExpression)) {
-                continue; // DEAD CODE?
-            }
-
             SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
@@ -1651,13 +1649,11 @@ public class PlanAssembler {
                 // in getBestCostPlan, above.
                 throw new PlanningErrorException("INSERT INTO ... SELECT subquery could not be planned: "
                         + m_recentErrorMsg);
-
             }
 
             boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
-                            targetIsExportTable);
+                    new InsertSubPlanAssembler(m_parsedInsert, m_partitioning, targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -2020,85 +2016,77 @@ public class PlanAssembler {
             // scan or join node at all.  This seems unlikely
             // to be right.  Maybe this should be an assert?
             return true;
-        }
-
-        //
-        //   o If the SLOB cannot use the index, then we
-        //     need an order by node always.
-        //   o If there are zero window functions, then
-        //     - If the SLOB cannot use the index than we
-        //       need an order by node.
-        //     - If the SLOB can use the index, then
-        //       = If the statement is a single fragment
-        //         statement then we don't need an order by
-        //         node.
-        //       = If the statement is a two fragment
-        //         statement then we need an order by node.
-        //         This is because we will convert the RECEIVE
-        //         node into a MERGERECEIVE node in the
-        //         microoptimizer, and the MERGERECEIVE
-        //         node needs an inline order by node to do
-        //         the merge.
-        //   o If there is only one window function, then
-        //     - If the window function does not use the index
-        //       then we always need an order by node.
-        //     - If the window function can use the index but
-        //       the SLOB can't use the index, then we need an
-        //       order by node.
-        //     - If both the SLOB and the window function can
-        //       use the index, then we don't need an order
-        //       by, no matter how many fragments this statement
-        //       has.  This is because any RECEIVE node will be
-        //       a descendent of the window function node.  So
-        //       the RECEIVE to MERGERECEIVE conversion happens
-        //       in the window function and not the order by.
-        //   o If there is more than one window function then
-        //     we always need an order by node.  The second
-        //     window function will invalidate the ordering of
-        //     the first one.  (Actually, if the SLOB order is
-        //     compatible with the last window function then
-        //     the situation is like the one-window function
-        //     below.)
-        //
-        if ( ! (probe instanceof IndexSortablePlanNode)) {
+        } else if ( ! (probe instanceof IndexSortablePlanNode)) {
+            //
+            //   o If the SLOB cannot use the index, then we
+            //     need an order by node always.
+            //   o If there are zero window functions, then
+            //     - If the SLOB cannot use the index than we
+            //       need an order by node.
+            //     - If the SLOB can use the index, then
+            //       = If the statement is a single fragment
+            //         statement then we don't need an order by
+            //         node.
+            //       = If the statement is a two fragment
+            //         statement then we need an order by node.
+            //         This is because we will convert the RECEIVE
+            //         node into a MERGERECEIVE node in the
+            //         microoptimizer, and the MERGERECEIVE
+            //         node needs an inline order by node to do
+            //         the merge.
+            //   o If there is only one window function, then
+            //     - If the window function does not use the index
+            //       then we always need an order by node.
+            //     - If the window function can use the index but
+            //       the SLOB can't use the index, then we need an
+            //       order by node.
+            //     - If both the SLOB and the window function can
+            //       use the index, then we don't need an order
+            //       by, no matter how many fragments this statement
+            //       has.  This is because any RECEIVE node will be
+            //       a descendent of the window function node.  So
+            //       the RECEIVE to MERGERECEIVE conversion happens
+            //       in the window function and not the order by.
+            //   o If there is more than one window function then
+            //     we always need an order by node.  The second
+            //     window function will invalidate the ordering of
+            //     the first one.  (Actually, if the SLOB order is
+            //     compatible with the last window function then
+            //     the situation is like the one-window function
+            //     below.)
+            //
             return true;
-        }
-
-        IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)probe).indexUse();
-
-        if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
-            return true;
-        }
-        // Hash aggregates and partial aggregates
-        // invalidate the index ordering.  So, we will need
-        // an ORDERBY node.
-        if (numberHashAggregates > 0) {
-            return true;
-        }
-        if ( numberWindowFunctions == 0 ) {
-            if ( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+        } else {
+            final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode) probe).indexUse();
+            if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+                return true;
+            } else if (numberHashAggregates > 0) {
+                // Hash aggregates and partial aggregates
+                // invalidate the index ordering.  So, we will need
+                // an ORDERBY node.
+                return true;
+            } else if (numberWindowFunctions == 0) {
+                if (indexUse.getWindowFunctionUsesIndex() == WindowFunctionScoreboard.NO_INDEX_USE) {
+                    return true;
+                } else {
+                    assert (indexUse.getWindowFunctionUsesIndex() == WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX);
+                    // Return true for MP (numberReceiveNodes > 0) and
+                    // false for SP (numberReceiveNodes == 0);
+                    return numberReceiveNodes > 0;
+                }
+            } else if (numberWindowFunctions == 1) {
+                // If the WF uses the index then getWindowFunctionUsesIndex()
+                // will return 0.
+                return ! (indexUse.getWindowFunctionUsesIndex() == 0 && indexUse.isWindowFunctionCompatibleWithOrderBy());
+                // Both the WF and the SLOB can use the index.  Since the
+                // window function will have the order by node, the SLOB
+                // does not need one.  So this is a false.
+            } else {
+                // This can actually never happen now,
+                // because we only support one window function.
                 return true;
             }
-            assert( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
-            // Return true for MP (numberReceiveNodes > 0) and
-            // false for SP (numberReceiveNodes == 0);
-            return numberReceiveNodes > 0;
         }
-        if (numberWindowFunctions == 1) {
-            // If the WF uses the index then getWindowFunctionUsesIndex()
-            // will return 0.
-            if ( ( indexUse.getWindowFunctionUsesIndex() != 0 )
-                    || ( ! indexUse.isWindowFunctionCompatibleWithOrderBy() ) ) {
-                return true;
-            }
-            // Both the WF and the SLOB can use the index.  Since the
-            // window function will have the order by node, the SLOB
-            // does not need one.  So this is a false.
-            return false;
-        }
-        // This can actually never happen now,
-        // because we only support one window function.
-        return true;
     }
 
     /**
@@ -2489,15 +2477,15 @@ public class PlanAssembler {
         // into an inline order by in a MergeReceivePlanNode.
         IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
         AbstractPlanNode cnode = null;
-        int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
+        int winfunc = (scanNode == null) ? WindowFunctionScoreboard.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
         // If we have an index which is compatible with the statement
         // level order by, and we have a window function which can't
         // use the index we have to ignore the statement level order by
         // index use.  We will need to order the input according to the
         // window function first, and that will in general invalidate the
         // statement level order by ordering.
-        if ((SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
-                || (SubPlanAssembler.NO_INDEX_USE == winfunc)) {
+        if ((WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
+                || (WindowFunctionScoreboard.NO_INDEX_USE == winfunc)) {
             // No index.  Calculate the expression order here and stuff it into
             // the order by node.  Note that if we support more than one window
             // function this would be the case when scanNode.getWindowFunctionUsesIndex()

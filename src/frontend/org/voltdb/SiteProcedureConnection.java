@@ -33,6 +33,7 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
@@ -85,16 +86,10 @@ public interface SiteProcedureConnection {
      * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
      */
     public byte[] loadTable(
-            long txnId,
-            long spHandle,
-            long uniqueId,
-            String clusterName,
-            String databaseName,
+            TransactionState transactionState,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo)
+            LoadTableCaller caller)
     throws VoltAbortException;
 
     /**
@@ -106,10 +101,7 @@ public interface SiteProcedureConnection {
             long uniqueId,
             int tableId,
             VoltTable data,
-            boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo,
-            boolean elastic);
+            LoadTableCaller caller);
 
     /**
      * Execute a set of plan fragments.

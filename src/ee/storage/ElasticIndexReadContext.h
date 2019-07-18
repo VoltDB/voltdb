@@ -34,8 +34,8 @@ class TupleSchema;
 class TableTuple;
 
 class ElasticIndexReadContext : public TableStreamerContext {
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
-                                              TableStreamType, const std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TableStreamType,
+            const HiddenColumnFilter&, const std::vector<std::string>&);
 
 public:
     /**
@@ -92,6 +92,8 @@ private:
 
     /// Set to true after index was completely materialized.
     bool m_materialized;
+
+    const HiddenColumnFilter m_filter;
 };
 
 }

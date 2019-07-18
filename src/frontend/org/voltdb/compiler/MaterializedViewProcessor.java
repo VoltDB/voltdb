@@ -43,6 +43,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.AggregateExpression;
@@ -946,9 +947,9 @@ public class MaterializedViewProcessor {
                 }
                 String predicatejson = index.getPredicatejson();
                 if ( ! predicatejson.isEmpty() &&
-                        ! SubPlanAssembler.isPartialIndexPredicateCovered(
+                        ! SubPlanAssembler.evaluatePartialIndexPredicate(
                                 tableScan, coveringExprs,
-                                predicatejson, exactMatchCoveringExprs)) {
+                                predicatejson, exactMatchCoveringExprs).getFirst()) {
                     // the partial index predicate does not match the MatView's
                     // where clause -- give up on this index
                     continue;

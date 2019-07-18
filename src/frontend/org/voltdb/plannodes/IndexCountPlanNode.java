@@ -179,7 +179,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             nullExprIndex = m_searchkeyExpressions.size() - 1;
         }
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
-                nullExprIndex, m_catalogIndex, m_tableScan,
+                nullExprIndex, m_catalogIndex, m_tableScan, 0,
                 m_searchkeyExpressions, m_compareNotDistinct);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());

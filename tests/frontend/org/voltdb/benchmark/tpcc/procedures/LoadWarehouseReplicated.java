@@ -42,14 +42,14 @@ public class LoadWarehouseReplicated extends VoltProcedure {
             // check if we've already set up this partition
             voltQueueSQL(checkItemExists);
             VoltTable item = voltExecuteSQL()[0];
-            if (item.getRowCount() > 0)
+            if (item.getRowCount() > 0) {
                 return null;
+            }
 
             // now we know the partition is not loaded yet
-            DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ITEM", items, false, false);
+            DeprecatedProcedureAPIAccess.voltLoadTable(this, "ITEM", items);
         }
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "CUSTOMER_NAME", customerNames);
         return null;
     }
-
 }

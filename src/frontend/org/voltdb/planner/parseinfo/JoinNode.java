@@ -224,7 +224,7 @@ public abstract class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return ExpressionUtil.combinePredicates(out);
+        return ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, out);
     }
 
     protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }
