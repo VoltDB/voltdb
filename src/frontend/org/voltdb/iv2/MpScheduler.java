@@ -63,9 +63,6 @@ public class MpScheduler extends Scheduler
     static VoltLogger tmLog = new VoltLogger("TM");
     static final VoltLogger repairLogger = new VoltLogger("REPAIR");
 
-    // null if running community, fallback to MpProcedureTask
-    private static final ProClass<MpProcedureTask> NP_PROCEDURE_CLASS = loadNpProcedureTaskClass();
-
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
@@ -351,13 +348,13 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
+        // TODO: clear out this special case for BalancePartition rebalance
+        if (isBalancePartitionsTxn(message)) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
                 involvedPartitionMasters.keySet().retainAll(involvedPartitions);
-
-                task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                task = new NpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
                         m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
             }
@@ -372,7 +369,7 @@ public class MpScheduler extends Scheduler
                 involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
             }
 
-            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+            task = new NpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, involvedPartitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
         }
@@ -393,7 +390,7 @@ public class MpScheduler extends Scheduler
      * Hacky way to only run @BalancePartitions as n-partition transactions for now.
      * @return true if it's an n-partition transaction
      */
-    private boolean isNpTxn(Iv2InitiateTaskMessage msg)
+    private boolean isBalancePartitionsTxn(Iv2InitiateTaskMessage msg)
     {
         return msg.getStoredProcedureName().startsWith("@") &&
                 msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
@@ -452,13 +449,13 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
+        if (isBalancePartitionsTxn(message)) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
                 involvedPartitionMasters.keySet().retainAll(involvedPartitions);
 
-                task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                task = new NpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
                         m_buddyHSIds.get(m_nextBuddy), true, m_leaderId);
             }
@@ -619,20 +616,6 @@ public class MpScheduler extends Scheduler
     }
 
     /**
-     * Load the pro class for n-partition transactions.
-     * @return null if running in community or failed to load the class
-     */
-    private static ProClass<MpProcedureTask> loadNpProcedureTaskClass()
-    {
-        return ProClass
-                .<MpProcedureTask>load("org.voltdb.iv2.NpProcedureTask", "N-Partition",
-                        MiscUtils.isPro() ? ProClass.HANDLER_LOG : ProClass.HANDLER_IGNORE)
-                .errorHandler(tmLog::error)
-                .useConstructorFor(Mailbox.class, String.class, TransactionTaskQueue.class,
-                        Iv2InitiateTaskMessage.class, Map.class, long.class, boolean.class, int.class);
-    }
-
-    /**
      * Just using "put" on the dup counter map is unsafe.
      * It won't detect the case where keys collide from two different transactions.
      */
@@ -646,11 +629,6 @@ public class MpScheduler extends Scheduler
         else {
             m_duplicateCounters.put(dpKey, counter);
         }
-    }
-
-    private static MpProcedureTask instantiateNpProcedureTask(Object...params)
-    {
-        return NP_PROCEDURE_CLASS.newInstance(params);
     }
 
     public int getLeaderId() {
