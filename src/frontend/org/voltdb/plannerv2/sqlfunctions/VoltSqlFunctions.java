@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMultimap;
 import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
-import org.voltdb.types.ExpressionType;
 
 /**
  * Implementation of calls to VoltDB SQL functions through Calcite.
@@ -101,15 +100,15 @@ public class VoltSqlFunctions {
 
     public static class AggregateFunctionDescriptor extends FunctionDescriptor {
         // Aggregation type
-        final private ExpressionType m_aggType;
+        final private int m_aggType;
 
         public AggregateFunctionDescriptor(String functionName, boolean exactArgumentTypes,
-                                           Class[] argumentTypes, ExpressionType aggType) {
+                                           Class[] argumentTypes, int aggType) {
             super(functionName, exactArgumentTypes, argumentTypes, FunctionType.AGGREGATE);
             m_aggType = aggType;
         }
 
-        public ExpressionType getAggType() {
+        public int getAggType() {
             return m_aggType;
         }
     }
@@ -117,6 +116,7 @@ public class VoltSqlFunctions {
     // The map from method name to SQL FunctionDescriptor
     public static final ImmutableMultimap<Class, FunctionDescriptor> VOLT_SQL_FUNCTIONS =
             ImmutableMultimap.<Class, FunctionDescriptor>builder()
+                    // Scalar functions
                     .put(MigrationFunctions.class, new ScalarFunctionDescriptor(
                         "migrating",
                         false,
@@ -212,6 +212,12 @@ public class VoltSqlFunctions {
                         false,
                         new Class[] {String.class, int.class},
                         FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM))
+                    // Aggregate functions
+                    .put(AggExampleFunctions.class, new AggregateFunctionDescriptor(
+                        "aggregate_example",
+                        false,
+                         new Class[] {double.class},
+                         0))
                     .build();
 
     //-------------------------------------------------------------
@@ -316,7 +322,9 @@ public class VoltSqlFunctions {
     //-------------------------------------------------------------
     //                   volt extend sql aggregate functions
     //-------------------------------------------------------------
-    public static class StdDev {
-
+    public static class AggExampleFunctions {
+        public static double aggregate_example(double values) {
+            return 0.0;
+        }
     }
 }

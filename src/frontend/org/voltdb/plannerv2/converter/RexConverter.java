@@ -38,7 +38,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.schema.Function;
-import org.apache.calcite.schema.impl.ReflectiveFunctionBase;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
@@ -324,8 +324,8 @@ public class RexConverter {
                 int functionId = FunctionSQL.FUNC_VOLT_INVALID;
                 if (call.op instanceof SqlUserDefinedFunction) {
                     Function udf = ((SqlUserDefinedFunction) call.op).getFunction();
-                    if (udf instanceof ReflectiveFunctionBase)  {
-                        functionId = ((ReflectiveFunctionBase) udf).getFunctionId();
+                    if (udf instanceof ScalarFunctionImpl)  {
+                        functionId = ((ScalarFunctionImpl) udf).getFunctionId();
                     }
                 }
                 ae = RexConverterHelper.createFunctionExpression(
