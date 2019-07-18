@@ -289,6 +289,7 @@ public class TestExportCoordinator extends ZKTestBase {
                     eds1,
                     true);
 
+            ec0.setInitialSequenceNumber(991L);
             ec0.initialize();
             ec1.initialize();
 

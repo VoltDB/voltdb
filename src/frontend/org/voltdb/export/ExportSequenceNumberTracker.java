@@ -20,6 +20,7 @@ package org.voltdb.export;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.Set;
 
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
@@ -166,6 +167,10 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
         return truncated;
     }
 
+    public Set<Range<Long>> getRanges() {
+        return m_map.asRanges();
+    }
+
     /**
      * Truncate the tracker to the given truncation point. After truncation,
      * any ranges after the new truncation point will be removed.
@@ -252,17 +257,34 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      *         exist return null
      */
     public Pair<Long, Long> getFirstGap() {
+        return (getFirstGap(0L));
+    }
+
+    /**
+     * Find first gap after or including a sequence number if it exists
+     *
+     * @param afterSeqNo find first gap after (or including) this seqNo
+     * @return
+     */
+    public Pair<Long, Long> getFirstGap(long afterSeqNo) {
         if (m_map.isEmpty() || size() < 2) {
             return null;
         }
         Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-        long start = end(iter.next()) + 1;
-        long end = start(iter.next()) - 1;
-        return new Pair<Long, Long>(start, end);
-    }
+        Range<Long> current = iter.next();
+        assert current != null;
 
-    RangeSet<Long> getRanges() {
-        return m_map;
+        while (iter.hasNext()) {
+            Range<Long> next = iter.next();
+            long start = end(current) + 1;
+            long end = start(next) - 1;
+            if (end < afterSeqNo) {
+                current = next;
+                continue;
+            }
+            return new Pair<Long, Long>(start, end);
+        }
+        return null;
     }
 
     /**
