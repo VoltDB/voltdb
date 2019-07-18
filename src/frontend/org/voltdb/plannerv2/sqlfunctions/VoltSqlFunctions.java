@@ -21,7 +21,7 @@ import com.google.common.collect.ImmutableMultimap;
 import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
-import org.voltdb.catalog.Function;
+import org.voltdb.types.ExpressionType;
 
 /**
  * Implementation of calls to VoltDB SQL functions through Calcite.
@@ -48,23 +48,27 @@ public class VoltSqlFunctions {
     }
     // A POD holder for representing a SQL function
     public static class FunctionDescriptor {
+        // The name of the function
+        final private String m_functionName;
         // Whether the function needs its argument to match its declaration exactly.
         // This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
         final private boolean m_exactArgumentTypes;
         // Classes of argument types
         final private Class[] m_argumentTypes;
-        // Function ID
-        final private int m_functionId;
         // Function type
         final private FunctionType m_type;
 
 
-        protected FunctionDescriptor(boolean exactArgumentTypes,
-                                     Class[] argumentTypes, int functionId, FunctionType type) {
+        protected FunctionDescriptor(String functionName, boolean exactArgumentTypes,
+                                     Class[] argumentTypes, FunctionType type) {
+            m_functionName = functionName;
             m_exactArgumentTypes = exactArgumentTypes;
             m_argumentTypes = argumentTypes;
-            m_functionId = functionId;
             m_type = type;
+        }
+
+        public String getFunctionName() {
+            return m_functionName;
         }
 
         public boolean isExactArgumentTypes() {
@@ -75,62 +79,38 @@ public class VoltSqlFunctions {
             return m_argumentTypes;
         }
 
-        public int getFunctionId() {
-            return m_functionId;
-        }
-
         public FunctionType getType() {
             return m_type;
         }
     }
 
     public static class ScalarFunctionDescriptor extends FunctionDescriptor {
-        // The name of the method that implements the scalar function
-        final private String m_implementor;
+        // Function ID
+        final private int m_functionId;
 
-        public ScalarFunctionDescriptor(String implementor, boolean exactArgumentTypes,
-                                        Class[] argumentTypes, int functionId, FunctionType type) {
-            super(exactArgumentTypes, argumentTypes, functionId, FunctionType.SCALAR);
-            m_implementor = implementor;
+        public ScalarFunctionDescriptor(String functionName, boolean exactArgumentTypes,
+                                        Class[] argumentTypes, int functionId) {
+            super(functionName, exactArgumentTypes, argumentTypes, FunctionType.SCALAR);
+            m_functionId = functionId;
         }
 
-        public String getImplementor() {
-            return m_implementor;
+        public int getFunctionId() {
+            return m_functionId;
         }
     }
 
     public static class AggregateFunctionDescriptor extends FunctionDescriptor {
-        // The name of the methods that implement the aggregate function
-        final private String m_startImplementor;
-        final private String m_assembleImplementor;
-        final private String m_combineImplementor;
-        final private String m_endImplementor;
+        // Aggregation type
+        final private ExpressionType m_aggType;
 
-        public AggregateFunctionDescriptor(String startImplementor, String assembleImplementor,
-                                           String combineImplementor, String endImplementor,
-                                           boolean exactArgumentTypes, Class[] argumentTypes,
-                                           int functionId, FunctionType type) {
-            super(exactArgumentTypes, argumentTypes, functionId, FunctionType.AGGREGATE);
-            m_startImplementor = startImplementor;
-            m_assembleImplementor = assembleImplementor;
-            m_combineImplementor = combineImplementor;
-            m_endImplementor = endImplementor;
+        public AggregateFunctionDescriptor(String functionName, boolean exactArgumentTypes,
+                                           Class[] argumentTypes, ExpressionType aggType) {
+            super(functionName, exactArgumentTypes, argumentTypes, FunctionType.AGGREGATE);
+            m_aggType = aggType;
         }
 
-        public String getStartImplementor() {
-            return m_startImplementor;
-        }
-
-        public String getAddImplementor() {
-            return m_assembleImplementor;
-        }
-
-        public String getMergeImplementor() {
-            return m_combineImplementor;
-        }
-
-        public String getEndImplementor() {
-            return m_endImplementor;
+        public ExpressionType getAggType() {
+            return m_aggType;
         }
     }
 
@@ -141,116 +121,97 @@ public class VoltSqlFunctions {
                         "migrating",
                         false,
                         new Class[] {},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                     "bit_shift_left",
                         true,
                         new Class[] {long.class, int.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_LEFT,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_LEFT))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                         "bit_shift_right",
                         true,
                         new Class[] {long.class, int.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_RIGHT,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_RIGHT))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                         "bitAnd",
                         true,
                         new Class[] {long.class, long.class},
-                        FunctionCustom.FUNC_BITAND,
-                        FunctionType.SCALAR))
+                        FunctionCustom.FUNC_BITAND))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                         "bitNot",
                         true,
                         new Class[] {long.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BITNOT,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_BITNOT))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                         "bitOr",
                         true,
                         new Class[] {long.class, long.class},
-                        FunctionCustom.FUNC_BITOR,
-                        FunctionType.SCALAR))
+                        FunctionCustom.FUNC_BITOR))
                     .put(BitwiseFunctions.class, new ScalarFunctionDescriptor(
                         "bitXor",
                         true,
                         new Class[] {long.class, long.class},
-                        FunctionCustom.FUNC_BITXOR,
-                        FunctionType.SCALAR))
+                        FunctionCustom.FUNC_BITXOR))
                     .put(JsonFunctions.class, new ScalarFunctionDescriptor(
                         "array_element",
                         false,
                         new Class[] {String.class, int.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_ELEMENT,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_ELEMENT))
                     .put(JsonFunctions.class, new ScalarFunctionDescriptor(
                         "array_length",
                         false,
                         new Class[] {String.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_LENGTH,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_ARRAY_LENGTH))
                     .put(JsonFunctions.class, new ScalarFunctionDescriptor(
                         "field",
                         false,
                         new Class[] {String.class, String.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_FIELD,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_FIELD))
                     .put(JsonFunctions.class, new ScalarFunctionDescriptor(
                         "set_field",
                         false,
                         new Class[] {String.class, String.class, String.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SET_FIELD,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SET_FIELD))
                     .put(InternetFunctions.class, new ScalarFunctionDescriptor(
                         "inet6_aton",
                         false,
                         new Class[] {String.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_ATON,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_ATON))
                     .put(InternetFunctions.class, new ScalarFunctionDescriptor(
                         "inet6_ntoa",
                         false,
                         new Class[] {byte[].class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_NTOA,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET6_NTOA))
                     .put(InternetFunctions.class, new ScalarFunctionDescriptor(
                         "inet_aton",
                         false,
                         new Class[] {String.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
                     .put(InternetFunctions.class, new ScalarFunctionDescriptor(
                         "inet_ntoa",
                         false,
                         new Class[] {long.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_INET_ATON))
                     .put(StringFunctions.class, new ScalarFunctionDescriptor(
                         "hex",
                         false,
                         new Class[] {long.class},
-                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_HEX,
-                        FunctionType.SCALAR))
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_HEX))
                     .put(StringFunctions.class, new ScalarFunctionDescriptor(
                         "substring",
                         false,
                         new Class[] {String.class, int.class, int.class},
-                        FunctionSQL.FUNC_SUBSTRING_CHAR,
-                        FunctionType.SCALAR))
+                        FunctionSQL.FUNC_SUBSTRING_CHAR))
                     .put(StringFunctions.class, new ScalarFunctionDescriptor(
                         "substring",
                         false,
                         new Class[] {byte[].class, int.class, int.class},
-                        FunctionSQL.FUNC_SUBSTRING_BINARY,
-                        FunctionType.SCALAR))
+                        FunctionSQL.FUNC_SUBSTRING_BINARY))
                     .put(StringFunctions.class, new ScalarFunctionDescriptor(
                         "substring",
                         false,
                         new Class[] {String.class, int.class},
-                        FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM,
-                        FunctionType.SCALAR))
+                        FunctionSQL.FUNC_VOLT_SUBSTRING_CHAR_FROM,))
                     .build();
 
     //-------------------------------------------------------------
