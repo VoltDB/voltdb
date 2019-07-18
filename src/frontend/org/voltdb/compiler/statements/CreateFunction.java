@@ -49,6 +49,8 @@ public abstract class CreateFunction extends StatementProcessor {
             short.class, int.class, long.class, double.class, Byte.class, Byte[].class, Short.class,
             Integer.class, Long.class, Double.class, BigDecimal.class, String.class,
             TimestampType.class, GeographyPointValue.class, GeographyValue.class);
+    static final ImmutableSet<String> m_builtInAggregateFunctions = ImmutableSet.of(
+            "SUM", "COUNT", "AVG", "MIN", "MAX", "APPROX_COUNT_DISTINCT");
 
      /**
      * Find out if the function is defined.  It might be defined in the
@@ -61,7 +63,12 @@ public abstract class CreateFunction extends StatementProcessor {
         return FunctionForVoltDB.isFunctionNameDefined(functionName)
                 || FunctionSQL.isFunction(functionName)
                 || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
-                || (null != m_schema.findChild("ud_function", functionName));
+                || (null != m_schema.findChild("ud_function", functionName)
+                || isBuiltInAggregateFunction(functionName));
+    }
+
+    protected boolean isBuiltInAggregateFunction(String functionName) {
+        return m_builtInAggregateFunctions.contains(functionName.toUpperCase());
     }
 
 }
