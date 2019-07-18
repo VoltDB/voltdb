@@ -110,7 +110,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -495,7 +494,7 @@ public abstract class CatalogUtil {
 
         int i = 0;
         for (Column catCol : catalogColumns) {
-            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+            columns[i++] = catalogColumnToInfo(catCol);
         }
 
         return new VoltTable(columns);
@@ -514,7 +513,7 @@ public abstract class CatalogUtil {
 
         int i = 0;
         for (Column catCol : catalogColumns) {
-            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+            columns[i++] = catalogColumnToInfo(catCol);
         }
         for (VoltTable.ColumnInfo hiddenColumnInfo : hiddenColumns) {
             columns[i++] = hiddenColumnInfo;
@@ -535,28 +534,8 @@ public abstract class CatalogUtil {
      * @return A list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> List<T> getSortedCatalogItems(CatalogMap<T> items, String sortFieldName) {
-        assert(items != null);
-        assert(sortFieldName != null);
-
-        // build a treemap based on the field value
-        TreeMap<Object, T> map = new TreeMap<>();
-        boolean hasField = false;
-        for (T item : items) {
-            // check the first time through for the field
-            if (hasField == false) {
-                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
-            }
-            assert(hasField == true);
-
-            map.put(item.getField(sortFieldName), item);
-        }
-
-        // create a sorted list from the map
-        ArrayList<T> retval = new ArrayList<>();
-        for (T item : map.values()) {
-            retval.add(item);
-        }
-
+        List<T> retval = new ArrayList<>();
+        getSortedCatalogItems(items, sortFieldName, retval);
         return retval;
     }
 
@@ -568,7 +547,23 @@ public abstract class CatalogUtil {
      * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
-        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
+        assert (items != null);
+        assert (sortFieldName != null);
+
+        // build a treemap based on the field value
+        TreeMap<Object, T> map = new TreeMap<>();
+        boolean hasField = false;
+        for (T item : items) {
+            // check the first time through for the field
+            if (hasField == false) {
+                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
+            }
+            assert (hasField == true);
+
+            map.put(item.getField(sortFieldName), item);
+        }
+
+        result.addAll(map.values());
     }
 
     /**
@@ -679,7 +674,9 @@ public abstract class CatalogUtil {
 
     public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
 
-        if (!logger.isDebugEnabled()) return;
+        if (!logger.isDebugEnabled()) {
+            return;
+        }
         StringBuilder sb = new StringBuilder("Connectors:\n");
         for (Connector conn : connectors) {
             sb.append("\tname:    " + conn.getTypeName() + "\n");
@@ -3270,5 +3267,15 @@ public abstract class CatalogUtil {
             return table.getIsreplicated();
         }
         return false;
+    }
+
+    /**
+     * Utility method for converting a {@link Column} to a {@link VoltTable.ColumnInfo}
+     *
+     * @param column Source {@link Column}
+     * @return {@code column} converted into a {@link VoltTable.ColumnInfo}
+     */
+    public static VoltTable.ColumnInfo catalogColumnToInfo(Column column) {
+        return new VoltTable.ColumnInfo(column.getTypeName(), VoltType.get((byte) column.getType()));
     }
 }

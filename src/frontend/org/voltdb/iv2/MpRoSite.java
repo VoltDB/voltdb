@@ -59,10 +59,12 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -266,7 +268,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+                boolean undo, byte[] predicates)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -465,17 +468,15 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName, VoltTable data, LoadTableCaller caller)
+            throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo, boolean elastic)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

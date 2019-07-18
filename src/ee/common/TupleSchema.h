@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "common/FatalException.hpp"
+#include "common/HiddenColumn.h"
 #include "common/types.h"
 
 #define UNINLINEABLE_OBJECT_LENGTH 64
@@ -45,25 +46,40 @@ class AbstractExpression;
  */
 class TupleSchema {
 public:
-    // holds per column info
-    struct ColumnInfo {
+    // Base struct used for per column information
+    struct ColumnInfoBase {
         uint32_t offset;
-        uint32_t length;   // does not include length prefix for ObjectTypes
         char type;
-        char allowNull;
-        bool inlined;      // Stored inside the tuple or outside the tuple.
-
-        bool inBytes;
+        bool allowNull;
 
         inline const ValueType getVoltType() const {
             return static_cast<ValueType>(type);
         }
+    };
+
+    // holds per column info
+    struct ColumnInfo : ColumnInfoBase {
+        uint32_t length;   // does not include length prefix for ObjectTypes
+        bool inlined;      // Stored inside the tuple or outside the tuple.
+
+        bool inBytes;
+
+        std::string debug() const;
+    };
+
+    struct HiddenColumnInfo : ColumnInfoBase {
+        HiddenColumn::Type columnType;
 
         std::string debug() const;
     };
 
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
+
+    /* The index value used to represent no hidden column.
+     * This value is guaranteed to be greater than all valid hidden column indexes
+     */
+    static const uint8_t UNSET_HIDDEN_COLUMN = 0xFF;
 
     /** Static factory method to create a TupleSchema a fixed number
      *  of all visible columns */
@@ -77,21 +93,7 @@ public:
                                           const std::vector<int32_t>&   columnSizes,
                                           const std::vector<bool>&      allowNull,
                                           const std::vector<bool>&      columnInBytes,
-                                          const std::vector<ValueType>& hiddenColumnTypes,
-                                          const std::vector<int32_t>&   hiddenColumnSizes,
-                                          const std::vector<bool>&      hiddenAllowNull,
-                                          const std::vector<bool>&      hiddenColumnInBytes);
-
-    /** Static factory method to create a TupleSchema that contains hidden columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
-                                          const std::vector<int32_t>&   columnSizes,
-                                          const std::vector<bool>&      allowNull,
-                                          const std::vector<bool>&      columnInBytes,
-                                          const std::vector<ValueType>& hiddenColumnTypes,
-                                          const std::vector<int32_t>&   hiddenColumnSizes,
-                                          const std::vector<bool>&      hiddenAllowNull,
-                                          const std::vector<bool>&      hiddenColumnInBytes,
-                                          const bool isTableWithStream);
+                                          const std::vector<HiddenColumn::Type>& hiddenColumnTypes);
 
     /** Static factory method to create a TupleSchema for index keys */
     static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
@@ -151,9 +153,6 @@ public:
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
 
-    /** Return true if there is a hidden column on the table with stream. */
-    inline bool isTableWithStream() const;
-
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
         return m_isHeaderless;
@@ -212,8 +211,8 @@ public:
     }
 
     /** Returns column info object for columnIndex-th hidden column.  */
-    const ColumnInfo* getHiddenColumnInfo(int columnIndex) const;
-    ColumnInfo* getHiddenColumnInfo(int columnIndex);
+    const HiddenColumnInfo* getHiddenColumnInfo(int columnIndex) const;
+    HiddenColumnInfo* getHiddenColumnInfo(int columnIndex);
 
     /** Returns the offset of the first hidden column in the tuple.
      * In debug builds, asserts if there are no hidden columns. */
@@ -226,13 +225,31 @@ public:
 
     uint16_t totalColumnCount() const;
 
-private:
+    /** Returns the index of the hidden column of columnType. The value
+     * returned by this method will be UNSET_HIDDEN_COLUMN if this schema
+     * does not have a column which is the requested type.
+     */
+    uint8_t getHiddenColumnIndex(HiddenColumn::Type columnType) const {
+        return m_hiddenColumnIndexes[columnType];
+    }
 
+    /** Returns whether or not a hidden column of columnType is in this tuple schema */
+    bool hasHiddenColumn(HiddenColumn::Type columnType) const {
+        return m_hiddenColumnIndexes[columnType] != UNSET_HIDDEN_COLUMN;
+    }
+
+private:
     /** These methods are like their public counterparts, but accepts
      *  indexes >= m_columnCount, in order to access hidden columns or
      *  the terminating ColumnInfo object. */
-    ColumnInfo* getColumnInfoPrivate(int columnIndex);
-    const ColumnInfo* getColumnInfoPrivate(int columnIndex) const;
+    ColumnInfoBase* getColumnInfoPrivate(int columnIndex);
+    const ColumnInfoBase* getColumnInfoPrivate(int columnIndex) const;
+
+    /**
+     * Return the raw pointer to the start of an column entry. It can
+     * be ColumnInfoBase or anything which extends it.
+     */
+    char *rawColumnAt(int columnIndex) const;
 
     /*
      * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
@@ -241,12 +258,16 @@ private:
 
     void setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex);
 
-    /** Set the type and column size for a column. The columns can be set in any order,
-        but it's important to set this data for all columns before any use. Note, the "length"
+    /** Set the type and column size for a column. Note, the "length"
         param may not be read in some places for some types (like integers), so make sure it
         is correct, or the code will act all wonky. */
     void setColumnMetaData(uint16_t index, ValueType type, int32_t length, bool allowNull,
             uint16_t &uninlinedObjectColumnIndex, bool inBytes);
+
+    /** Set the type for a hidden column*/
+    void setHiddenColumnMetaData(uint16_t index, HiddenColumn::Type columnType);
+
+    void setColumnMetaDataCommon(uint16_t index, ColumnInfoBase *info, ValueType type, int32_t length, bool allowNull);
 
     /*
      * Returns the number of string columns that can't be inlined.
@@ -275,8 +296,7 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
-    // has a hidden column for table with stream
-    bool m_isTableWithStream;
+    uint8_t m_hiddenColumnIndexes[HiddenColumn::MAX_HIDDEN_COUNT];
 
     /*
      * Data storage for:
@@ -297,8 +317,8 @@ private:
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
     vassert(index < totalColumnCount());
-    const ColumnInfo *columnInfo = getColumnInfoPrivate(index);
-    const ColumnInfo *columnInfoPlusOne = getColumnInfoPrivate(index + 1);
+    const ColumnInfoBase *columnInfo = getColumnInfoPrivate(index);
+    const ColumnInfoBase *columnInfoPlusOne = getColumnInfoPrivate(index + 1);
     // calculate the real column length in raw bytes
     return static_cast<uint32_t>(columnInfoPlusOne->offset - columnInfo->offset);
 }
@@ -309,10 +329,6 @@ inline uint16_t TupleSchema::columnCount() const {
 
 inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
-}
-
-inline bool TupleSchema::isTableWithStream() const {
-    return m_isTableWithStream;
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {
@@ -328,7 +344,7 @@ inline uint32_t TupleSchema::tupleLength() const {
 
 inline size_t TupleSchema::offsetOfHiddenColumns() const {
     vassert(hiddenColumnCount() > 0);
-    return getColumnInfoPrivate(columnCount())->offset;
+    return getHiddenColumnInfo(0)->offset;
 }
 
 inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
@@ -336,33 +352,50 @@ inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
     return tupleLength() - offsetOfHiddenColumns();
 }
 
+inline char *TupleSchema::rawColumnAt(int columnIndex) const {
+    uint64_t columnStart = reinterpret_cast<uint64_t>(m_data) + (sizeof(uint16_t) * m_uninlinedObjectColumnCount);
+    if (columnIndex < columnCount()) {
+        return reinterpret_cast<char *>(columnStart + sizeof(ColumnInfo) * columnIndex);
+    }
 
-inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnIndex) const {
-    return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
+    columnIndex -= columnCount();
+    columnStart += sizeof(ColumnInfo) * columnCount();
+    if (columnIndex < hiddenColumnCount()) {
+        return reinterpret_cast<char *>(columnStart + sizeof(HiddenColumnInfo) * columnIndex);
+    }
+
+    vassert(columnIndex == hiddenColumnCount());
+    return reinterpret_cast<char *>(columnStart + sizeof(HiddenColumnInfo) * hiddenColumnCount());
 }
 
-inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnIndex) {
-    return &reinterpret_cast<ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
+inline const TupleSchema::ColumnInfoBase* TupleSchema::getColumnInfoPrivate(int columnIndex) const {
+    return reinterpret_cast<const ColumnInfoBase *>(rawColumnAt(columnIndex));
+}
+
+inline TupleSchema::ColumnInfoBase* TupleSchema::getColumnInfoPrivate(int columnIndex) {
+    return reinterpret_cast<ColumnInfoBase *>(rawColumnAt(columnIndex));
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    vassert(columnIndex < totalColumnCount());
-    return getColumnInfoPrivate(columnIndex);
+    vassert(columnIndex < columnCount());
+    return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    vassert(columnIndex < totalColumnCount());
-    return getColumnInfoPrivate(columnIndex);
+    vassert(columnIndex < columnCount());
+    return &reinterpret_cast<ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
-inline const TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) const {
-    vassert(hiddenColumnIndex < m_hiddenColumnCount);
-    return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
+inline const TupleSchema::HiddenColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) const {
+    vassert(hiddenColumnIndex < hiddenColumnCount());
+    return &reinterpret_cast<const HiddenColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount) +
+            sizeof(ColumnInfo) * columnCount())[hiddenColumnIndex];
 }
 
-inline TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) {
-    vassert(hiddenColumnIndex < m_hiddenColumnCount);
-    return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
+inline TupleSchema::HiddenColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) {
+    vassert(hiddenColumnIndex < hiddenColumnCount());
+    return &reinterpret_cast<HiddenColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount) +
+            sizeof(ColumnInfo) * columnCount())[hiddenColumnIndex];
 }
 
 inline uint16_t TupleSchema::getUninlinedObjectColumnCount() const { return m_uninlinedObjectColumnCount; }

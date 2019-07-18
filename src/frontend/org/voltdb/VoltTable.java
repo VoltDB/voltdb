@@ -298,6 +298,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             }
             return name.equals(other.name);
         }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{ name=" + name + ", type=" + type + " }";
+        }
     }
 
     /**

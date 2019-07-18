@@ -46,10 +46,6 @@ public:
         , m_allowNullFlags(numCols)
         , m_inBytesFlags(numCols)
         , m_hiddenTypes(0)
-        , m_hiddenSizes(0)
-        , m_hiddenAllowNullFlags(0)
-        , m_hiddenInBytesFlags(0)
-        , m_isTableWithStream(false)
     {
     }
 
@@ -61,10 +57,6 @@ public:
         , m_allowNullFlags(numCols)
         , m_inBytesFlags(numCols)
         , m_hiddenTypes(numHiddenCols)
-        , m_hiddenSizes(numHiddenCols)
-        , m_hiddenAllowNullFlags(numHiddenCols)
-        , m_hiddenInBytesFlags(numHiddenCols)
-        , m_isTableWithStream(false)
     {
     }
 
@@ -84,31 +76,11 @@ public:
     }
 
     /** Set the attributes of the index-th hidden column for the
-     *  schema to be built. */
-    void setHiddenColumnAtIndex(size_t index,
-                                ValueType valueType,
-                                int32_t colSize,
-                                bool allowNull,
-                                bool inBytes)
-    {
-        vassert(index < m_hiddenTypes.size());
-        m_hiddenTypes[index] = valueType;
-        m_hiddenSizes[index] = colSize;
-        m_hiddenAllowNullFlags[index] = allowNull;
-        m_hiddenInBytesFlags[index] = inBytes;
-    }
-
-    /** Set the attributes of the index-th hidden column for the
       *  schema to be built. */
-     void setHiddenColumnAtIndex(size_t index,
-                                 ValueType valueType,
-                                 int32_t colSize,
-                                 bool allowNull,
-                                 bool inBytes,
-                                 bool isTableWithStream)
+     void setHiddenColumnAtIndex(size_t index, HiddenColumn::Type columnType)
      {
-         setHiddenColumnAtIndex(index, valueType, colSize, allowNull, inBytes);
-         m_isTableWithStream = isTableWithStream;
+         vassert(index < m_hiddenTypes.size());
+         m_hiddenTypes[index] = columnType;
      }
     /** Finally, build the schema with the attributes specified. */
     TupleSchema* build() const
@@ -117,11 +89,7 @@ public:
                                               m_sizes,
                                               m_allowNullFlags,
                                               m_inBytesFlags,
-                                              m_hiddenTypes,
-                                              m_hiddenSizes,
-                                              m_hiddenAllowNullFlags,
-                                              m_hiddenInBytesFlags,
-                                              m_isTableWithStream);
+                                              m_hiddenTypes);
     }
 
     /** A special build method for index keys, which use "headerless" tuples */
@@ -176,54 +144,13 @@ public:
                          false); // size not in bytes
     }
 
-    void setHiddenColumnAtIndex(size_t index,
-                                ValueType valueType,
-                                int32_t colSize,
-                                bool allowNull)
-    {
-        setHiddenColumnAtIndex(index,
-                               valueType,
-                               colSize,
-                               allowNull,
-                               false);  // size not in bytes
-    }
-
-    void setHiddenColumnAtIndex(size_t index,
-                                ValueType valueType,
-                                int32_t colSize)
-    {
-        setHiddenColumnAtIndex(index,
-                               valueType,
-                               colSize,
-                               true,    // allow nulls
-                               false);  // size not in bytes
-    }
-
-    void setHiddenColumnAtIndex(size_t index,
-                                ValueType valueType)
-    {
-        // sizes for variable length types
-        // must be explicitly specified
-        vassert(! isVariableLengthType(valueType));
-
-        setHiddenColumnAtIndex(index,
-                               valueType,
-                               NValue::getTupleStorageSize(valueType),
-                               true,    // allow nulls
-                               false);  // size not in bytes
-    }
-
 private:
     std::vector<ValueType> m_types;
     std::vector<int32_t> m_sizes;
     std::vector<bool> m_allowNullFlags;
     std::vector<bool> m_inBytesFlags;
 
-    std::vector<ValueType> m_hiddenTypes;
-    std::vector<int32_t> m_hiddenSizes;
-    std::vector<bool> m_hiddenAllowNullFlags;
-    std::vector<bool> m_hiddenInBytesFlags;
-    bool m_isTableWithStream;
+    std::vector<HiddenColumn::Type> m_hiddenTypes;
 };
 
 } // end namespace voltdb

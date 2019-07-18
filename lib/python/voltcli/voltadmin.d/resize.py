@@ -29,22 +29,25 @@ class Option:
     RESTART = 3
     UPDATE = 4
 
-def test(runner):
-    procedureCaller(runner, Option.TEST)
+def hostIdsToNames(hostId, hosts):
+    host = hosts.hosts_by_id.get(int(hostId))
+    return host.hostname if host else 'UNAVAILABLE'
 
-def start(runner):
-    procedureCaller(runner, Option.START)
-
-def restart(runner):
-    procedureCaller(runner, Option.RESTART)
-
-def status(runner):
-    procedureCaller(runner, Option.STATUS)
-
-def update(runner):
-    procedureCaller(runner, Option.UPDATE)
-
-def procedureCaller(runner, type):
+@VOLT.Command(
+    bundles = VOLT.AdminBundle(),
+    description = 'Elastic resizing cluster command.',
+    options = (
+            VOLT.StringListOption(None, '--ignore', 'skip_requirements',
+                                  '''Conditions that can be ignored when resizing the cluster:
+                                  disabled_export -- ignore pending export data for targets that are disabled''',
+                                  default = ''),
+            VOLT.StringOption(None, '--test', 'opt', 'Check the feasibility of current resizing plan.', action='store_const', const=Option.TEST, default=Option.START),
+            VOLT.StringOption(None, '--restart', 'opt', 'Restart the previous failed resizing operation.', action='store_const', const=Option.RESTART),
+            VOLT.StringOption(None, '--status', 'opt', 'Check the resizing progress.', action='store_const', const=Option.STATUS),
+            VOLT.StringOption(None, '--update', 'opt', 'Update the options for the current resizing operation.', action='store_const', const=Option.UPDATE),
+    ),
+)
+def resize(runner):
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
                                 ['OVERVIEW'])
@@ -52,7 +55,7 @@ def procedureCaller(runner, type):
     # Convert @SystemInformation results to objects.
     hosts = Hosts(runner.abort)
     for tuple in response.table(0).tuples():
-        hosts.update(tuple[0], tuple[1], tuple[2])
+        hosts.update(*tuple)
 
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
@@ -68,40 +71,19 @@ def procedureCaller(runner, type):
     if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
         runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
 
-
+    option = runner.opts.opt
     result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [type, '', ','.join(runner.opts.skip_requirements)]).table(0)
+                              [option, '', ','.join(runner.opts.skip_requirements)]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
-    if message.find("host ids:"):
-        host_names = ','.join([hosts.hosts_by_id.get(int(id)).hostname for id in re.search('host ids: \[(.+?)\]', message).group(1).split(',')])
-        if type == Option.TEST:
+    if option in (Option.TEST, Option.START) and "host ids:" in message:
+        host_names = ', '.join([hostIdsToNames(id, hosts) for id in re.search('host ids: \[(.+?)\]', message).group(1).split(',')])
+        if option == Option.TEST:
             message = "Hosts will be removed: [" + host_names + "], " + message
-        if type == Option.START:
+        elif option == Option.START:
             message = "Starting cluster resize: Removing hosts: [" + host_names + "], " + message
     if status == 0:
         runner.info(message)
     else:
         runner.error(message)
         sys.exit(1)
-
-@VOLT.Multi_Command(
-    bundles = VOLT.AdminBundle(),
-    description = 'Elastic resizing cluster command.',
-    options = (
-            VOLT.StringListOption(None, '--ignore', 'skip_requirements',
-                                  '''Conditions that can be ignored when resizing the cluster:
-                                  disabled_export -- ignore pending export data for targets that are disabled''',
-                                  default = ''),
-    ),
-    modifiers = (
-            VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
-            VOLT.Modifier('start', start, 'Start the elastically resizing.'),
-            VOLT.Modifier('restart', restart, 'Restart the previous failed resizing operation.'),
-            VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('update', update, 'Update the options for the current resizing operation.'),
-    )
-)
-
-def resize(runner):
-    runner.go()

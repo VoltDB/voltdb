@@ -76,7 +76,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginDuration("runsptask",
+            traceLog.add(() -> VoltTrace.beginDuration("runSpTask",
                                                        "txnId", TxnEgo.txnIdToString(getTxnId()),
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
@@ -108,6 +108,11 @@ public class SpProcedureTask extends ProcedureTask
             m_txnState.setNeedsRollback(true);
         }
         completeInitiateTask(siteConnection);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endDuration("runSpTask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+        }
         response.m_sourceHSId = m_initiator.getHSId();
         if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isForReplica())) {
             response.setExecutedOnPreviousLeader(true);
@@ -135,6 +140,9 @@ public class SpProcedureTask extends ProcedureTask
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
         }
+        if (HOST_DEBUG_ENABLED) {
+            hostLog.debug("START for rejoin: " + this);
+        }
 
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response =
@@ -160,7 +168,7 @@ public class SpProcedureTask extends ProcedureTask
         LatencyWatchdog.pet();
 
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("START replaying txn: " + this);
+            hostLog.debug("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
             m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -194,7 +202,7 @@ public class SpProcedureTask extends ProcedureTask
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         }
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("COMPLETE replaying txn: " + this);
+            hostLog.debug("COMPLETE replaying txn: " + this);
         }
 
         logToDR(siteConnection.getDRGateway(), txnState);

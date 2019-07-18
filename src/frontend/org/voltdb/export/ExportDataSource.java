@@ -426,7 +426,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 @Override
                 public void run() {
                     if (m_closed) {
-                        exportLog.info("Closed, not ready for polling");
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Closed, not ready for polling");
+                        }
                         return;
                     }
                     if (!m_readyForPolling) {
@@ -436,7 +438,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         m_coordinator.initialize(m_runEveryWhere);
                     }
                     if (isMaster() && m_pollTask != null) {
-                        exportLog.info("Newly ready for polling master executes pending poll");
                         pollImpl(m_pollTask);
                     }
                 }
@@ -727,7 +728,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_runEveryWhere) {
                     exportingRole = "XDCR";
                 } else {
-                    exportingRole = (m_coordinator.isMaster() ? "TRUE" : "FALSE");
+                    // Note that we are 'ACTIVE' == 'TRUE' only if we are export master AND we have
+                    // an export client configured
+                    exportingRole = (m_coordinator.isMaster() && m_client != null ? "TRUE" : "FALSE");
                 }
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
                         exportingRole, m_tupleCount, m_tuplesPending.get(),
@@ -882,7 +885,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (RejectedExecutionException rej) {
             m_bufferPushPermits.release();
             //We are shutting down very much rolling generation so dont passup for error reporting.
-            exportLog.info("Export buffer rejected by data source executor: ", rej);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Export buffer rejected by data source executor: ", rej);
+            }
         }
     }
 
@@ -912,6 +917,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (action == StreamStartAction.RECOVER || action == StreamStartAction.REJOIN) {
                         seqNo = sequenceNumber;
                     }
+                    m_coordinator.setInitialSequenceNumber(seqNo);
                     m_tupleCount = seqNo;
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(seqNo, action);
@@ -1100,7 +1106,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             });
         } catch (RejectedExecutionException rej) {
-            exportLog.info("Polling from export data source rejected by data source executor.");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Polling from export data source rejected by data source executor.");
+            }
         }
         return fut;
     }
@@ -1482,7 +1490,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
              }
          } catch (RejectedExecutionException reex) {
              // Ignore, {@code GuestProcessor} was closed
-             exportLog.info("End of Stream event rejected ");
+             if (exportLog.isDebugEnabled()) {
+                 exportLog.debug("End of Stream event rejected ");
+             }
          }
      }
 
@@ -1494,8 +1504,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                exportLog.info("Handling processor shutdown for " + this);
-
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Handling processor shutdown for " + this);
+                }
                 m_pollTask = null;
                 m_readyForPolling = false;
             }
@@ -1646,19 +1657,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public synchronized boolean processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
-            if (m_status == StreamStatus.BLOCKED && m_gapTracker.getFirstGap() != null) {
-                long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
-                        "] and cluster is complete. Skipping to next available transaction for " + this.toString());
-                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
-                clearGap(true);
-
+            if (m_status == StreamStatus.BLOCKED) {
                 // Satisfy a pending poll request
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            pollImpl(m_pollTask);
+                            if (isMaster() && m_pollTask != null) {
+                                long firstUnpolledSeqNo;
+                                if (m_gapTracker.getFirstGap() != null) {
+                                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+                                } else {
+                                    firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
+                                    exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
+                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+
+                                }
+                                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
+                                clearGap(true);
+                                pollImpl(m_pollTask);
+                            }
                         } catch (Exception e) {
                             exportLog.error("Exception polling export buffer after RELEASE", e);
                         } catch (Error e) {

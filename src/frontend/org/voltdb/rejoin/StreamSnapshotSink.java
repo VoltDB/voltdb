@@ -34,6 +34,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.utils.CachedByteBufferAllocator;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -141,7 +142,8 @@ public class StreamSnapshotSink {
             // Currently, only export cares about this TXN ID.  Since we don't have one handy,
             // just use Long.MIN_VALUE to match how m_openSpHandle is initialized in ee/storage/TupleStreamWrapper
 
-            connection.loadTable(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE, tableId, table, false, false, false, false);
+            connection.loadTable(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE, tableId, table,
+                    LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         }
     }
 

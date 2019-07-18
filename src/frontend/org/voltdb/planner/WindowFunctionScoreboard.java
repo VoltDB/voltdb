@@ -24,7 +24,7 @@ import java.util.TreeSet;
 import org.voltdb.types.SortDirectionType;
 
 /**
- * Objects of this class keep track of all window functions and
+ * Objects of this class: keep track of all window functions and
  * order by statement expressions.  We run the index expressions
  * over this scoreboard to see if any of them match appropriately.
  * If so we pull out the window function or statement level order by
@@ -40,7 +40,7 @@ public class WindowFunctionScoreboard {
      * These are some constants for using indexes for window functions.
      */
     public final static int NO_INDEX_USE = -2;
-    public final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
+    final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
 
     public WindowFunctionScoreboard(AbstractParsedStmt stmt) {
         m_numWinScores = stmt.getWindowFunctionExpressionCount();

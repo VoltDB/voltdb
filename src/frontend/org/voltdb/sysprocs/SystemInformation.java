@@ -21,6 +21,7 @@ import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
@@ -85,7 +87,8 @@ public class SystemInformation extends VoltSystemProcedure
             SysProcFragmentId.PF_systemInformationOverview,
             SysProcFragmentId.PF_systemInformationOverviewAggregate,
             SysProcFragmentId.PF_systemInformationDeployment,
-            SysProcFragmentId.PF_systemInformationAggregate
+            SysProcFragmentId.PF_systemInformationAggregate,
+            SysProcFragmentId.PF_systemInformationLicense
         };
     }
 
@@ -173,6 +176,21 @@ public class SystemInformation extends VoltSystemProcedure
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationAggregate, result);
         }
+        else if (fragmentId == SysProcFragmentId.PF_systemInformationLicense)
+        {
+            VoltTable result = null;
+            // Choose the lowest site ID on this host to do the info gathering
+            // All other sites should just return empty results tables.
+            if (context.isLowestSiteId())
+            {
+                result = populateLicenseProperties();
+            }
+            else
+            {
+                result = new VoltTable(clusterInfoSchema);
+            }
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationLicense, result);
+        }
         assert(false);
         return null;
     }
@@ -244,13 +262,17 @@ public class SystemInformation extends VoltSystemProcedure
         VoltTable[] results;
 
         // This selector provides the old @SystemInformation behavior
-        if (selector.toUpperCase().equals("OVERVIEW"))
+        if ("OVERVIEW".equalsIgnoreCase(selector.toString()))
         {
             results = getOverviewInfo();
         }
-        else if (selector.toUpperCase().equals("DEPLOYMENT"))
+        else if ("DEPLOYMENT".equalsIgnoreCase(selector.toString()))
         {
             results = getDeploymentInfo();
+        }
+        else if ("LICENSE".equalsIgnoreCase(selector.toString()))
+        {
+            results = getLicenseInfo();
         }
         else
         {
@@ -277,6 +299,10 @@ public class SystemInformation extends VoltSystemProcedure
     private VoltTable[] getDeploymentInfo() {
         // create a work fragment to gather deployment data from each of the sites.
         return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationDeployment,
+                SysProcFragmentId.PF_systemInformationAggregate);
+    }
+    private VoltTable[] getLicenseInfo() {
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationLicense,
                 SysProcFragmentId.PF_systemInformationAggregate);
     }
 
@@ -571,5 +597,65 @@ public class SystemInformation extends VoltSystemProcedure
         }
 
         return sb.toString();
+    }
+
+    static public VoltTable populateLicenseProperties()
+    {
+        VoltTable results = new VoltTable(clusterInfoSchema);
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+        LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
+
+
+        results.addRow("PERMIT_VERSION", Integer.toString(licenseApi.getVersion()));
+        results.addRow("PERMIT_SCHEME", Integer.toString(licenseApi.getScheme()));
+
+        if(licenseApi.getLicenseType() != null)
+        {
+            results.addRow("TYPE", licenseApi.getLicenseType());
+        }
+        if(licenseApi.getIssuerCompany() != null)
+        {
+            results.addRow("ISSUER_COMPANY", licenseApi.getIssuerCompany());
+        }
+        if(licenseApi.getIssuerEmail() != null)
+        {
+            results.addRow("ISSUER_EMAIL", licenseApi.getIssuerEmail());
+        }
+        if(licenseApi.getIssuerUrl() != null)
+        {
+            results.addRow("ISSUER_URL", licenseApi.getIssuerUrl());
+        }
+        if(licenseApi.getIssuerPhone() != null)
+        {
+            results.addRow("ISSUER_PHONE", licenseApi.getIssuerPhone());
+        }
+        if(licenseApi.issued() != null)
+        {
+            results.addRow("ISSUE_DATE", sdf.format(licenseApi.issued().getTime()));
+        }
+        if(licenseApi.licensee() != null)
+        {
+            results.addRow("LICENSEE", licenseApi.licensee());
+        }
+        if(licenseApi.expires() != null)
+        {
+            results.addRow("EXPIRATION", sdf.format(licenseApi.expires().getTime()));
+        }
+
+        results.addRow("HOSTCOUNT_MAX", Integer.toString(licenseApi.maxHostcount()));
+        results.addRow("FEATURES_TRIAL", Boolean.toString(licenseApi.isAnyKindOfTrial()));
+        results.addRow("FEATURES_UNRESTRICTED", Boolean.toString(licenseApi.isUnrestricted()));
+        results.addRow("FEATURES_COMMANDLOGGING", Boolean.toString(licenseApi.isCommandLoggingAllowed()));
+        results.addRow("FEATURES_DRACTIVEACTIVE", Boolean.toString(licenseApi.isDrActiveActiveAllowed()));
+
+        if(licenseApi.note() != null)
+        {
+            results.addRow("NOTE", licenseApi.note());
+        }
+        if(licenseApi.getSignature() != null)
+        {
+            results.addRow("SIGNATURE", licenseApi.getSignature());
+        }
+        return results;
     }
 }

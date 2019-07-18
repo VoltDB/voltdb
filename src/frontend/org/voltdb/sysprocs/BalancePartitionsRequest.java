@@ -42,6 +42,13 @@ public class BalancePartitionsRequest implements JSONString {
             this.rangeStart = rangeStart;
             this.rangeEnd = rangeEnd;
         }
+
+        @Override
+        public String toString() {
+            return "PartitionPair [srcPartition=" + srcPartition + ", destPartition=" + destPartition + ", rangeStart="
+                    + rangeStart + ", rangeEnd=" + rangeEnd + "]";
+        }
+
     }
 
     public final List<PartitionPair> partitionPairs;

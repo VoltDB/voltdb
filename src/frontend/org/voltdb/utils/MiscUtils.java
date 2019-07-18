@@ -224,6 +224,42 @@ public class MiscUtils {
                 public boolean isUnrestricted() {
                     return false;
                 }
+
+                @Override
+                public String getIssuerCompany()
+                {
+                    return null;
+                }
+
+                @Override
+                public String getIssuerUrl()
+                {
+                    return null;
+                }
+
+                @Override
+                public String getIssuerEmail()
+                {
+                    return null;
+                }
+
+                @Override
+                public String getIssuerPhone()
+                {
+                    return null;
+                }
+
+                @Override
+                public int getVersion()
+                {
+                    return 0;
+                }
+
+                @Override
+                public int getScheme()
+                {
+                    return 0;
+                }
             };
         }
 

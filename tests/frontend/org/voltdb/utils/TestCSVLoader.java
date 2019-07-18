@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.base.Strings;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -52,7 +51,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -67,6 +65,8 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
+import com.google_voltpatches.common.base.Strings;
+
 public class TestCSVLoader {
 
     protected static ServerThread localServer;
@@ -79,8 +79,9 @@ public class TestCSVLoader {
     protected static String dbName = String.format("mydb_%s", userName);
 
     public static void prepare() {
-        if (!reportDir.endsWith("/"))
+        if (!reportDir.endsWith("/")) {
             reportDir += "/";
+        }
         File dir = new File(reportDir);
         try {
             if (!dir.exists()) {
@@ -103,7 +104,7 @@ public class TestCSVLoader {
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         builder.addLiteralSchema(
-                "create table BLAH ("
+                "create table BLAH MIGRATE TO TARGET target1 ("
                 + "clm_integer integer not null, "
                 + "clm_tinyint tinyint default 0, "
                 + "clm_smallint smallint default 0, "
@@ -115,8 +116,12 @@ public class TestCSVLoader {
                 + "clm_point geography_point default null, "
                 + "clm_geography geography default null, "
                 + "PRIMARY KEY(clm_integer) "
-                + ");");
+                + ");"
+                + "DR TABLE BLAH;");
         builder.addPartitionInfo("BLAH", "clm_integer");
+        if (MiscUtils.isPro()) {
+            builder.setXDCR();
+        }
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -136,7 +141,9 @@ public class TestCSVLoader {
     @AfterClass
     public static void stopDatabase() throws InterruptedException
     {
-        if (client != null) client.close();
+        if (client != null) {
+            client.close();
+        }
         client = null;
 
         if (localServer != null) {
@@ -1417,8 +1424,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1446,7 +1454,9 @@ public class TestCSVLoader {
 
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1491,8 +1501,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1523,8 +1534,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists())
+            if(temp.exists()) {
                 temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1569,8 +1581,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1602,7 +1615,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1647,8 +1662,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1675,7 +1691,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1720,8 +1738,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1760,7 +1779,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1870,8 +1891,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (bw != null)
+                if (bw != null) {
                     bw.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }

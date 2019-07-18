@@ -48,6 +48,8 @@
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
+#include "common/LoadTableCaller.h"
+#include "common/HiddenColumnFilter.h"
 #include "common/ThreadLocalPool.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
@@ -95,7 +97,6 @@ class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
 class ExecutorVector;
 class PersistentTable;
-class RecoveryProtoMsg;
 class StreamedTable;
 class Table;
 class TableCatalogDelegate;
@@ -275,10 +276,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle,
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
-                       bool returnConflictRows,
-                       bool shouldDRStream,
                        int64_t undoToken,
-                       bool elastic);
+                       const LoadTableCaller &caller);
 
         /**
          * Reset the result buffer (use the nextResultBuffer by default)
@@ -463,6 +462,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 CatalogId tableId,
                 TableStreamType streamType,
+                HiddenColumnFilter::Type hiddenColumnFilterType,
                 int64_t undoToken,
                 ReferenceSerializeInputBE& serializeIn);
 
@@ -484,11 +484,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                          TableStreamType streamType,
                                          ReferenceSerializeInputBE& serializeIn,
                                          std::vector<int>& retPositions);
-
-        /*
-         * Apply the updates in a recovery message.
-         */
-        void processRecoveryMessage(RecoveryProtoMsg* message);
 
         /**
          * Perform an action on behalf of Export.

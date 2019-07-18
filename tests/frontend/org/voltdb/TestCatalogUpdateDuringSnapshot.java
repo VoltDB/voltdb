@@ -30,6 +30,7 @@ import java.io.IOException;
 
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -55,8 +56,8 @@ public class TestCatalogUpdateDuringSnapshot extends JUnit4LocalClusterTest {
     @Rule
     public final TestName m_name = new TestName();
 
-    @Rule
-    public final TemporaryFolder m_folder = new TemporaryFolder();
+    @ClassRule
+    public static final TemporaryFolder m_folder = new TemporaryFolder();
 
     @Rule
     public final TestWatcher m_cleanUpOnError = new TestWatcher() {
@@ -169,7 +170,7 @@ public class TestCatalogUpdateDuringSnapshot extends JUnit4LocalClusterTest {
     }
 
     private void performSnapsthot() throws NoConnectionsException, IOException, ProcCallException {
-        m_client.callProcedure("@SnapshotSave", m_folder.getRoot().getPath(), m_name.getMethodName(), 0);
+        m_client.callProcedure("@SnapshotSave", m_folder.newFolder().getAbsolutePath(), m_name.getMethodName(), 0);
     }
 
     private void performDdlProcedure(String procedure) throws NoConnectionsException, IOException, ProcCallException {

@@ -760,7 +760,7 @@ public class DDLCompiler {
                     triggers = validateExportTriggers(exportTrigger);
                 }
                 if (triggers.isEmpty()) {
-                    triggers = Arrays.asList("DELETE","INSERT","UPDATE");
+                    triggers = Arrays.asList("INSERT");
                 }
                 targetName = targetName.toUpperCase();
                 tableName = tableName.toUpperCase();

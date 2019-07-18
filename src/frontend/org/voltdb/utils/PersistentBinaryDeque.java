@@ -503,7 +503,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     // FIXME: reject this case for now
                     // FIXME: we could select the sequence that has the oldest entry and delete
                     // the other files
-                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
+                    StringBuilder sb = new StringBuilder();
+                    for (Deque<Long> seq : sequences) {
+                        sb.append("\nsequence:" + seq);
+                    }
+                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce +
+                            sb.toString() );
                 }
                 Deque<Long> sequence = sequences.getFirst();
                 long index = 1L;
@@ -803,7 +808,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void updateExtraHeader(M extraHeader) throws IOException {
+    public synchronized void updateExtraHeader(M extraHeader) throws IOException {
         m_extraHeader = extraHeader;
         addSegment(peekLastSegment());
     }
@@ -1219,7 +1224,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void scanEntries(BinaryDequeScanner scanner) throws IOException
+    public synchronized void scanEntries(BinaryDequeScanner scanner) throws IOException
     {
         if (m_closed) {
             throw new IOException("Cannot scanForGap(): PBD has been closed");
@@ -1257,7 +1262,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public boolean deletePBDSegment(BinaryDequeValidator<M> validator) throws IOException
+    public synchronized boolean deletePBDSegment(BinaryDequeValidator<M> validator) throws IOException
     {
         boolean segmentDeleted = false;
         if (m_closed) {

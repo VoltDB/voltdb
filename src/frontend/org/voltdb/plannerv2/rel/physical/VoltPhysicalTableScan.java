@@ -284,7 +284,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         RexProgram program = m_aggregate == null ? m_program : m_preAggregateProgram;
         Preconditions.checkNotNull(program, "Cannot add projection when program is null");
         final ProjectionPlanNode ppn = new ProjectionPlanNode();
-        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program));
+        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program, 0));
         node.addInlinePlanNode(ppn);
         return node;
     }

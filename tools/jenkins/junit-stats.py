@@ -14,8 +14,9 @@ from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
 from numpy import std, mean
-from re import sub
+from re import search, sub
 from string import whitespace
+from traceback import format_exc
 from urllib2 import HTTPError, URLError, urlopen
 
 # Constants used in posting messages on Slack
@@ -96,6 +97,17 @@ JENKINS_JOB_NICKNAMES = {
     'test-nextrelease-nonflaky-pro-junit'     : 'nonflaky-pro',
     'test-nextrelease-pool-community-junit'   : 'pool-community',
     'test-nextrelease-pool-pro-junit'         : 'pool-pro',
+    }
+JENKINS_JOBS = {
+    'branch-2-community-junit-master'         : {'nickname' : 'community-junit',  'label' : 'junit-community-failure'},
+    'branch-2-pro-junit-master'               : {'nickname' : 'pro-junit',        'label' : 'junit-pro-failure'},
+    'test-nextrelease-debug-pro'              : {'nickname' : 'debug-pro',        'label' : 'junit-debug-failure'},
+    'test-nextrelease-memcheck-pro'           : {'nickname' : 'memcheck-pro',     'label' : 'junit-memcheck-debug-failure'},
+    'test-nextrelease-memcheck-nodebug-pro'   : {'nickname' : 'memcheck-nodebug', 'label' : 'junit-memcheck-failure'},
+    'test-nextrelease-fulljmemcheck-pro-junit': {'nickname' : 'fulljmemcheck',    'label' : 'junit-fulljmemcheck-failure'},
+    'test-nextrelease-nonflaky-pro-junit'     : {'nickname' : 'nonflaky-pro',     'label' : 'junit-nonflaky-failure'},
+    'test-nextrelease-pool-community-junit'   : {'nickname' : 'pool-community',   'label' : 'junit-pool-community-failure'},
+    'test-nextrelease-pool-pro-junit'         : {'nickname' : 'pool-pro',         'label' : 'junit-pool-pro-failure'},
     }
 
 # Used for getting the preferred URL prefix; we prefer the latter to the former,
@@ -232,25 +244,25 @@ class Stats(object):
         logging.info("starting... %s" % sys.argv)
 
 
-    def error(self, message, caused_by=None):
+    def error(self, message='', caused_by=None):
         """TODO
         :param 
         """
         global ERROR_COUNT
         ERROR_COUNT = ERROR_COUNT + 1
         if caused_by:
-            message = message + '\nCaused by:\n' + str(caused_by)
+            message += '\nCaused by:\n' + str(caused_by)
         logging.error(message)
 
 
-    def warn(self, message, caused_by=None):
+    def warn(self, message='', caused_by=None):
         """TODO
         :param 
         """
         global WARNING_COUNT
         WARNING_COUNT = WARNING_COUNT + 1
         if caused_by:
-            message = message + '\nCaused by:\n' + str(caused_by)
+            message += '\nCaused by:\n' + str(caused_by)
         logging.warn(message)
 
 
@@ -612,22 +624,28 @@ class Stats(object):
                         message_end = len(description)
 
                     matching_message = description[message_start:message_end]
-                    msg_build_index  = matching_message.rfind('#') + 1
+                    msg_build_start  = matching_message.rfind('#') + 1
+                    msg_build_end    = len(matching_message)
+                    match = search('\D', matching_message[msg_build_start:])
+                    if match:
+                        msg_build_end = msg_build_start + match.start()
 
                     logging.debug('  msg             : '+str(msg))
                     logging.debug('  message_start   : '+str(message_start))
                     logging.debug('  message_end     : '+str(message_end))
                     logging.debug('  matching_message: '+matching_message)
-                    logging.debug('  msg_build_index : '+str(msg_build_index))
-                    logging.debug('  matching_message[msg_build_index:]: '+matching_message[msg_build_index:])
+                    logging.debug('  msg_build_start : '+str(msg_build_start))
+                    logging.debug('  msg_build_end   : '+str(msg_build_end))
+                    logging.debug('  matching_message[msg_build_start:msg_build_end]: '
+                                  + matching_message[msg_build_start:msg_build_end])
 
                     try:
-                        msg_build_number = int(matching_message[msg_build_index:])
+                        msg_build_number = int(matching_message[msg_build_start:msg_build_end])
                         old_build_number = min(old_build_number, msg_build_number)
                     except ValueError as e:
                         self.error('While trying to get build number from old description '
-                                   '(index %d):\n    %s\n    Found Exception:\n    %s'
-                                   % (msg_build_index, matching_message, str(e)) )
+                                   '(index %d-%d):\n    %s\n    Found Exception:\n    %s'
+                                   % (msg_build_start, msg_build_end, matching_message, str(e)) )
                         break
                     description = description.replace(matching_message,'')
                     updated_description = True
@@ -805,7 +823,10 @@ class Stats(object):
             info_messages.append('failure history')
 
         new_description += old_stack_trace
-        if new_stack_trace.strip().replace('\r', '') not in new_description.replace('\r', ''):
+        # Do not add new Stack Traces that are identical except for
+        # the line numbers (or other digits)
+        if (    sub('\d', 'x', new_stack_trace.replace('\r', '').strip()) not in
+                sub('\d', 'x', new_description.replace('\r', '')) ):
             new_description += new_stack_trace
             info_messages.append('stack trace')
 
@@ -821,6 +842,13 @@ class Stats(object):
                                                                 info_messages, jenkins_job_name,
                                                                 build_type)
 
+        # Make sure there are not too many new line (line feed) characters in a row
+        for i in range(10):
+            if '\n\n\n\n\n\n' in new_description.replace('\r', ''):
+                new_description = new_description.replace('\r', '').replace('\n\n\n\n\n\n', '\n\n\n')
+            else:
+                break
+
         logging.debug('  new_description:\n  %s' % str(new_description))
         if info_messages and old_description:
             logging.info('Description of ticket %s modified, including: %s'
@@ -828,6 +856,38 @@ class Stats(object):
 
         return self.truncate_if_needed(new_description, False, '\n[Truncated]',
                                        MAX_NUM_CHARS_PER_JIRA_DESCRIPTION)
+
+
+    def get_modified_labels(self, old_labels, new_labels, description,
+                            jenkins_job_name=None):
+        """TODO
+        """
+        modified_labels = []
+        modified_labels.extend(old_labels)
+
+        for label in new_labels:
+            if label not in modified_labels:
+                modified_labels.append(label)
+            # A Jira ticket should not normally be labeled as both Consistent
+            # and Intermittent
+            if (label == JIRA_LABEL_FOR_CONSISTENT_FAILURES
+                    and  JIRA_LABEL_FOR_INTERMITTENT_FAILURES in modified_labels):
+                modified_labels.remove(JIRA_LABEL_FOR_INTERMITTENT_FAILURES)
+            elif (label == JIRA_LABEL_FOR_INTERMITTENT_FAILURES
+                    and    JIRA_LABEL_FOR_CONSISTENT_FAILURES in modified_labels):
+                modified_labels.remove(JIRA_LABEL_FOR_CONSISTENT_FAILURES)
+
+        if jenkins_job_name:
+            jenkins_job_label = JENKINS_JOBS.get(jenkins_job_name, {}).get('label')
+            if jenkins_job_label and jenkins_job_label not in modified_labels:
+                modified_labels.append(jenkins_job_label)
+
+        logging.debug('In get_modified_labels:')
+        logging.debug('  old_labels:\n  %s' % str(old_labels))
+        logging.debug('  new_labels:\n  %s' % str(new_labels))
+        logging.debug('  modified_labels:\n  %s' % str(modified_labels))
+
+        return modified_labels
 
 
     def file_jira_issue(self, issue, DRY_RUN=False, failing_consistently=False):
@@ -881,21 +941,24 @@ class Stats(object):
         history = self.fix_url(history)
         logging.debug('  history(1)   : '+str(history))
         logging.debug('  className            : '+str(issue['className']))
-        logging.debug('  type(className)      : '+str(type(issue['className'])))
         logging.debug('  testName             : '+str(issue['testName']))
-        logging.debug('  type(testName)       : '+str(type(issue['testName'])))
         logging.debug('  fullTestName         : '+str(fullTestName))
-        logging.debug('  type(fullTestName)   : '+str(type(fullTestName)))
         logging.debug('  issue[type]          : '+str(issue['type']))
-        logging.debug('  type(issue[type])    : '+str(type(issue['type'])))
         logging.debug('  failure_percent      : '+str(failure_percent))
-        logging.debug('  type(failure_percent): '+str(type(failure_percent)))
         logging.debug('  jenkins_job_nickname : '+str(jenkins_job_nickname))
-        logging.debug('  type(jenkins_job_nickname): '+str(type(jenkins_job_nickname)))
         logging.debug('  failed_since         : '+str(failed_since))
+        logging.debug('  type(className)      : '+str(type(issue['className'])))
+        logging.debug('  type(testName)       : '+str(type(issue['testName'])))
+        logging.debug('  type(fullTestName)   : '+str(type(fullTestName)))
+        logging.debug('  type(issue[type])    : '+str(type(issue['type'])))
+        logging.debug('  type(failure_percent): '+str(type(failure_percent)))
+        logging.debug('  type(jenkins_job_nickname): '+str(type(jenkins_job_nickname)))
         logging.debug('  type(failed_since)   : '+str(type(failed_since)))
 
-        summary = issue['type']+' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
+        # In the future, this may become more elaborate (like labels & description)
+        issue_type = issue['type']
+
+        summary = issue_type +' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
 
         descriptions = {}
         descriptions['failingtest'] = 'Failing Test:\n'+fullTestName+'\n'
@@ -904,17 +967,20 @@ class Stats(object):
             descriptions['stacktrace'] = STACK_TRACE_LINE + str(error_report['errorStackTrace'])
         if failed_since:
             descriptions['sincebuild'] = ('\n%s %s%% failure in %s since build #%d'
-                                          % (str(issue['type']), str(failure_percent),
+                                          % (str(issue_type), str(failure_percent),
                                              jenkins_job_nickname, failed_since ))
 
-        old_description = ''
         issue_key = 'TBD'
+        old_description = ''
+        old_labels = []
         if existing_ticket:
-            old_description = existing_ticket.fields.description
             issue_key = existing_ticket.key
+            old_description = existing_ticket.fields.description
+            old_labels = existing_ticket.fields.labels
         description = self.get_modified_description(old_description, descriptions,
-                                                    jenkins_job_nickname, issue['type'],
+                                                    jenkins_job_nickname, issue_type,
                                                     issue_key)
+        labels = self.get_modified_labels(old_labels, labels, description, jenkins_job)
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
@@ -997,9 +1063,10 @@ class Stats(object):
             JENKINSBOT = JenkinsBot()
 
         summary_keys = [issue['className'], issue['testName']]
-        channel      = issue['channel']
-        labels       = issue['labels']
-        build_number = issue['build']
+        channel      = issue.get('channel')
+        jenkins_job  = issue.get('job', 'Unknown job')
+        build_number = issue.get('build', 'Unknown build')
+        labels       = issue.get('labels', [JIRA_LABEL_FOR_AUTO_FILING])
 
         closed_issue_url = None
         try:
@@ -1550,11 +1617,13 @@ class Stats(object):
                                              % (count_test_cases, str(run.get('url'))) )
 
             except KeyError as ke:
-                self.error('Error retrieving test data for this particular build: %d\n' % build, ke)
+                self.error('Error retrieving test data for this particular build: %d\n' % build,
+                           format_exc() )
             except Exception as e:
                 # Catch all errors to avoid causing a failing build for the upstream job in case this is being
                 # called from the junit-test-branch on Jenkins
-                self.error('Catching unexpected errors to avoid causing a failing build for the upstream job', e)
+                self.error('Catching unexpected errors to avoid causing a failing build for the upstream job',
+                           format_exc() )
                 # re-raise the exception, cause the build to fail (until the bugs are worked out)
                 raise
 

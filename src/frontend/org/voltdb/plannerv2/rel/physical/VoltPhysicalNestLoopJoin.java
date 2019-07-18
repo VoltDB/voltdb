@@ -95,6 +95,7 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
         // Inline LIMIT / OFFSET
         addLimitOffset(nlpn);
         // Set output schema
-        return setOutputSchema(nlpn);
+        setOutputSchema(nlpn);
+        return nlpn;
     }
 }
