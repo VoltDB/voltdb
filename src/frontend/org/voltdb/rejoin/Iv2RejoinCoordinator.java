@@ -187,9 +187,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         // Print out ZK info
-        StringBuilder builder = new StringBuilder("action blocker:\n");
+        StringBuilder builder = new StringBuilder("Contect on ZK:\n");
         VoltZK.printZKDir(messenger.getZK(), VoltZK.actionBlockers, builder);
-        builder.append("action lock:\n");
         VoltZK.printZKDir(messenger.getZK(), VoltZK.actionLock, builder);
         REJOINLOG.info(builder.toString());
         VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime +
