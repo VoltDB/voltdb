@@ -76,7 +76,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginDuration("runSpTask",
+            traceLog.add(() -> VoltTrace.beginDuration("runsptask",
                                                        "txnId", TxnEgo.txnIdToString(getTxnId()),
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
@@ -108,11 +108,6 @@ public class SpProcedureTask extends ProcedureTask
             m_txnState.setNeedsRollback(true);
         }
         completeInitiateTask(siteConnection);
-        if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.endDuration("runSpTask",
-                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
-                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
-        }
         response.m_sourceHSId = m_initiator.getHSId();
         if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isForReplica())) {
             response.setExecutedOnPreviousLeader(true);

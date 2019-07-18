@@ -84,7 +84,6 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMultimap;
 import com.google_voltpatches.common.collect.Maps;
@@ -370,7 +369,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * connections.
      * Updates via COW
      */
-    volatile ImmutableListMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableListMultimap.of();
+    volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
 
     /*
      * Track dead ForeignHosts that are reported independently by zookeeper and PicoNetwork.
@@ -403,9 +402,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /* Peers within the same partition group */
     private Set<Integer> m_peers;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
+    private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
-    private static Map<Integer, Integer> s_nextForeignHost = new HashMap<>();
     /*
      * used when coordinating joining hosts
      */
@@ -852,7 +851,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableListMultimap.<Integer, ForeignHost>builder()
+            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
                     .putAll(m_foreignHosts)
                     .put(hostId, fh)
                     .build();
@@ -875,7 +874,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private void removeForeignHost(final int hostId) {
         ImmutableCollection<ForeignHost> fhs = m_foreignHosts.get(hostId);
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableListMultimap.<Integer, ForeignHost>builder()
+            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
                     .putAll(Multimaps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
                     .build();
 
@@ -1405,7 +1404,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // the foreign machine case
-        ImmutableList<ForeignHost> fhosts = m_foreignHosts.get(hostId);
+        ImmutableCollection<ForeignHost> fhosts = m_foreignHosts.get(hostId);
         if (fhosts.isEmpty()) {
             if (!m_knownFailedHosts.containsKey(hostId)) {
                 networkLog.warn(
@@ -1426,33 +1425,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * case of binding all sites to the primary connection, this check has been added to prevent it.
              */
             if (m_hasAllSecondaryConnectionCreated) {
-                // fast path
                 // assign a foreign host for regular mailbox
                 fhost = m_fhMapping.get(hsId);
                 if (fhost == null) {
-                    // slow path
-                    // The synchronized block below is invoked on first message to the destination only.
-                    synchronized(this) {
-                        if (s_nextForeignHost.isEmpty()) {
-                            for (Integer hId : getLiveHostIds()) {
-                                s_nextForeignHost.put(hId, 1);
-                            }
-                        }
-                        // in case of multiple threads send to the same hsId at the same time
-                        fhost = m_fhMapping.get(hsId);
-                        if (fhost == null) {
-                            Integer perFHCounter = s_nextForeignHost.get(hostId);
-                            int index = Math.abs(perFHCounter % fhosts.size());
-                            s_nextForeignHost.put(hostId, ++perFHCounter);
-                            fhost = fhosts.get(index);
-                            if (hostLog.isDebugEnabled()) {
-                                hostLog.debug("bind " + CoreUtils.hsIdToString(hsId) +
-                                        " to " + fhost.hostnameAndIPAndPort() + " nextForeignHost=" +
-                                        perFHCounter + " hostId=" + hostId + " fhosts.size=" + fhosts.size());
-                            }
-                            bindForeignHost(hsId, fhost);
-                        }
+                    int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
+                    fhost = (ForeignHost) fhosts.toArray()[index];
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
+                                " to " + fhost.hostnameAndIPAndPort());
                     }
+                    bindForeignHost(hsId, fhost);
                 }
             } else {
                 // otherwise use primary for a short while
@@ -1499,9 +1481,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    private ForeignHost getPrimary(ImmutableList<ForeignHost> fhosts, int hostId) {
-        ForeignHost fhost = fhosts.get(0);
-        assert fhost.isPrimary();
+    private ForeignHost getPrimary(ImmutableCollection<ForeignHost> fhosts, int hostId) {
+        ForeignHost fhost = null;
+        for (ForeignHost f : fhosts) {
+            if (f.isPrimary()) {
+                fhost = f;
+                break;
+            }
+        }
+        if (fhost == null) { // unlikely
+            networkLog.warn("Attempted to deliver a message to host " +
+                        hostId + " but there is no primary connection to the host.");
+        }
         return fhost;
     }
 
