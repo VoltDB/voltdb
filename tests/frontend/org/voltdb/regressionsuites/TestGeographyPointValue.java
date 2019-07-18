@@ -45,10 +45,7 @@ public class TestGeographyPointValue extends RegressionSuite {
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
-                "insert into t values "
-                        + "(" + startPk + ", "
-                        + "'Bedford', "
-                        + "pointfromtext('" + BEDFORD_PT.toString() + "'));",
+                "insert into t values (" + startPk + ", 'Bedford', pointfromtext('" + BEDFORD_PT.toString() + "'));",
                 new long[] {1});
         startPk++;
 
@@ -58,8 +55,7 @@ public class TestGeographyPointValue extends RegressionSuite {
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         startPk++;
-        validateTableOfScalarLongs(client,
-                "insert into t values (" + startPk + ", 'Atlantis', null);",
+        validateTableOfScalarLongs(client, "insert into t values (" + startPk + ", 'Atlantis', null);",
                 new long[] {1});
         startPk++;
         return startPk;
@@ -68,15 +64,12 @@ public class TestGeographyPointValue extends RegressionSuite {
     public void testInsertDefaultNull() throws IOException, ProcCallException {
         Client client = getClient();
 
-        validateTableOfScalarLongs(client,
-                "insert into t (pk) values (1);",
-                new long[] {1});
+        validateTableOfScalarLongs(client, "insert into t (pk) values (1);", new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, pt from t;").getResults()[0];
         String actual = vt.toString();
         String expectedPart = "NULL";
-        assertTrue(actual + " does not contain " + expectedPart,
-                actual.contains(expectedPart));
+        assertTrue(actual + " does not contain " + expectedPart, actual.contains(expectedPart));
 
         assertTrue(vt.advanceRow());
         long id = vt.getLong(0);
@@ -93,16 +86,14 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "select pt from t where pt is null;").getResults()[0];
         assertTrue(vt.advanceRow());
-        ptByIndex = vt.getGeographyPointValue(0);
+        vt.getGeographyPointValue(0);
         assert(vt.wasNull());
     }
 
     public void testPointFromText() throws Exception {
         Client client = getClient();
 
-        validateTableOfScalarLongs(client,
-                "insert into t (pk) values (1);",
-                new long[] {1});
+        validateTableOfScalarLongs(client, "insert into t (pk) values (1);", new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select pointfromtext('point (-71.2767 42.4906)') from t;").getResults()[0];
@@ -121,22 +112,19 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         // Self join to test EQ operator
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.name, t1.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt = t2.pt "
-                + "order by t1.pk;").getResults()[0];
+                "select t1.pk, t1.name, t1.pt from t as t1, t as t2 where t1.pt = t2.pt order by t1.pk;")
+                .getResults()[0];
 
         assertApproximateContentOfTable(new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
-                {1, "Santa Clara", SANTA_CLARA_PT}},
+                {1, "Santa Clara", SANTA_CLARA_PT}
+                },
                 vt, EPSILON);
 
         // Self join to test not equals operator
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.pt, t2.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt <> t2.pt "
-                + "order by t1.pk, t1.pt;").getResults()[0];
+                "select t1.pk, t1.pt, t2.pt from t as t1, t as t2 where t1.pt <> t2.pt order by t1.pk, t1.pt;")
+                .getResults()[0];
 
         assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
@@ -145,21 +133,16 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         // Self join to test < operator
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.pt, t2.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt < t2.pt "
-                + "order by t1.pk, t1.pt;").getResults()[0];
+                "select t1.pk, t1.pt, t2.pt from t as t1, t as t2 where t1.pt < t2.pt order by t1.pk, t1.pt;")
+                .getResults()[0];
 
-        assertApproximateContentOfTable (new Object[][] {
-                {1, SANTA_CLARA_PT, BEDFORD_PT}},
+        assertApproximateContentOfTable (new Object[][] {{1, SANTA_CLARA_PT, BEDFORD_PT}},
                 vt, EPSILON);
 
         // Self join to test <= operator
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.pt, t2.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt <= t2.pt "
-                + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
+                "select t1.pk, t1.pt, t2.pt from t as t1, t as t2 where t1.pt <= t2.pt order by t1.pk, t1.pt, t2.pt;")
+                .getResults()[0];
 
         assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, BEDFORD_PT},
@@ -169,21 +152,15 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         // Self join to test > operator
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.pt, t2.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt > t2.pt "
-                + "order by t1.pk, t1.pt;").getResults()[0];
+                "select t1.pk, t1.pt, t2.pt from t as t1, t as t2 where t1.pt > t2.pt order by t1.pk, t1.pt;")
+                .getResults()[0];
 
-        assertApproximateContentOfTable (new Object[][] {
-                {0, BEDFORD_PT, SANTA_CLARA_PT}},
-                vt, EPSILON);
+        assertApproximateContentOfTable (new Object[][] {{0, BEDFORD_PT, SANTA_CLARA_PT}}, vt, EPSILON);
 
         // Self join to test >= operator
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.pt, t2.pt "
-                + "from t as t1, t as t2 "
-                + "where t1.pt >= t2.pt "
-                + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
+                "select t1.pk, t1.pt, t2.pt from t as t1, t as t2 where t1.pt >= t2.pt order by t1.pk, t1.pt, t2.pt;")
+                .getResults()[0];
 
         assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
@@ -193,25 +170,17 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         // Test IS NULL
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.name, t1.pt "
-                + "from t as t1 "
-                + "where t1.pt is null "
-                + "order by t1.pk, t1.pt;").getResults()[0];
+                "select t1.pk, t1.name, t1.pt from t as t1 where t1.pt is null order by t1.pk, t1.pt;")
+                .getResults()[0];
 
-        assertApproximateContentOfTable (new Object[][] {
-                {2, "Atlantis", null}},
-                vt, EPSILON);
+        assertApproximateContentOfTable (new Object[][] {{2, "Atlantis", null}}, vt, EPSILON);
 
         // Test IS NOT NULL
         vt = client.callProcedure("@AdHoc",
-                "select t1.pk, t1.name, t1.pt "
-                + "from t as t1 "
-                + "where t1.pt is not null "
-                + "order by t1.pk, t1.pt;").getResults()[0];
+                "select t1.pk, t1.name, t1.pt from t as t1 where t1.pt is not null order by t1.pk, t1.pt;")
+                .getResults()[0];
 
-        assertApproximateContentOfTable (new Object[][] {
-                {0, "Bedford", BEDFORD_PT},
-                {1, "Santa Clara", SANTA_CLARA_PT}},
+        assertApproximateContentOfTable (new Object[][] {{0, "Bedford", BEDFORD_PT}, {1, "Santa Clara", SANTA_CLARA_PT}},
                 vt, EPSILON);
     }
 
@@ -251,16 +220,10 @@ public class TestGeographyPointValue extends RegressionSuite {
         fillTableWithFunnyPoints(client);
 
         VoltTable vt;
-        String query = "select t2.name "
-                + "from t as t1 inner join t as t2 "
-                + "  on t1.pt = t2.pt "
-                + "where t1.name = ? "
-                + "order by t2.pk";
+        String query = "select t2.name from t as t1 inner join t as t2   on t1.pt = t2.pt where t1.name = ? order by t2.pk";
 
         vt = client.callProcedure("@AdHoc", query, "point").getResults()[0];
-        assertContentOfTable(new Object[][] {
-                {"point"},
-                {"closePoint"}},
+        assertContentOfTable(new Object[][] {{"point"}, {"closePoint"}},
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "northPole1").getResults()[0];
@@ -304,20 +267,15 @@ public class TestGeographyPointValue extends RegressionSuite {
         int pk = 0;
         pk = fillTable(client, pk);
         pk = fillTable(client, pk);
-        pk = fillTable(client, pk);
+        fillTable(client, pk);
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select pt, count(*) "
-                + "from t "
-                + "group by pt "
-                + "order by pt asc")
+                "select pt, count(*) from t group by pt order by pt asc")
                 .getResults()[0];
 
-        assertApproximateContentOfTable (new Object[][] {
-            {null, 3},
-            {SANTA_CLARA_PT, 3},
-            {BEDFORD_PT, 3}},
-            vt, EPSILON);
+        assertApproximateContentOfTable(new Object[][] {
+            {null, 3}, {SANTA_CLARA_PT, 3}, {BEDFORD_PT, 3}
+            }, vt, EPSILON);
     }
 
     public void testPointUpdate() throws Exception {
@@ -329,10 +287,7 @@ public class TestGeographyPointValue extends RegressionSuite {
         final GeographyPointValue SAN_JOSE_PT = new GeographyPointValue(-121.8906, 37.3362);
 
         validateTableOfScalarLongs(client,
-                "update t set "
-                + "name = 'Cambridge', "
-                + "pt = pointfromtext('" + CAMBRIDGE_PT + "') "
-                + "where pk = 0",
+                "update t set name = 'Cambridge', pt = pointfromtext('" + CAMBRIDGE_PT + "') where pk = 0",
                 new long[] {1});
 
         validateTableOfScalarLongs(client,
@@ -354,24 +309,18 @@ public class TestGeographyPointValue extends RegressionSuite {
     }
 
     public void testPointArithmetic() throws Exception {
-        Client client = getClient();
-
+        final Client client = getClient();
         fillTable(client, 0);
-
-        verifyStmtFails(client,
-                "select pk, pt + pt from t order by pk",
-                "incompatible data types in combination");
-
-        verifyStmtFails(client,
-                "select pk, pt + 1 from t order by pk",
-                "incompatible data types in combination");
+        final String expectedErrorMessage =
+                USING_CALCITE ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
+        verifyStmtFails(client, "select pk, pt + pt from t order by pk", expectedErrorMessage);
+        verifyStmtFails(client, "select pk, pt + 1 from t order by pk", expectedErrorMessage);
     }
 
     public void testPointNotNull() throws Exception {
         Client client = getClient();
 
-        verifyStmtFails(client,
-                "insert into t_not_null (pk, name) values (0, 'Westchester')",
+        verifyStmtFails(client, "insert into t_not_null (pk, name) values (0, 'Westchester')",
                 "Column PT has no default and is not nullable");
 
         verifyStmtFails(client,
@@ -405,12 +354,11 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt, EPSILON);
 
         try {
-            vt = client.callProcedure("sel_in",
+            client.callProcedure("sel_in",
                     (Object)(new Object[] {SANTA_CLARA_PT, null, LOWELL_PT}))
-                    .getResults()[0];
+                    .getResults();
             fail("Expected an exception to be thrown");
-        }
-        catch (RuntimeException rte) {
+        } catch (RuntimeException rte) {
             // When ENG-9311 is fixed, then we shouldn't get this error and
             // the procedure call should succeed.
             assertTrue(rte.getMessage().contains("GeographyPointValue or GeographyValue instances "
@@ -420,9 +368,8 @@ public class TestGeographyPointValue extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeographyPointValue.class);
+        VoltServerConfig config;
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestGeographyPointValue.class);
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -446,12 +393,12 @@ public class TestGeographyPointValue extends RegressionSuite {
                 ;
         try {
             project.addLiteralSchema(literalSchema);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             fail();
         }
 
-        config = new LocalCluster("point-type-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("point-type-onesite.jar", 1, 1, 0,
+                BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

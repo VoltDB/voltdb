@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -36,21 +35,20 @@ import junit.framework.TestCase;
 
 public class TestLikeQueries extends TestCase {
 
-    static class LikeTest
-    {
+    static class LikeTest {
         String pattern;
         int matches;
         boolean crashes;
         boolean addNot = false;
         String escape  = null;
 
-        public LikeTest(String pattern, int matches) {
+        LikeTest(String pattern, int matches) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = false;
         }
 
-        public LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
+        LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = crashes;
@@ -61,33 +59,32 @@ public class TestLikeQueries extends TestCase {
         public String getClause() {
             String not = (this.addNot ? "NOT " : "");
             String escape = (this.escape != null ? String.format(" ESCAPE '%s'", this.escape) : "");
-            String clause = String.format("%sLIKE '%s'%s", not, this.pattern, escape);
-            return clause;
+            return String.format("%sLIKE '%s'%s", not, this.pattern, escape);
         }
     }
 
     static class NotLikeTest extends LikeTest {
-        public NotLikeTest(String pattern, int matches) {
+        NotLikeTest(String pattern, int matches) {
             super(pattern, matches, false, true, null);
         }
     }
 
     static class EscapeLikeTest extends LikeTest {
-        public EscapeLikeTest(String pattern, int matches, String escape) {
+        EscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, false, false, escape);
         }
     }
 
     static class UnsupportedEscapeLikeTest extends LikeTest {
-        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
+        UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, true, false, escape);
         }
     }
 
     static class LikeTestData {
         public final String val;
-        public final String pat;
-        public LikeTestData(String val, String pat) {
+        final String pat;
+        LikeTestData(String val, String pat) {
             this.val = val;
             this.pat = pat;
         }
@@ -157,7 +154,7 @@ public class TestLikeQueries extends TestCase {
     public static class LikeSuite {
         public void doTests(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             loadForTests(client);
-            if (forHSQLcomparison == false) {
+            if (! forHSQLcomparison) {
                 doViaStoredProc(client);
             }
             doViaAdHoc(client, forHSQLcomparison);
@@ -174,7 +171,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        protected void doViaStoredProc(Client client) throws IOException {
+        private void doViaStoredProc(Client client) throws IOException {
             // Tests based on LikeTest list
             for (LikeTest test : tests) {
                 doTestViaStoredProc(client, test);
@@ -255,7 +252,7 @@ public class TestLikeQueries extends TestCase {
             } catch (ProcCallException e) {
                 System.out.printf("LIKE clause \"%s\" failed\n", clause);
                 System.out.println(e.toString());
-                assertTrue("This failure was unexpected", test.crashes);
+                assertTrue("This failure was unexpected on " + query, test.crashes);
                 System.out.println("(This failure was expected)");
             }
         }

@@ -30,6 +30,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
@@ -95,7 +96,8 @@ public interface SystemProcedureExecutionContext {
      */
     public void updateHashinator(TheHashinator hashinator);
 
-    boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
+    boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter, boolean undo,
+            byte[] predicates);
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 

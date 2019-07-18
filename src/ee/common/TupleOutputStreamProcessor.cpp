@@ -94,7 +94,7 @@ void TupleOutputStreamProcessor::close()
  * Expects buffer space was already checked.
  * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
+bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter, bool *deleteRow)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
@@ -134,7 +134,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            iter->writeRow(tuple);
+            iter->writeRow(tuple, hiddenColumnFilter);
 
             // Check if we'll need to yield after handling this row.
             if (!yield) {

@@ -56,6 +56,7 @@ import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
@@ -406,6 +407,7 @@ public class SnapshotSiteProcessor {
     public void initiateSnapshots(
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
@@ -427,7 +429,7 @@ public class SnapshotSiteProcessor {
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
             int tableId = tablePredicates.getKey();
             TableStreamer streamer =
-                    new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+                    new TableStreamer(tableId, format.getStreamType(), hiddenColumnFilter, m_snapshotTableTasks.get(tableId));
             if (!streamer.activate(context, tablePredicates.getValue())) {
                 VoltDB.crashLocalVoltDB("Failed to activate snapshot stream on table " +
                                         CatalogUtil.getTableNameFromId(context.getDatabase(), tableId), false, null);

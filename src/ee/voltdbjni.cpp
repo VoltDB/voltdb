@@ -108,7 +108,6 @@
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
 #include "common/SegvException.hpp"
-#include "common/RecoveryProtoMessage.h"
 #include "common/ElasticHashinator.h"
 #include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
@@ -425,7 +424,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
-    jlong uniqueId, jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken, jboolean elastic)
+    jlong uniqueId, jlong undoToken, jbyte callerId)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -447,8 +446,8 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
-                                             spHandle, lastCommittedSpHandle, uniqueId,
-                                             returnUniqueViolations, shouldDRStream, undoToken, elastic);
+                                             spHandle, lastCommittedSpHandle, uniqueId, undoToken,
+                                             LoadTableCaller::get(static_cast<LoadTableCaller::Id>(callerId)));
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 
@@ -958,7 +957,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
  * Signature: (JIIIJ[B)Z
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
-        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jlong undoToken,
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jbyte schemaFilterType, jlong undoToken,
         jbyteArray serialized_predicates)
 {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
@@ -973,7 +972,8 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
+            voltdb::HiddenColumnFilter::Type hiddenColumnFilter = static_cast<voltdb::HiddenColumnFilter::Type>(schemaFilterType);
+            bool success = engine->activateTableStream(tableId, tableStreamType, hiddenColumnFilter, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;
@@ -1211,31 +1211,6 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
         topend->crashVoltDB(e);
     }
     return NULL;
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeProcessRecoveryMessage
- * Signature: (JJII)V
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint offset, jint remaining) {
-    //ProfilerEnable();
-    VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    char *data = reinterpret_cast<char*>(buffer_ptr) + offset;
-    try {
-        if (data == NULL) {
-            throwFatalException("Failed to get byte array elements of recovery message");
-        }
-        ReferenceSerializeInputBE input(data, remaining);
-        RecoveryProtoMsg message(&input);
-        return engine->processRecoveryMessage(&message);
-    } catch (const FatalException &e) {
-        topend->crashVoltDB(e);
-    }
-    //ProfilerDisable();
 }
 
 /*

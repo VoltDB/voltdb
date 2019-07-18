@@ -61,7 +61,6 @@
 
 #include "common/ExecuteWithMpMemory.h"
 #include "common/FailureInjection.h"
-#include "common/RecoveryProtoMessage.h"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
@@ -127,7 +126,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_noAvailableUniqueIndex(false)
     , m_smallestUniqueIndex(NULL)
     , m_smallestUniqueIndexCrc(0)
-    , m_drTimestampColumnIndex(-1)
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
     , m_mvTrigger(NULL)
@@ -151,14 +149,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             bool ownsTupleSchema,
                                             int32_t compactionThreshold) {
     vassert(schema != NULL);
-    uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    bool isTableWithMigrate = schema->isTableWithMigrate();
-    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithMigrate) ||
-        (hiddenColumnCount == 2 && isTableWithMigrate))) {
-        m_drTimestampColumnIndex = 0; // The first hidden column
-        // At some point if we have more than one hidden column in a table,
-        // we'll need a system for keeping track of which are which.
-    }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
 
@@ -605,7 +595,7 @@ struct CompiledSwap {
 
 #ifdef NDEBUG
 static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
-    return false;
+    return true;
 }
 #else
 static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
@@ -732,11 +722,10 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
     }
 }
 
-void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
+void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     vassert(hasDRTimestampColumn());
     if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
-        int64_t drTimestamp = ec->currentDRTimestamp();
-        tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), HiddenColumn::getDefaultValue(HiddenColumn::XDCR_TIMESTAMP));
     }
 }
 
@@ -829,11 +818,11 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     // Write to DR stream before everything else to ensure nothing gets left in
     // the index if the append fails.
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
-        setDRTimestampForTuple(ec, target, false);
+        setDRTimestampForTuple(target, false);
     }
 
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
@@ -1028,7 +1017,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
     if (hasDRTimestampColumn() && updateDRTimestamp) {
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
+        setDRTimestampForTuple(sourceTupleWithNewValues, true);
     }
 
     if (isTableWithMigrate(m_tableType)) {
@@ -1462,11 +1451,18 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
      */
     TableTuple tableTuple(m_schema);
     TableIterator ti(this, m_data.begin());
-    if (lookupType != LOOKUP_FOR_UNDO &&
-            m_schema->getUninlinedObjectColumnCount() != 0) {
-        bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
+
+    if (lookupType == LOOKUP_FOR_DR && m_schema->hiddenColumnCount()) {
+        // Force column compare for DR so we can easily use the filter
+        HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
         while (ti.next(tableTuple)) {
-            if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
+            if (tableTuple.equalsNoSchemaCheck(tuple, &filter)) {
+                return tableTuple;
+            }
+        }
+    } else if (lookupType != LOOKUP_FOR_UNDO && m_schema->getUninlinedObjectColumnCount() != 0) {
+        while (ti.next(tableTuple)) {
+            if (tableTuple.equalsNoSchemaCheck(tuple)) {
                 return tableTuple;
             }
         }
@@ -1657,7 +1653,7 @@ std::string PersistentTable::debug(const std::string& spacer) const {
  * Used for snapshot restore and bulkLoad
  */
 void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool *stringPool,
-      ReferenceSerializeOutput *uniqueViolationOutput, bool shouldDRStreamRows, bool ignoreTupleLimit, bool elastic) {
+      ReferenceSerializeOutput *uniqueViolationOutput, const LoadTableCaller &caller) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();
@@ -1681,7 +1677,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
     }
 
     // Check if the column count matches what the temp table is expecting
-    int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+    uint16_t expectedColumnCount = caller.getExpectedColumnCount(m_schema);
     if (colcount != expectedColumnCount) {
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
@@ -1720,7 +1716,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         target.setPendingDeleteOnUndoReleaseFalse();
 
         try {
-            target.deserializeFrom(serialInput, stringPool, elastic);
+            target.deserializeFrom(serialInput, stringPool, caller);
         } catch (SQLException &e) {
             deleteTupleStorage(target);
             throw;
@@ -1730,7 +1726,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         // exceptions should be thrown in the try-block is pretty
         // daring and likely not correct.
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
-                           shouldDRStreamRows, ignoreTupleLimit || elastic);
+                           caller.shouldDrStream(), caller.ignoreTupleLimit());
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -1788,6 +1784,7 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
     TableStreamType streamType,
+    HiddenColumnFilter::Type hiddenColumnFilterType,
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInputBE& serializeIn) {
@@ -1817,7 +1814,9 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
+    const HiddenColumnFilter filter = HiddenColumnFilter::create(hiddenColumnFilterType, m_schema);
+
+    return m_tableStreamer->activateStream(m_surgeon, streamType, filter, predicateStrings);
 }
 
 /**
@@ -1826,6 +1825,7 @@ bool PersistentTable::activateStream(
  * Return true on success or false if it was already active.
  */
 bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
+        HiddenColumnFilter::Type hiddenColumnFilterType,
         boost::shared_ptr<TableStreamerInterface> tableStreamer,
         CatalogId tableId,
         std::vector<std::string>& predicateStrings,
@@ -1835,7 +1835,8 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
     m_tableStreamer = tableStreamer;
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
-        success = m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
+        const HiddenColumnFilter filter = HiddenColumnFilter::create(hiddenColumnFilterType, m_schema);
+        success = m_tableStreamer->activateStream(m_surgeon, streamType, filter, predicateStrings);
     }
     return success;
 }
@@ -1856,26 +1857,6 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor& outputStreams,
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
-}
-
-/**
- * Process the updates from a recovery message
- */
-void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool* pool) {
-    switch (message->msgType()) {
-    case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (isPersistentTableEmpty()) {
-            uint32_t tupleCount = message->totalTupleCount();
-            BOOST_FOREACH (auto index, m_indexes) {
-                index->ensureCapacity(tupleCount);
-            }
-        }
-        loadTuplesFromNoHeader(*message->stream(), pool);
-        break;
-    }
-    default:
-        throwFatalException("Attempted to process a recovery message of unknown type %d", message->msgType());
-    }
 }
 
 /**
@@ -2055,11 +2036,6 @@ void PersistentTable::doIdleCompaction() {
 }
 
 bool PersistentTable::doForcedCompaction() {
-    if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
-            "Deferring compaction until recovery is complete.");
-        return false;
-    }
     bool hadWork1 = true;
     bool hadWork2 = true;
     int64_t notPendingCompactions = 0;
@@ -2118,7 +2094,7 @@ bool PersistentTable::doForcedCompaction() {
         snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
                 "and compacted to the point that the compaction predicate was "
                 "satisfied after %d failed attempts", failedCompactionCountBefore);
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
+        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
         m_failedCompactionCount = 0;
     }
 
@@ -2495,8 +2471,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 }
 
 uint16_t PersistentTable::getMigrateColumnIndex() {
-    // The last column is the migrate column for now.
-    return (m_schema->hiddenColumnCount() -1);
+    return m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
@@ -2521,7 +2496,7 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
-   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %ld, batch remaining: %ld",
         name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
    return true;
 }

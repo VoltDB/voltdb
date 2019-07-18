@@ -192,7 +192,7 @@ public class CatalogContext {
             m_ptool = new PlannerTool(database, m_catalogInfo.m_catalogHash);
         } else {
             m_defaultProcs = defaultProcManager;
-            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);
         }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_catalogInfo.m_jarfile);

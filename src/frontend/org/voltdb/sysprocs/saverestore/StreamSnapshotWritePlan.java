@@ -41,16 +41,13 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Lists;
@@ -132,21 +129,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<>();
-        boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
-            VoltTable schemaTable;
-            final boolean preserveMigrateHiddenColumn = TableType.needsShadowStream(table.getTabletype());
-            if (XDCR && table.getIsdred()) {
-                if (preserveMigrateHiddenColumn) {
-                    schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
-                } else {
-                    schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
-                }
-            } else if (preserveMigrateHiddenColumn) {
-                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
-            } else {
-                schemaTable = CatalogUtil.getVoltTable(table);
-            }
+            VoltTable schemaTable = HiddenColumnFilter.NONE.createSchema(context.getCluster(), table);
             schemas.put(table.getRelativeIndex(),
                         Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
         }

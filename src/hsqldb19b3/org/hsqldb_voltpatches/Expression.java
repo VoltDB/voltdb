@@ -2062,7 +2062,8 @@ public class Expression {
 
         // There should be at least 2 columnref expressions
         if (uniqueColumnrefs.size() < 2) {
-            throw Error.error(ErrorCode.X_42581, "There should be at least 2 unique table/alias");
+            throw Error.error(ErrorCode.X_42581, "Cannot distinguish column reference between two tables. "
+                    + "Use fully qualified names including the table name or alias to avoid ambiguous references");
         }
         VoltXMLElement lastAlternativeExpr = null;
         VoltXMLElement resultColaesceExpr = null;

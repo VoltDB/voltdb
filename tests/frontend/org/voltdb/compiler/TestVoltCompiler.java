@@ -64,7 +64,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;

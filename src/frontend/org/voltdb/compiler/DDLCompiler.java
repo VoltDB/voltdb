@@ -20,14 +20,7 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
@@ -83,7 +76,7 @@ import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.*;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -94,6 +87,7 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.plannerv2.utils.DropTableUtils;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -105,8 +99,6 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
 
-
-
 /**
  * Compiles schema (SQL DDL) text files and stores the results in a given catalog.
  *
@@ -117,7 +109,7 @@ public class DDLCompiler {
     public static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     // These constants should be consistent with the definitions in VoltType.java
     protected static final int MAX_VALUE_LENGTH = 1024 * 1024;
-    private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
+    public static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     private final HSQLInterface m_hsql;
     private final VoltCompiler m_compiler;
@@ -400,16 +392,29 @@ public class DDLCompiler {
      * @param whichProcs  which type(s) of procedures to load
      * @throws VoltCompiler.VoltCompilerException
      */
-    void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
-            throws VoltCompiler.VoltCompilerException {
+    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
         int currLineNo = 1;
 
         DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
+        final StringBuilder ddls = new StringBuilder();
+        boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
-            // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            processVoltDBStatements(db, whichProcs, stmt);
+            final String encodedDropTable;
+            if (isBatch) {      // We cannot query previous database for existing tables in batch mode, as
+                encodedDropTable = null;    // current DDL batch may contain CREATE statements, that is later dropped.
+            } else {
+                encodedDropTable = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
+            }
+            if (encodedDropTable == null) {
+                processVoltDBStatements(db, whichProcs, stmt);
+            } else {        // matched & executed DROP TABLE stmt
+                ddls.append(encodedDropTable);
+            }
             stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
+            isBatch = true;
         }
+        m_fullDDL += ddls;
 
         try {
             reader.close();
@@ -510,7 +515,7 @@ public class DDLCompiler {
             DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
         Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
-        loadSchema(reader, db, whichProcs);
+        loadSchema(reader, db, previousDBIfAny, whichProcs);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
@@ -959,7 +964,6 @@ public class DDLCompiler {
         // note this will need to be decompressed to be used
         String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
-
         // output the xml catalog to disk
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
@@ -980,12 +984,12 @@ public class DDLCompiler {
         // 5.) Start processing materialized views.
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("ud_function")) {
-                addUserDefinedFunctionToCatalog(db, node, isXDCR);
+                addUserDefinedFunctionToCatalog(db, node);
             }
         }
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
-                addTableToCatalog(db, node, isXDCR);
+                addTableToCatalog(db, node, isXDCR);        // Inside the function, it skips when a table catalog had already been created.
             }
         }
 
@@ -995,8 +999,7 @@ public class DDLCompiler {
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
-    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
-                        throws VoltCompilerException {
+    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc) {
         // Fetch out the functions, find the function name and define
         // the function object.
         CatalogMap<Function> catalogFunctions = db.getFunctions();
@@ -1404,7 +1407,11 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-
+        // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
+        if (StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
+            return;
+        }       // Code below this point is not executed any more.
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
         // set max value before return for view table
@@ -2096,7 +2103,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    protected static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
+    public static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {
@@ -2108,7 +2115,7 @@ public class DDLCompiler {
         return stringer.toString();
     }
 
-    private static String convertToJSONObject(AbstractExpression expr) throws JSONException {
+    public static String convertToJSONObject(AbstractExpression expr) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
         expr.toJSONString(stringer);
@@ -2165,8 +2172,8 @@ public class DDLCompiler {
     }
 
     /** Accessor */
-    Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
-        return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
+    Map<Statement, VoltXMLElement> getLimitDeleteStmtToXmlEntries() {
+        return m_limitDeleteStmtToXml;
     }
 
     /**
@@ -2321,14 +2328,14 @@ public class DDLCompiler {
 
         if (! processed) {
             try {
+                // figure out what table this DDL might affect to minimize diff processing
+                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
+
                 //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
                 // kind of ugly.  We hex-encode each statement so we can
                 // avoid embedded newlines so we can delimit statements
                 // with newline.
                 m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-
-                // figure out what table this DDL might affect to minimize diff processing
-                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
 
                 // Get the diff that results from applying this statement and apply it
                 // to our local tree (with Volt-specific additions)
@@ -2337,7 +2344,6 @@ public class DDLCompiler {
                 if (thisStmtDiff != null) {
                     applyDiff(thisStmtDiff);
                 }
-
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {
                     processCreateStreamStatement(stmt, db, whichProcs);

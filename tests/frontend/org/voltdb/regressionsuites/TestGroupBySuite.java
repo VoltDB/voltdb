@@ -183,6 +183,21 @@ public class TestGroupBySuite extends RegressionSuite {
         }
     }
 
+    /** select PK from T1 group by A1, invalid */
+    public void testSelectPKGroupbyA() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        loaderNxN(client, 0);
+
+        // execute the query, expected to fail
+        try {
+            client.callProcedure("@AdHoc", "SELECT PKEY from T1 group by A1");
+            fail("Select list should match group by list");
+        } catch (Exception e){
+            assertTrue(e.getMessage().contains("expression not in aggregate or GROUP BY columns"));
+        }
+    }
+
     /** select B_VAL1 from B group by B_VAL1 */
     public void testSelectGroupbyVarbinary() throws IOException, ProcCallException {
         Client client = this.getClient();

@@ -59,6 +59,7 @@ import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -860,16 +861,13 @@ public class ProcedureRunner {
         return results;
     }
 
-    public byte[] voltLoadTable(String clusterName, String databaseName,
-                    String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean undo)
+    public byte[] voltLoadTable(String tableName, VoltTable data, LoadTableCaller caller)
                     throws VoltAbortException {
         if (data == null || data.getRowCount() == 0) {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
-                    clusterName, databaseName,
-                    tableName, data, returnUniqueViolations, shouldDRStream, undo);
+            return m_site.loadTable(m_txnState, tableName, data, caller);
         } catch (EEException e) {
             String msg = "Failed to load table \"" + tableName + "\"";
             if (e.getMessage() != null) {

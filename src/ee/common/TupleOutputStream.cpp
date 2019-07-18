@@ -41,10 +41,10 @@ std::size_t TupleOutputStream::startRows(int32_t partitionId)
     return m_rowCountPosition;
 }
 
-std::size_t TupleOutputStream::writeRow(const TableTuple &tuple)
+std::size_t TupleOutputStream::writeRow(const TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter)
 {
     const std::size_t startPos = position();
-    tuple.serializeTo(*this, true);
+    tuple.serializeTo(*this, &hiddenColumnFilter);
     const std::size_t endPos = position();
     m_rowCount++;
     std::size_t bytesSerialized = endPos - startPos;

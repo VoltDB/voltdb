@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.VoltDB;
@@ -54,11 +55,12 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         }
 
         logCatalogUpdateInvocation("@UpdateApplicationCatalog");
-
+        // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
         return updateApplication("@UpdateApplicationCatalog",
                                 catalogJarBytes,
                                 deploymentString,
                                 new String[0],
+                                Collections.emptyList(),
                                 null,
                                 false, /* isPromotion */
                                 useDDLSchema);

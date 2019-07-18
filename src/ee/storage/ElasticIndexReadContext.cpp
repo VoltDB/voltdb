@@ -38,7 +38,8 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         const std::vector<std::string> &predicateStrings) :
     TableStreamerContext(table, surgeon, partitionId),
     m_predicateStrings(predicateStrings),
-    m_materialized(false)
+    m_materialized(false),
+    m_filter(HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, table.schema()))
 {}
 
 /**
@@ -141,7 +142,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                 // output.
                 if (!tuple.isPendingDelete()) {
                     // Write the tuple.
-                    yield = outputStreams.writeRow(tuple);
+                    yield = outputStreams.writeRow(tuple, m_filter);
                 } else {
                     throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }
