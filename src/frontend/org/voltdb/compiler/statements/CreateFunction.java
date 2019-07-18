@@ -71,4 +71,8 @@ public abstract class CreateFunction extends StatementProcessor {
         return m_builtInAggregateFunctions.contains(functionName.toUpperCase());
     }
 
+    public static boolean isAllowedDataType(Class<?> type) {
+        return m_allowedDataTypes.contains(type);
+    }
+
 }

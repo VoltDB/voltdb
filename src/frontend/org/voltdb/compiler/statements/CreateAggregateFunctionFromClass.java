@@ -108,26 +108,22 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                 continue;
             }
             found = true;
-            StringBuilder warningMessage = new StringBuilder("function " + funcName + " is ");
             if (!Modifier.isPublic(m.getModifiers())) {
-                warningMessage.append("non-public ");
                 found = false;
             }
             if (Modifier.isStatic(m.getModifiers())) {
-                warningMessage.append("static ");
                 found = false;
             }
-            // start|assemble|combine function should be void,
+            // The return type of start|assemble|combine function should be void,
             // but end function cannot be void
             if (!funcName.equals("end")) {
                 if (!m.getReturnType().equals(Void.TYPE)) {
-                    warningMessage.append("not void ");
                     found = false;
                 }
             }
             else {
-                if (m.getReturnType().equals(Void.TYPE)) {
-                    warningMessage.append("void ");
+                Class<?> returnTypeClass = m.getReturnType();
+                if (returnTypeClass.equals(Void.TYPE) || !isAllowedDataType(returnTypeClass)) {
                     found = false;
                 }
             }
@@ -139,7 +135,9 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             String msg = "Class " + shortName + " has multiple methods named start";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        startMethod = m;
+                        if (m.getParameterCount() == 0) {
+                            startMethod = m;
+                        }
                         break;
                     
                     case "assemble":
@@ -147,7 +145,13 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             String msg = "Class " + shortName + " has multiple methods named assemble";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        assembleMethod = m;
+                        if (m.getParameterCount() == 1) {
+                            // check the parameter types for the assemble method
+                            Class<?> paramTypeClass = m.getParameterTypes()[0];
+                            if (isAllowedDataType(paramTypeClass)) {
+                                assembleMethod = m;
+                            }
+                        }
                         break;
                     
                     case "combine":
@@ -155,7 +159,12 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             String msg = "Class " + shortName + " has multiple methods named combine";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        combineMethod = m;
+                        if (m.getParameterCount() == 1) {
+                            Class<?> paramTypeClass = m.getParameterTypes()[0];
+                            if (paramTypeClass == funcClass) {
+                                combineMethod = m;
+                            }
+                        }
                         break;
                     
                     case "end":
@@ -163,55 +172,28 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             String msg = "Class " + shortName + " has multiple methods named end";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        endMethod = m;
-                        Class<?> returnTypeClass = endMethod.getReturnType();
-                        if (!m_allowedDataTypes.contains(returnTypeClass)) {
-                            String msg = String.format("End has an unsupported return type %s",
-                                returnTypeClass.getName());
-                            throw m_compiler.new VoltCompilerException(msg);
+                        if (m.getParameterCount() == 0) {
+                            endMethod = m;
                         }
                         break;
                 }
             }
-            else {
-                m_compiler.addWarn(warningMessage.toString());
-            }
         }
 
         // check if all four functions appear in the class
-        if (!(startMethod != null && assembleMethod != null && combineMethod != null && endMethod != null)) {
-            String msg = "Cannot find all four functions for the class " + shortName +
-                " for user-defined aggregate function " + functionName;
-            throw m_compiler.new VoltCompilerException(msg);
+        String msg = "In the class " + shortName + " for user-defined aggregate function "
+        + functionName + " , you do not have the correctly formatted method ";
+        if (startMethod == null) {
+            throw m_compiler.new VoltCompilerException(msg + "start");
         }
-
-        // there should not be any parameter for the start method or end method
-        if (startMethod.getParameterCount() > 0 || endMethod.getParameterCount() > 0) {
-            String msg = String.format("Start method or end method should not have any parameter");
-            throw m_compiler.new VoltCompilerException(msg);
+        else if (assembleMethod == null) {
+            throw m_compiler.new VoltCompilerException(msg + "assemble");
         }
-
-        // check the parameter types for the assemble method
-        Class<?>[] paramTypeClasses = assembleMethod.getParameterTypes();
-        int paramCount = paramTypeClasses.length;
-        for (int i = 0; i < paramCount; i++) {
-            Class<?> paramTypeClass = paramTypeClasses[i];
-            if (!m_allowedDataTypes.contains(paramTypeClass)) {
-                String msg = String.format("Assmble has an unsupported parameter type %s at position %d",
-                        paramTypeClass.getName(), i);
-                throw m_compiler.new VoltCompilerException(msg);
-            }
+        else if (combineMethod == null) {
+            throw m_compiler.new VoltCompilerException(msg + "combine");
         }
-
-        // check the parameter type for the combine method
-        if (combineMethod.getParameterCount() != 1) {
-            String msg = String.format("Combine method should only have one parameter");
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-        Class<?> combineParameter = combineMethod.getParameterTypes()[0];
-        if (combineParameter != funcClass) {
-            String msg = String.format("Combine method's parameter should be the type of this class");
-            throw m_compiler.new VoltCompilerException(msg);
+        else if (endMethod == null) {
+            throw m_compiler.new VoltCompilerException(msg + "end");
         }
 
         try {
@@ -221,6 +203,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
             throw new RuntimeException(String.format("Error instantiating class \"%s\"", shortName), e);
         }
         VoltType voltReturnType = VoltType.typeFromClass(endMethod.getReturnType());
+        Class<?>[] paramTypeClasses = assembleMethod.getParameterTypes();
         VoltType[] voltParamTypes = new VoltType[paramTypeClasses.length];
         VoltXMLElement funcXML = new VoltXMLElement("ud_function")
                                     .withValue("name", functionName)
