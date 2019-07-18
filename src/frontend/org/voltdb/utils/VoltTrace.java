@@ -304,7 +304,7 @@ public class VoltTrace implements Runnable {
         private TraceEventFilter() {}
 
         // Return an instance of TraceEventFilter
-        public static TraceEventWrapper getFilterInstance() {
+        public static TraceEventFilter getFilterInstance() {
             if (t_filter == null) {
                 t_filter = new TraceEventFilter();
             }
