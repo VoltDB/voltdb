@@ -80,7 +80,10 @@ public class TraceAgent extends OpsAgent {
 
         subselector = (String)first;
 
-        // check the validity of arguments
+        // Usage: "exec @Trace status"
+        // Check the status of VoltDB tracing tool and the result is returned.
+        // Usage: "exec @Trace dump"
+        // Write the trace events recorded in the buffer to file, and the absolute path of the file is returned
         if ("status".equalsIgnoreCase(subselector) || "dump".equalsIgnoreCase(subselector)) {
             if (numOfParams != 1) {
                 return "Incorrect number of arguments to @Trace " +
@@ -93,6 +96,11 @@ public class TraceAgent extends OpsAgent {
             return null;
         }
 
+        // Enable/Disable the category for VoltDB tracing tool
+        // The tracing tool is turned on automatically when, at least, one category is enabled.
+        // The tracing tool is turned off automatically when there is no enabled category.
+        // Usage: "exec @Trace enable [Category]"
+        // Usage: "exec @Trace disable [Category]"
         if ("enable".equalsIgnoreCase(subselector) || "disable".equalsIgnoreCase(subselector)) {
             if (numOfParams != 2) {
                 return "Incorrect number of arguments to @Trace " +
@@ -111,6 +119,8 @@ public class TraceAgent extends OpsAgent {
                 }
             }
 
+            // Disable all enabled categories and shutdown the VoltDB tracing tool
+            // Usage: "exec @Trace disable ALL"
             if ("ALL".equalsIgnoreCase(categoryItem)) {
                 obj.put("subselector", subselector);
                 obj.put("categories", categoryItem);
@@ -123,22 +133,29 @@ public class TraceAgent extends OpsAgent {
                     categoryItem;
         }
 
+        // Trace event filter of VoltDB Tracing tool
+        // Usage: "exec @Trace filter [filterTime]"
+        // The filter is turned on automatically when filterTime is positive.
+        // Usage: "exec @Trace filter 0"
+        // The filter is turned off automatically by setting the filterTime to be zero.
         if ("filter".equalsIgnoreCase(subselector)) {
             if (numOfParams != 2) {
                 return "Incorrect number of arguments to @Trace " +
                         subselector + " (expected: 2,  received: " +
                         numOfParams + ")";
             }
-
+            // filterTime is a latency target set by the customers
+            // It is used as the threshold to filter the trace events,
+            // whose latencies are larger than the filterTime.
             String filterTime = paramsArray[1].toString();
             try {
-                double f_time = Double.parseDouble(filterTime);
-                if (f_time < 0) {
+                double time = Double.parseDouble(filterTime);
+                if (time < 0) {
                     return "Second argument of @Trace filter must be a non-negative numeric number";
                 }
             } catch (NumberFormatException | NullPointerException e) {
                 return "Incorrect type of second argument of @Trace filter " +
-                        filterTime + " (It must be an double number)";
+                        filterTime + " (It must be a double-precision number)";
             }
 
             obj.put("subselector", subselector);
