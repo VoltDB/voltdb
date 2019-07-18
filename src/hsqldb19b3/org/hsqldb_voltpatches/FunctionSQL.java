@@ -47,6 +47,8 @@ import org.voltdb.VoltType;
 
 import java.util.NoSuchElementException;
 
+import java.util.NoSuchElementException;
+
 /**
  * Implementation of SQL standard function calls
  *
