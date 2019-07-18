@@ -541,23 +541,27 @@ public class VoltZK {
         }
         try {
             zk.delete(node, -1);
-            if (log != null) {
-                log.info("Action blocker " + node + " removed.");
-            }
-            return true;
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NONODE) {
+                if (log != null) {
+                    log.info("Action blocker " + node + " does not exist.");
+                }
                 return true;
             }
             if (log != null) {
                 log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
             }
+            return false;
         } catch (InterruptedException e) {
             if (log != null) {
                 log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
             }
+            return false;
         }
-        return false;
+        if (log != null) {
+            log.info("Remove action blocker " + node + " successfully.");
+        }
+        return true;
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
