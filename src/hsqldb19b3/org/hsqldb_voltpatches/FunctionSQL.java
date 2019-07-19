@@ -43,9 +43,6 @@ import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
-import org.voltdb.VoltType;
-
-import java.util.NoSuchElementException;
 
 import java.util.NoSuchElementException;
 
