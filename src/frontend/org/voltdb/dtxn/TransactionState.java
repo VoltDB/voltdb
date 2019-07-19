@@ -18,8 +18,10 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -113,6 +115,11 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_isReadOnly;
     }
 
+    // emptySet indicate to all all partitions
+    public Set<Integer> getInvolvedPartitions() {
+        return Collections.emptySet();
+    }
+
     public boolean isForReplay() {
         return m_isForReplay;
     }
@@ -127,6 +134,8 @@ public abstract class TransactionState extends OrderableTransaction  {
      * sane results by subclasses.
      */
     public abstract boolean isSinglePartition();
+
+    public boolean isNPartTxn() {return false;}
 
     public void setHash(Integer hash) {
         m_hash = hash == null ? 0 : hash; // don't allow null

@@ -17,16 +17,19 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
@@ -34,10 +37,13 @@ import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
+
 /**
  * Provide an implementation of the TransactionTaskQueue specifically for the MPI.
  * This class will manage separating the stream of reads and writes to different
  * Sites and block appropriately so that reads and writes never execute concurrently.
+ *
+ * Extend the responsibility of the MpTransactionTaskQueue that handles concurrent scheduling non overlappping 2p txn
  */
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
@@ -45,20 +51,42 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     // Track the current writes and reads in progress.  If writes contains anything, reads must be empty,
     // and vice versa
-    private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
-    private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
-    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+
+    // System allow mp/np txn in following 3 states
+    // 1. one mp write txn
+    // 2. multiple Np write and np read txns
+    // 3. multiple np read and mp read txns
+    private Map.Entry<Long, TransactionTask> m_currentMpWrite;
+    private final Map<Long, TransactionTask> m_currentNpWrites = new HashMap<>();
+    private final Map<Long, TransactionTask> m_currentMpReads = new HashMap<>();
+    private final Map<Long, TransactionTask> m_currentNpReads = new HashMap<>();
+    private int m_numberOfPartitions;
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<>();
+    // secondary backlog
+    private Map<Long, TransactionTask> m_npBacklog = new HashMap<>();
+    // TODO: handle partition count changes case during elastic operation
+    private ImmutableList<Deque<Long>> m_ledgerForWrite;
+    private ImmutableList<Deque<Long>> m_ledgerForRead;
 
     private NpSitePool m_sitePool = null;
 
     private long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    MpTransactionTaskQueue(SiteTaskerQueue queue)
+    MpTransactionTaskQueue(SiteTaskerQueue queue, int numberOfPartitions)
     {
         super(queue, false);
+        m_numberOfPartitions = numberOfPartitions;
+        ImmutableList.Builder<Deque<Long>> builderForRead = ImmutableList.builder();
+        ImmutableList.Builder<Deque<Long>> builderForWrite = ImmutableList.builder();
+        for (int i=0; i< m_numberOfPartitions; i++){
+            builderForRead.add(new ArrayDeque<>());
+            builderForWrite.add(new ArrayDeque<>());
+        }
+        m_ledgerForWrite = builderForWrite.build();
+        m_ledgerForRead = builderForRead.build();
     }
 
-    void setMpRoSitePool(NpSitePool sitePool)
+    void setNpSitePool(NpSitePool sitePool)
     {
         m_sitePool = sitePool;
     }
@@ -88,8 +116,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * TransactionTaskQueue.
      */
     @Override
-    synchronized void offer(TransactionTask task)
-    {
+    synchronized void offer(TransactionTask task) {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         m_backlog.addLast(task);
         taskQueueOffer();
@@ -106,25 +133,43 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
         Map<Long, TransactionTask> currentSet;
-        boolean readonly = true;
-        if (!m_currentReads.isEmpty()) {
-            assert(m_currentWrites.isEmpty());
+        if (m_currentMpWrite != null) {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + balanceSPI);
-            }
-            for (Long txnId : m_currentReads.keySet()) {
-                m_sitePool.repair(txnId, task);
-            }
-            currentSet = m_currentReads;
-        }
-        else {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + balanceSPI);
+                tmLog.debug("MpTTQ: repairing MP writes. MigratePartitionLeader:" + balanceSPI);
             }
             m_taskQueue.offer(task);
-            currentSet = m_currentWrites;
-            readonly = false;
+            currentSet = Collections.singletonMap(m_currentMpWrite.getKey(), m_currentMpWrite.getValue());
+        } else {
+            currentSet = new HashMap<>();
+            if (!m_currentNpWrites.isEmpty()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + balanceSPI);
+                }
+                for (Long txnId : m_currentNpWrites.keySet()) {
+                    m_sitePool.repair(txnId, task);
+                }
+                currentSet.putAll(m_currentNpWrites);
+            }
+            if (!m_currentNpReads.isEmpty()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("MpTTQ: repairing NP reads. MigratePartitionLeader:" + balanceSPI);
+                }
+                for (Long txnId : m_currentNpReads.keySet()) {
+                    m_sitePool.repair(txnId, task);
+                }
+                currentSet.putAll(m_currentNpReads);
+            }
+            if (!m_currentMpReads.isEmpty()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("MpTTQ: repairing MP reads. MigratePartitionLeader:" + balanceSPI);
+                }
+                for (Long txnId : m_currentMpReads.keySet()) {
+                    m_sitePool.repair(txnId, task);
+                }
+                currentSet.putAll(m_currentMpReads);
+            }
         }
+
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
@@ -177,10 +222,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
     }
 
-    private void taskQueueOffer(TransactionTask task)
-    {
+    private void offerTaskToPoolOrSite(TransactionTask task, boolean toSitePool) {
         Iv2Trace.logSiteTaskerQueueOffer(task);
-        if (task.getTransactionState().isReadOnly()) {
+        if (toSitePool) {
             m_sitePool.doWork(task.getTxnId(), task);
         }
         else {
@@ -188,43 +232,124 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
     }
 
+    private boolean isInvolvedPartitionsAvailable(TransactionTask task) {
+        Set<Integer> partitions = task.getTransactionState().getInvolvedPartitions();
+        boolean readOnly = task.getTransactionState().isReadOnly();
+        boolean retval = true;
+        if (readOnly) {
+            for (int partition : partitions) {
+                if (!m_ledgerForWrite.get(partition).isEmpty()) {
+                    retval = false;
+                }
+                m_ledgerForRead.get(partition).offer(task.getTxnId());
+            }
+            if (retval) {
+                m_currentNpReads.put(task.getTxnId(), task);
+            }
+        } else {
+            retval = m_currentMpReads.isEmpty();
+            for (int partition : partitions) {
+                if (!m_ledgerForWrite.get(partition).isEmpty() || !m_ledgerForRead.get(partition).isEmpty()) {
+                    retval = false;
+                }
+                m_ledgerForWrite.get(partition).offer(task.getTxnId());
+            }
+            if (retval) {
+                m_currentNpWrites.put(task.getTxnId(), task);
+            }
+        }
+
+        return retval;
+    }
+
     private boolean taskQueueOffer()
     {
         // Do we have something to do?
-        // - If so, is it a write?
-        //   - If so, are there reads or writes outstanding?
-        //     - if not, pull it from the backlog, add it to current write set, and queue it
+        // - If so, is it a MP write?
+        //   - If so, are there reads or writes outstanding ?
+        //     - if not, pull it from the backlog, add it to the current write set, and queue it
         //     - if so, bail for now
-        //   - If not, are there writes outstanding?
+
+        //   - If not, is it NP Txn?
+        //     - if so, while there are NP txn on the backlog and pool has capacity:
+        //          - pull from backlog
+        //          - if it's write
+        //              - are there reads or writes outstanding on involved partitions
+        //                  - if not, add to current write set, queue it
+        //                  - if so, put to the secondary backlog (per partition based)
+        //          - if it's read
+        //              - are there writes outstanding on involved partitions
+        //                  - if not, add to current read set, queue it
+        //                  - if so, put to the secondary backlog (per partition based)
+
         //     - if not, while there are reads on the backlog and the pool has capacity:
-        //       - pull the read from the backlog, add it to the current read set, and queue it.
+        //       - pull the read from the backlog, add it to the  current read set, and queue it
         //       - bail when done
         //     - if so, bail for now
 
         boolean retval = false;
-        if (!m_backlog.isEmpty()) {
-            // We may not queue the next task, just peek to get the read-only state
-            TransactionTask task = m_backlog.peekFirst();
-            if (!task.getTransactionState().isReadOnly()) {
-                if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-                    task = m_backlog.pollFirst();
-                    m_currentWrites.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
+        if (m_currentMpWrite == null) {
+            // loop through the ledger first
+            Map<Long, Integer> count = new HashMap<>();
+            for (int i = 0; i < m_numberOfPartitions; i++) {
+                if (!m_ledgerForWrite.get(i).isEmpty()) {
+                    long txnId = m_ledgerForWrite.get(i).getFirst();
+                    count.put(txnId, count.getOrDefault(txnId, 0) + 1);
+                } else if (!m_ledgerForRead.get(i).isEmpty()) {
+                    long txnId = m_ledgerForRead.get(i).getFirst();
+                    count.put(txnId, count.getOrDefault(txnId, 0) + 1);
+                }
+            }
+            for (Map.Entry<Long, Integer> pair: count.entrySet()) {
+                TransactionTask task = m_npBacklog.get(pair.getKey());
+                assert(task != null);
+                if (pair.getValue() == task.getTransactionState().getInvolvedPartitions().size()) {
+                    m_npBacklog.remove(pair.getKey());
+                    if (task.getTransactionState().isReadOnly()) {
+                        m_currentNpReads.put(task.getTxnId(), task);
+                    } else {
+                        m_currentNpWrites.put(task.getTxnId(), task);
+                    }
+                    offerTaskToPoolOrSite(task, true);
                     retval = true;
                 }
             }
-            else if (m_currentWrites.isEmpty()) {
-                while (task != null && task.getTransactionState().isReadOnly() &&
-                       m_sitePool.canAcceptWork())
-                {
-                    task = m_backlog.pollFirst();
-                    assert(task.getTransactionState().isReadOnly());
-                    m_currentReads.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
-                    // Prime the pump with the head task, if any.  If empty,
-                    // task will be null
-                    task = m_backlog.peekFirst();
+            if (!m_backlog.isEmpty()) {
+                // We may not queue the next task, just peek to get the read-only state
+                TransactionTask task = m_backlog.peekFirst();
+                if (!task.getTransactionState().isNPartTxn() && !task.getTransactionState().isReadOnly()) { // MP write
+                    if (m_currentMpReads.isEmpty() && m_currentNpReads.isEmpty() && m_currentNpWrites.isEmpty()) {
+                        task = m_backlog.pollFirst();
+                        m_currentMpWrite = Maps.immutableEntry(task.getTxnId(), task);
+                        offerTaskToPoolOrSite(task, false);
+                        retval = true;
+                    }
+                } else if (task.getTransactionState().isNPartTxn()) { // NP txn
+                    while (task != null && task.getTransactionState().isNPartTxn() &&
+                            m_sitePool.canAcceptWork()) {
+                        task = m_backlog.pollFirst();
+                        if (isInvolvedPartitionsAvailable(task)) {
+                            offerTaskToPoolOrSite(task, true);
+                            retval = true;
+                        } else {
+                            m_npBacklog.put(task.getTxnId(), task);
+                        }
+                        // Prime the pump with the head task, if any.  If empty,
+                        // task will be null
+                        task = m_backlog.peekFirst();
+                    }
+                } else if (m_currentNpWrites.isEmpty()) { // MP read
+                    while (task != null && task.getTransactionState().isReadOnly() &&
+                            m_sitePool.canAcceptWork()) {
+                        task = m_backlog.pollFirst();
+                        assert (task.getTransactionState().isReadOnly());
+                        m_currentMpReads.put(task.getTxnId(), task);
+                        offerTaskToPoolOrSite(task, true);
+                        retval = true;
+                        // Prime the pump with the head task, if any.  If empty,
+                        // task will be null
+                        task = m_backlog.peekFirst();
+                    }
                 }
             }
         }
@@ -237,21 +362,35 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * submit additional tasks to be done, determined by whatever the current state is.
      * See giant comment at top of taskQueueOffer() for what happens.
      */
+    // TODO: remove the unused returned offered value
     @Override
     synchronized int flush(long txnId)
     {
         int offered = 0;
-        if (m_currentReads.containsKey(txnId)) {
-            m_currentReads.remove(txnId);
+        if (m_currentMpReads.containsKey(txnId)) {
+            m_currentMpReads.remove(txnId);
             m_sitePool.completeWork(txnId);
+        } else if (m_currentNpReads.containsKey(txnId)) {
+            TransactionTask task = m_currentNpReads.remove(txnId);
+            Set<Integer> partitions = task.getTransactionState().getInvolvedPartitions();
+            for (int partition: partitions) {
+                m_ledgerForRead.get(partition).remove(txnId);
+            }
+            m_sitePool.completeWork(txnId);
+        } else if (m_currentNpWrites.containsKey(txnId)) {
+            TransactionTask task = m_currentNpWrites.remove(txnId);
+            Set<Integer> partitions = task.getTransactionState().getInvolvedPartitions();
+            for (int partition: partitions) {
+                m_ledgerForWrite.get(partition).remove(txnId);
+            }
+            m_sitePool.completeWork(txnId);
+        } else {
+            assert(txnId == m_currentMpWrite.getKey());
+            m_currentMpWrite = null;
         }
-        else {
-            assert(m_currentWrites.containsKey(txnId));
-            m_currentWrites.remove(txnId);
-            assert(m_currentWrites.isEmpty());
-        }
+
         if (taskQueueOffer()) {
-            ++offered;
+            ++offered; // TODO: for np, this offered is not accurate
         }
         return offered;
     }
@@ -264,21 +403,22 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     @Override
     synchronized void restart()
     {
-        if (!m_currentReads.isEmpty()) {
+        if (m_currentMpWrite != null) {
+            assert (m_currentNpReads.isEmpty() & m_currentNpWrites.isEmpty() && m_currentMpReads.isEmpty());
+            offerTaskToPoolOrSite(m_currentMpWrite.getValue(), false);
+        } else {
             // re-submit all the tasks in the current read set to the pool.
             // the pool will ensure that things submitted with the same
             // txnID will go to the the NpSite which is currently running it
-            for (TransactionTask task : m_currentReads.values()) {
-                taskQueueOffer(task);
+            for (TransactionTask task : m_currentNpWrites.values()) {
+                offerTaskToPoolOrSite(task, true);
             }
-        }
-        else {
-            assert(!m_currentWrites.isEmpty());
-            TransactionTask task;
-            // There currently should only ever be one current write.  This
-            // is the awkward way to get a single value out of a Map
-            task = m_currentWrites.entrySet().iterator().next().getValue();
-            taskQueueOffer(task);
+            for (TransactionTask task : m_currentNpReads.values()) {
+                offerTaskToPoolOrSite(task, true);
+            }
+            for (TransactionTask task : m_currentMpReads.values()) {
+                offerTaskToPoolOrSite(task, true);
+            }
         }
     }
 
@@ -312,6 +452,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 }
             }
         }
+        sb.append("\tcurrent mp write: ").append(m_currentMpWrite).append("\n");
+        sb.append("\tcurrent mp reads: ").append(m_currentMpReads).append("\n");
+        sb.append("\tcurrent np write: ").append(m_currentNpWrites).append("\n");
+        sb.append("\tcurrent np read: ").append(m_currentNpReads).append("\n");
+
+
     }
 
     private String getProcName(TransactionTask task) {

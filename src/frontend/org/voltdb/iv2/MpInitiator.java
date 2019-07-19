@@ -51,7 +51,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId, int numberOfPartitions)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -60,7 +60,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                     MP_INIT_PID,
                     buddyHSIds,
                     new SiteTaskerQueue(MP_INIT_PID),
-                    leaderId),
+                    leaderId, numberOfPartitions),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);
@@ -93,7 +93,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                 catalogContext,
                 m_partitionId,
                 m_initiatorMailbox);
-        sched.setMpRoSitePool(sitePool);
+        sched.setNpSitePool(sitePool);
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition

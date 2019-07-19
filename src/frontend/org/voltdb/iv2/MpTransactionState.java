@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +56,8 @@ import org.voltdb.utils.VoltTrace;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+
+import javax.annotation_voltpatches.concurrent.Immutable;
 
 public class MpTransactionState extends TransactionState
 {
@@ -268,6 +271,15 @@ public class MpTransactionState extends TransactionState
     public boolean isSinglePartition()
     {
         return false;
+    }
+
+    @Override
+    public Set<Integer> getInvolvedPartitions() {
+        if (m_nPartTxn) {
+            return m_masterHSIds.keySet();
+        } else {
+            return Collections.emptySet();
+        }
     }
 
     @Override
@@ -762,6 +774,7 @@ public class MpTransactionState extends TransactionState
         return m_masterHSIds.get(partition);
     }
 
+    @Override
     public boolean isNPartTxn() {
         return m_nPartTxn;
     }

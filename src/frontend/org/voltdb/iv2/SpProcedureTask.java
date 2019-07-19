@@ -40,7 +40,7 @@ import org.voltdb.utils.VoltTrace;
  * Implements the single partition procedure ProcedureTask.
  * Runs single partition procedures against a SiteConnection
  */
-public class SpProcedureTask extends ProcedureTask
+public class SpProcedureTask extends ProcedureTask<SpTransactionState>
 {
     private static final boolean EXEC_TRACE_ENABLED;
     private static final boolean HOST_DEBUG_ENABLED;

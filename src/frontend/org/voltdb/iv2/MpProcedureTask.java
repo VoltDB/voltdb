@@ -46,7 +46,7 @@ import com.google_voltpatches.common.collect.Maps;
  * Runs multi-partition transaction, causing work to be distributed
  * across the cluster as necessary.
  */
-public class MpProcedureTask extends ProcedureTask
+public class MpProcedureTask extends ProcedureTask<MpTransactionState>
 {
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters

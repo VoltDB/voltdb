@@ -38,11 +38,11 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
 
-abstract public class ProcedureTask extends TransactionTask
+abstract public class ProcedureTask<S extends TransactionState> extends TransactionTask
 {
     final Mailbox m_initiator;
     final String m_procName;
-    ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
+    ProcedureTask(Mailbox initiator, String procName, S txn,
                   TransactionTaskQueue queue)
     {
         super(txn, queue);

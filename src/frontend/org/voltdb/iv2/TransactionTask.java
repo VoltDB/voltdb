@@ -27,7 +27,7 @@ import org.voltdb.dtxn.TransactionState;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-public abstract class TransactionTask extends SiteTasker
+public abstract class TransactionTask<S extends TransactionState> extends SiteTasker
 {
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -39,11 +39,11 @@ public abstract class TransactionTask extends SiteTasker
         m_rawDummyResult = dummyResult.buildReusableDependenyResult();
     }
 
-    final protected TransactionState m_txnState;
+    final protected S m_txnState;
     final protected TransactionTaskQueue m_queue;
     protected ListenableFuture<Object> m_durabilityBackpressureFuture = null;
 
-    public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
+    public TransactionTask(S txnState, TransactionTaskQueue queue)
     {
         m_txnState = txnState;
         m_queue = queue;
@@ -83,7 +83,7 @@ public abstract class TransactionTask extends SiteTasker
     // MP read-write task need to be coordinated.
     abstract public boolean needCoordination();
 
-    public TransactionState getTransactionState()
+    public S getTransactionState()
     {
         return m_txnState;
     }
