@@ -88,7 +88,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                 numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
         // Hacky
         MpScheduler sched = m_scheduler;
-        MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
+        NpSitePool sitePool = new NpSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
                 m_partitionId,

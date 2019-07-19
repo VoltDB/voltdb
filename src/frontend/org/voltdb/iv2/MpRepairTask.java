@@ -75,7 +75,7 @@ public class MpRepairTask extends SiteTasker
     @Override
     public void run(SiteProcedureConnection connection) {
 
-        // When MP is processing reads, the task will be queued to all MpRoSite but the task is processed only on one of MpRoSite.
+        // When MP is processing reads, the task will be queued to all NpSite but the task is processed only on one of NpSite.
         synchronized (m_lock) {
             if (!m_repairRan) {
                 try {

@@ -54,14 +54,14 @@ public class TestMpTransactionTaskQueue extends TestCase
     }
 
     SiteTaskerQueue m_writeQueue;
-    MpRoSitePool m_MPpool;
+    NpSitePool m_MPpool;
     MpTransactionTaskQueue m_dut;
 
     @Override
     public void setUp()
     {
         m_writeQueue = mock(SiteTaskerQueue.class);
-        m_MPpool = mock(MpRoSitePool.class);
+        m_MPpool = mock(NpSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
         m_dut = new MpTransactionTaskQueue(m_writeQueue);
@@ -70,7 +70,7 @@ public class TestMpTransactionTaskQueue extends TestCase
 
     // Test cases:
 
-    // Reads will continue to emit until the MpRoSite pool says stop
+    // Reads will continue to emit until the NpSite pool says stop
     @Test
     public void testMultiReads()
     {
@@ -97,7 +97,7 @@ public class TestMpTransactionTaskQueue extends TestCase
         for (int i = 0; i < 10; i++) {
             // flush will cause the pool to be able to accept work before it
             // attempts to give it more, we'll have to fake it by telling the mock
-            // to accept more before flush, then we'll test MpRoSitePool separately
+            // to accept more before flush, then we'll test NpSitePool separately
             when(m_MPpool.canAcceptWork()).thenReturn(true);
             m_dut.flush(activeTxns.get(i));
             verify(m_MPpool).completeWork(activeTxns.get(i));

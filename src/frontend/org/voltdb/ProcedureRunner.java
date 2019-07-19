@@ -235,8 +235,8 @@ public class ProcedureRunner {
             return m_ee;
         }
         // m_site is declared as SiteProcedureConnection here.
-        // SiteProcedureConnection only has two implementations: Site and MpRoSite.
-        // Only SP site has an underlying ExecutionEngine, MpRoSite does not.
+        // SiteProcedureConnection only has two implementations: Site and NpSite.
+        // Only SP site has an underlying ExecutionEngine, NpSite does not.
         if (m_site instanceof Site) {
             m_ee = ((Site)m_site).getExecutionEngine();
             return m_ee;

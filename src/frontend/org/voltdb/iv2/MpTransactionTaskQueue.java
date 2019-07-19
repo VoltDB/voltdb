@@ -49,7 +49,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    private MpRoSitePool m_sitePool = null;
+    private NpSitePool m_sitePool = null;
 
     private long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
@@ -58,7 +58,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         super(queue, false);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(NpSitePool sitePool)
     {
         m_sitePool = sitePool;
     }
@@ -267,7 +267,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (!m_currentReads.isEmpty()) {
             // re-submit all the tasks in the current read set to the pool.
             // the pool will ensure that things submitted with the same
-            // txnID will go to the the MpRoSite which is currently running it
+            // txnID will go to the the NpSite which is currently running it
             for (TransactionTask task : m_currentReads.values()) {
                 taskQueueOffer(task);
             }

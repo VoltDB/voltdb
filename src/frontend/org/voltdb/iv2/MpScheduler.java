@@ -29,7 +29,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -51,8 +50,6 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.ProClass;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -99,7 +96,7 @@ public class MpScheduler extends Scheduler
         m_leaderMigrationMap = Maps.newHashMap();
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(NpSitePool sitePool)
     {
         m_pendingTasks.setMpRoSitePool(sitePool);
     }

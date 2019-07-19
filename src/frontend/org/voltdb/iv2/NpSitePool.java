@@ -35,34 +35,34 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.StarvationTracker;
 
 /**
- * Provide a pool of MP Read-only sites to do MP RO work.
+ * Provide a pool of NP sites to do MP or NP work
  * This should be owned by the MpTransactionTaskQueue and expects all operations
  * to be done while holding its lock.
  */
-class MpRoSitePool {
+class NpSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
+    // TODO: adjust size for allow more parallelism
     static final int MAX_POOL_SIZE = Integer.getInteger("MPI_READ_POOL_SIZE", 3);
     static final int INITIAL_POOL_SIZE = 1;
 
-    class MpRoSiteContext {
+    class NpSiteContext {
         final private SiteTaskerQueue m_queue;
-        final private MpRoSite m_site;
+        final private NpSite m_site;
         final private CatalogContext m_catalogContext;
         final private LoadedProcedureSet m_loadedProcedures;
         final private Thread m_siteThread;
 
-        MpRoSiteContext(long siteId, BackendTarget backend,
-                CatalogContext context, int partitionId,
-                InitiatorMailbox initiatorMailbox,
-                ThreadFactory threadFactory)
-        {
+        NpSiteContext(long siteId, BackendTarget backend,
+                      CatalogContext context, int partitionId,
+                      InitiatorMailbox initiatorMailbox,
+                      ThreadFactory threadFactory) {
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue(partitionId);
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
             m_queue.setupQueueDepthTracker(siteId);
-            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
+            m_site = new NpSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_loadedProcedures = new LoadedProcedureSet(m_site);
             m_loadedProcedures.loadProcedures(m_catalogContext);
             m_site.setLoadedProcedures(m_loadedProcedures);
@@ -96,15 +96,15 @@ class MpRoSitePool {
         }
     }
 
-    // Stack of idle MpRoSites
-    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<>();
+    // Stack of idle NpSites
+    private Deque<NpSiteContext> m_idleSites = new ArrayDeque<>();
     // Active sites, hashed by the txnID they're working on
-    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<>();
+    private Map<Long, NpSiteContext> m_busySites = new HashMap<>();
 
     //The reference for all sites, used for shutdown
-    private List<MpRoSiteContext> m_allSites = Collections.synchronizedList(new ArrayList<>());
+    private final List<NpSiteContext> m_allSites = Collections.synchronizedList(new ArrayList<>());
 
-    // Stuff we need to construct new MpRoSites
+    // Stuff we need to construct new NpSites
     private final long m_siteId;
     private final BackendTarget m_backend;
     private final int m_partitionId;
@@ -113,27 +113,26 @@ class MpRoSitePool {
     private ThreadFactory m_poolThreadFactory;
     private volatile boolean m_shuttingDown = false;
 
-    MpRoSitePool(
+    NpSitePool(
             long siteId,
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            InitiatorMailbox initiatorMailbox)
-    {
+            InitiatorMailbox initiatorMailbox) {
         m_siteId = siteId;
         m_backend = backend;
         m_catalogContext = context;
         m_partitionId = partitionId;
         m_initiatorMailbox = initiatorMailbox;
         m_poolThreadFactory =
-            CoreUtils.getThreadFactory("RO MP Site - " + CoreUtils.hsIdToString(m_siteId),
-                    CoreUtils.MEDIUM_STACK_SIZE);
+                CoreUtils.getThreadFactory("Np Site - " + CoreUtils.hsIdToString(m_siteId),
+                        CoreUtils.MEDIUM_STACK_SIZE);
 
         tmLog.info("Setting maximum size of MPI read pool to: " + MAX_POOL_SIZE);
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-            MpRoSiteContext site = new MpRoSiteContext(m_siteId,
+            NpSiteContext site = new NpSiteContext(m_siteId,
                     m_backend,
                     m_catalogContext,
                     m_partitionId,
@@ -147,8 +146,7 @@ class MpRoSitePool {
     /**
      * Update the catalog
      */
-    void updateCatalog(String diffCmds, CatalogContext context)
-    {
+    void updateCatalog(String diffCmds, CatalogContext context) {
         if (m_shuttingDown) {
             return;
         }
@@ -157,9 +155,9 @@ class MpRoSitePool {
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
         // whatever they started before the catalog update
-        Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
+        Iterator<NpSiteContext> siterator = m_idleSites.iterator();
         while (siterator.hasNext()) {
-            MpRoSiteContext site = siterator.next();
+            NpSiteContext site = siterator.next();
             if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()
                     || site.getCatalogVersion() != m_catalogContext.catalogVersion) {
                 site.shutdown();
@@ -172,33 +170,30 @@ class MpRoSitePool {
     /**
      * update cluster settings
      */
-    void updateSettings(CatalogContext context)
-    {
+    void updateSettings(CatalogContext context) {
         m_catalogContext = context;
     }
 
     /**
-     * Repair: Submit the provided task to the MpRoSite running the transaction associated
+     * Repair: Submit the provided task to the NpSite running the transaction associated
      * with txnId.  This occurs when the MPI has survived a node failure and needs to interrupt and
      * re-run the current MP transaction; this task is used to run the repair algorithm in the site thread.
      */
-    void repair(long txnId, SiteTasker task)
-    {
+    void repair(long txnId, SiteTasker task) {
         if (m_busySites.containsKey(txnId)) {
-            MpRoSiteContext site = m_busySites.get(txnId);
+            NpSiteContext site = m_busySites.get(txnId);
             site.offer(task);
-        }
-        else {
+        } else {
             // Should be impossible
+            // TODO: change to non-fatal
             throw new RuntimeException("MPI repair attempted to repair transaction: " + txnId);
         }
     }
 
     /**
-     * Is there a RO site available to do MP RO work?
+     * Is there a NP site available to do work?
      */
-    boolean canAcceptWork()
-    {
+    boolean canAcceptWork() {
         //lock down the pool and accept no more work upon shutting down.
         if (m_shuttingDown) {
             return false;
@@ -207,23 +202,23 @@ class MpRoSitePool {
     }
 
     /**
-     * Attempt to start the transaction represented by the given task.  Need the txn ID for future reference.
+     * Attempt to start the transaction represented by the given task.
+     * Need the txn ID for future reference.
+     *
      * @return true if work was started successfully, false if not.
      */
-    boolean doWork(long txnId, TransactionTask task)
-    {
+    boolean doWork(long txnId, TransactionTask task) {
         boolean retval = canAcceptWork();
         if (!retval) {
             return false;
         }
-        MpRoSiteContext site;
+        NpSiteContext site;
         // Repair case
         if (m_busySites.containsKey(txnId)) {
             site = m_busySites.get(txnId);
-        }
-        else {
+        } else {
             if (m_idleSites.isEmpty()) {
-                MpRoSiteContext newSite = new MpRoSiteContext(m_siteId,
+                NpSiteContext newSite = new NpSiteContext(m_siteId,
                         m_backend,
                         m_catalogContext,
                         m_partitionId,
@@ -242,14 +237,14 @@ class MpRoSitePool {
     /**
      * Inform the pool that the work associated with the given txnID is complete
      */
-    void completeWork(long txnId)
-    {
+    void completeWork(long txnId) {
         if (m_shuttingDown) {
             return;
         }
 
-        MpRoSiteContext site = m_busySites.remove(txnId);
+        NpSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
+            // TODO: change to non-fatal
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
         // check the catalog versions, only push back onto idle if the catalog hasn't changed
@@ -258,24 +253,22 @@ class MpRoSitePool {
         if (site.getCatalogCRC() == m_catalogContext.getCatalogCRC()
                 && site.getCatalogVersion() == m_catalogContext.catalogVersion) {
             m_idleSites.push(site);
-        }
-        else {
+        } else {
             site.shutdown();
             m_allSites.remove(site);
         }
     }
 
-    void shutdown()
-    {
+    void shutdown() {
         m_shuttingDown = true;
 
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
-        synchronized(m_allSites) {
-            for (MpRoSiteContext site : m_allSites) {
+        synchronized (m_allSites) {
+            for (NpSiteContext site : m_allSites) {
                 site.shutdown();
             }
 
-            for (MpRoSiteContext site : m_allSites) {
+            for (NpSiteContext site : m_allSites) {
                 site.joinThread();
             }
         }
