@@ -19,6 +19,8 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.iv2.TxnEgo;
 
@@ -84,20 +87,67 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
     @Override
     public int getSerializedSize()
     {
-        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
-                                   "which should never happen");
+        int msgsize = super.getSerializedSize();
+        // serialize the map
+        msgsize += 4; // number of map keys: int
+        for (Map.Entry<Integer, List<VoltTable>> e : m_inputDeps.entrySet()) {
+            msgsize += 4; // entry key
+            msgsize += 4; // VoltTable count: int
+            for (VoltTable vt: e.getValue()) {
+                msgsize += vt.getSerializedSize();
+            }       }
+
+        assert(m_fragTask != null);
+        msgsize += m_fragTask.getSerializedSize();
+
+        return msgsize;
+
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
-                                   "which should never happen");
+        buf.put(VoltDbMessageFactory.BORROW_TASK_ID);
+        super.flattenToBuffer(buf);
+
+        buf.putInt(m_inputDeps.size());
+        for (Map.Entry<Integer, List<VoltTable>> e : m_inputDeps.entrySet()) {
+            buf.putInt(e.getKey());
+            buf.putInt(e.getValue().size());
+            for (VoltTable vt: e.getValue()) {
+                vt.flattenToBuffer(buf);
+            }
+        }
+
+        assert(m_fragTask != null);
+        ByteBuffer paybuf = ByteBuffer.allocate(m_fragTask.getSerializedSize());
+        m_fragTask.flattenToBuffer(paybuf);
+        if (paybuf.position() != 0) {
+            paybuf.flip();
+        }
+        buf.put(paybuf);
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
-        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
-                                   "which should never happen");
+        super.initFromBuffer(buf);
+
+        int numKeys = buf.getInt();
+        Map<Integer, List<VoltTable>> depTables = new HashMap<>();
+        for (int i = 0; i < numKeys; i++) {
+            int key = buf.getInt();
+            int vtSize = buf.getInt();
+            List<VoltTable> vtList = new ArrayList<>();
+            for (int j = 0; j < vtSize; j++) {
+                VoltTable vt = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+                vtList.add(vt);
+            }
+            depTables.put(key, vtList);
+        }
+        addInputDepMap(depTables);
+
+        VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
+        m_fragTask = (FragmentTaskMessage) messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
+        assert(m_fragTask != null);
     }
 
     @Override
@@ -122,6 +172,13 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
             sb.append("  WRITE, COORD ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
+        sb.append("\nInput dependency: \n");
+        for (Map.Entry<Integer, List<VoltTable>> e : m_inputDeps.entrySet()) {
+            sb.append("\t").append(e.getKey()).append(" -> ");
+            for (VoltTable vt: e.getValue()) {
+                sb.append(vt.toJSONString()).append(", ");
+            }
+        }
         return sb.toString();
     }
 }

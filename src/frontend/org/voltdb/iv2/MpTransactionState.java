@@ -338,6 +338,10 @@ public class MpTransactionState extends TransactionState
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
                 m_mbox.send(non_local_hsids, m_remoteWork);
+                // TODO: buddy site optimization
+                if (m_nPartTxn) {
+                    m_buddyHSId = non_local_hsids[0]; // for np, borrow task message would become no local to MPI
+                }
             }
         }
         else {
@@ -440,6 +444,9 @@ public class MpTransactionState extends TransactionState
                                                     MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, batchIdx),
                                                     "txnId", TxnEgo.txnIdToString(txnId),
                                                     "dest", CoreUtils.hsIdToString(m_buddyHSId)));
+        }
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("[MpTxnState BorrowTaskMsg] " + borrowmsg);
         }
         m_mbox.send(m_buddyHSId, borrowmsg);
 

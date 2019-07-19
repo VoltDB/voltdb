@@ -52,8 +52,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte DUMMY_TRANSACTION_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 26;
     final public static byte DUMMY_TRANSACTION_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 27;
     final public static byte DUMP_PLAN_ID = VOLTCORE_MESSAGE_ID_MAX + 28;
-    final public static byte Migrate_Partition_Leader_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 29;
+    final public static byte MIGRATE_PARTITION_LEADER_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 29;
     final public static byte FLUSH_RO_TXN_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 30;
+    final public static byte BORROW_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 31;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -145,7 +146,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case DUMMY_TRANSACTION_RESPONSE_ID:
             message = new DummyTransactionResponseMessage();
             break;
-        case Migrate_Partition_Leader_MESSAGE_ID:
+        case MIGRATE_PARTITION_LEADER_MESSAGE_ID:
             message = new MigratePartitionLeaderMessage();
             break;
         case DUMP_PLAN_ID:
@@ -153,6 +154,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case FLUSH_RO_TXN_MESSAGE_ID:
             message = new MPBacklogFlushMessage();
+            break;
+        case BORROW_TASK_ID:
+            message = new BorrowTaskMessage();
             break;
         default:
             message = null;

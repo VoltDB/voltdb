@@ -60,7 +60,7 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(VoltDbMessageFactory.Migrate_Partition_Leader_MESSAGE_ID);
+        buf.put(VoltDbMessageFactory.MIGRATE_PARTITION_LEADER_MESSAGE_ID);
         buf.putLong(m_newLeaderHSID);
         buf.putLong(m_priorLeaderHSID);
         buf.put(m_startingService ? (byte) 1 : (byte) 0);
