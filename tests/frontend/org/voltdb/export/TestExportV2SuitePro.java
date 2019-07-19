@@ -51,6 +51,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
+        m_streamNames.add("S_ALLOW_NULLS");
     }
 
     @Override
@@ -60,7 +61,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         closeSocketExporterClientAndServer();
     }
 
-    // Test Export of an ADDED table.
+    // Test Export of an ADDED stream.
     //
     public void testExportAndAddedTable() throws Exception {
         System.out.println("testExportAndAddedTable");
@@ -76,17 +77,18 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        m_streamNames.add("ADDED_STREAM");
 
         // verify that it exports
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
+            m_verifier.addRow(client, "ADDED_STREAM", i, convertValsToRow(i, 'I', rowdata));
             // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
+            final Object[]  params = convertValsToParams("ADDED_STREAM", i, rowdata);
             client.callProcedure("InsertAddedStream", params);
         }
 
-        quiesceAndVerifyTarget(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
     }
 
     public TestExportV2SuitePro(final String name) {
@@ -110,8 +112,8 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         project.addUsers(USERS);
         project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        project.addProcedures(ALLOWNULL_PROCEDURES);
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
 
 
         // JNI, single server
@@ -135,25 +137,6 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         assertTrue(compile);
         builder.addServerConfig(config, false);
 
-
-        /*
-         * compile a catalog without the NO_NULLS table for add/drop tests
-         */
-        config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        project = new VoltProjectBuilder();
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        project.addProcedures(ALLOWNULL_PROCEDURES);
-        compile = config.compile(project);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml"));
-        assertTrue(compile);
-
         /*
          * compile a catalog with an added table for add tests
          */
@@ -167,10 +150,10 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
         project.addSchema(TestExportBase.class.getResource("export-addedstream-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("ADDED_STREAM");
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        wireupExportTableToSocketExport("S_ADDED_STREAM");
 
-        project.addProcedures(ALLOWNULL_PROCEDURES);
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
         project.addProcedures(ADDSTREAM_PROCEDURES);
         compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),

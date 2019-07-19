@@ -1,0 +1,320 @@
+/*
+ * This file is part of VoltDB.
+ * Copyright (C) 2008-2019 VoltDB Inc.
+ */
+
+package org.voltdb.export;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.SnapshotVerifier;
+
+/**
+ * End to end Export tests using the injected custom export.
+ *
+ *  Note, this test reuses the TestSQLTypesSuite schema and procedures.
+ *  Each table in that schema, to the extent the DDL is supported by the
+ *  DB, really needs an Export round trip test.
+ */
+
+public class TestExportSuite extends TestExportBaseSocketExport {
+    private static final int k_factor = 1;
+
+    @Override
+    public void setUp() throws Exception
+    {
+        m_username = "default";
+        m_password = "password";
+        ExportLocalClusterBase.resetDir();
+        super.setUp();
+
+        startListener();
+        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+        System.out.println("Shutting down client and server");
+        closeSocketExporterClientAndServer();
+    }
+
+    //  Test Export of a DROPPED table.  Queues some data to a table.
+    //  Then drops the table and verifies that Export can successfully
+    //  drain the dropped table. IE, drop table doesn't lose Export data.
+    //
+    public void testExportAndDroppedTable() throws Exception {
+        System.out.println("testExportAndDroppedTable");
+        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
+        Client client = getClient();
+        for (int i = 0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client, "S_NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("S_NO_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
+        }
+        waitForExportAllRowsDelivered(client, m_streamNames);
+
+        // now drop the no-nulls table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
+        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                new File(deploymentURL));
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        m_streamNames.remove("S_ALLOW_NULLS");
+
+        client = getClient();
+
+        // must still be able to verify the export data.
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+    }
+
+    // Test that a table w/o Export enabled does not produce Export content
+    public void testThatTablesOptIn() throws Exception {
+        System.out.println("testThatTablesOptIn");
+        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
+        final Client client = getClient();
+
+        final Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
+        params[0] = "LOOPBACK_NO_NULLS";  // this table should not produce Export output
+
+        // populate the row data
+        for (int i = 0; i < TestSQLTypesSuite.COLS; ++i) {
+            params[i + 2] = TestSQLTypesSuite.m_midValues[i];
+        }
+        long icnt = m_verifier.getExportedDataCount();
+        for (int i = 0; i < 10; i++) {
+            params[1] = i; // pkey
+            // do NOT add row to TupleVerfier as none should be produced
+            client.callProcedure("TableInsertLoopback", params);
+        }
+        //Make sure that we have not recieved any new data.
+        waitForExportAllRowsDelivered(client, m_streamNames);
+        assertEquals(icnt, ExportTestClient.getExportedDataCount());
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+    }
+
+    // Verify that planner rejects updates to append-only tables
+    //
+    public void testExportUpdateAppendOnly() throws IOException {
+        System.out.println("testExportUpdateAppendOnly");
+        final Client client = getClient();
+        boolean threw = false;
+        try {
+            client.callProcedure("@AdHoc", "Update S_NO_NULLS SET A_TINYINT=0 WHERE PKEY=0;");
+        }
+        catch (final ProcCallException e) {
+            assertTrue("Updating an export table with adhoc returned a strange message",
+                       e.getMessage().contains("Illegal to update a stream."));
+            threw = true;
+        }
+        assertTrue("Updating an export-only table failed to throw an exception",
+                   threw);
+    }
+
+    //
+    // Verify that planner rejects reads of append-only tables.
+    //
+    public void testExportSelectAppendOnly() throws IOException {
+        System.out.println("testExportSelectAppendOnly");
+        final Client client = getClient();
+        boolean passed = false;
+        try {
+            client.callProcedure("@AdHoc", "Select PKEY from S_NO_NULLS WHERE PKEY=0;");
+        }
+        catch (final ProcCallException e) {
+            if (e.getMessage().contains("Illegal to read a stream.")) {
+                passed = true;
+            }
+        }
+        assertTrue(passed);
+    }
+
+    //
+    //  Verify that planner rejects deletes of append-only tables
+    //
+    public void testExportDeleteAppendOnly() throws IOException {
+        System.out.println("testExportDeleteAppendOnly");
+        final Client client = getClient();
+        boolean passed = false;
+        try {
+            client.callProcedure("@AdHoc", "DELETE from S_NO_NULLS WHERE PKEY=0;");
+        }
+        catch (final ProcCallException e) {
+            if (e.getMessage().contains("Illegal to delete from a stream.")) {
+                passed = true;
+            }
+        }
+        assertTrue(passed);
+    }
+
+    //
+    // Multi-table test
+    //
+    public void testExportMultiTable() throws Exception
+    {
+        System.out.println("testExportMultiTable");
+        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
+        final Client client = getClient();
+        long icnt = m_verifier.getExportedDataCount();
+        for (int i=0; i < 10; i++) {
+            // add data to a first (persistent) table
+            Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client,
+                    "S_ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            Object[] params = convertValsToParams("S_ALLOW_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertAllowNulls", params);
+
+            // add data to a second (streaming) table.
+            rowdata = TestSQLTypesSuite.m_defaultValues;
+            m_verifier.addRow(client,
+                    "S_NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            params = convertValsToParams("S_NO_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
+        }
+        // Make sure some are exported and seen by me
+        assertTrue((m_verifier.getExportedDataCount() - icnt > 0));
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+    }
+
+    //
+    // Verify that snapshot can be enabled with a streamed table present
+    //
+    public void testExportPlusSnapshot() throws Exception {
+        System.out.println("testExportPlusSnapshot");
+        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            // add data to a first (persistent) table
+            Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client,
+                    "S_ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            Object[] params = convertValsToParams("S_ALLOW_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertAllowNulls", params);
+
+            // add data to a second (streaming) table.
+            rowdata = TestSQLTypesSuite.m_defaultValues;
+            m_verifier.addRow(client,
+                    "S_NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            params = convertValsToParams("S_NO_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
+        }
+        // this blocks until the snapshot is complete
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testExportPlusSnapshot", (byte)1).getResults();
+
+        // verify. copied from TestSaveRestoreSysprocSuite
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final PrintStream ps = new PrintStream(baos);
+        final PrintStream original = System.out;
+        new java.io.File("/tmp/" + System.getProperty("user.name")).mkdir();
+        try {
+            System.setOut(ps);
+            final String args[] = new String[] {
+                    "testExportPlusSnapshot",
+                    "--dir",
+                    "/tmp/" + System.getProperty("user.name")
+            };
+            SnapshotVerifier.main(args);
+            ps.flush();
+            final String reportString = baos.toString("UTF-8");
+            assertTrue(reportString.startsWith("Snapshot valid\n"));
+        } catch (final UnsupportedEncodingException e) {}
+        finally {
+            System.setOut(original);
+        }
+
+        // verify the el data
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+    }
+
+    public void testSwapTables() throws Exception {
+        System.out.println("testExportSwapTables");
+        final Client client = getClient();
+        verifyProcFails(client, "Illegal to swap a stream", "@SwapTables", "S_ALLOW_NULLS", "LOOPBACK_NO_NULLS");
+    }
+
+    public TestExportSuite(final String name) {
+        super(name);
+    }
+
+    static public junit.framework.Test suite() throws Exception
+    {
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+        String dexportClientClassName = System.getProperty("exportclass", "");
+        System.out.println("Test System override export class is: " + dexportClientClassName);
+        LocalCluster config;
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+
+        final MultiConfigSuiteBuilder builder =
+            new MultiConfigSuiteBuilder(TestExportSuite.class);
+
+        project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true, true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-allownulls-ddl-with-target.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonullsloopback-table-ddl.sql"));
+        project.addPartitionInfo("LOOPBACK_NO_NULLS", "PKEY");
+
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        wireupExportTableToSocketExport("S_NO_NULLS");
+
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
+        project.addProcedures(NONULLS_PROCEDURES);
+        project.addProcedures(LOOPBACK_PROCEDURES);
+
+        /*
+         * compile the catalog all tests start with
+         */
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        config.setHasLocalServer(false);
+        config.setMaxHeap(1024);
+        boolean compile = config.compile(project);
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls-and-allownulls.xml"));
+        assertTrue(compile);
+        builder.addServerConfig(config, false);
+
+
+        /*
+         * compile a catalog without the NO_NULLS table for add/drop tests
+         */
+        config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        config.setHasLocalServer(false);
+        config.setMaxHeap(1024);
+        project = new VoltProjectBuilder();
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
+
+        wireupExportTableToSocketExport("S_NO_NULLS");
+        project.addProcedures(NONULLS_PROCEDURES);
+        compile = config.compile(project);
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml"));
+        assertTrue(compile);
+
+        return builder;
+    }
+}

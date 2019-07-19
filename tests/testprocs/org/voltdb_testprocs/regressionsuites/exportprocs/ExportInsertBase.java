@@ -21,21 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-public class InsertAddedTable extends VoltProcedure {
-
-    public final SQLStmt i_addedtable = new SQLStmt
-    ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+public class ExportInsertBase extends VoltProcedure {
 
     public VoltTable[] run(
             String tablename,
@@ -57,23 +53,8 @@ public class InsertAddedTable extends VoltProcedure {
             GeographyValue a_geography
             )
     {
-
-        // these types are converted to instances of Long when processed
-        // from the wire protocol serialization to the stored procedure
-        // run prototype arguments. Convert them back to the underlying
-        // java mappings of the SQL types here to test EE handling of non-long
-        // values.
-
-        byte v_tinyint = new Long(a_tinyint).byteValue();
-        short v_smallint = new Long(a_smallint).shortValue();
-        int v_integer = new Long(a_integer).intValue();
-
-        if (tablename.equals("ADDED_TABLE")) {
-            voltQueueSQL(i_addedtable, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        return voltExecuteSQL();
+        assert(false);
+        throw new RuntimeException("Don't call this.");
     }
+
 }

@@ -26,7 +26,9 @@ package org.voltdb.export;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -66,6 +68,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
                 + "     a integer not null, "
                 + "     b integer not null"
                 + ");";
+    private static List<String> streamNames = new ArrayList<>();
 
     @Before
     public void setUp() throws Exception
@@ -77,6 +80,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(T1_SCHEMA);
         builder.addLiteralSchema(T2_SCHEMA);
+        streamNames = new ArrayList<>(Arrays.asList("T_1", "T_2"));
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
@@ -140,7 +144,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         client.drain();
 
         client = getClient(m_cluster);
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         assertEquals(3, m_cluster.getLiveNodeCount());
     }
 
@@ -174,7 +178,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         client = getClient(m_cluster);
         client.drain();
         client.callProcedure("@Quiesce");
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         // make sure no partition has more than active stream
         VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
         Map<String, Integer> masterCounters = Maps.newHashMap();

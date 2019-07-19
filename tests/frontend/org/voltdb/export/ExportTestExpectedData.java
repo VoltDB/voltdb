@@ -42,7 +42,7 @@ public class ExportTestExpectedData {
     public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
     public final Map<String, Integer> m_expectedRowCount = new HashMap<>();
 
-    private final Map<String, ServerListener> m_severSockets;
+    private final Map<String, ServerListener> m_serverSockets;
     // TODO: support per-table replicated stream check
     private final boolean m_replicated;
     private final boolean m_exact;
@@ -52,7 +52,7 @@ public class ExportTestExpectedData {
 
     public ExportTestExpectedData(Map<String, ServerListener> serverSockets, boolean isExportReplicated, boolean exact,
             int copies) {
-        m_severSockets = serverSockets;
+        m_serverSockets = serverSockets;
         m_replicated = isExportReplicated;
         m_exact = exact;
         m_copies = copies;
@@ -81,7 +81,7 @@ public class ExportTestExpectedData {
         /*
          * Process the row data in each table
          */
-        for (Entry<String, ServerListener> f : m_severSockets.entrySet()) {
+        for (Entry<String, ServerListener> f : m_serverSockets.entrySet()) {
             String tableName = f.getKey();
             System.out.println("Processing Table:" + tableName);
 
@@ -114,7 +114,7 @@ public class ExportTestExpectedData {
     }
 
     public synchronized void ignoreRow(String tableName, long rowId) {
-        ServerListener listener = m_severSockets.get(tableName);
+        ServerListener listener = m_serverSockets.get(tableName);
         if (listener != null) {
             listener.ignoreRow(rowId);
         }
