@@ -206,6 +206,58 @@ public class AsyncExportClient
             }
         }
     }
+    
+    static class TableExportCallback implements ProcedureCallback
+    {
+        private final TxnIdWriter m_writer;
+        private final long m_type;
+        public TableExportCallback(TxnIdWriter writer, long type)
+        {
+            super();
+            m_type = type;
+            m_writer = writer;
+        }
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
+            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+            {
+                
+                TrackingResults.incrementAndGet(0);
+                TransactionCounts.incrementAndGet(transType);
+                /*********
+                long txid = clientResponse.getResults()[0].asScalarLong();
+                final String trace = String.format("%d:%d:%d\n", m_type, txid, now);
+                try
+                {
+                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+                *********/
+            }
+            /*********
+            else
+            {
+                TrackingResults.incrementAndGet(1);
+                final String trace = String.format("%d:-1:%d:%s\n", m_type, now,((ClientResponseImpl)clientResponse).toJSONString());
+                try
+                {
+                    m_writer.write(-1,trace);
+                }
+                catch (IOException e)
+                {
+                    log.error("Exception: " + e);
+                    e.printStackTrace();
+                }
+            }
+            *********/
+        }
+    }
 
     // Connection configuration
     private final static class ConnectionConfig {
@@ -248,8 +300,9 @@ public class AsyncExportClient
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
-    
+
     // If testing Table/Export, count inserts, deletes, update fore & aft
+    
     private static int INSERT = 1;
     private static int DELETE = 2;
     private static int UPDATE_OLD = 3;
@@ -377,19 +430,21 @@ public class AsyncExportClient
                     e.printStackTrace();
                     System.exit(-1);
                 }
-                
+
                 // Table with Export
-                try {
-                    clientRef.get().callProcedure(
-                                                  new AsyncCallback(writer, currentRowId),
-                                                  config.procedure,
-                                                  currentRowId,
-                                                  0);
-                }
-                catch (Exception e) {
-                    log.fatal("Exception: " + e);
-                    e.printStackTrace();
-                    System.exit(-1);
+                if (config.usetableexport) {
+                    try {
+                        clientRef.get().callProcedure(
+                                new TableExportCallback(writer, r.nextInt(3)+1),
+                                "TableExport",
+                                currentRowId,
+                                0);
+                    }
+                    catch (Exception e) {
+                        log.fatal("Exception: " + e);
+                        e.printStackTrace();
+                        System.exit(-1);
+                    }
                 }
 
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
@@ -457,6 +512,27 @@ public class AsyncExportClient
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
                 log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
+            
+            // 2. Print TABLE EXPORT stats if that's configured
+            if (config.usetableexport) {
+                System.out.printf(
+                        "-------------------------------------------------------------------------------------\n"
+                      + " Table/Export Results\n"
+                      + "-------------------------------------------------------------------------------------\n\n"
+                      + "A total of %d calls were received...\n"
+                      + " - %,9d INSERT\n"
+                      + " - %,9d DELETE\n"
+                      + " - %,9d UPDATE"
+                      + "\n\n"
+                      + "-------------------------------------------------------------------------------------\n"
+                      , TrackingResults.get(0)+TrackingResults.get(1)
+                      , TransactionCounts.get(INSERT)
+                      , TransactionCounts.get(DELETE)
+                      , TransactionCounts.get(UPDATE_OLD)
+                      // old & new on each update so either = total updates, not the sum of the 2
+                      // +TransactionCounts.get(UPDATE_NEW)
+                      );
+            }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             log.info(
               "\n\n-------------------------------------------------------------------------------------\n"
@@ -488,9 +564,6 @@ public class AsyncExportClient
     }
 
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
-     *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
