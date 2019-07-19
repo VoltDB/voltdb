@@ -21,36 +21,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import static org.voltdb.VoltProcedure.EXPECT_SCALAR_MATCH;
-import static org.voltdb.VoltProcedure.EXPECT_ZERO_OR_ONE_ROW;
 import org.voltdb.VoltTable;
 
-//1 - paused
-//0 - resumed
-public class PauseResumeExport extends VoltProcedure {
+public class ExportInsertFromTableSelectSP extends VoltProcedure {
 
-    public static final SQLStmt checkStateStmt = new SQLStmt(
-            "SELECT status FROM PAUSE_RESUME WHERE STATUS_ID = ?;");
-    public static final SQLStmt insertStmt = new SQLStmt(
-            "INSERT INTO PAUSE_RESUME (status, status_id) VALUES (?, ?);");
-    public static final SQLStmt updateStmt = new SQLStmt(
-            "UPDATE PAUSE_RESUME set status=? where status_id=1;");
+    private final SQLStmt i_insert_select_repl = new SQLStmt
+    ("INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS;");
 
-    public long run(long flag) {
-        voltQueueSQL(checkStateStmt, EXPECT_ZERO_OR_ONE_ROW, 1);
-        VoltTable validation[] = voltExecuteSQL();
+    private final SQLStmt i_insert_select_part = new SQLStmt
+    ("INSERT INTO S_ALLOW_NULLS SELECT * FROM NO_NULLS;");
 
-        if (validation[0].getRowCount() == 0) {
-            voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), flag, 1);
-            voltExecuteSQL();
-        } else {
-            voltQueueSQL(updateStmt, EXPECT_SCALAR_MATCH(1), flag);
-            voltExecuteSQL();
+    public VoltTable[] run(
+            String targetStream,
+            int pkey
+            )
+    {
+        if (targetStream.equals("S_ALLOW_NULLS_REPL")) {
+            voltQueueSQL(i_insert_select_repl);
         }
-        return flag;
+        else if (targetStream.equals("S_ALLOW_NULLS")) {
+            voltQueueSQL(i_insert_select_part);
+        }
+        else {
+            assert(false);
+            throw new RuntimeException("Don't call this.");
+        }
+        return voltExecuteSQL();
     }
 }

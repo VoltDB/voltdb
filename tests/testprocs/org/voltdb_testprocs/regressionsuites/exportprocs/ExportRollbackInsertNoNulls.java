@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
 import java.math.BigDecimal;
 
@@ -32,30 +32,36 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-public class InsertAddedTable extends VoltProcedure {
+/**
+ * This procedure performs an insert and then rolls it back;
+ * used in conjunction with the nearly identical Insert.java
+ * to test Export with rollback for TestExportSuite.java
+ */
 
-    public final SQLStmt i_addedtable = new SQLStmt
-    ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+public class ExportRollbackInsertNoNulls extends VoltProcedure {
+
+    public final SQLStmt i_no_nulls = new SQLStmt
+    ("INSERT INTO S_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public VoltTable[] run(
-            String tablename,
-            int pkey,
-            long a_tinyint,
-            long a_smallint,
-            long a_integer,
-            long a_bigint,
-            double a_float,
-            TimestampType a_timestamp,
-            String a_inline_s1,
-            String a_inline_s2,
-            String a_pool_s,
-            String a_pool_max_s,
-            byte[] b_inline,
-            byte[] b_pool,
-            BigDecimal a_decimal,
-            GeographyPointValue a_geography_point,
-            GeographyValue a_geography
-            )
+        String tablename,
+        int pkey,
+        long a_tinyint,
+        long a_smallint,
+        long a_integer,
+        long a_bigint,
+        double a_float,
+        TimestampType a_timestamp,
+        String a_inline_s1,
+        String a_inline_s2,
+        String a_pool_s,
+        String a_pool_max_s,
+        byte[] b_inline,
+        byte[] b_pool,
+        BigDecimal a_decimal,
+        GeographyPointValue a_geography_point,
+        GeographyValue a_geography
+    ) throws VoltAbortException
     {
 
         // these types are converted to instances of Long when processed
@@ -68,12 +74,18 @@ public class InsertAddedTable extends VoltProcedure {
         short v_smallint = new Long(a_smallint).shortValue();
         int v_integer = new Long(a_integer).intValue();
 
-        if (tablename.equals("ADDED_TABLE")) {
-            voltQueueSQL(i_addedtable, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
+        assert(tablename.equals("S_NO_NULLS"));
+        voltQueueSQL(i_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
+                     a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
+                     a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
+                     a_geography_point, a_geography);
+
+        VoltTable[] results =  voltExecuteSQL();
+        if (results.length < 1) {
+            throw new VoltAbortException("ERROR");
         }
-        return voltExecuteSQL();
+
+        throw new VoltAbortException("OK");
+
     }
 }
