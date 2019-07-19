@@ -406,12 +406,28 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(importerDetails);
             });
         };
-
-        this.getExporterGraphInformation = function (onInformationLoaded) {
-            var exporterDetails = {};
+        
+        this.getExportTableInformation = function (onInformationLoaded) {
+            var exportDetails = {};
             VoltDBService.GetExporterInformation(function (connection) {
-                getExporterDetails(connection, exporterDetails);
-                onInformationLoaded(exporterDetails);
+                getExportTableDetails(connection, exportDetails);
+                onInformationLoaded(exportDetails);
+            });
+        };
+
+        this.getThroughputGraphInformation = function (onInformationLoaded) {
+            var throughputDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getThroughputDetails(connection, throughputDetails);
+                onInformationLoaded(throughputDetails);
+            });
+        };
+
+        this.getQueuedGraphInformation = function (onInformationLoaded) {
+            var queuedDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getQueuedDetails(connection, queuedDetails);
+                onInformationLoaded(queuedDetails);
             });
         };
 
@@ -486,7 +502,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //Get Cluster Id 
+        //Get Cluster Id
         this.GetDrInformations = function (onInformationLoaded) {
             var replicationData = {};
             VoltDBService.GetDrReplicationInformation(function (connection) {
@@ -738,7 +754,7 @@ function alertNodeClicked(obj) {
                     adminConfigValues['configuration'] = data["export"].configuration;
                 }
 
-                //Advanced 
+                //Advanced
                 if (data.heartbeat != null) {
                     adminConfigValues['heartBeatTimeout'] = data.heartbeat.timeout;
                 }
@@ -759,7 +775,7 @@ function alertNodeClicked(obj) {
                             adminConfigValues['memorylimit'] = data.systemsettings.resourcemonitor.memorylimit.size;
                         }
                     }
-                    
+
                     if (data.systemsettings.resourcemonitor != null) {
                         if (data.systemsettings.resourcemonitor.disklimit != null) {
                             adminConfigValues['disklimit'] = data.systemsettings.resourcemonitor.disklimit;
@@ -783,7 +799,7 @@ function alertNodeClicked(obj) {
 
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
-                    
+
                     if (data.paths.droverflow != null)
                         adminConfigValues['drOverflowPath'] = data.paths.droverflow.path;
                 }
@@ -872,7 +888,7 @@ function alertNodeClicked(obj) {
                 }
 
                 //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
-                //otherwise to a updatedSystemOverview 
+                //otherwise to a updatedSystemOverview
                 if (voltDbRenderer.isHost) {
                     currentServerOverview[singleData[1]] = singleData[2];
 
@@ -1420,8 +1436,59 @@ function alertNodeClicked(obj) {
                 });
             }
         };
+        
+        var getExportTableDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
 
-        var getExporterDetails = function (connection, exporterDetails) {
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "TUPLE_PENDING"
+                    || columnInfo["name"] == "SOURCE" || columnInfo["name"] == "TARGET")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var tuple_count = {} // For keeping separate sums for each target
+                var tuple_pending = {}
+                var target = ""
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(target != info[colIndex["TARGET"]]){
+                        target = info[colIndex["TARGET"]];
+                    }
+                    if(isNaN(tuple_count[target])){ // Catches when tuple_count has not started tracking a certain target
+                        tuple_count[target] = 0;
+                    }
+                    if(isNaN(tuple_pending[target])){
+                        tuple_pending[target] = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("SOURCE")) { // Add property for each group of data we want to get
+                        exporterDetails["SOURCE"] = {};
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
+                        exporterDetails["TUPLE_COUNT"] = {};
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
+                        exporterDetails["TUPLE_PENDING"] = {};
+                    }
+                    
+                    tuple_count[target] += info[colIndex["TUPLE_COUNT"]];
+                    tuple_pending[target] += info[colIndex["TUPLE_PENDING"]];
+                    exporterDetails["SOURCE"][target] = info[colIndex["SOURCE"]];
+                    exporterDetails["TUPLE_COUNT"][target] = tuple_count[target];
+                    exporterDetails["TUPLE_PENDING"][target] = tuple_pending[target];
+                    exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                });
+            }
+        };
+        
+        var getThroughputDetails = function (connection, exporterDetails) {
             var colIndex = {};
             var counter = 0;
 
@@ -1437,20 +1504,57 @@ function alertNodeClicked(obj) {
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
-                var rowCount = connection.Metadata["@Statistics_EXPORT"].data.length
-                var tuple_count = 0;
-                var target = "";
+                var tuple_count = {}
+                var target = ""
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
                     if(target != info[colIndex["TARGET"]]){
                         target = info[colIndex["TARGET"]];
-                        touple_count = 0;
+                    }
+                    if(isNaN(tuple_count[target])){
+	                    tuple_count[target] = 0;
                     }
                     if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
                         exporterDetails["TUPLE_COUNT"] = {};
                     }
-                    tuple_count += info[colIndex["TUPLE_COUNT"]];
-                    exporterDetails["TUPLE_COUNT"][target] = tuple_count;
+                    tuple_count[target] += info[colIndex["TUPLE_COUNT"]];
+                    exporterDetails["TUPLE_COUNT"][target] = tuple_count[target];
                     exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                });
+            }
+        };
+
+        var getQueuedDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_PENDING" || columnInfo["name"] == "TARGET")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var tuple_count = {}
+                var target = ""
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(target != info[colIndex["TARGET"]]){
+                        target = info[colIndex["TARGET"]];
+                    }
+                    if(isNaN(tuple_count[target])){
+	                    tuple_count[target] = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
+                        exporterDetails["TUPLE_PENDING"] = {};
+                    }
+                    tuple_count[target] += info[colIndex["TUPLE_PENDING"]];
+                    exporterDetails["TUPLE_PENDING"][target] = tuple_count[target];
+                    exporterDetails["TUPLE_PENDING"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
             }
@@ -2312,7 +2416,7 @@ function alertNodeClicked(obj) {
                 if (!snapshotDetails.hasOwnProperty(hostName)) {
                     snapshotDetails[hostName] = [];
                 }
-                var snapshot = {                    
+                var snapshot = {
                     "TIMESTAMP": info[colIndex["TIMESTAMP"]],
                     "PATH": info[colIndex["PATH"]],
                     "START_TIME": info[colIndex["START_TIME"]],
@@ -2991,7 +3095,7 @@ function alertNodeClicked(obj) {
 })(window);
 
 
-//Navigation responsive	
+//Navigation responsive
 $(function () {
     $('#toggleMenu').click(function () {
         $("#nav").slideToggle('slow');
@@ -3012,4 +3116,3 @@ $(window).resize(function () {
         $("#nav").css('display', 'none');
     }
 });
-

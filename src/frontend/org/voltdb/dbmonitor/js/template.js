@@ -194,6 +194,43 @@ $(document).ready(function () {
         navigate(hash);
         return false;
     });
+    
+    $(".tableL4").tablesorter({ // Same as tableL1 except has no sticky header, needed for when table doesn't take up whole page
+        theme: 'bootstrap',
+        widthFixed: true,
+        headerTemplate: '{content} {icon}',
+        widgets: ["uitheme", "filter"],
+        widgetOptions: {
+            filter_reset: ".reset",
+            filter_hideFilters: true
+        },
+        cssChildRow: "tablesorter-childRow"
+    });
+
+    $('.tableL4').delegate('.togglex', 'click', function () {
+        var id = $(this).attr('id');
+        var toppage = id.split('-')[0];
+        var dropdownid = "#" + id + "--dropdown";
+
+        var hash = "#" + id;
+        if ($(dropdownid).is(":visible")) {
+            hash = "#" + toppage;
+            var iconid = "#" + toppage + "-" + id.split('-')[1] + "--icon";
+            $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#ffffff');
+            $(iconid).removeClass('icon-chevron-down').addClass('icon-chevron-right');
+            $(dropdownid).hide();
+            $("[id^="+id+"]").each(function (i, el) {
+                var element = '#' + this.id;
+                if(element.match("--icon$")) {
+                    $(element).removeClass('icon-chevron-down').addClass('icon-chevron-right');
+                } else if(element.match("--dropdown$")) {
+                    $(element).hide();
+                }
+            });
+        }
+        navigate(hash);
+        return false;
+    });
 
     $('.cb').click(function () {
         if ($(this).is(":checked")) {
