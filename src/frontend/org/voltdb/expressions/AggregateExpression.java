@@ -72,62 +72,68 @@ public class AggregateExpression extends AbstractExpression {
         AbstractExpression aggArg;
 
         switch (type) {
-        case AGGREGATE_COUNT:
-        case AGGREGATE_WINDOWED_RANK:
-        case AGGREGATE_WINDOWED_DENSE_RANK:
-        case AGGREGATE_WINDOWED_ROW_NUMBER:
-        case AGGREGATE_WINDOWED_COUNT:
-        case AGGREGATE_COUNT_STAR:
-        case AGGREGATE_APPROX_COUNT_DISTINCT:
-        case AGGREGATE_HYPERLOGLOGS_TO_CARD:
-            //
-            // Always an integer
-            //
-            expr.m_valueType = VoltType.BIGINT;
-            expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
-            break;
-        case AGGREGATE_VALS_TO_HYPERLOGLOG:
-            expr.m_valueType = VoltType.VARBINARY;
-            expr.m_valueSize = 65537;
-            break;
-        case AGGREGATE_AVG:
-        case AGGREGATE_MAX:
-        case AGGREGATE_MIN:
-        case AGGREGATE_WINDOWED_MIN:
-        case AGGREGATE_WINDOWED_MAX:
-            //
-            // It's always whatever the base type is
-            //
-            aggArg = expr.getFirstArgument();
-            assert(aggArg != null);
-            expr.m_valueType = aggArg.getValueType();
-            expr.m_valueSize = aggArg.getValueSize();
-            expr.m_inBytes = aggArg.getInBytes();
-            // Of these aggregate functions, only AVG is
-            // non-deterministic on floating point types.
-            if (expr.m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
-                expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
-            }
-            break;
-        case AGGREGATE_WINDOWED_SUM:
-        case AGGREGATE_SUM:
-            aggArg = expr.getFirstArgument();
-            assert(aggArg != null);
-            if (aggArg.getValueType() == VoltType.TINYINT ||
-                aggArg.getValueType() == VoltType.SMALLINT ||
-                aggArg.getValueType() == VoltType.INTEGER) {
+            case AGGREGATE_COUNT:
+            case AGGREGATE_WINDOWED_RANK:
+            case AGGREGATE_WINDOWED_DENSE_RANK:
+            case AGGREGATE_WINDOWED_ROW_NUMBER:
+            case AGGREGATE_WINDOWED_COUNT:
+            case AGGREGATE_COUNT_STAR:
+            case AGGREGATE_APPROX_COUNT_DISTINCT:
+            case AGGREGATE_HYPERLOGLOGS_TO_CARD:
+            case AGGREGATE_COMPACT_COUNT_DISTINCT:
+            case AGGREGATE_COMPACT_TO_CARDINALITY:
+                //
+                // Always an integer
+                //
                 expr.m_valueType = VoltType.BIGINT;
                 expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
-            } else {
+                break;
+            case AGGREGATE_VALS_TO_HYPERLOGLOG:
+                expr.m_valueType = VoltType.VARBINARY;
+                expr.m_valueSize = 65537;
+                break;
+            case AGGREGATE_VALUES_TO_COMPACT:
+                expr.m_valueType = VoltType.VARBINARY;
+                expr.m_valueSize = 1024 * 1024 * 8; // AbstractExpression enforces 10_000_000
+                break;
+            case AGGREGATE_AVG:
+            case AGGREGATE_MAX:
+            case AGGREGATE_MIN:
+            case AGGREGATE_WINDOWED_MIN:
+            case AGGREGATE_WINDOWED_MAX:
+                //
+                // It's always whatever the base type is
+                //
+                aggArg = expr.getFirstArgument();
+                assert(aggArg != null);
                 expr.m_valueType = aggArg.getValueType();
                 expr.m_valueSize = aggArg.getValueSize();
-            }
-            if (expr.m_valueType == VoltType.FLOAT) {
-                expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
-            }
-            break;
-        default:
-            throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + expr + "'");
+                expr.m_inBytes = aggArg.getInBytes();
+                // Of these aggregate functions, only AVG is
+                // non-deterministic on floating point types.
+                if (expr.m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
+                    expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
+                }
+                break;
+            case AGGREGATE_WINDOWED_SUM:
+            case AGGREGATE_SUM:
+                aggArg = expr.getFirstArgument();
+                assert(aggArg != null);
+                if (aggArg.getValueType() == VoltType.TINYINT ||
+                    aggArg.getValueType() == VoltType.SMALLINT ||
+                    aggArg.getValueType() == VoltType.INTEGER) {
+                    expr.m_valueType = VoltType.BIGINT;
+                    expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
+                } else {
+                    expr.m_valueType = aggArg.getValueType();
+                    expr.m_valueSize = aggArg.getValueSize();
+                }
+                if (expr.m_valueType == VoltType.FLOAT) {
+                    expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
+                }
+                break;
+            default:
+                throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + expr + "'");
         }
     }
 

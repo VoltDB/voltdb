@@ -238,6 +238,9 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         // ENG-12466
         ClientResponse cr = client.callProcedure("@AdHoc", "SELECT ALL APPROX_COUNT_DISTINCT(bi) C1, COUNT(bi) AS C1 FROM p;");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        ClientResponse ccd_cr = client.callProcedure("@AdHoc", "SELECT ALL COMPACT_COUNT_DISTINCT(bi) C1, COUNT(bi) AS C1 FROM p;");
+        assertEquals(ccd_cr.getStatus(), ClientResponse.SUCCESS);
     }
 
     /**

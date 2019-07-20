@@ -49,6 +49,8 @@
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 
+#include "roaring/roaring.c"
+#include "roaring/roaring.hh"
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
 namespace voltdb {
@@ -487,6 +489,80 @@ public:
     }
 };
 
+class CompactCountDistinctAgg : public Agg {
+public:
+    CompactCountDistinctAgg()
+        : m_roaring()
+    {
+    }
+
+    virtual void advance(const NValue& val)
+    {
+        if (val.isNull()) {
+            return;
+        }
+
+        size_t seed = 0;
+        val.hashCombine(seed);
+        m_roaring.add(seed);
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        double cardinality = roaring().cardinality();
+        return ValueFactory::getBigIntValue(static_cast<int64_t>(cardinality));
+    }
+
+    virtual void resetAgg()
+    {
+        Roaring empty;
+        roaring().intersect(empty);
+        Agg::resetAgg();
+    }
+
+protected:
+    Roaring& roaring() {
+        return m_roaring;
+    }
+
+private:
+
+    Roaring m_roaring;
+};
+
+
+/// Push-down aggregate
+class ValuesToCompactAgg : public CompactCountDistinctAgg {
+public:
+    virtual NValue finalize(ValueType type)
+    {
+        assert (type == VALUE_TYPE_VARBINARY);
+        uint32_t byteSize =  roaring().getSizeInBytes();
+        char *serializedBytes = new char[byteSize];
+
+        roaring().write(serializedBytes);
+        return ValueFactory::getTempBinaryValue(serializedBytes, byteSize);
+    }
+};
+
+/// Pull-up aggregate
+class CompactToCardinalityAgg : public CompactCountDistinctAgg {
+public:
+    virtual void advance(const NValue& val)
+    {
+        assert (ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        assert (!val.isNull());
+
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(val, &length);
+
+        assert (length > 0);
+
+        roaring() |= Roaring::read(buf);
+    }
+};
+
+
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
@@ -521,6 +597,12 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
+    case EXPRESSION_TYPE_AGGREGATE_COMPACT_COUNT_DISTINCT:
+        return new (memoryPool) CompactCountDistinctAgg();
+    case EXPRESSION_TYPE_AGGREGATE_VALUES_TO_COMPACT:
+        return new (memoryPool) ValuesToCompactAgg();
+    case EXPRESSION_TYPE_AGGREGATE_COMPACT_TO_CARDINALITY:
+        return new (memoryPool) CompactToCardinalityAgg();
     default:
         {
             char message[128];
