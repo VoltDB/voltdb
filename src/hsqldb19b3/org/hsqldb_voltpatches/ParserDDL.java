@@ -1020,6 +1020,48 @@ public class ParserDDL extends ParserRoutine {
                                    null, t.getName());
     }
 
+    private void setPeristentExportTriggers(Table table) {
+        // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
+        if (token.tokenType != Tokens.EXPORT) {
+            return;
+        }
+        String target = readMigrateTarget();
+        List<String> triggers = new ArrayList<>();
+        read();
+        if (token.tokenType == Tokens.ON) {
+            read();
+            while (token.tokenType != Tokens.OPENBRACKET) {
+                if (token.tokenType == Tokens.DELETE) {
+                    triggers.add(Tokens.T_DELETE);
+                } else if (token.tokenType == Tokens.INSERT) {
+                    triggers.add(Tokens.T_INSERT);
+                } else if (token.tokenType == Tokens.UPDATE) {
+                    triggers.add(Tokens.T_UPDATE);
+                } else if (token.tokenType == Tokens.UPDATEOLD) {
+                    triggers.add(Tokens.T_UPDATEOLD);
+                } else if (token.tokenType == Tokens.UPDATENEW) {
+                    triggers.add(Tokens.T_UPDATENEW);
+                } else if (token.tokenType != Tokens.COMMA){
+                    throw unexpectedToken();
+                }
+                read();
+            }
+            if (triggers.contains(Tokens.T_UPDATE) && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
+                throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                        " or " + Tokens.T_UPDATENEW);
+            }
+            if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
+                throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                        " and " + Tokens.T_UPDATENEW);
+            }
+        }
+        if (triggers.isEmpty()) {
+            triggers= Arrays.asList("INSERT");
+        }
+        target = target.toUpperCase();
+        PersistentExport export = new PersistentExport(target, triggers);
+        table.persistentExport = export;
+    }
     private Statement readPersistentExport(Table table, boolean alter) {
 
         // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
@@ -1307,6 +1349,10 @@ public class ParserDDL extends ParserRoutine {
         int position = getPosition();
 
         table.setHasMigrationTarget(token.tokenType == Tokens.MIGRATE);
+        if (token.tokenType == Tokens.EXPORT) {
+            // have to setup PersistentExport
+            setPeristentExportTriggers(table);
+        }
         // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
         // We can collect the ttl first in order to decide if its a ttl migration or general migration.
         readUntilThis(Tokens.OPENBRACKET);
