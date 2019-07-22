@@ -2,7 +2,7 @@ package org.voltdb_testfuncs;
 
 import java.io.Serializable;
 
-public class UprimesumNoReturn implements Serializable {
+public class UprimesumCombineWrongParameter implements Serializable {
     private int intermediateResult = 0;
 
     public void start() {
@@ -22,11 +22,11 @@ public class UprimesumNoReturn implements Serializable {
         }     
     }
 
-    public void combine (UprimesumNoReturn other) {
-        intermediateResult += other.intermediateResult;
+    public void combine (int other) {
+        intermediateResult += other;
     }
 
-    public void end () {
-        intermediateResult++;
+    public int end () {
+        return intermediateResult;
     }
 }

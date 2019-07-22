@@ -1792,6 +1792,9 @@ public class Expression {
 
         case OpTypes.USER_DEFINED_AGGREGATE:
             exp.attributes.put("valuetype", dataType.getNameString());
+            if (((ExpressionAggregate)this).isDistinctAggregate) {
+                throw Error.runtimeError(ErrorCode.X_UDAF01, "User-defined aggregate function does not support the 'distinct' keyword");
+            }
             return exp;
 
         case OpTypes.COUNT:
