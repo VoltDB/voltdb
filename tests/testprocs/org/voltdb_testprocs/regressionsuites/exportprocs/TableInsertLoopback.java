@@ -38,7 +38,6 @@ public class TableInsertLoopback extends VoltProcedure {
     ("INSERT INTO LOOPBACK_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
-            String tablename,
             int pkey,
             long a_tinyint,
             long a_smallint,
@@ -57,7 +56,6 @@ public class TableInsertLoopback extends VoltProcedure {
             GeographyValue a_geography
             )
     {
-        assert(tablename.equals("LOOPBACK_NO_NULLS"));
         voltQueueSQL(i_loopback, pkey, a_tinyint, a_smallint, a_integer,
                      a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                      a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,

@@ -63,11 +63,6 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         closeSocketExporterClientAndServer();
     }
 
-    //
-    // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
-    // when the snapshot is restored
-    // @throws Exception
-    //
     public void testExportLoopbackData() throws Exception {
         if (isValgrind()) {
             return;
@@ -82,6 +77,8 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         m_streamNames.add(streamName);
 
         ClientResponse response;
+        // Insert rows into stream that will be processed by the loopback connector
+        // and inserted into LOOPBACK_NO_NULLS
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
         for (int i = 0; i < 10; i++) {
             final Object[] params = convertValsToParams("S_NO_NULLS", i, rowdata);
@@ -164,7 +161,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
         project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonullsloopback-table-ddl.sql"));
 
-        wireupExportTableToCustomExport("S_NO_NULLS", "Loopback");
+        wireupExportTableToCustomExport("S_NO_NULLS", "TableInsertLoopback");
 
         project.addPartitionInfo("S_NO_NULLS", "PKEY");
         project.addPartitionInfo("LOOPBACK_NO_NULLS", "PKEY");

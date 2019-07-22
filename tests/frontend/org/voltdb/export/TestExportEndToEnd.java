@@ -80,7 +80,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(T1_SCHEMA);
         builder.addLiteralSchema(T2_SCHEMA);
-        streamNames = new ArrayList<>(Arrays.asList("T_1", "T_2"));
+        streamNames = new ArrayList<>(Arrays.asList("t_1", "t_2"));
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
@@ -138,6 +138,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         // drop stream
         ClientResponse response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        streamNames.remove("t_1");
 
         // rejoin node back
         m_cluster.rejoinOne(1);

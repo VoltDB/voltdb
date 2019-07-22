@@ -70,7 +70,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
         // Each stream needs an exporter configuration
-        String streamName = "T";
+        String streamName = "t";
         streamNames = new ArrayList<>(Arrays.asList(streamName));
         builder.addExport(true /* enabled */,
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
