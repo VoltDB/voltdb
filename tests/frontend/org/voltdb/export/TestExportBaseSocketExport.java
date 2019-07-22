@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -74,7 +74,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static ExportTestExpectedData m_verifier;
     protected static int m_portCount = 5001;
     protected static VoltProjectBuilder project;
-    protected List<String> m_streamNames = new ArrayList<>();
+    protected static List<String> m_streamNames = new ArrayList<>();
 
     public static class ServerListener extends Thread {
 
@@ -303,7 +303,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
             new ProcedureInfo(TableInsertLoopback.class,
-                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY", "1"), new String[] { "proc" })
+                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY", "0"), new String[] { "proc" })
     };
 
     public static final ProcedureInfo[] INSERTSELECT_PROCEDURES = {
@@ -327,7 +327,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
         boolean passed = false;
         assertFalse(streamNames.isEmpty());
-        Set<String> matchStreams = new HashSet<>(streamNames);
+        Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
 
         // Quiesce to see all data flushed.
         System.out.println("Quiesce client....");
