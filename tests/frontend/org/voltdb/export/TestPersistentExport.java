@@ -141,7 +141,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T3", 400, true);
 
         //test alter table add column
-        client.callProcedure("@AdHoc",  "ALTER TABLE T3 ADD COLUMN tweaked SMALLINT DEFAULT 0;");
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ADD COLUMN tweaked SMALLINT DEFAULT 0;");
         client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON INSERT;");
         insertToStreamWithNewColumn("T3", 600, 100, client, data);
         client.drain();
