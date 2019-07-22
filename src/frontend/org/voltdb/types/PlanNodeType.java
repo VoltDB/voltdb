@@ -48,6 +48,7 @@ public enum PlanNodeType implements PlanMatcher {
     //
     NESTLOOP        (20, NestLoopPlanNode.class),
     NESTLOOPINDEX   (21, NestLoopIndexPlanNode.class),
+    MERGEJOIN       (22, MergeJoinPlanNode.class),
 
     //
     // Operator Nodes

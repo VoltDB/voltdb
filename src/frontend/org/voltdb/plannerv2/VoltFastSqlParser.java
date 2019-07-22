@@ -15,22 +15,28 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.plannerv2;
 
-public class PlanningErrorException extends RuntimeException {
-    private static final long serialVersionUID = 1L;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParser;
 
-    public PlanningErrorException(String msg) {
-        super(msg);
-    }
+/**
+ * Direct API provider for parsing a SQL query.
+ *
+ * @author Yiqun Zhang
+ * @since 9.0
+ */
+public class VoltFastSqlParser {
+
     /**
-     * Create an exception with stacktrace erased. Used for reporting
-     * parsing/validation errors without the long backtrace list, to mimick
-     * user-observable error message from VoltCompiler.VoltCompilerException.
-     * @param msg exception message
-     * @param ignored not used
+     * Given a SQL statement (could be either a DDL or DQL/DML),
+     * parse it into a {@link SqlNode}.
+     *
+     * @param sql the SQL statement to parse.
+     * @return the parsed SqlNode tree for it.
      */
-    public PlanningErrorException(String msg, int ignored) {
-        super(msg, null, true, false);
+    public static SqlNode parse(String sql) throws SqlParseException {
+        return SqlParser.create(sql, VoltFrameworkConfig.PARSER_CONFIG).parseQuery(sql);
     }
 }

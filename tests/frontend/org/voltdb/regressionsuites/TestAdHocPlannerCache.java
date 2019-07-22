@@ -30,7 +30,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.jni.ExecutionEngine;
@@ -67,7 +66,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
     private void checkCacheStatistics(Client client, long cache1_level, long cache2_level,
             long cache1_hits, long cache2_hits, long cache_misses)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt;
 
         boolean checked = false;
@@ -95,7 +94,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         assertTrue(checked);
     }
 
-    private void checkPlannerCache(Client client, int... cacheTypes) throws NoConnectionsException, IOException, ProcCallException {
+    private void checkPlannerCache(Client client, int... cacheTypes) throws IOException, ProcCallException {
         for (int cacheType : cacheTypes) {
             if (cacheType == CACHE_MISS1) {
                 ++m_cache1_level;
@@ -198,7 +197,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     }
 
     public void subtest1AdHocPlannerCache(Client client) throws IOException, ProcCallException {
-        System.out.println("subtest1AdHocPlannerCache...");
         VoltTable vt;
         String sql;
 
@@ -825,19 +823,21 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         // use user parameter with the constant in the expression index
         // not able to use the index scan here
-        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-?) = 1 AND ID >= ? ORDER BY ID;";
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertFalse(vt.toString().contains("ABSIDX"));
-        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+        // ENG-15255
+        if (!USING_CALCITE) {
+            sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-?) = 1 AND ID >= ? ORDER BY ID;";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            assertFalse(vt.toString().contains("ABSIDX"));
+            checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
 
-        vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_MISS2);
+            vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{3});
+            checkPlannerCache(client, CACHE_MISS2);
 
-        vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{1, 2});
-        checkPlannerCache(client, CACHE_HIT2);
-
+            vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{1, 2});
+            checkPlannerCache(client, CACHE_HIT2);
+        }
 
         //
         // no user parameters
@@ -863,7 +863,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
+        VoltServerConfig config;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestAdHocPlannerCache.class);
         VoltProjectBuilder project = new VoltProjectBuilder();

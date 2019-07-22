@@ -74,15 +74,17 @@ public class ParameterSet implements JSONString {
     public static ParameterSet fromArrayWithCopy(Object... params) {
         if (params.length == 0) {
             return EMPTY;
+        } else {
+            return fromArray(params.clone());
         }
-        return fromArray(params.clone());
     }
 
     public static ParameterSet fromArrayNoCopy(Object... params) {
         if (params.length == 0) {
             return EMPTY;
+        } else {
+            return fromArray(params);
         }
-        return fromArray(params);
     }
 
     private static ParameterSet fromArray(Object[] params) {
@@ -105,16 +107,12 @@ public class ParameterSet implements JSONString {
                 ByteBuffer bb = (ByteBuffer)obj;
                 size += 4 + bb.capacity();
                 continue;
-            }
-
-            if (cls.isArray()) {
+            } else if (cls.isArray()) {
                 if (obj instanceof byte[]) {
                     final byte[] b = (byte[]) obj;
                     size += 4 + b.length;
                     continue;
-                }
-
-                if (obj instanceof Byte[]) {
+                } else if (obj instanceof Byte[]) {
                     final Byte[] b = (Byte[]) obj;
                     size += 4 + b.length;
                     continue;
@@ -123,8 +121,7 @@ public class ParameterSet implements JSONString {
                 VoltType type;
                 try {
                     type = VoltType.typeFromClass(cls.getComponentType());
-                }
-                catch (VoltTypeException e) {
+                } catch (VoltTypeException e) {
                     obj = getAKosherArray((Object[]) obj);
                     cls = obj.getClass();
                     type = VoltType.typeFromClass(cls.getComponentType());
@@ -218,22 +215,18 @@ public class ParameterSet implements JSONString {
             if (obj == VoltType.NULL_TIMESTAMP) {
                 size += 8;
                 continue;
-            }
-            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
+            } else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
                 size += 4;
                 continue;
-            }
-            else if (obj == VoltType.NULL_DECIMAL) {
+            } else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
                 continue;
-            }
-            else if (obj == VoltType.NULL_POINT) {
+            } else if (obj == VoltType.NULL_POINT) {
                 size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck();
                 continue;
-            }
-            else if (obj == VoltType.NULL_GEOGRAPHY) {
-                    size += 4;
-                    continue;
+            } else if (obj == VoltType.NULL_GEOGRAPHY) {
+                size += 4;
+                continue;
             } else if (obj instanceof BBContainer) {
                 size += 4 + ((BBContainer)obj).b().remaining();
                 continue;
@@ -341,9 +334,9 @@ public class ParameterSet implements JSONString {
         Class<?> ctype = o.getClass();
         if (ctype == Integer.class) {
             return ((Integer) o).longValue();
+        } else {
+            return o;
         }
-
-        return o;
     }
 
     public Object getParam(int index) {
@@ -430,8 +423,7 @@ public class ParameterSet implements JSONString {
                 // Fixing that ticket will require updating the logic below.
                 throw new RuntimeException("GeographyPointValue or GeographyValue instances are not yet supported in "
                         + "Object arrays passed as parameters.  Try passing GeographyPointValue[] or GeographyValue[] instead.");
-            }
-            else {
+            } else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
                                         array[i].getClass().toString());
                 throw new RuntimeException(msg);
@@ -465,8 +457,7 @@ public class ParameterSet implements JSONString {
             }
             assert((strings + nulls) == array.length);
             String[] retval = new String[array.length];
-            for (int i = 0; i < array.length; i++)
-            {
+            for (int i = 0; i < array.length; i++) {
                 if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) {
                     array[i] = null;
                 }
@@ -525,21 +516,17 @@ public class ParameterSet implements JSONString {
                     Double dval = (Double) o;
                     if (dval.isNaN()) {
                         js.value(dval.toString());
-                    }
-                    else if (dval.isInfinite()) {
+                    } else if (dval.isInfinite()) {
                         js.value(dval.toString());
-                    }
-
-                    else
+                    } else {
                         js.value(o);
-                }
-                else {
+                    }
+                } else {
                     js.value(o);
                 }
             }
             js.endArray();
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             e.printStackTrace();
             throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
         }
@@ -550,8 +537,7 @@ public class ParameterSet implements JSONString {
         if (value instanceof JSONObject) {
             JSONObject jsonObj = (JSONObject) value;
             return VoltTable.fromJSONObject(jsonObj);
-        }
-        if (value instanceof JSONArray) {
+        } else if (value instanceof JSONArray) {
             JSONArray array = (JSONArray) value;
             Object[] retval = new Object[array.length()];
             for (int i = 0; i < array.length(); i++) {
@@ -559,12 +545,12 @@ public class ParameterSet implements JSONString {
                 retval[i] = paramFromPossibleJSON(valueAtIndex);
             }
             return retval;
+        } else {
+            return value;
         }
-        return value;
     }
 
-    static private OneParamInfo readOneParameter(ByteBuffer in)
-            throws IOException {
+    static private OneParamInfo readOneParameter(ByteBuffer in) throws IOException {
         Object value;
         int len;
         byte[] encodedString = null;
@@ -581,25 +567,21 @@ public class ParameterSet implements JSONString {
             }
             if (nextType == null) {
                 value = null;
-            }
-            else if (nextType == VoltType.STRING) {
+            } else if (nextType == VoltType.STRING) {
                 encodedStringArray = (byte[][]) SerializationHelper.readArray(byte[].class, in);
                 String[] sval = new String[encodedStringArray.length];
                 for (int i = 0; i < encodedStringArray.length; ++i) {
                     if (encodedStringArray[i] == null) {
                         sval[i] = null;
-                    }
-                    else {
+                    } else {
                         sval[i] = new String(encodedStringArray[i], Constants.UTF8ENCODING);
                     }
                 }
                 value = sval;
-            }
-            else {
+            } else {
                 value = SerializationHelper.readArray(nextType.classFromType(), in);
             }
-        }
-        else {
+        } else {
             VoltType nextType;
             try {
                 nextType = VoltType.get(nextTypeByte);
@@ -629,8 +611,7 @@ public class ParameterSet implements JSONString {
                     len = in.getInt();
                     if (len == VoltType.NULL_STRING_LENGTH) {
                         value = VoltType.NULL_STRING_OR_VARBINARY;
-                    }
-                    else {
+                    } else {
                         encodedString = new byte[len];
                         in.get(encodedString);
                         value = new String(encodedString, Constants.UTF8ENCODING);
@@ -640,8 +621,7 @@ public class ParameterSet implements JSONString {
                     len = in.getInt();
                     if (len == VoltType.NULL_STRING_LENGTH) {
                         value = VoltType.NULL_STRING_OR_VARBINARY;
-                    }
-                    else {
+                    } else {
                         encodedString = new byte[len];
                         in.get(encodedString);
                         value = encodedString;
@@ -661,8 +641,7 @@ public class ParameterSet implements JSONString {
                     BigDecimal decimal_val = SerializationHelper.getBigDecimal(in);
                     if (decimal_val == null) {
                         value = VoltType.NULL_DECIMAL;
-                    }
-                    else {
+                    } else {
                         value = decimal_val;
                     }
                     break;
@@ -677,8 +656,7 @@ public class ParameterSet implements JSONString {
                     len = in.getInt();
                     if (len == VoltType.NULL_STRING_LENGTH) {
                         value = VoltType.NULL_GEOGRAPHY;
-                    }
-                    else {
+                    } else {
                         value = GeographyValue.unflattenFromBuffer(in);
                     }
                     break;
@@ -756,8 +734,7 @@ public class ParameterSet implements JSONString {
                 VoltType type;
                 try {
                     type = VoltType.typeFromClass(cls.getComponentType());
-                }
-                catch (VoltTypeException e) {
+                } catch (VoltTypeException e) {
                     obj = getAKosherArray((Object[]) obj);
                     cls = obj.getClass();
                     type = VoltType.typeFromClass(cls.getComponentType());
@@ -767,25 +744,25 @@ public class ParameterSet implements JSONString {
                 switch (type) {
                     case SMALLINT:
                         if (obj instanceof Short[])
-                            SerializationHelper.writeArray((short[]) ArrayUtils.toPrimitive((Short[])obj), buf);
+                            SerializationHelper.writeArray(ArrayUtils.toPrimitive((Short[])obj), buf);
                         else
                             SerializationHelper.writeArray((short[]) obj, buf);
                         break;
                     case INTEGER:
                         if (obj instanceof Integer[])
-                            SerializationHelper.writeArray((int[]) ArrayUtils.toPrimitive((Integer[])obj), buf);
+                            SerializationHelper.writeArray(ArrayUtils.toPrimitive((Integer[])obj), buf);
                         else
                             SerializationHelper.writeArray((int[]) obj, buf);
                         break;
                     case BIGINT:
                         if (obj instanceof Long[])
-                            SerializationHelper.writeArray((long[]) ArrayUtils.toPrimitive((Long[])obj), buf);
+                            SerializationHelper.writeArray(ArrayUtils.toPrimitive((Long[])obj), buf);
                         else
                             SerializationHelper.writeArray((long[]) obj, buf);
                         break;
                     case FLOAT:
                         if (obj instanceof Double[])
-                            SerializationHelper.writeArray((double[]) ArrayUtils.toPrimitive((Double[])obj), buf);
+                            SerializationHelper.writeArray(ArrayUtils.toPrimitive((Double[])obj), buf);
                         else
                             SerializationHelper.writeArray((double[]) obj, buf);
                         break;
@@ -793,11 +770,9 @@ public class ParameterSet implements JSONString {
                         if (m_encodedStringArrays[i] == null) {
                             // should not happen
                             throw new IOException("String array not encoded");
-                        }
-                        // This check used to be done by FastSerializer.writeArray(), but things changed?
-                        if (m_encodedStringArrays[i].length > Short.MAX_VALUE) {
-                            throw new IOException("Array exceeds maximum length of "
-                                                  + Short.MAX_VALUE + " bytes");
+                        } else if (m_encodedStringArrays[i].length > Short.MAX_VALUE) {
+                            // This check used to be done by FastSerializer.writeArray(), but things changed?
+                            throw new IOException("Array exceeds maximum length of " + Short.MAX_VALUE + " bytes");
                         }
                         buf.putShort((short)m_encodedStringArrays[i].length);
                         for (int zz = 0; zz < m_encodedStringArrays[i].length; zz++) {
@@ -843,28 +818,23 @@ public class ParameterSet implements JSONString {
                 buf.put(VoltType.TIMESTAMP.getValue());
                 buf.putLong(VoltType.NULL_BIGINT);  // corresponds to EE value.h isNull()
                 continue;
-            }
-            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
+            } else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
                 buf.put(VoltType.STRING.getValue());
                 buf.putInt(VoltType.NULL_STRING_LENGTH);
                 continue;
-            }
-            else if (obj == VoltType.NULL_DECIMAL) {
+            } else if (obj == VoltType.NULL_DECIMAL) {
                 buf.put(VoltType.DECIMAL.getValue());
                 VoltDecimalHelper.serializeNull(buf);
                 continue;
-            }
-            else if (obj == VoltType.NULL_POINT) {
+            } else if (obj == VoltType.NULL_POINT) {
                     buf.put(VoltType.GEOGRAPHY_POINT.getValue());
                     GeographyPointValue.serializeNull(buf);
                     continue;
-            }
-            else if (obj == VoltType.NULL_GEOGRAPHY) {
+            } else if (obj == VoltType.NULL_GEOGRAPHY) {
                 buf.put(VoltType.GEOGRAPHY.getValue());
                 buf.putInt(VoltType.NULL_STRING_LENGTH);
                 continue;
-            }
-            else if (obj instanceof BBContainer) {
+            } else if (obj instanceof BBContainer) {
                 final BBContainer cont = (BBContainer) obj;
                 final ByteBuffer paramBuf = cont.b();
                 buf.put(VoltType.VARBINARY.getValue());
@@ -892,7 +862,7 @@ public class ParameterSet implements JSONString {
                     if (cls == Float.class)
                         buf.putDouble(((Float) obj).doubleValue());
                     else if (cls == Double.class)
-                        buf.putDouble(((Double) obj).doubleValue());
+                        buf.putDouble((Double) obj);
                     else
                         throw new RuntimeException("Can't cast parameter type to Double");
                     break;
@@ -958,9 +928,9 @@ public class ParameterSet implements JSONString {
     public boolean equals(Object obj) {
         if (!(obj instanceof ParameterSet)) {
             return false;
+        } else {
+            return Arrays.deepEquals(m_params, ((ParameterSet) obj).m_params);
         }
-        ParameterSet other = (ParameterSet) obj;
-        return Arrays.deepEquals(m_params, other.m_params);
     }
 
     /* (non-Javadoc)

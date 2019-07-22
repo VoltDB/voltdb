@@ -23,10 +23,10 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.ParsedUnionStmt.UnionType;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 

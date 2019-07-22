@@ -57,9 +57,9 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlanSelector;
 import org.voltdb.planner.PlannerTestCase;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
