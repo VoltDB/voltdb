@@ -28,11 +28,13 @@ import org.voltdb.VoltProcedure;
 public class JiggleExportGroupDoneTable extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
     public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
+    public final SQLStmt export3 = new SQLStmt("INSERT INTO export_done_table_3 (txnid) VALUES (?)");
 
     public long run(long txid)
     {
         voltQueueSQL(export, txid);
         voltQueueSQL(exportFoo, txid);
+        voltQueueSQL(export3, txid);
 
         // Execute last statement batch
         voltExecuteSQL(true);
