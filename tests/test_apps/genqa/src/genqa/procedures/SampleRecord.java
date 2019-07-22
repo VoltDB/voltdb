@@ -80,7 +80,7 @@ public class SampleRecord
     }
 
     public String toString() {
-        return 
+        return
             rowid                      + ", " +
             rowid_group                + ", " +
             type_null_tinyint          + ", " +
