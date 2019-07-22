@@ -15,14 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STRINGREF_H
-#define STRINGREF_H
+#pragma once
 
 #include <cstddef>
 #include <stdint.h>
 
-namespace voltdb
-{
+namespace voltdb {
 class Pool;
 class LargeTempTableBlock;
 
@@ -31,8 +29,18 @@ class LargeTempTableBlock;
 /// constant pointer value to be stored in tuple storage while
 /// allowing the memory containing the actual string to be moved
 /// around as the result of compaction.
-class StringRef
-{
+class StringRef {
+    // Signature used internally for persistent strings
+    StringRef(int32_t size);
+    // Signature used internally for temporary strings
+    StringRef(Pool* tempPool, int32_t size);
+    // Only called from destroy and only for persistent strings.
+    ~StringRef();
+
+    // Only called from destroy and only for persistent strings.
+    void operator delete(void* object);
+
+    char* m_stringPtr;
 public:
     /// Utility method to extract the amount of memory that was
     /// used by non-inline storage for this string/varbinary.
@@ -83,21 +91,7 @@ public:
 
     /// When a string is relocated, we need to update the data pointer.
     void relocate(std::ptrdiff_t offset);
-
-private:
-    // Signature used internally for persistent strings
-    StringRef(int32_t size);
-    // Signature used internally for temporary strings
-    StringRef(Pool* tempPool, int32_t size);
-    // Only called from destroy and only for persistent strings.
-    ~StringRef();
-
-    // Only called from destroy and only for persistent strings.
-    void operator delete(void* object);
-
-    char* m_stringPtr;
 };
 
 } // namespace voltdb
 
-#endif // STRINGREF_H

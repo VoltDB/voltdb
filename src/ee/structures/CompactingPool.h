@@ -23,8 +23,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace voltdb
-{
+namespace voltdb {
 // Provide a compacting pool of objects of fixed size. Each object is assumed
 // to have a single char* pointer referencing it in the caller for the lifetime
 // of the allocation.
@@ -43,8 +42,7 @@ namespace voltdb
 // it reserves the right to relocate past allocations on the thread and reset
 // their forward pointers to copied versions of their allocations.
 // Currently, this only happens when (other) allocations are freed.
-    class CompactingPool
-    {
+    class CompactingPool {
     public:
         // Create a compacting pool.  As memory is required, it will
         // allocate buffers of size elementSize * elementsPerBuffer bytes.
@@ -66,8 +64,7 @@ namespace voltdb
 #endif
 
     public:
-    void* malloc(char** referrer)
-    {
+    void* malloc(char** referrer) {
         Relocatable* result =
             Relocatable::fromAllocation(m_allocator.alloc(), referrer);
         // Going forward, the compacting pool manages the value of
@@ -88,8 +85,7 @@ namespace voltdb
         return result->m_data;
     }
 
-    void free(void* element)
-    {
+    void free(void* element) {
         if (!clrPtr(element))
             return;
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
@@ -112,19 +108,21 @@ namespace voltdb
         m_allocator.trim();
     }
 
-    std::size_t getBytesAllocated() const
-    { return m_allocator.bytesAllocated(); }
+    std::size_t getBytesAllocated() const {
+        return m_allocator.bytesAllocated();
+    }
 
-    static int32_t FIXED_OVERHEAD_PER_ENTRY()
-    { return static_cast<int32_t>(sizeof(Relocatable)); }
+    static int32_t FIXED_OVERHEAD_PER_ENTRY() {
+        return static_cast<int32_t>(sizeof(Relocatable));
+    }
 
     private:
         ContiguousAllocator m_allocator;
 #ifdef VOLT_POOL_CHECKING
 #ifdef VOLT_TRACE_ALLOCATIONS
-        typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+        typedef std::unordered_map<void*, StackTrace*> AllocTraceMap_t;
 #else
-        typedef std::unordered_set<void *> AllocTraceMap_t;
+        typedef std::unordered_set<void*> AllocTraceMap_t;
 #endif
         AllocTraceMap_t m_allocations;
 #endif
@@ -144,15 +142,13 @@ namespace voltdb
         char** m_referringPtr;
         char m_data[0];
 
-        static Relocatable* fromAllocation(void* allocation, char** referrer)
-        {
+        static Relocatable* fromAllocation(void* allocation, char** referrer) {
             Relocatable* result = reinterpret_cast<Relocatable*>(allocation);
             result->m_referringPtr = referrer;
             return result;
         }
 
-        static Relocatable* backtrackFromCallerData(void* data)
-        {
+        static Relocatable* backtrackFromCallerData(void* data) {
             // "-1" for a Relocatable* subtracts sizeof(Relocatable) ==
             // sizeof(m_referringPtr) == 8 bytes.
             Relocatable* result = reinterpret_cast<Relocatable*>(data)-1;

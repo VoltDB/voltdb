@@ -63,9 +63,7 @@
 namespace voltdb {
 int64_t UpdateExecutor::s_modifiedTuples;
 
-bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
-                            const ExecutorVector& executorVector)
-{
+bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Update Executor");
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);

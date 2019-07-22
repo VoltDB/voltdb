@@ -205,6 +205,129 @@ int32_t NValue::serializedSize() const {
 }
 
 /**
+ * This null compare function works for GROUP BY, ORDER BY, INDEX KEY, etc,
+ * except for comparison expression.
+ * comparison expression has different logic for null.
+ */
+inline int NValue::compareNull(const NValue& rhs) const {
+    bool const lnull = isNull();
+    bool const rnull = rhs.isNull();
+    if (lnull) {
+        return rnull ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+    } else if (rnull) {
+        return VALUE_COMPARE_GREATERTHAN;
+    } else {
+       return VALUE_COMPARE_INVALID;
+    }
+}
+
+/**
+ * Compare any two NValues. Comparison is not guaranteed to
+ * succeed if the values are incompatible.  Avoid use of
+ * comparison in favor of op_*.
+ */
+inline int NValue::compare(const NValue& rhs) const {
+    int hasNullCompare = compareNull(rhs);
+    if (hasNullCompare != VALUE_COMPARE_INVALID) {
+        return hasNullCompare;
+    } else {
+        vassert(!isNull() && !rhs.isNull());
+        return compare_withoutNull(rhs);
+    }
+}
+
+/**
+ * Assuming no nulls are in comparison.
+ * Compare any two NValues. Comparison is not guaranteed to
+ * succeed if the values are incompatible.  Avoid use of
+ * comparison in favor of op_*.
+ */
+inline int NValue::compare_withoutNull(const NValue& rhs) const {
+   vassert(! isNull() && ! rhs.isNull());
+
+   switch (m_valueType) {
+      case VALUE_TYPE_VARCHAR:
+         return compareStringValue(rhs);
+      case VALUE_TYPE_BIGINT:
+         return compareBigInt(rhs);
+      case VALUE_TYPE_INTEGER:
+         return compareInteger(rhs);
+      case VALUE_TYPE_SMALLINT:
+         return compareSmallInt(rhs);
+      case VALUE_TYPE_TINYINT:
+         return compareTinyInt(rhs);
+      case VALUE_TYPE_TIMESTAMP:
+         return compareTimestamp(rhs);
+      case VALUE_TYPE_DOUBLE:
+         return compareDoubleValue(rhs);
+      case VALUE_TYPE_VARBINARY:
+         return compareBinaryValue(rhs);
+      case VALUE_TYPE_DECIMAL:
+         return compareDecimalValue(rhs);
+      case VALUE_TYPE_POINT:
+         return comparePointValue(rhs);
+      case VALUE_TYPE_GEOGRAPHY:
+         return compareGeographyValue(rhs);
+      case VALUE_TYPE_BOOLEAN:
+         return compareBooleanValue(rhs);
+      default:
+         throwDynamicSQLException(
+                 "non comparable types lhs '%s' rhs '%s'",
+                 getValueTypeString().c_str(), rhs.getValueTypeString().c_str());
+               /* no break */
+   }
+}
+
+int NValue::compareStringValue(const NValue& rhs) const {
+    vassert(m_valueType == VALUE_TYPE_VARCHAR);
+
+    ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_VARCHAR) {
+        char message[128];
+        snprintf(message, 128, "Type %s cannot be cast for comparison to type %s",
+                valueToString(rhsType).c_str(), valueToString(m_valueType).c_str());
+        throw SQLException(SQLException::data_exception_most_specific_type_mismatch, message);
+    }
+
+    int32_t leftLength = -1;
+    const char* left = getObject_withoutNull(leftLength);
+    int32_t rightLength = -1;
+    const char* right = rhs.getObject_withoutNull(rightLength);
+    int result = ::strncmp(left, right, std::min(leftLength, rightLength));
+    if (result == 0) {
+        result = leftLength - rightLength;
+    }
+    fprintf(stderr, "<%s>(%lu) ^ <%s>(%lu) ? : %d\n", left, strlen(left), right, strlen(right), result);
+    fflush(stderr);
+    if (result > 0) {
+        return VALUE_COMPARE_GREATERTHAN;
+    } else if (result < 0) {
+        return VALUE_COMPARE_LESSTHAN;
+    } else {
+        return VALUE_COMPARE_EQUAL;
+    }
+}
+
+const char* NValue::getObject_withoutNull(int32_t& lengthOut) const {
+    if (getSourceInlined()) {
+        const char* storage = *reinterpret_cast<const char* const*>(m_data);
+        lengthOut = storage[0]; // one-byte length prefix for inline
+        return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
+    } else {
+        char const* retVal = getObjectPointer()->getObject(lengthOut);
+        /*if(lengthOut < 0) {
+            fprintf(stderr, "!!! size=%d\n", lengthOut);
+            fflush(stderr);
+        } else if (lengthOut == 0) {
+            fprintf(stderr, "!!? size=%d: <%s>\n", lengthOut, retVal);
+            fflush(stderr);
+        }*/
+        vassert(lengthOut >= 0);
+        return retVal;
+    }
+}
+
+/**
  * Serialize sign and value using radix point (no exponent).
  */
 std::string NValue::createStringFromDecimal() const {
@@ -216,8 +339,8 @@ std::string NValue::createStringFromDecimal() const {
     }
     TTInt whole(scaledValue);
     TTInt fractional(scaledValue);
-    whole /= NValue::kMaxScaleFactor;
-    fractional %= NValue::kMaxScaleFactor;
+    whole /= kMaxScaleFactor;
+    fractional %= kMaxScaleFactor;
     if (whole.IsSign()) {
         whole.ChangeSign();
     }
@@ -227,7 +350,7 @@ std::string NValue::createStringFromDecimal() const {
         fractional.ChangeSign();
     }
     std::string fractionalString = fractional.ToString(10);
-    for (int ii = static_cast<int>(fractionalString.size()); ii < NValue::kMaxDecScale; ii++) {
+    for (auto ii = fractionalString.size(); ii < kMaxDecScale; ii++) {
         buffer << '0';
     }
     buffer << fractionalString;
@@ -240,8 +363,7 @@ std::string NValue::createStringFromDecimal() const {
  */
 void NValue::createDecimalFromString(const std::string &txt) {
     if (txt.length() == 0) {
-        throw SQLException(SQLException::volt_decimal_serialization_error,
-                                       "Empty string provided");
+        throw SQLException(SQLException::volt_decimal_serialization_error, "Empty string provided");
     }
     bool setSign = false;
     if (txt[0] == '-') {
@@ -254,10 +376,8 @@ void NValue::createDecimalFromString(const std::string &txt) {
     for (int ii = (setSign ? 1 : 0); ii < static_cast<int>(txt.size()); ii++) {
         if ((txt[ii] < '0' || txt[ii] > '9') && txt[ii] != '.') {
             char message[4096];
-            snprintf(message, 4096, "Invalid characters in decimal string: %s",
-                     txt.c_str());
-            throw SQLException(SQLException::volt_decimal_serialization_error,
-                               message);
+            snprintf(message, 4096, "Invalid characters in decimal string: %s", txt.c_str());
+            throw SQLException(SQLException::volt_decimal_serialization_error, message);
         }
     }
 
@@ -267,7 +387,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
         const std::size_t wholeStringSize = wholeString.size();
         if (wholeStringSize > 26) {
             throw SQLException(SQLException::volt_decimal_serialization_error,
-                               "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+                    "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
         }
         TTInt whole(wholeString);
         if (setSign) {
@@ -276,11 +396,8 @@ void NValue::createDecimalFromString(const std::string &txt) {
         whole *= kMaxScaleFactor;
         getDecimal() = whole;
         return;
-    }
-
-    if (txt.find( '.', separatorPos + 1) != std::string::npos) {
-        throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Too many decimal points");
+    } else if (txt.find( '.', separatorPos + 1) != std::string::npos) {
+        throw SQLException(SQLException::volt_decimal_serialization_error, "Too many decimal points");
     }
 
     // This is set to 1 if we carry in the scale.
@@ -310,7 +427,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
         carryScale = ('5' <= fractionalString[kMaxDecScale]) ? 1 : 0;
         fractionalString = fractionalString.substr(0, kMaxDecScale);
     } else {
-        while(fractionalString.size() < NValue::kMaxDecScale) {
+        while(fractionalString.size() < kMaxDecScale) {
             fractionalString.push_back('0');
         }
     }
@@ -333,14 +450,15 @@ void NValue::createDecimalFromString(const std::string &txt) {
     }
 
     // Process the whole number string.
-    const std::string wholeString = txt.substr( setSign ? 1 : 0, separatorPos - (setSign ? 1 : 0));
+    const std::string wholeString = txt.substr(setSign ? 1 : 0,
+            separatorPos - (setSign ? 1 : 0));
     // We will check for oversize numbers below, so don't waste time
     // doing it now.
     TTInt whole(wholeString);
     whole += carryWhole;
     if (oversizeWholeDecimal(whole)) {
         throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+                "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
     }
     whole *= kMaxScaleFactor;
     whole += fractional;
@@ -353,26 +471,23 @@ void NValue::createDecimalFromString(const std::string &txt) {
 }
 
 struct NValueList {
-    static int allocationSizeForLength(size_t length)
-    {
+    static int allocationSizeForLength(size_t length) {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
         // This allocation has the advantage of getting freed via NValue::free.
         return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
     }
 
-    void* operator new(size_t size, char* placement)
-    {
+    void* operator new(size_t size, char* placement) {
         return placement;
     }
     void operator delete(void*, char*) {}
     void operator delete(void*) {}
 
-    NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
-    { }
+    NValueList(size_t length, ValueType elementType) :
+        m_length(length), m_elementType(elementType) { }
 
-    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
-    {
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool) {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
         }
@@ -395,8 +510,7 @@ struct NValueList {
  * explicit cast operators and and/or constant promotions as needed.
  * @return a VALUE_TYPE_BOOLEAN NValue.
  */
-bool NValue::inList(const NValue& rhs) const
-{
+bool NValue::inList(const NValue& rhs) const {
     //TODO: research: does the SQL standard allow a null to match a null list element
     // vs. returning FALSE or NULL?
     const bool lhsIsNull = isNull();
@@ -417,8 +531,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
-{
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool) {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
     int trueSize = NValueList::allocationSizeForLength(length);
@@ -430,16 +543,14 @@ void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPo
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-void NValue::allocateANewNValueList(size_t length, ValueType elementType)
-{
+void NValue::allocateANewNValueList(size_t length, ValueType elementType) {
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, NULL);
     ::memset(storage, 0, trueSize);
     new (storage) NValueList(length, elementType);
 }
 
-void NValue::setArrayElements(std::vector<NValue> &args) const
-{
+void NValue::setArrayElements(std::vector<NValue> &args) const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
@@ -453,15 +564,13 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-int NValue::arrayLength() const
-{
+int NValue::arrayLength() const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
-const NValue& NValue::itemAtIndex(int index) const
-{
+const NValue& NValue::itemAtIndex(int index) const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     vassert(index >= 0);
@@ -469,8 +578,7 @@ const NValue& NValue::itemAtIndex(int index) const
     return listOfNValues->m_values[index];
 }
 
-void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const
-{
+void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const {
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
@@ -486,22 +594,20 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
             StlFriendlyNValue stlValue;
             stlValue = value.castAs(outputType);
             uniques.insert(stlValue);
+        } catch (SQLException &sqlException) {
+            // cast exceptions mean the in-list test is redundant
+            // don't include these values in the materialized table
+            // TODO: make this less hacky
         }
-        // cast exceptions mean the in-list test is redundant
-        // don't include these values in the materialized table
-        // TODO: make this less hacky
-        catch (SQLException &sqlException) {}
     }
 
     // insert all items in the set in order
-    std::set<StlFriendlyNValue>::const_iterator iter;
-    for (iter = uniques.begin(); iter != uniques.end(); iter++) {
-        outList.push_back(*iter);
+    for (auto const& elm : uniques) {
+        outList.emplace_back(elm);
     }
 }
 
-void NValue::streamTimestamp(std::stringstream& value) const
-{
+void NValue::streamTimestamp(std::stringstream& value) const {
     int64_t epoch_micros = getTimestamp();
     if (epochMicrosOutOfRange(epoch_micros)) {
         throwOutOfRangeTimestampInput("CAST");
@@ -527,18 +633,16 @@ void NValue::streamTimestamp(std::stringstream& value) const
     value << mbstr;
 }
 
-inline static void throwTimestampFormatError(const std::string &str)
-{
+inline static void throwTimestampFormatError(const std::string &str) {
     char message[4096];
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
-             "or \'YYYY-MM-DD\'",
-             str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
+    snprintf(message, 4096,
+            "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\' or \'YYYY-MM-DD\'",
+            str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
     throw SQLException(SQLException::dynamic_sql_error, message);
 }
 
-int64_t NValue::parseTimestampString(const std::string &str)
-{
+int64_t NValue::parseTimestampString(const std::string &str) {
     // date_str
     std::string date_str(str);
     // This is the std:string API for "ltrim" and "rtrim".
@@ -710,8 +814,7 @@ int64_t NValue::parseTimestampString(const std::string &str)
 }
 
 
-int warn_if(int condition, const char* message)
-{
+int warn_if(int condition, const char* message) {
     if (condition) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, message);
     }

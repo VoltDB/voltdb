@@ -18,12 +18,8 @@
 
 #include "common/FatalException.hpp"
 #include "common/ThreadLocalPool.h"
-#include "boost/foreach.hpp"
 
-#include <common/debuglog.h>
-
-namespace voltdb
-{
+namespace voltdb {
 
 #ifdef VOLT_POOL_CHECKING
 CompactingPool::~CompactingPool() {
@@ -32,15 +28,15 @@ CompactingPool::~CompactingPool() {
                 ThreadLocalPool::getThreadPartitionId());
         VOLT_ERROR_STACK();
 #ifdef VOLT_TRACE_ALLOCATIONS
-    BOOST_FOREACH (AllocTraceMap_t::value_type& entry, m_allocations) {
-        VOLT_ERROR("Missing deallocation for %p at:", entry.first);
-        entry.second->printLocalTrace();
-        delete entry.second;
-    }
+        for (auto const& entry, m_allocations) {
+            VOLT_ERROR("Missing deallocation for %p at:", entry.first);
+            entry.second->printLocalTrace();
+            delete entry.second;
+        }
 #else
-    BOOST_FOREACH (void* entry, m_allocations) {
-        VOLT_ERROR("Missing deallocation for %p at:", entry);
-    }
+        for(void* entry: m_allocations) {
+            VOLT_ERROR("Missing deallocation for %p at:", entry);
+        }
 #endif
         vassert(false);
     }
@@ -73,8 +69,7 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
         VOLT_TRACE("ContiguousAllocator deallocated data pointer %p in wrong context thread (partition %d)",
                 oldData, ThreadLocalPool::getEnginePartitionId());
         VOLT_ERROR_STACK();
-    }
-    else {
+    } else {
 #ifdef VOLT_TRACE_ALLOCATIONS
         bool success = m_allocations.insert(std::make_pair(newData, it->second)).second;
 #else
@@ -88,8 +83,9 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
             delete it->second;
 #endif
             throwFatalException("Previously allocated relocatable object mysteriously re-allocated during move");
+        } else {
+            m_allocations.erase(it);
         }
-        m_allocations.erase(it);
     }
 }
 
@@ -100,8 +96,7 @@ bool CompactingPool::clrPtr(void* data) {
         VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
         VOLT_ERROR_STACK();
         throwFatalException("Deallocation of unknown pointer to relocatable object");
-    }
-    else {
+    } else {
 #ifdef VOLT_TRACE_ALLOCATIONS
         delete it->second;
 #endif

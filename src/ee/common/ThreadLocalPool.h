@@ -21,17 +21,15 @@
 #ifdef VOLT_POOL_CHECKING
 #include "common/StackTrace.h"
 #endif
-
+#include <memory>
+#include "debuglog.h"
 #include "boost/pool/pool.hpp"
-#include "boost/shared_ptr.hpp"
-#include <boost/unordered_map.hpp>
 
 namespace voltdb {
 
-typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
+using CompactingStringStorage = std::unordered_map<int32_t, std::shared_ptr<CompactingPool>>;
 
-struct voltdb_pool_allocator_new_delete
-{
+struct voltdb_pool_allocator_new_delete {
     typedef std::size_t size_type;
     typedef std::ptrdiff_t difference_type;
 
@@ -40,38 +38,23 @@ struct voltdb_pool_allocator_new_delete
 };
 
 typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
-typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
-typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
+typedef std::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
+typedef std::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
 
 typedef std::pair<int, PoolsByObjectSize* > PoolPairType;
 typedef PoolPairType* PoolPairTypePtr;
 
 struct PoolLocals {
     PoolLocals();
-    PoolLocals(bool dummyEntry) {
-        poolData = NULL;
-        stringData = NULL;
-        allocated = NULL;
-        enginePartitionId = NULL;
-    }
-    PoolLocals(const PoolLocals& src) {
-        poolData = src.poolData;
-        stringData = src.stringData;
-        allocated = src.allocated;
-        enginePartitionId = src.enginePartitionId;
-    }
+    PoolLocals(bool dummyEntry) { }
+    PoolLocals(const PoolLocals& src) = default;
 
-    PoolLocals& operator = (PoolLocals const& rhs) {
-        poolData = rhs.poolData;
-        stringData = rhs.stringData;
-        allocated = rhs.allocated;
-        return *this;
-    }
+    PoolLocals& operator = (PoolLocals const& rhs) = default;
 
-    PoolPairTypePtr poolData;
-    CompactingStringStorage* stringData;
-    std::size_t* allocated;
-    int32_t* enginePartitionId;
+    PoolPairTypePtr poolData = nullptr;
+    CompactingStringStorage* stringData = nullptr;
+    std::size_t* allocated = nullptr;
+    int32_t* enginePartitionId = nullptr;
 };
 
 

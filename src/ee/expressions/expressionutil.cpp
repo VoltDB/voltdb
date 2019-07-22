@@ -637,9 +637,9 @@ void ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr,
       } else {
          ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
          ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
-         for(auto const* e : expr->getArgs()) {
+         /*for(auto const* e : expr->getArgs()) {
             ExpressionUtil::extractTupleValuesColumnIdx(e, columnIds);
-         }
+         } */
       }
    }
 }
