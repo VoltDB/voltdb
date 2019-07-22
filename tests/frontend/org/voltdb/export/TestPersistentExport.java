@@ -139,6 +139,14 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T3", 400, true);
+
+        //test alter table add column
+        client.callProcedure("@AdHoc",  "ALTER TABLE T3 ADD COLUMN tweaked SMALLINT DEFAULT 0;");
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON INSERT;");
+        insertToStreamWithNewColumn("T3", 600, 100, client, data);
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 500, true);
     }
 
     private static void checkTupleCount(Client client, String tableName, long expectedCount, boolean replicated){
