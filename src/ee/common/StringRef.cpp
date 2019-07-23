@@ -54,7 +54,6 @@ const char* StringRef::getObject(int32_t& lengthOut) const {
     if (lengthOut > 0) {
        return sized->m_data;
     } else {
-        //vassert(lengthOut == 0);        // TODO: should never be negative
         lengthOut = 0;
         return empty_string;
     }
@@ -119,11 +118,6 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     vassert(sz >= 0);
     StringRef* result;
     if (tempPool) {
-        if (sz == 0) {
-            fprintf(stderr, "tempPool allocating %lu=%lu+%lu+0 bytes for empty string\n",
-                    sizeof(StringRef) + sizeof(ThreadLocalPool::Sized) + sz, sizeof(StringRef), sizeof(ThreadLocalPool::Sized));
-            fflush(stderr);
-        }
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(tempPool, sz);
     } else {
 #ifdef MEMCHECK
