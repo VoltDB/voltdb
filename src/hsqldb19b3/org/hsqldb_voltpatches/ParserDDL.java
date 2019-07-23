@@ -1020,6 +1020,17 @@ public class ParserDDL extends ParserRoutine {
                                    null, t.getName());
     }
 
+    private void setPeristentExportTriggers(Table table) {
+        // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
+        if (token.tokenType != Tokens.EXPORT) {
+            return;
+        }
+        String target = readMigrateTarget();
+        List<String> triggers = readExportTrigger(false);
+        target = target.toUpperCase();
+        PersistentExport export = new PersistentExport(target, triggers);
+        table.persistentExport = export;
+    }
     private Statement readPersistentExport(Table table, boolean alter) {
 
         // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
@@ -1028,39 +1039,7 @@ public class ParserDDL extends ParserRoutine {
         }
         String target = readMigrateTarget();
         // read triggers
-        List<String> triggers = new ArrayList<>();
-        read();
-        if (token.tokenType == Tokens.ON) {
-            read();
-            while (token.tokenType != Tokens.SEMICOLON) {
-                if (token.tokenType == Tokens.DELETE) {
-                    triggers.add(Tokens.T_DELETE);
-                } else if (token.tokenType == Tokens.INSERT) {
-                    triggers.add(Tokens.T_INSERT);
-                } else if (token.tokenType == Tokens.UPDATE) {
-                    triggers.add(Tokens.T_UPDATE);
-                } else if (token.tokenType == Tokens.UPDATEOLD) {
-                    triggers.add(Tokens.T_UPDATEOLD);
-                } else if (token.tokenType == Tokens.UPDATENEW) {
-                    triggers.add(Tokens.T_UPDATENEW);
-                } else if (token.tokenType != Tokens.COMMA){
-                    throw unexpectedToken();
-                }
-                read();
-            }
-            if (triggers.contains(Tokens.T_UPDATE) && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
-                throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
-                        " or " + Tokens.T_UPDATENEW);
-            }
-            if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
-                throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
-                        " and " + Tokens.T_UPDATENEW);
-            }
-        }
-        if (triggers.isEmpty()) {
-            triggers= Arrays.asList("INSERT");
-        }
-
+        List<String> triggers = readExportTrigger(true);
         Object[] args = new Object[] {
                 table.getName(),
                 target.toUpperCase(),
@@ -1072,6 +1051,66 @@ public class ParserDDL extends ParserRoutine {
                                        null, table.getName());
     }
 
+    private List<String> readExportTrigger(boolean alter) {
+        List<String> triggers = new ArrayList<>();
+        read();
+        if (token.tokenType == Tokens.ON) {
+            read();
+            int lastTokenType = token.tokenType;
+            int endToken = (alter ? Tokens.SEMICOLON : Tokens.OPENBRACKET);
+            while (token.tokenType != endToken) {
+                String theToken = null;;
+                switch(token.tokenType) {
+                case Tokens.DELETE:
+                    theToken = Tokens.T_DELETE;
+                    break;
+                case Tokens.INSERT:
+                    theToken = Tokens.T_INSERT;
+                    break;
+                case Tokens.UPDATE:
+                    theToken = Tokens.T_UPDATE;
+                    break;
+                case Tokens.UPDATEOLD:
+                    theToken = Tokens.T_UPDATEOLD;
+                    break;
+                case Tokens.UPDATENEW:
+                    theToken = Tokens.T_UPDATENEW;
+                    break;
+                default:
+                    if (token.tokenType != Tokens.COMMA){
+                        throw unexpectedToken();
+                    }
+                }
+                if (theToken != null) {
+                    if (triggers.contains(theToken)) {
+                        throw unexpectedToken();
+                    }
+                    triggers.add(theToken);
+                }
+                read();
+
+                // Cannot have two same tokens in a row
+                if (lastTokenType == token.tokenType) {
+                    throw unexpectedToken();
+                }
+                lastTokenType = token.tokenType;
+            }
+        }
+        if (triggers.contains(Tokens.T_UPDATE) && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
+            throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                    " or " + Tokens.T_UPDATENEW);
+        }
+        if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
+            throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                    " and " + Tokens.T_UPDATENEW);
+        }
+
+        if (triggers.isEmpty()) {
+            triggers= Arrays.asList("INSERT");
+        }
+
+        return triggers;
+    }
     private Statement readTimeToLive(Table table, boolean alter) {
         //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TARGET NAME>
         if (!alter && token.tokenType != Tokens.USING) {
@@ -1307,6 +1346,10 @@ public class ParserDDL extends ParserRoutine {
         int position = getPosition();
 
         table.setHasMigrationTarget(token.tokenType == Tokens.MIGRATE);
+        if (token.tokenType == Tokens.EXPORT) {
+            // have to setup PersistentExport
+            setPeristentExportTriggers(table);
+        }
         // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
         // We can collect the ttl first in order to decide if its a ttl migration or general migration.
         readUntilThis(Tokens.OPENBRACKET);
