@@ -504,12 +504,11 @@ function test-tools-wait-for-server-to-start() {
     done
 
     if [[ "$i" -gt "$MAX_SECONDS" ]]; then
-        EXTENDED_ERROR_MSG="Here is the end of the VoltDB console output (./volt_console.out):" \
-                           `tail -10 volt_console.out` \
-                           "\nHere is the end of the VoltDB log (./voltdbroot/log/volt.log):" \
-                           `tail -10 voltdbroot/log/volt.log`
-        tt-exit-script 13 $FUNCNAME "VoltDB server unable to start after waiting $MAX_SECONDS seconds" \
-                       $EXTENDED_ERROR_MSG
+        EXTENDED_ERROR_MSG="Here is the end of the VoltDB console output (./volt_console.out):\n"
+        EXTENDED_ERROR_MSG+=`tail -10 volt_console.out`
+        EXTENDED_ERROR_MSG+="\n\nHere is the end of the VoltDB log (./voltdbroot/log/volt.log):\n"
+        EXTENDED_ERROR_MSG+=`tail -10 voltdbroot/log/volt.log`
+        tt-exit-script 13 $FUNCNAME "VoltDB server unable to start after waiting $MAX_SECONDS seconds" "$EXTENDED_ERROR_MSG"
         return
     fi
 }
@@ -569,22 +568,47 @@ function test-tools-server-pro() {
     test-tools-server-community-or-pro
 }
 
+# Counts the number of VoltDB processes, e.g., processes that contain
+# 'voldb/voltdb-8.4.4.jar' or 'voldb/voltdb-9.1.jar' or 'voldb/voltdb-10.0.jar'
+# (this version should be good through 'voldb/voltdb-99.9.9.9.9.9.jar').
+# Note that 'org.voltdb.VoltDB' cannot be used because it does not work on
+# Ubuntu-14.04 machines; and 'jps' no longer seems to work either.
+function test-tools-server-count() {
+    COUNT_VOLTDB_PROCESSES=`ps -ef | grep -v grep | grep -vi SQLCommand | grep -cE 'voltdb/voltdb-[1-9]?[0-9](.[0-9])+.jar'`
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: test-tools-server-count: $COUNT_VOLTDB_PROCESSES"
+    fi
+    return $COUNT_VOLTDB_PROCESSES
+}
+
 # Start the VoltDB server ('community'), only if not already running
 function test-tools-server-if-needed() {
-    if ps -ef | grep -v "grep" | grep -c "org.voltdb.VoltDB"; then
-        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
-        #echo -e "    DEBUG: jps -l:" $(jps -l | grep org.voltdb.VoltDB)
+    test-tools-server-count
+    RETURN_CODE=$?
+    if [[ "$RETURN_CODE" -gt "0" ]]; then
+        if [[ "$TT_DEBUG" -ge "2" ]]; then
+            echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
+        fi
     else
+        if [[ "$TT_DEBUG" -ge "2" ]]; then
+            echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
+        fi
         test-tools-server
     fi
 }
 
 # Start the VoltDB 'pro' server, only if not already running
 function test-tools-server-pro-if-needed() {
-    if ps -ef | grep -v "grep" | grep -c "org.voltdb.VoltDB"; then
-        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
-        #echo -e "    DEBUG: jps -l:" $(jps -l | grep org.voltdb.VoltDB)
+    test-tools-server-count
+    RETURN_CODE=$?
+    if [[ "$RETURN_CODE" -gt "0" ]]; then
+        if [[ "$TT_DEBUG" -ge "2" ]]; then
+            echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
+        fi
     else
+        if [[ "$TT_DEBUG" -ge "2" ]]; then
+            echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
+        fi
         test-tools-server-pro
     fi
 }
@@ -700,17 +724,18 @@ function tt-exit-script() {
     if [[ "$TT_EXIT_CODE" -ne "0" ]]; then
         echo -e "\nFATAL: $ERROR_MSG in ${BASH_SOURCE[0]}, function $FUNC_NAME"
         if [[ -n "$EXTRA_MSG" ]]; then
-            echo -e "    $EXTRA_MSG"
+            echo -e "\nAdditional FATAL Error Info:\n$EXTRA_MSG"
         fi
-        echo -e "exiting with code: $TT_EXIT_CODE\n"
     fi
 
     # If this script was called "normally", then 'exit' with the appropriate
     # error code; but if it was called using 'source' or '.', then simply
     # 'return' with that code, in order to avoid also exiting the shell
     if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+        echo -e "\n$FUNCNAME exiting with code: $TT_EXIT_CODE\n"
         exit $TT_EXIT_CODE
     else
+        echo -e "\n$FUNCNAME returning with code: $TT_EXIT_CODE\n"
         return $TT_EXIT_CODE
     fi
 }
