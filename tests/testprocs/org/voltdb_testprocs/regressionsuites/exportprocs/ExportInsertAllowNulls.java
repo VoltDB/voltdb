@@ -26,17 +26,17 @@ package org.voltdb_testprocs.regressionsuites.exportprocs;
 import java.math.BigDecimal;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-public class ExportInsertAllowNulls extends ExportInsertBase {
+public class ExportInsertAllowNulls extends VoltProcedure {
 
     private final SQLStmt i_allow_nulls = new SQLStmt
     ("INSERT INTO S_ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    @Override
     public VoltTable[] run(
             String tablename,
             int pkey,

@@ -26,12 +26,13 @@ package org.voltdb_testprocs.regressionsuites.exportprocs;
 import java.math.BigDecimal;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-public class ExportInsertNoNulls extends ExportInsertBase {
+public class ExportInsertNoNulls extends VoltProcedure {
 
     // see InsertBase for 3 more SQL statements
     // this class doubles as a test for visibility and inheritance of statements
@@ -39,7 +40,6 @@ public class ExportInsertNoNulls extends ExportInsertBase {
     protected final SQLStmt i_no_nulls = new SQLStmt
     ("INSERT INTO S_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    @Override
     public VoltTable[] run(
             String tablename,
             int pkey,
