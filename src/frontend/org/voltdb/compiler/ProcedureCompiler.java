@@ -95,7 +95,7 @@ public abstract class ProcedureCompiler {
         Field[] fields = procClass.getDeclaredFields();
         for (Field f : fields) {
             // skip non SQL fields
-            if (f.getType() != SQLStmt.class)
+            if (!SQLStmt.class.isAssignableFrom(f.getType()))
                 continue;
 
             int modifiers = f.getModifiers();
@@ -138,6 +138,15 @@ public abstract class ProcedureCompiler {
         if (superClass != null) {
             Map<String, SQLStmt> superStmts = getValidSQLStmts(compiler, procName, superClass, procInstance, false);
             for (Entry<String, SQLStmt> e : superStmts.entrySet()) {
+                if (retval.containsKey(e.getKey()) == false)
+                    retval.put(e.getKey(), e.getValue());
+            }
+        }
+        
+        Class<?> interfaces[] = procClass.getInterfaces();
+        for (Class<?> aninterface : interfaces ){
+        	Map<String, SQLStmt> interfaceStmts = getValidSQLStmts(compiler, procName, aninterface, procInstance, false);
+            for (Entry<String, SQLStmt> e : interfaceStmts.entrySet()) {
                 if (retval.containsKey(e.getKey()) == false)
                     retval.put(e.getKey(), e.getValue());
             }
