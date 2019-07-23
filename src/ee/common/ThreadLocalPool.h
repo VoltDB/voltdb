@@ -27,7 +27,7 @@
 
 namespace voltdb {
 
-using CompactingStringStorage = std::unordered_map<int32_t, std::shared_ptr<CompactingPool>>;
+using CompactingStringStorage = std::unordered_map<int32_t, std::unique_ptr<CompactingPool>>;
 
 struct voltdb_pool_allocator_new_delete {
     typedef std::size_t size_type;
@@ -37,12 +37,10 @@ struct voltdb_pool_allocator_new_delete {
     static void free(char * const block);
 };
 
-typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
-typedef std::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
-typedef std::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
+using PoolForObjectSize = boost::pool<voltdb_pool_allocator_new_delete>;
+using PoolsByObjectSize = std::unordered_map<std::size_t, std::unique_ptr<PoolForObjectSize>>;
 
-typedef std::pair<int, PoolsByObjectSize* > PoolPairType;
-typedef PoolPairType* PoolPairTypePtr;
+using PoolPairType = std::pair<int, PoolsByObjectSize*>;
 
 struct PoolLocals {
     PoolLocals();
@@ -51,7 +49,7 @@ struct PoolLocals {
 
     PoolLocals& operator = (PoolLocals const& rhs) = default;
 
-    PoolPairTypePtr poolData = nullptr;
+    PoolPairType* poolData = nullptr;
     CompactingStringStorage* stringData = nullptr;
     std::size_t* allocated = nullptr;
     int32_t* enginePartitionId = nullptr;
@@ -90,7 +88,7 @@ public:
 
     static void assignThreadLocals(const PoolLocals& mapping);
 
-    static PoolPairTypePtr getDataPoolPair();
+    static PoolPairType* getDataPoolPair();
 
     /**
      * Allocate space from a page of objects of the requested size.
@@ -192,12 +190,12 @@ private:
         int32_t m_allocatingThread;
         static pthread_mutex_t s_sharedMemoryMutex;
     #ifdef VOLT_TRACE_ALLOCATIONS
-        typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+        using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
     #else
-        typedef std::unordered_set<void *> AllocTraceMap_t;
+        using AllocTraceMap_t = std::unordered_set<void*> ;
     #endif
-        typedef std::unordered_map<std::size_t, AllocTraceMap_t> SizeBucketMap_t;
-        typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
+        using SizeBucketMap_t = std::unordered_map<std::size_t, AllocTraceMap_t> ;
+        using PartitionBucketMap_t = std::unordered_map<int32_t, SizeBucketMap_t> ;
         static PartitionBucketMap_t s_allocations;
     #endif
 };
