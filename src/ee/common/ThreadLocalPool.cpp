@@ -22,8 +22,6 @@
 #include "common/SynchronizedThreadLock.h"
 #include "ExecuteWithMpMemory.h"
 #include <numeric>
-#include <iostream>
-#include <pthread.h>
 
 namespace voltdb {
 
@@ -47,7 +45,7 @@ namespace {
 }
 
 #ifdef VOLT_POOL_CHECKING
-pthread_mutex_t ThreadLocalPool::s_sharedMemoryMutex = PTHREAD_MUTEX_INITIALIZER;
+std::mutex ThreadLocalPool::s_sharedMemoryMutex;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
@@ -101,9 +99,10 @@ ThreadLocalPool::~ThreadLocalPool() {
             VOLT_ERROR_STACK();
             vassert(false);
         }
-        pthread_mutex_lock(&s_sharedMemoryMutex);
-        SizeBucketMap_t& mapBySize = s_allocations[*enginePartitionIdPtr];
-        pthread_mutex_unlock(&s_sharedMemoryMutex);
+        {
+            std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
+            SizeBucketMap_t& mapBySize = s_allocations[*enginePartitionIdPtr];
+        }
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
             AllocTraceMap_t& allocMap = mapForAdd->second;
@@ -317,9 +316,10 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
     int32_t enginePartitionId =  getEnginePartitionId();
-    pthread_mutex_lock(&s_sharedMemoryMutex);
-    SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
-    pthread_mutex_unlock(&s_sharedMemoryMutex);
+    {
+        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
+        SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
+    }
     SizeBucketMap_t::iterator mapForAdd;
 #endif
     if (iter == pools.end()) {
@@ -398,9 +398,10 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
 #ifdef VOLT_POOL_CHECKING
 StackTrace* ThreadLocalPool::getStackTraceFor(int32_t engineId, std::size_t sz, void* object) {
 #ifdef VOLT_TRACE_ALLOCATIONS
-    pthread_mutex_lock(&s_sharedMemoryMutex);
-    auto const foundEngineAlloc = s_allocations.find(engineId);
-    pthread_mutex_unlock(&s_sharedMemoryMutex);
+    {
+        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
+        auto const foundEngineAlloc = s_allocations.find(engineId);
+    }
     if (foundEngineAlloc == s_allocations.end()) {
         return nullptr;
     }
@@ -422,9 +423,10 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
     int32_t engineId = getEnginePartitionId();
     VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
             engineId, getThreadPartitionId());
-    pthread_mutex_lock(&s_sharedMemoryMutex);
-    SizeBucketMap_t& mapBySize = s_allocations[engineId];
-    pthread_mutex_unlock(&s_sharedMemoryMutex);
+    {
+        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
+        SizeBucketMap_t& mapBySize = s_allocations[engineId];
+    }
     auto const mapForAdd = mapBySize.find(sz);
     if (mapForAdd == mapBySize.cend()) {
         VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
@@ -508,7 +510,7 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
 #ifdef VOLT_POOL_CHECKING
     // Don't track allocations on the mp thread because it is not used at all
     if (partitionId != 16383) {
-        pthread_mutex_lock(&s_sharedMemoryMutex);
+        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
         auto const it = s_allocations.find(partitionId);
         if (it != s_allocations.end()) {
             SizeBucketMap_t& mapBySize = it->second;
@@ -521,7 +523,6 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
         } else {
             s_allocations.emplace(partitionId, {});
         }
-        pthread_mutex_unlock(&s_sharedMemoryMutex);
     }
 #endif
     auto* pidPtr = m_threadPartitionIdKey;
@@ -556,14 +557,14 @@ int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
     }
 }
 
-char* voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
+char* voltdb_pool_allocator_new_delete::malloc(const size_t bytes) {
     m_allocatedKey += bytes + sizeof(std::size_t);
-    char *retval = new (std::nothrow) char[bytes + sizeof(std::size_t)];
+    char *retval = new char[bytes + sizeof(std::size_t)];
     *reinterpret_cast<std::size_t*>(retval) = bytes + sizeof(std::size_t);
     return &retval[sizeof(std::size_t)];
 }
 
-void voltdb_pool_allocator_new_delete::free(char * const block) {
+void voltdb_pool_allocator_new_delete::free(char *const block) {
     m_allocatedKey -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }

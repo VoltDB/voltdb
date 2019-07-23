@@ -20,6 +20,7 @@
 #include "structures/CompactingPool.h"
 #ifdef VOLT_POOL_CHECKING
 #include "common/StackTrace.h"
+#include <mutex>
 #endif
 #include <memory>
 #include "debuglog.h"
@@ -30,10 +31,9 @@ namespace voltdb {
 using CompactingStringStorage = std::unordered_map<int32_t, std::unique_ptr<CompactingPool>>;
 
 struct voltdb_pool_allocator_new_delete {
-    typedef std::size_t size_type;
-    typedef std::ptrdiff_t difference_type;
-
-    static char * malloc(const size_type bytes);
+    using size_type = std::size_t;         // These typedefs are required by boost::pool
+    using difference_type = std::ptrdiff_t;
+    static char* malloc(const size_t bytes);
     static void free(char * const block);
 };
 
@@ -188,7 +188,7 @@ private:
 
         int32_t m_allocatingEngine;
         int32_t m_allocatingThread;
-        static pthread_mutex_t s_sharedMemoryMutex;
+        static std::mutex s_sharedMemoryMutex;
     #ifdef VOLT_TRACE_ALLOCATIONS
         using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
     #else
