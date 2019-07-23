@@ -120,9 +120,9 @@ namespace voltdb {
         ContiguousAllocator m_allocator;
 #ifdef VOLT_POOL_CHECKING
 #ifdef VOLT_TRACE_ALLOCATIONS
-        typedef std::unordered_map<void*, StackTrace*> AllocTraceMap_t;
+        using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
 #else
-        typedef std::unordered_set<void*> AllocTraceMap_t;
+        using AllocTraceMap_t = std::unordered_set<void*>;
 #endif
         AllocTraceMap_t m_allocations;
 #endif

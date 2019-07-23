@@ -28,7 +28,7 @@ CompactingPool::~CompactingPool() {
                 ThreadLocalPool::getThreadPartitionId());
         VOLT_ERROR_STACK();
 #ifdef VOLT_TRACE_ALLOCATIONS
-        for (auto const& entry, m_allocations) {
+        for (auto const& entry: m_allocations) {
             VOLT_ERROR("Missing deallocation for %p at:", entry.first);
             entry.second->printLocalTrace();
             delete entry.second;

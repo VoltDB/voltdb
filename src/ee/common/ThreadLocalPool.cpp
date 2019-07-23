@@ -152,7 +152,7 @@ ThreadLocalPool::~ThreadLocalPool() {
 void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping) {
     vassert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
 
-    m_allocatedKey = *mapping.allocated;
+    m_allocatedKey = mapping.allocated;
     m_key = mapping.poolData;
     m_stringKey = mapping.stringData;
     m_enginePartitionIdKey = mapping.enginePartitionId;
@@ -486,18 +486,18 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
 }
 
 // internal non-member helper function for calcuate Pool allocation Size
-std::size_t getPoolAllocationSize_internal(size_t *bytes, CompactingStringStorage *poolMap) {
+std::size_t getPoolAllocationSize_internal(size_t bytes, CompactingStringStorage *poolMap) {
     // For relocatable objects, each object-size-specific pool
     // -- or actually, its ContiguousAllocator -- tracks its own memory
     // allocation, so sum them, here.
-    return std::accumulate(poolMap->cbegin(), poolMap->cend(), *bytes,
+    return std::accumulate(poolMap->cbegin(), poolMap->cend(), bytes,
             [](size_t acc, typename CompactingStringStorage::value_type const& cur) {
             return acc + cur.second->getBytesAllocated();
             });
 }
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
-    size_t bytes_allocated = getPoolAllocationSize_internal(&m_allocatedKey, m_stringKey);
+    size_t bytes_allocated = getPoolAllocationSize_internal(m_allocatedKey, m_stringKey);
 
     if (SynchronizedThreadLock::isLowestSiteContext()) {
         PoolLocals mpMapping = SynchronizedThreadLock::getMpEngine();
@@ -512,10 +512,10 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
     if (partitionId != 16383) {
         std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
         auto const it = s_allocations.find(partitionId);
-        if (it != s_allocations.end()) {
+        if (it != s_allocations.cend()) {
             SizeBucketMap_t& mapBySize = it->second;
             SizeBucketMap_t::iterator it2 = mapBySize.begin();
-            while (it2 != mapBySize.end()) {
+            while (it2 != mapBySize.cend()) {
                 vassert(it2->second.empty());
                 it2++;
                 mapBySize.erase(mapBySize.begin());
@@ -570,7 +570,7 @@ void voltdb_pool_allocator_new_delete::free(char *const block) {
 }
 
 PoolLocals::PoolLocals() {
-    allocated = &m_allocatedKey;
+    allocated = m_allocatedKey;
     poolData = m_key;
     stringData = m_stringKey;
     enginePartitionId = m_enginePartitionIdKey;

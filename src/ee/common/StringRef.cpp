@@ -52,7 +52,7 @@ const char* StringRef::getObject(int32_t& lengthOut) const {
     auto const* sized = asSizedObject(m_stringPtr);
     lengthOut = sized->m_size;
     if (lengthOut > 0) {
-       return sized->m_data;
+        return sized->m_data;
     } else {
         lengthOut = 0;
         return empty_string;
@@ -92,7 +92,7 @@ int32_t StringRef::getAllocatedSizeInTempStorage() const {
 // StringRef class so that it can call a proper accessor method.
 // An earlier implementation taking this approach proved hard to follow.
 inline StringRef::StringRef(int32_t sz):
-    m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) {}
+    m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) { }
 
 // Temporary strings are allocated in one piece with their referring
 // StringRefs -- the string data starts just past the StringRef object,
