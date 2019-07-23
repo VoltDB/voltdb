@@ -490,7 +490,7 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, bool isWorkerIn, int udafIndexIn, bool isPartitionIn)
+    UserDefineAgg(int id, bool isWorkerIn, bool isPartitionIn, int udafIndexIn)
         : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndexIn), isPartition(isPartitionIn)
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
@@ -535,7 +535,7 @@ private:
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct, int aggId, bool isWorker, int udafIndex, bool isPartition)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct)
 {
     switch (aggType) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -565,8 +565,6 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
-    case EXPRESSION_TYPE_USER_DEFINED_AGGREGATE:
-        return new (memoryPool) UserDefineAgg(aggId, isWorker, udafIndex, isPartition);
     default:
         {
             char message[128];
@@ -574,6 +572,10 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
+}
+
+inline Agg* getUDAFAggInstance(Pool& memoryPool, int functionId, bool isWorker, bool isPartition, int udafIndex) {
+    return new (memoryPool) UserDefineAgg(functionId, isWorker, isPartition, udafIndex);
 }
 
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
@@ -738,9 +740,14 @@ inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, const
 inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
-    std::unordered_map<int, int> udaf_indexes;
+    std::unordered_map<int, int> udafIndexes;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii], udaf_indexes[m_aggregateIds[ii]]++, m_isPartition[ii]);
+        if (m_aggTypes[ii] == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE) {
+            aggs[ii] = getUDAFAggInstance(m_memoryPool, m_aggregateIds[ii], m_isWorker[ii], m_isPartition[ii], udafIndexes[m_aggregateIds[ii]]++);
+        }
+        else {
+            aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        }
     }
 }
 

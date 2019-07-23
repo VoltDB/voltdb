@@ -267,10 +267,7 @@ public class UserDefinedFunctionManager {
                         }
                         // If the end method has at least one parameter, this is not the end
                         // method we're looking for
-                        if (m.getParameterCount() > 0) {
-                            continue;
-                        }
-                        if (!CreateFunction.isAllowedDataType(m.getReturnType())) {
+                        if (m.getParameterCount() > 0 || !CreateFunction.isAllowedDataType(m.getReturnType())) {
                             continue;
                         }
                     }

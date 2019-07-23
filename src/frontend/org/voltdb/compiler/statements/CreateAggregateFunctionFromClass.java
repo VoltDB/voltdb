@@ -160,8 +160,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             throw m_compiler.new VoltCompilerException(msg);
                         }
                         if (m.getParameterCount() == 1) {
-                            Class<?> paramTypeClass = m.getParameterTypes()[0];
-                            if (paramTypeClass == funcClass) {
+                            if (m.getParameterTypes()[0] == funcClass) {
                                 combineMethod = m;
                             }
                         }

@@ -2688,6 +2688,9 @@ public class PlanAssembler {
                     if (tempRoot.getUserAggregateId() != null) {
                         aggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
                     }
+                    else {
+                        aggNode.addUserDefineAggregateId("-1");
+                    }
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,

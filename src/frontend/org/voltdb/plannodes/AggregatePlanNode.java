@@ -261,15 +261,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public int getUserAggregateId(int index) {
-        if (m_userAggregateId.size() > 0) {
-            return m_userAggregateId.get(index);
-        } else {
-            return -1;
-        }
-    }
-
-    public int getUserAggregateIdSize() {
-        return m_userAggregateId.size();
+        return m_userAggregateId.get(index);
     }
 
     public void setOutputSchema(NodeSchema schema) {
