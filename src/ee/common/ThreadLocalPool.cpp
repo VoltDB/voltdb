@@ -36,15 +36,14 @@ namespace voltdb {
  * Thread local key for storing thread specific memory pools
  */
 namespace {
-pthread_key_t m_key;
-pthread_key_t m_stringKey;
+    thread_local PoolPairType* m_key = nullptr;
+    thread_local CompactingStringStorage* m_stringKey = nullptr;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
-pthread_key_t m_allocatedKey;
-pthread_key_t m_threadPartitionIdKey;
-pthread_key_t m_enginePartitionIdKey;
-pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
+    thread_local size_t* m_allocatedKey = nullptr;
+    thread_local int32_t* m_threadPartitionIdKey = nullptr;
+    thread_local int32_t* m_enginePartitionIdKey = nullptr;
 }
 
 #ifdef VOLT_POOL_CHECKING
@@ -53,38 +52,28 @@ ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
 namespace {
-void createThreadLocalKey() {
-    (void) pthread_key_create(&m_key, nullptr);
-    (void) pthread_key_create(&m_stringKey, nullptr);
-    (void) pthread_key_create(&m_allocatedKey, nullptr);
-    (void) pthread_key_create(&m_threadPartitionIdKey, nullptr);
-    (void) pthread_key_create(&m_enginePartitionIdKey, nullptr);
-}
 }
 
 ThreadLocalPool::ThreadLocalPool() {
-    (void)pthread_once(&m_keyOnce, createThreadLocalKey);
-    if (pthread_getspecific(m_key) == nullptr) {
-        pthread_setspecific(m_allocatedKey, reinterpret_cast<const void*>(new std::size_t(0)));
+    if (m_key == nullptr) {
+        m_allocatedKey = new std::size_t(0);
         // Since these are int32_t values we can't just
         // put them into the void* pointer which is the thread
         // local data.  We have to allocate an int32_t
         // buffer to hold the partition id value.
-        pthread_setspecific(m_threadPartitionIdKey, reinterpret_cast<const void*>(new int32_t(0)));
-        pthread_setspecific(m_enginePartitionIdKey, reinterpret_cast<const void*>(new int32_t(0)));
+        m_threadPartitionIdKey = new int32_t(0);
+        m_enginePartitionIdKey = new int32_t(0);
         PoolsByObjectSize* pools = new PoolsByObjectSize();
-        PoolPairType* refCountedPools = new PoolPairType(1, pools);
-        pthread_setspecific(m_key, reinterpret_cast<const void*>(refCountedPools));
-        pthread_setspecific(m_stringKey, reinterpret_cast<const void*>(new CompactingStringStorage()));
+        m_key = new PoolPairType(1, pools);
+        m_stringKey = new CompactingStringStorage();
 #ifdef VOLT_POOL_CHECKING
         m_allocatingEngine = -1;
         m_allocatingThread = -1;
 #endif
     } else {
-        auto p = reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key));
-        p->first++;
+        m_key->first++;
         VOLT_TRACE("Increment (%d) ThreadPool Memory counter for partition %d on thread %d",
-                p->first, getEnginePartitionId(), getThreadPartitionId());
+                m_key->first, getEnginePartitionId(), getThreadPartitionId());
 #ifdef VOLT_POOL_CHECKING
         m_allocatingEngine = getEnginePartitionId();
         m_allocatingThread = getThreadPartitionId();
@@ -93,23 +82,18 @@ ThreadLocalPool::ThreadLocalPool() {
 }
 
 ThreadLocalPool::~ThreadLocalPool() {
-    auto const p = reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key));
-    if (p == nullptr) {
-        VOLT_ERROR("Failed to find context");
-        VOLT_ERROR_STACK();
-        vassert(p != nullptr);
-    }
-    if (p != nullptr) {
-        if (p->first == 1) {
-            delete p->second;
-            pthread_setspecific( m_key, NULL);
-            delete reinterpret_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
-            pthread_setspecific(m_stringKey, NULL);
-            delete reinterpret_cast<std::size_t*>(pthread_getspecific(m_allocatedKey));
-            pthread_setspecific( m_allocatedKey, NULL);
-            int32_t* threadPartitionIdPtr = reinterpret_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
-            pthread_setspecific( m_threadPartitionIdKey, NULL);
-            int32_t* enginePartitionIdPtr = reinterpret_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
+    vassert(m_key != nullptr);
+    if (m_key != nullptr) {
+        if (m_key->first == 1) {
+            delete m_key->second;
+            m_key = nullptr;
+            delete m_stringKey;
+            m_stringKey = nullptr;
+            delete m_allocatedKey;
+            m_allocatedKey = nullptr;
+            int32_t* threadPartitionIdPtr = m_threadPartitionIdKey;
+            m_threadPartitionIdKey = nullptr;
+            int32_t* enginePartitionIdPtr = m_enginePartitionIdKey;
 #ifdef VOLT_POOL_CHECKING
             VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
             // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
@@ -153,12 +137,12 @@ ThreadLocalPool::~ThreadLocalPool() {
             }
             delete threadPartitionIdPtr;
             delete enginePartitionIdPtr;
-            delete p;
+            delete m_key;
         } else {
-            p->first--;
+            m_key->first--;
 #ifdef VOLT_POOL_CHECKING
             VOLT_TRACE("Decrement (%d) ThreadPool Memory counter for partition %d on thread %d",
-                    p->first, getEnginePartitionId(), getThreadPartitionId());
+                    m_key->first, getEnginePartitionId(), getThreadPartitionId());
             // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
             // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
             // if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
@@ -176,24 +160,24 @@ ThreadLocalPool::~ThreadLocalPool() {
 void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping) {
     vassert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
 
-    pthread_setspecific(m_allocatedKey, reinterpret_cast<const void*>(mapping.allocated));
-    pthread_setspecific(m_key, reinterpret_cast<const void*>(mapping.poolData));
-    pthread_setspecific(m_stringKey, reinterpret_cast<const void*>(mapping.stringData));
-    pthread_setspecific(m_enginePartitionIdKey, reinterpret_cast<const void*>(mapping.enginePartitionId));
+    m_allocatedKey = mapping.allocated;
+    m_key = mapping.poolData;
+    m_stringKey = mapping.stringData;
+    m_enginePartitionIdKey = mapping.enginePartitionId;
 }
 
 void ThreadLocalPool::resetStateForTest() {
-    pthread_setspecific(m_allocatedKey, NULL);
-    pthread_setspecific(m_key, NULL);
-    pthread_setspecific(m_stringKey, NULL);
-    pthread_setspecific(m_enginePartitionIdKey, NULL);
-    pthread_setspecific(m_threadPartitionIdKey, NULL);
+    m_allocatedKey = nullptr;
+    m_key = nullptr;
+    m_stringKey = nullptr;
+    m_enginePartitionIdKey = nullptr;
+    m_threadPartitionIdKey = nullptr;
 }
 int32_t* ThreadLocalPool::getThreadPartitionIdForTest() {
-    return reinterpret_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+    return m_threadPartitionIdKey;
 }
 void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
-    pthread_setspecific(m_threadPartitionIdKey, reinterpret_cast<const void*>(partitionId));
+    m_threadPartitionIdKey = partitionId;
 }
 
 namespace {
@@ -261,12 +245,12 @@ void ThreadLocalPool::freeRelocatable(Sized* data) {
 #else // not MEMCHECK
 
 PoolPairType* ThreadLocalPool::getDataPoolPair() {
-    return reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key));
+    return m_key;
 }
 
 namespace {
 CompactingStringStorage &getStringPoolMap() {
-    return *reinterpret_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    return *m_stringKey;
 }
 }
 
@@ -336,7 +320,7 @@ void ThreadLocalPool::freeRelocatable(Sized* sized) {
 #endif
 
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
-    PoolsByObjectSize& pools = *(reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key))->second);
+    PoolsByObjectSize& pools = *(m_key->second);
     auto iter = pools.find(sz);
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
@@ -350,7 +334,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
         pool = new PoolForObjectSize(sz);
         pools.emplace(sz, pool);
 #ifdef VOLT_POOL_CHECKING
-        mapForAdd = mapBySize.find(sz);
+        auto mapForAdd = mapBySize.find(sz);
         if (mapForAdd == mapBySize.cend()) {
             mapForAdd = mapBySize.emplace(sz, {}).first;
         } else {
@@ -498,7 +482,7 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
     }
 #endif
 
-    PoolsByObjectSize& pools = *(reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key))->second);
+    PoolsByObjectSize& pools = *(m_key->second);
     auto const iter = pools.find(sz);
     if (iter == pools.cend()) {
         throwFatalException("Failed to locate an allocated object of size %ld to free it.",
@@ -519,9 +503,7 @@ std::size_t getPoolAllocationSize_internal(size_t *bytes, CompactingStringStorag
 }
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
-    size_t bytes_allocated = getPoolAllocationSize_internal(
-            reinterpret_cast<std::size_t*>(pthread_getspecific(m_allocatedKey)),
-            reinterpret_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey)));
+    size_t bytes_allocated = getPoolAllocationSize_internal(m_allocatedKey, m_stringKey);
 
     if (SynchronizedThreadLock::isLowestSiteContext()) {
         PoolLocals mpMapping = SynchronizedThreadLock::getMpEngine();
@@ -550,24 +532,22 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
         pthread_mutex_unlock(&s_sharedMemoryMutex);
     }
 #endif
-    auto* pidPtr = reinterpret_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
+    auto* pidPtr = m_threadPartitionIdKey;
     *pidPtr = partitionId;
-    pidPtr = reinterpret_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
+    pidPtr = m_enginePartitionIdKey;
     *pidPtr = partitionId;
 }
 
 int32_t ThreadLocalPool::getThreadPartitionId() {
-    int32_t partitionId = *reinterpret_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
-    return partitionId;
+    return *m_threadPartitionIdKey;
 }
 
 int32_t ThreadLocalPool::getEnginePartitionId() {
-    int32_t partitionId = *reinterpret_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
-    return partitionId;
+    return *m_enginePartitionIdKey;
 }
 
 int32_t ThreadLocalPool::getThreadPartitionIdWithNullCheck() {
-    int32_t *ptrToPartitionId = reinterpret_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
+    int32_t *ptrToPartitionId = m_threadPartitionIdKey;
     if (ptrToPartitionId == nullptr) {
         return -1;
     } else {
@@ -576,7 +556,7 @@ int32_t ThreadLocalPool::getThreadPartitionIdWithNullCheck() {
 }
 
 int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
-    auto *ptrToPartitionId = reinterpret_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
+    auto *ptrToPartitionId = m_enginePartitionIdKey;
     if (ptrToPartitionId == NULL) {
         return -1;
     } else {
@@ -585,23 +565,22 @@ int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
 }
 
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
-    (*reinterpret_cast<std::size_t*>(pthread_getspecific(m_allocatedKey))) += bytes + sizeof(std::size_t);
+    *m_allocatedKey += bytes + sizeof(std::size_t);
     char *retval = new (std::nothrow) char[bytes + sizeof(std::size_t)];
     *reinterpret_cast<std::size_t*>(retval) = bytes + sizeof(std::size_t);
     return &retval[sizeof(std::size_t)];
 }
 
 void voltdb_pool_allocator_new_delete::free(char * const block) {
-    (*reinterpret_cast<std::size_t*>(pthread_getspecific(m_allocatedKey))) -=
-        *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
+    *m_allocatedKey -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }
 
 PoolLocals::PoolLocals() {
-    allocated = reinterpret_cast<std::size_t*>(pthread_getspecific(m_allocatedKey));
-    poolData = reinterpret_cast<PoolPairType*>(pthread_getspecific(m_key));
-    stringData = reinterpret_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
-    enginePartitionId = reinterpret_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
+    allocated = m_allocatedKey;
+    poolData = m_key;
+    stringData = m_stringKey;
+    enginePartitionId = m_enginePartitionIdKey;
 }
 
 }
