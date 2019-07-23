@@ -265,12 +265,12 @@ ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, in
     auto iter = poolMap.find(alloc_size);
     if (iter == poolMap.cend()) { // Compacting pool adds in its overhead so remove it since getAllocationSizeForObject also adds it
         iter = poolMap.emplace(alloc_size,
-                new CompactingPool(
+                std::unique_ptr<CompactingPool>(new CompactingPool(
                     alloc_size - CompactingPool::FIXED_OVERHEAD_PER_ENTRY(),
                     // There is no pool yet for objects of this size, so create one.
                     // Compute num_elements to be the largest multiple of alloc_size
                     // to fit in a 2MB buffer.
-                    (2 * 1024 * 1024 - 1) / alloc_size + 1)).first;
+                    (2 * 1024 * 1024 - 1) / alloc_size + 1))).first;
     }
     // Convert from the raw allocation to the initialized size header.
     return new (iter->second->malloc(referrer)) Sized(sz);
@@ -324,7 +324,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
 #endif
     if (iter == pools.end()) {
         pool = new PoolForObjectSize(sz);
-        pools.emplace(sz, pool);
+        pools.emplace(sz, std::unique_ptr<PoolForObjectSize>(pool));
 #ifdef VOLT_POOL_CHECKING
         auto mapForAdd = mapBySize.find(sz);
         if (mapForAdd == mapBySize.cend()) {
