@@ -1217,7 +1217,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
-                if (isStreamUpdate) {
+                if (isStreamUpdate || persistentTable->getStreamedTable()) {
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                         attachTupleStream(streamedTable, name, purgedStreams, timestamp);
