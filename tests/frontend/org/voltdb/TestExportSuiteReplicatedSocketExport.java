@@ -85,7 +85,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         System.out.println("testExportReplicatedExportToSocket");
         final Client client = getClient();
 
-        client.callProcedure("@AdHoc", "create stream ex (i bigint not null)");
+        client.callProcedure("@AdHoc", "create stream ex export to target ex (i bigint not null)");
         StringBuilder insertSql;
         for (int i=0;i<5000;i++) {
             insertSql = new StringBuilder();
@@ -140,7 +140,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.createConnection("localhost", config.port(0));
 
         client.callProcedure("@AdHoc", "create table regular (i bigint not null)");
-        client.callProcedure("@AdHoc", "create stream ex (i bigint not null)");
+        client.callProcedure("@AdHoc", "create stream ex export to target ex (i bigint not null)");
         StringBuilder insertSql = new StringBuilder();
         for (int i=0;i<50;i++) {
             insertSql.append("insert into ex values(" + i + ");");
@@ -212,7 +212,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         props.put("replicated", "true");
         props.put("skipinternals", "true");
 
-        project.addExport(true, ServerExportEnum.CUSTOM, props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "ex");
         /*
          * compile the catalog all tests start with
          */

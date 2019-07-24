@@ -118,9 +118,7 @@ public abstract class CatalogSchemaTools {
                 if (streamPartitionColumn != null && viewQuery == null) {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
                 }
-                //Default target means no target.
-                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME) &&
-                        TableType.isStream(catalog_tbl.getTabletype())) {
+                if (streamTarget != null && TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
             } else {

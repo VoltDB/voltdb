@@ -744,7 +744,7 @@ public class VoltProjectBuilder {
     }
 
     public void addExport(boolean enabled, ServerExportEnum exportType, Properties config) {
-        addExport(enabled, exportType, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        addExport(enabled, exportType, config, Constants.UNUSED_EXPORT_CONNECTOR_NAME);
     }
 
     public void addExport(boolean enabled, ServerExportEnum exportType, Properties config, String target) {
