@@ -50,7 +50,7 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
     }
 
     protected void testFunction(String functionCall, Object[] expected, VoltType returnType,
-            String[] columnNames, String[] columnValues)
+            String[] columnNames, String[][] columnValues)
             throws IOException, ProcCallException {
         // randomly decide which table to test
         String tableName = "R1";
@@ -70,16 +70,17 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         Client client = getClient();
 
         // INSERT rows into the table that we are using for testing
+        String allColumnNames = "ID";
+        String allColumnValues = "";
         for (int i = 0; i < columnValues.length; ++i) {
-            String allColumnNames  = "ID";
-            String allColumnValues = Integer.toString(i);
-            if (columnNames != null && columnNames.length > 0) {
-                allColumnNames += ", " + columnNames[0];
+            allColumnNames += ", " + columnNames[i];
+        }
+        for (int i = 0; i < columnValues[0].length; ++i) {
+            allColumnValues = Integer.toString(i);
+            for (int j = 0; j < columnValues.length; ++j) {
+                allColumnValues += ", " + columnValues[j][i];
             }
-            if (columnValues != null && columnValues.length > 0) {
-                allColumnValues += ", " + columnValues[i];
-            }
-            String insertStatement = "INSERT INTO "+tableName
+            String insertStatement = "INSERT INTO "+ tableName
                     + " ("+allColumnNames+") VALUES" + " ("+allColumnValues+")";
             cr = client.callProcedure("@AdHoc", insertStatement);
             assertEquals(insertStatement+" failed", ClientResponse.SUCCESS, cr.getStatus());
@@ -117,30 +118,100 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUavg() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"1", "2", "3", "4"};
+        String[][] columnValues = {{"1", "2", "3", "4"}};
         Object[] expected = {2.5D};
         testFunction("uavg(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUavgAndAbs() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"1", "-2", "3", "-4"};
+        String[][] columnValues = {{"1", "-2", "3", "-4"}};
         Object[] expected = {2.5D};
         testFunction("uavg(abs(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    public void testUavgAndFloor() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"1.2", "2.8", "3.3", "4.6"}};
+        Object[] expected = {2.5D};
+        testFunction("uavg(floor(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUavgTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"1", "2", "3", "4"}, {"2", "3", "4", "5"}};
+        Object[] expected = {2.5D, 3.5D};
+        testFunction("uavg(NUM), uavg(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUavgAddColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"1", "2", "3", "4"}, {"2", "3", "4", "5"}};
+        Object[] expected = {6D};
+        testFunction("uavg(NUM) + uavg(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
     public void testUCount() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"};
+        String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
         Object[] expected = {8};
         testFunction("ucount(NUM)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    public void testUCountTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
+        Object[] expected = {8, 8};
+        testFunction("ucount(NUM), ucount(DEC)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUCountSubtractColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
+        Object[] expected = {0D};
+        testFunction("ucount(NUM) - ucount(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUCountThreeColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
+        Object[] expected = {8, 8, 8};
+        testFunction("ucount(NUM), ucount(DEC), count(DEC)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
     public void testUmax() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"0", "1.1", "100.4", "999.0", "-1000.4", "999"};
+        String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}};
         Object[] expected = {999.0D};
         testFunction("umax(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmaxAndAbs() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}};
+        Object[] expected = {1000.4D};
+        testFunction("umax(abs(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmaxTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}, {"-0.5", "11000.2", "100.4", "999.8", "-1000.4", "998.3"}};
+        Object[] expected = {999.0D, 11000.2D};
+        testFunction("umax(NUM), umax(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmaxDivideColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"0", "1.1", "100.4", "999.8", "-1000.4", "999"}, {"-0.5", "100.2", "100.4", "999.8", "-1000.4", "998.3"}};
+        Object[] expected = {1.0D};
+        testFunction("umax(NUM)/umax(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmaxAndCeilingDivideColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"0", "1.1", "100.4", "999.8", "-1000.4", "999"}, {"-0.5", "100.2", "100.4", "1999.8", "-1000.4", "998.3"}};
+        Object[] expected = {0.5D};
+        testFunction("umax(ceiling(NUM))/umax(ceiling(DEC))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUmaxNoSerializable() throws IOException, ProcCallException {
@@ -151,9 +222,30 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUmedian() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"2", "4", "5", "10"};
+        String[][] columnValues = {{"2", "4", "5", "10"}};
         Object[] expected = {4.5D};
         testFunction("umedian(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmedianTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"2", "4", "5", "10"}, {"1", "10", "5", "5"}};
+        Object[] expected = {4.5D, 5.0D};
+        testFunction("umedian(NUM), umedian(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmedianAndDivide() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"2", "9", "9", "10"}, {"1", "10", "4", "4"}};
+        Object[] expected = {2.25D};
+        testFunction("umedian(NUM)/umedian(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmedianThreeColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM", "DEC"};
+        String[][] columnValues = {{"2", "4", "5", "10"}, {"1", "10", "5", "5"}};
+        Object[] expected = {4.5D, 5.0D, 21.0D};
+        testFunction("umedian(NUM), umedian(DEC), sum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUmedianEndMissing() throws IOException, ProcCallException {
@@ -182,9 +274,16 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUmin() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"};
+        String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
         Object[] expected = {-1000.0};
         testFunction("umin(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUminAndUDF() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
+        Object[] expected = {1.0D};
+        testFunction("add2Float(umin(NUM),1001.0)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUminStartMissing() throws IOException, ProcCallException {
@@ -207,9 +306,23 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUmode() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String[] columnValues = {"1", "3", "3", "3", "5", "5", "7"};
+        String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}};
         Object[] expected = {3};
         testFunction("umode(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUmodeTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"INT", "BIG"};
+        String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}, {"0", "0", "0", "23", "13", "9", "12"}};
+        Object[] expected = {3, 0};
+        testFunction("umode(INT), umode(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUmodeAndUDF() throws IOException, ProcCallException {
+        String[] columnNames = {"INT", "BIG"};
+        String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}, {"0", "0", "0", "23", "13", "9", "12"}};
+        Object[] expected = {3};
+        testFunction("add2Integer(umode(INT), umode(BIG))", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
     public void testUmodeAssembleMissing() throws IOException, ProcCallException {
@@ -238,9 +351,30 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUprimesum() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String[] columnValues = {"0", "2", "13", "25", "37", "14", "87"};
+        String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}};
         Object[] expected = {52};
         testFunction("uprimesum(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUprimesumTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"INT", "BIG"};
+        String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}, {"2", "3", "5", "7", "11", "13", "17"}};
+        Object[] expected = {52, 58};
+        testFunction("uprimesum(INT), uprimesum(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUprimesumAndPower() throws IOException, ProcCallException {
+        String[] columnNames = {"INT"};
+        String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}};
+        Object[] expected = {2704D};
+        testFunction("power(uprimesum(INT), 2)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUprimesumAndSubtractTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"INT", "BIG"};
+        String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}, {"2", "3", "5", "7", "11", "13", "17"}};
+        Object[] expected = {-6};
+        testFunction("uprimesum(INT) - uprimesum(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
     public void testUprimesumCombineMissing() throws IOException, ProcCallException {
@@ -269,9 +403,23 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUsum() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"1.2", "2.5", "-4.6", "6.4", "-5.5"};
+        String[][] columnValues = {{"1.2", "2.5", "-4.6", "6.4", "-5.5"}};
         Object[] expected = {0.0D};
         testFunction("usum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUsumAndSqrt() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"1.45", "2.5", "-4.6", "6.4", "-5.5"}};
+        Object[] expected = {0.5D};
+        testFunction("sqrt(usum(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUsumAndSqrtAndCeilingTwoColumn() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"1.45", "2.5", "-4.6", "6.4", "-5.5"}};
+        Object[] expected = {0.5D, 1.0D};
+        testFunction("sqrt(usum(NUM)), ceiling(usum(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUminOverflow() throws IOException, ProcCallException {

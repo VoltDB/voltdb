@@ -591,9 +591,9 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(FUNCTIONS_SCHEMA);
 
         for (Function func : m_database.getFunctions()) {
-            String function_type = func.getMethodname() == null ? "aggregate" : "scalar";
+            String functionType = func.getMethodname() == null ? "aggregate" : "scalar";
             results.addRow(
-                           function_type,           // Function Type
+                           functionType,           // Function Type
                            func.getFunctionname(),  // Function Name
                            func.getClassname(),     // Class Name
                            func.getMethodname());   // Method Name

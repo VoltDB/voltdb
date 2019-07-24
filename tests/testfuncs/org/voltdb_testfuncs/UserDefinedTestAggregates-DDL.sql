@@ -20,6 +20,9 @@ DROP AGGREGATE FUNCTION uprimesum IF EXISTS;
 DROP AGGREGATE FUNCTION uprimesumCombineTwo IF EXISTS;
 DROP AGGREGATE FUNCTION usum IF EXISTS;
 
+DROP FUNCTION add2Integer IF EXISTS;
+DROP FUNCTION add2Float   IF EXISTS;
+
 CREATE AGGREGATE FUNCTION uavg FROM CLASS org.voltdb_testfuncs.Uavg;
 CREATE AGGREGATE FUNCTION ucount FROM CLASS org.voltdb_testfuncs.Ucount;
 CREATE AGGREGATE FUNCTION umax FROM CLASS org.voltdb_testfuncs.Umax;
@@ -34,3 +37,6 @@ CREATE AGGREGATE FUNCTION umodeAssembleTwo FROM CLASS org.voltdb_testfuncs.Umode
 CREATE AGGREGATE FUNCTION uprimesum FROM CLASS org.voltdb_testfuncs.Uprimesum;
 CREATE AGGREGATE FUNCTION uprimesumCombineTwo FROM CLASS org.voltdb_testfuncs.UprimesumCombineTwo;
 CREATE AGGREGATE FUNCTION usum FROM CLASS org.voltdb_testfuncs.Usum;
+
+CREATE FUNCTION add2Integer FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Integer;
+CREATE FUNCTION add2Float     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float;

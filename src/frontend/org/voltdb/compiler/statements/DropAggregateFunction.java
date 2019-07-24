@@ -72,7 +72,7 @@ public class DropAggregateFunction extends StatementProcessor {
             throws VoltCompilerException {
         // Matches if it is DROP FUNCTION <name>
         Matcher statementMatcher = SQLParser.matchDropAggregateFunction(ddlStatement.statement);
-        if (! statementMatcher.matches()) {
+        if (!statementMatcher.matches()) {
             return false;
         }
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
