@@ -1260,7 +1260,50 @@ JAVA COMPILATION
     </ant>
 </target>
 
-<target name="compile_core" depends="compile_client">
+<!-- Build Calcite jar files -->
+<target name="refresh_calcite">
+   <exec executable="rm" failonerror="true">   <!-- Remove previous Calcite artifacts -->
+      <arg value="-rf"/>
+      <arg value="${build.calcite.dir}"/>
+   </exec>
+   <mkdir dir="${build.calcite.dir}"/>
+   <exec executable="tar" failonerror="true">
+      <arg value="-xf"/>
+      <arg value="${vendor.tar.dir}/Calcite-1.17.0.tgz"/>
+      <arg value="-C"/>
+      <arg value="${build.calcite.dir}/../"/>
+   </exec>
+   <exec executable="patch" dir="${build.calcite.dir}" failonerror="true" input="${vendor.tar.dir}/commits.patch">
+      <arg value="-p1"/>
+   </exec>
+   <delete file="${vendor.tar.dir}/commits.patch"/>
+   <echo message="Untarred and patched Calcite. Prepare to build." />
+   <exec executable="mvn" dir="${build.calcite.dir}" failonerror="true">
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+   </exec>
+   <echo message="Calcite built successfully. Copying to lib directory" />   <!-- NOTE: the jar files are still labeled as 1.18 snapshot even though it's from 1.17 release branch. -->
+   <copy tofile="${lib.dir}/calcite-core-1.17.0.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-core-1.17.0-sources.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-server-1.17.0.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-server-1.17.0-sources.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0-sources.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT-sources.jar"/>
+   <delete dir="${build.calcite.dir}"/>
+   <echo message="Calcite jar refreshed." />
+</target>
+
+<target name='using_calcite'>
+    <exec executable="awk" failonerror="false" resultproperty="using_calcite">
+        <arg value='BEGIN{ while(("git branch --no-color" | getline) > 0) { if (match($0, "\\* .*calcite-")) exit 0} exit 1}'/>
+    </exec>
+    <condition property='plan_with_calcite'>
+        <equals arg1='${using_calcite}' arg2='0'/>
+    </condition>
+    <envdefault prop='plan_with_calcite' var='plan_with_calcite' default='${plan_with_calcite}' />
+</target>
+
+<target name="compile_core" depends="compile_client, using_calcite">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
