@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -159,7 +160,7 @@ public class TestExportBase extends RegressionSuite {
     public void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
         boolean passed = false;
         assertFalse(streamNames.isEmpty());
-        Set<String> matchStreams = new HashSet<>(streamNames);
+        Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
 
         //Quiesc to see all data flushed.
         System.out.println("Quiesce client....");

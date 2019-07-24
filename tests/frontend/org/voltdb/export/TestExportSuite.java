@@ -110,18 +110,12 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         final Client client = getClient();
 
-        final Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
-        params[0] = "LOOPBACK_NO_NULLS";  // this table should not produce Export output
-
+        final Object[] rowdata = TestSQLTypesSuite.m_midValues;
         // populate the row data
-        for (int i = 0; i < TestSQLTypesSuite.COLS; ++i) {
-            params[i + 2] = TestSQLTypesSuite.m_midValues[i];
-        }
         long icnt = m_verifier.getExportedDataCount();
         for (int i = 0; i < 10; i++) {
-            params[1] = i; // pkey
             // do NOT add row to TupleVerfier as none should be produced
-            client.callProcedure("TableInsertLoopback", params);
+            client.callProcedure("TableInsertLoopback", convertValsToLoaderRow(i, rowdata));
         }
         //Make sure that we have not recieved any new data.
         waitForExportAllRowsDelivered(client, m_streamNames);

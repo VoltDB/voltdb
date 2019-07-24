@@ -77,6 +77,7 @@ public class Constants
 
     // default export group to use when no group name is provided
     public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__default__";
+    public static final String UNUSED_EXPORT_CONNECTOR_NAME = "__UNUSED_TARGET__";
 
     // Special HTTP port values to disable or trigger auto-scan.
     public static final int UNDEFINED = -1;
