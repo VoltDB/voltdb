@@ -51,6 +51,9 @@ public class RexConverterHelper {
 
     public static AbstractExpression createFunctionExpression(
             RelDataType relDataType, String funcName, int funcId, List<AbstractExpression> operands, String impliedArg) {
+        if (funcId == FunctionSQL.FUNC_VOLT_INVALID) {
+            return createFunctionExpression(relDataType, funcName, operands, impliedArg);
+        }
         FunctionExpression fe = new FunctionExpression();
         fe.setAttributes(funcName, impliedArg, funcId);
         fe.setArgs(operands);

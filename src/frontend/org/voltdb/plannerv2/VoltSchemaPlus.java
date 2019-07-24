@@ -17,11 +17,15 @@
 
 package org.voltdb.plannerv2;
 
+import java.util.Map;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.apache.calcite.schema.impl.AggregateFunctionImpl;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
+import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
+import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.AggregateFunctionDescriptor;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -55,9 +59,33 @@ public class VoltSchemaPlus {
         });
 
         // add Volt extend SQL functions to the SchemaPlus
-        VoltSqlFunctions.VOLT_SQL_FUNCTIONS.forEach(functionPair -> {
-            schema.add(functionPair.getFirst().toUpperCase(), ScalarFunctionImpl.create(functionPair.getSecond(),"eval"));
-        });
+        for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :
+                VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
+            switch(function.getValue().getType()){
+                case SCALAR:
+                    ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
+                    schema.add(scalarFunction.getFunctionName().toUpperCase(),
+                            ScalarFunctionImpl.create(
+                                    function.getKey(),
+                                    scalarFunction.getFunctionName(),
+                                    scalarFunction.isExactArgumentTypes(),
+                                    scalarFunction.getFunctionId(),
+                                    scalarFunction.getArgumentTypes()));
+                    break;
+                case AGGREGATE:
+                    AggregateFunctionDescriptor aggregateFunction = (AggregateFunctionDescriptor) function.getValue();
+                    schema.add(aggregateFunction.getFunctionName().toUpperCase(),
+                            AggregateFunctionImpl.create(
+                                    function.getKey(),
+                                    aggregateFunction.getFunctionName(),
+                                    aggregateFunction.isExactArgumentTypes(),
+                                    aggregateFunction.getAggType(),
+                                    aggregateFunction.getArgumentTypes()));
+                    break;
+                default:
+                    break;
+            }
+        }
 
         return schema;
     }
