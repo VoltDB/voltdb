@@ -30,6 +30,10 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.schema.AggregateFunction;
+import org.apache.calcite.schema.Function;
+import org.apache.calcite.schema.impl.AggregateFunctionImpl;
+import org.apache.calcite.sql.validate.SqlUserDefinedAggFunction;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannerv2.converter.ExpressionTypeConverter;
@@ -206,9 +210,14 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
         int aggrFieldIdx = getGroupCount();
         for(AggregateCall aggrCall : getAggCallList()) {
             // Aggr type
-            ExpressionType aggrType =
-                    ExpressionTypeConverter.calciteTypeToVoltType(aggrCall.getAggregation().kind);
-            if (aggrType == null) {
+            ExpressionType aggrType;
+            if (aggrCall.getAggregation() instanceof SqlUserDefinedAggFunction) {
+                AggregateFunction agg = ((SqlUserDefinedAggFunction) aggrCall.getAggregation()).getFunction();
+                aggrType = ExpressionType.get(((AggregateFunctionImpl) agg).getAggType());
+            } else {
+                aggrType = ExpressionTypeConverter.calciteTypeToVoltType(aggrCall.getAggregation().kind);
+            }
+            if (aggrType == ExpressionType.INVALID) {
                 throw new CalcitePlanningException("Unsupported aggregate function: " + aggrCall.getAggregation().kind.lowerName);
             }
 
