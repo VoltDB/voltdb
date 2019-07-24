@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMultimap;
 import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.voltdb.types.ExpressionType;
 
 /**
  * Implementation of calls to VoltDB SQL functions through Calcite.
@@ -217,7 +218,7 @@ public class VoltSqlFunctions {
                         "aggregate_example",
                         false,
                          new Class[] {double.class},
-                         0))
+                         ExpressionType.INVALID.getValue()))
                     .build();
 
     //-------------------------------------------------------------
