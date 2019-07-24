@@ -58,7 +58,6 @@ public class VoltSqlFunctions {
         // Function type
         final private FunctionType m_type;
 
-
         protected FunctionDescriptor(String functionName, boolean exactArgumentTypes,
                                      Class[] argumentTypes, FunctionType type) {
             m_functionName = functionName;
