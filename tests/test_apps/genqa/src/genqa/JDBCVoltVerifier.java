@@ -63,7 +63,7 @@ public class JDBCVoltVerifier {
     private static boolean dropVerticaTables(Connection jdbcConnection) {
         final String[] verticaTables = {
             "EXPORT_DONE_TABLE",
-            "EXPORT_PARTITIONED_TABLE",
+            "EXPORT_PARTITIONED_TABLE3",
             "EXPORT_REPLICATED_TABLE",
             "EXPORT_SKINNY_PARTITIONED_TABLE"
         };
