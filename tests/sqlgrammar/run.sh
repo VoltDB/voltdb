@@ -237,7 +237,7 @@ function ddl-if-needed() {
 function ddl-pro() {
     ddl-if-needed
 
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
+    echo -e "\n$0 performing: ddl-pro; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
     $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL-pro.sql
     code4e=$?
 

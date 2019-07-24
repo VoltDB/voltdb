@@ -575,9 +575,7 @@ function test-tools-server-pro() {
 # Ubuntu-14.04 machines; and 'jps' no longer seems to work either.
 function test-tools-server-count() {
     COUNT_VOLTDB_PROCESSES=`ps -ef | grep -v grep | grep -vi SQLCommand | grep -cE 'voltdb/voltdb-[1-9]?[0-9](.[0-9])+.jar'`
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: test-tools-server-count: $COUNT_VOLTDB_PROCESSES"
-    fi
+    echo -e "\n$0 performing: test-tools-server-count: $COUNT_VOLTDB_PROCESSES"
     return $COUNT_VOLTDB_PROCESSES
 }
 
@@ -586,13 +584,9 @@ function test-tools-server-if-needed() {
     test-tools-server-count
     RETURN_CODE=$?
     if [[ "$RETURN_CODE" -gt "0" ]]; then
-        if [[ "$TT_DEBUG" -ge "2" ]]; then
-            echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
-        fi
+        echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
     else
-        if [[ "$TT_DEBUG" -ge "2" ]]; then
-            echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
-        fi
+        echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
         test-tools-server
     fi
 }
