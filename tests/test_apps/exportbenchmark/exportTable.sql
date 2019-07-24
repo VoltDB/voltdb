@@ -1,5 +1,5 @@
 
-CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET default (
+CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
