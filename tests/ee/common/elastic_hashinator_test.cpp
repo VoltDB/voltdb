@@ -33,8 +33,7 @@ using namespace voltdb;
 class ElasticHashinatorTest : public Test {
 };
 
-TEST_F(ElasticHashinatorTest, TestMinMaxToken)
-{
+TEST_F(ElasticHashinatorTest, TestMinMaxToken) {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
     ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
 
@@ -46,15 +45,15 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     output.writeInt(std::numeric_limits<int32_t>::max());
     output.writeInt(2);
 
-    boost::scoped_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
+    std::unique_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
+    EXPECT_EQ(0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ(0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
-    EXPECT_EQ( 1, hashinator->partitionForToken(0));
-    EXPECT_EQ( 1, hashinator->partitionForToken(1));
+    EXPECT_EQ(1, hashinator->partitionForToken(0));
+    EXPECT_EQ(1, hashinator->partitionForToken(1));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
-    EXPECT_EQ( 1, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
+    EXPECT_EQ(2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
+    EXPECT_EQ(1, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 
     output.initializeWithPosition(config.get(), 4 + (12 * 3), 0);
 
@@ -71,18 +70,17 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 
     //This used to test wrapping, but we aren't allowing wrapping anymore (always have a token at Integer.MIN_VALUE)
     //EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
+    EXPECT_EQ(0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ(0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
-    EXPECT_EQ( 1, hashinator->partitionForToken(0));
-    EXPECT_EQ( 1, hashinator->partitionForToken(1));
+    EXPECT_EQ(1, hashinator->partitionForToken(0));
+    EXPECT_EQ(1, hashinator->partitionForToken(1));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
+    EXPECT_EQ(2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
+    EXPECT_EQ(2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 }
 
-TEST_F(ElasticHashinatorTest, TestNValueHashToken)
-{
+TEST_F(ElasticHashinatorTest, TestNValueHashToken) {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
     ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
 
@@ -94,7 +92,7 @@ TEST_F(ElasticHashinatorTest, TestNValueHashToken)
     output.writeInt(std::numeric_limits<int32_t>::max());
     output.writeInt(2);
 
-    boost::scoped_ptr<TheHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
+    std::unique_ptr<TheHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
 
     for (int i = -100; i < 100; i++) {
         NValue value = ValueFactory::getTinyIntValue(i);
