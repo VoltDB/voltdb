@@ -315,7 +315,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public static final ProcedureInfo[] ADDSTREAM_PROCEDURES = {
             new ProcedureInfo(InsertAddedStream.class,
-                    new ProcedurePartitionData ("ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
+                    new ProcedurePartitionData ("S_ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
     };
 
     /**

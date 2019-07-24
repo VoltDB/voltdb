@@ -77,14 +77,14 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        m_streamNames.add("ADDED_STREAM");
+        m_streamNames.add("S_ADDED_STREAM");
 
         // verify that it exports
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "ADDED_STREAM", i, convertValsToRow(i, 'I', rowdata));
+            m_verifier.addRow(client, "S_ADDED_STREAM", i, convertValsToRow(i, 'I', rowdata));
             // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            final Object[]  params = convertValsToParams("ADDED_STREAM", i, rowdata);
+            final Object[]  params = convertValsToParams("S_ADDED_STREAM", i, rowdata);
             client.callProcedure("InsertAddedStream", params);
         }
 

@@ -35,7 +35,7 @@ import org.voltdb.types.TimestampType;
 public class InsertAddedStream extends VoltProcedure {
 
     public final SQLStmt i_addedstream = new SQLStmt
-    ("INSERT INTO ADDED_STREAM VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO S_ADDED_STREAM VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
             String tablename,
