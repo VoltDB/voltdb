@@ -29,20 +29,17 @@ namespace voltdb {
 #error Do not build with both MEMCHECK and VOLT_POOL_CHECKING turned on
 #endif
 
-
 /**
  * Thread local key for storing thread specific memory pools
  */
-namespace {
-    thread_local PoolPairType* m_key = nullptr;
-    thread_local CompactingStringStorage* m_stringKey = nullptr;
+thread_local PoolPairType* m_key = nullptr;
+thread_local CompactingStringStorage* m_stringKey = nullptr;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
-    thread_local size_t m_allocated = 0;
-    thread_local int32_t* m_threadPartitionIdPtr = nullptr;
-    thread_local int32_t* m_enginePartitionIdPtr = nullptr;
-}
+thread_local size_t m_allocated = 0;
+thread_local int32_t* m_threadPartitionIdPtr = nullptr;
+thread_local int32_t* m_enginePartitionIdPtr = nullptr;
 
 #ifdef VOLT_POOL_CHECKING
 std::mutex ThreadLocalPool::s_sharedMemoryMutex;
@@ -79,19 +76,12 @@ ThreadLocalPool::ThreadLocalPool() {
 ThreadLocalPool::~ThreadLocalPool() {
     vassert(m_key != nullptr);
     if (m_key->first == 1) {
-        delete m_key->second;
-        m_key = nullptr;
-        delete m_stringKey;
-        m_stringKey = nullptr;
-        int32_t* threadPartitionIdPtr = m_threadPartitionIdPtr;
-        m_threadPartitionIdPtr = nullptr;
-        int32_t* enginePartitionIdPtr = m_enginePartitionIdPtr;
 #ifdef VOLT_POOL_CHECKING
-        VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
+        VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *m_enginePartitionIdPtr, *m_threadPartitionIdPtr);
         // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
         // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
-        // if (m_allocatingThread != -1 && (*threadPartitionIdPtr != m_allocatingThread || *enginePartitionIdPtr != m_allocatingEngine)) {
-        if (m_allocatingThread != -1 && *enginePartitionIdPtr != m_allocatingEngine) {
+        // if (m_allocatingThread != -1 && (*m_threadPartitionIdPtr != m_allocatingThread || *m_enginePartitionIdPtr != m_allocatingEngine)) {
+        if (m_allocatingThread != -1 && *m_enginePartitionIdPtr != m_allocatingEngine) {
             // Only the VoltDBEngine's ThreadLocalPool instance will have a -1 allocating thread because the threadId
             // has not been assigned yet. Normally the last ThreadLocalPool instance to be deallocated is the VoltDBEngine.
             VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
@@ -101,15 +91,14 @@ ThreadLocalPool::~ThreadLocalPool() {
         }
         {
             std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
-            SizeBucketMap_t& mapBySize = s_allocations[*enginePartitionIdPtr];
+            SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
         }
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
             AllocTraceMap_t& allocMap = mapForAdd->second;
             mapForAdd++;
             if (!allocMap.empty()) {
-                AllocTraceMap_t::iterator nextAlloc = allocMap.begin();
-                do {
+                for(auto nextAlloc : allocMap) {
 #ifdef VOLT_TRACE_ALLOCATIONS
                     VOLT_ERROR("Missing deallocation for %p at:", nextAlloc->first);
                     nextAlloc->second->printLocalTrace();
@@ -117,20 +106,24 @@ ThreadLocalPool::~ThreadLocalPool() {
 #else
                     VOLT_ERROR("Missing deallocation for %p at:", *nextAlloc);
 #endif
-                    nextAlloc++;
-                } while (nextAlloc != allocMap.end());
+                }
                 allocMap.clear();
                 vassert(false);
             }
             mapBySize.erase(mapBySize.begin());
         }
 #endif
-        if (threadPartitionIdPtr) {
-            SynchronizedThreadLock::resetMemory(*threadPartitionIdPtr);
+        if (m_threadPartitionIdPtr) {
+            SynchronizedThreadLock::resetMemory(*m_threadPartitionIdPtr);
         }
-        delete threadPartitionIdPtr;
-        delete enginePartitionIdPtr;
+        delete m_threadPartitionIdPtr;
+        delete m_enginePartitionIdPtr;
+        delete m_stringKey;
+        delete m_key->second;
         delete m_key;
+        m_stringKey = nullptr;
+        m_key = nullptr;
+        m_enginePartitionIdPtr = m_threadPartitionIdPtr = nullptr;
     } else {
         m_key->first--;
 #ifdef VOLT_POOL_CHECKING
@@ -171,7 +164,6 @@ void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
     m_threadPartitionIdPtr = partitionId;
 }
 
-namespace {
 int32_t getAllocationSizeForObject(int length) {
     static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = sizeof(voltdb::ThreadLocalPool::Sized);
     static const int32_t MAX_ALLOCATION =
@@ -210,7 +202,6 @@ int32_t getAllocationSizeForObject(int length) {
                 length);
     }
 }
-}
 
 int TestOnlyAllocationSizeForObject(int length) {
     return getAllocationSizeForObject(length);
@@ -239,10 +230,8 @@ PoolPairType* ThreadLocalPool::getDataPoolPair() {
     return m_key;
 }
 
-namespace {
 CompactingStringStorage &getStringPoolMap() {
     return *m_stringKey;
-}
 }
 
 ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz) {
