@@ -38,6 +38,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -402,7 +403,7 @@ public abstract class AbstractParsedStmt {
 
         XMLElementExpressionParser parser = m_exprParsers.get(elementName);
         if (parser == null) {
-            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
+            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'", 0);
         }
         AbstractExpression retval = parser.parse(this, exprNode);
         assert("asterisk".equals(elementName) || retval != null);
@@ -919,7 +920,7 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
-        AbstractExpression expr = null;
+        AbstractExpression expr;
 
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");

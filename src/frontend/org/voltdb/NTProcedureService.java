@@ -71,13 +71,9 @@ public class NTProcedureService {
         final boolean ntPriority;
         final StoredProcedureInvocation task;
 
-        PendingInvocation(long ciHandle,
-                          AuthUser user,
-                          Connection ccxn,
-                          boolean isAdmin,
-                          boolean ntPriority,
-                          StoredProcedureInvocation task)
-        {
+        PendingInvocation(
+                long ciHandle, AuthUser user, Connection ccxn, boolean isAdmin, boolean ntPriority,
+                StoredProcedureInvocation task) {
             this.ciHandle = ciHandle;
             this.user = user;
             this.ccxn = ccxn;
@@ -88,12 +84,12 @@ public class NTProcedureService {
     }
 
     // User-supplied non-transactional procedures
-    ImmutableMap<String, ProcedureRunnerNTGenerator> m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
+    Map<String, ProcedureRunnerNTGenerator> m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
     // Non-transactional system procedures
-    ImmutableMap<String, ProcedureRunnerNTGenerator> m_sysProcs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
+    Map<String, ProcedureRunnerNTGenerator> m_sysProcs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
 
     // A tracker of currently executing procedures by id, where id is a long that increments with each call
-    Map<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
+    final Map<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
     // This lets us respond over the network directly
     final LightweightNTClientResponseAdapter m_internalNTClientAdapter;
     // Mailbox for the client interface is used to send messages directly to other nodes (sysprocs only)
@@ -101,12 +97,12 @@ public class NTProcedureService {
     // We pause the service mid-catalog update for stats reasons
     boolean m_paused = false;
     // Transactions that arrived when paused (should always be empty if not paused)
-    Queue<PendingInvocation> m_pendingInvocations = new ArrayDeque<>();
+    final Queue<PendingInvocation> m_pendingInvocations = new ArrayDeque<>();
     // increments for every procedure call
     long nextProcedureRunnerId = 0;
 
     // no need for thread safety as this can't race with @UAC at startup
-    public boolean isRestoring;
+    boolean isRestoring;
 
     // names for threads in the exec service
     final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
@@ -118,14 +114,8 @@ public class NTProcedureService {
     // (doesn't run nt procs if started by other nt procs)
     // from 2 to 20 threads in parallel, with a bounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
-            2,
-            20,
-            60,
-            TimeUnit.SECONDS,
-            new ArrayBlockingQueue<Runnable>(10000),
-            new ThreadFactoryBuilder()
-                .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d")
-                .build());
+            2, 20, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(10000),
+            new ThreadFactoryBuilder().setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d").build());
 
     // runs any follow-up work from nt procs' run() method,
     // including other nt procs, or other callbacks.
@@ -146,12 +136,11 @@ public class NTProcedureService {
      * procedure call.
      */
     class ProcedureRunnerNTGenerator {
-
-        protected final String m_procedureName;
-        protected final Class<? extends VoltNonTransactionalProcedure> m_procClz;
-        protected final Method m_procMethod;
-        protected final Class<?>[] m_paramTypes;
-        protected final ProcedureStatsCollector m_statsCollector;
+        final String m_procedureName;
+        final Class<? extends VoltNonTransactionalProcedure> m_procClz;
+        final Method m_procMethod;
+        final Class<?>[] m_paramTypes;
+        final ProcedureStatsCollector m_statsCollector;
 
         ProcedureRunnerNTGenerator(Class<? extends VoltNonTransactionalProcedure> clz) {
             m_procClz = clz;
@@ -161,15 +150,9 @@ public class NTProcedureService {
             Method procMethod = null;
             Class<?>[] paramTypes = null;
 
-            Method[] methods = m_procClz.getDeclaredMethods();
-
-            // find the "run()" method
-            for (final Method m : methods) {
-                String name = m.getName();
-                if (name.equals("run")) {
-                    if (Modifier.isPublic(m.getModifiers()) == false) {
-                        continue;
-                    }
+            // find either of "run()", "runUsingCalcite", or "runUsingLegacy" methods
+            for (final Method m : m_procClz.getDeclaredMethods()) {
+                if (Modifier.isPublic(m.getModifiers()) && m.getName().equals("run")) {
                     procMethod = m;
                     paramTypes = m.getParameterTypes();
                     break; // compiler has checked there's only one valid run() method
@@ -181,53 +164,27 @@ public class NTProcedureService {
 
             // make a stats source for this proc
             m_statsCollector = new ProcedureStatsCollector(
-                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                    0,
-                    m_procClz.getName(),
-                    false,
-                    null,
-                    false);
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()), 0, m_procClz.getName(),
+                    false, null, false);
             VoltDB.instance().getStatsAgent().registerStatsSource(
-                    StatsSelector.PROCEDURE,
-                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                    m_statsCollector);
+                    StatsSelector.PROCEDURE, CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()), m_statsCollector);
         }
 
         /**
          * From the generator, create an actual procedure runner to be used
          * for a single invocation of an NT procedure run.
          */
-        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user,
-                                                    Connection ccxn,
-                                                    boolean isAdmin,
-                                                    long ciHandle,
-                                                    long clientHandle,
-                                                    int timeout)
-                throws InstantiationException, IllegalAccessException
-        {
+        ProcedureRunnerNT generateProcedureRunnerNT(
+                AuthUser user, Connection ccxn, boolean isAdmin, long ciHandle, long clientHandle, int timeout)
+                throws InstantiationException, IllegalAccessException {
             // every single call gets a unique id as a key for the outstanding procedure map
             // in NTProcedureService
             long id = nextProcedureRunnerId++;
-
-            VoltNonTransactionalProcedure procedure = null;
-            procedure = m_procClz.newInstance();
-            ProcedureRunnerNT runner = new ProcedureRunnerNT(id,
-                                                             user,
-                                                             ccxn,
-                                                             isAdmin,
-                                                             ciHandle,
-                                                             clientHandle,
-                                                             timeout,
-                                                             procedure,
-                                                             m_procedureName,
-                                                             m_procMethod,
-                                                             m_paramTypes,
-                                                             // use priority to avoid deadlocks
-                                                             m_priorityExecutorService,
-                                                             NTProcedureService.this,
-                                                             m_mailbox,
-                                                             m_statsCollector);
-            return runner;
+            final VoltNonTransactionalProcedure procedure = m_procClz.newInstance();
+            return new ProcedureRunnerNT(
+                    id, user, ccxn, isAdmin, ciHandle, clientHandle, timeout, procedure, m_procedureName,
+                    m_procMethod, m_paramTypes, m_priorityExecutorService, // use priority to avoid deadlocks
+                    NTProcedureService.this, m_mailbox, m_statsCollector);
         }
 
     }
@@ -235,13 +192,10 @@ public class NTProcedureService {
     NTProcedureService(ClientInterface clientInterface, InvocationDispatcher dispatcher, Mailbox mailbox) {
         assert(clientInterface != null);
         assert(mailbox != null);
-
         // create a specialized client response adapter for NT procs to use to call procedures
         m_internalNTClientAdapter = new LightweightNTClientResponseAdapter(ClientInterface.NT_ADAPTER_CID, dispatcher);
         clientInterface.bindAdapter(m_internalNTClientAdapter, null);
-
         m_mailbox = mailbox;
-
         m_sysProcs = loadSystemProcedures(true);
     }
 
@@ -271,8 +225,7 @@ public class NTProcedureService {
             if (className != null) {
                 try {
                     procClass = (Class<? extends VoltNonTransactionalProcedure>) Class.forName(className);
-                }
-                catch (final ClassNotFoundException e) {
+                } catch (final ClassNotFoundException e) {
                     if (sysProc.commercial) {
                         continue;
                     }
@@ -282,17 +235,14 @@ public class NTProcedureService {
                 if (startup) {
                     // This is a startup-time check to make sure we can instantiate
                     try {
-                        if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
+                        if (! (procClass.newInstance() instanceof VoltNTSystemProcedure)) {
                             VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
                         }
-                    }
-                    catch (InstantiationException | IllegalAccessException e) {
+                    } catch (InstantiationException | IllegalAccessException e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
                     }
                 }
-
-                ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(procClass);
-                builder.put(procName, prntg);
+                builder.put(procName, new ProcedureRunnerNTGenerator(procClass));
             }
         }
         return builder.build();
@@ -329,17 +279,14 @@ public class NTProcedureService {
                 if (className.startsWith("org.voltdb.")) {
                     String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
                     VoltDB.crashLocalVoltDB(msg, false, null);
-                }
-                else {
+                } else {
                     String msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
                     VoltDB.crashLocalVoltDB(msg, false, null);
                 }
             }
-
             // The ProcedureRunnerNTGenerator has all of the dangerous and slow
             // stuff in it. Like classfinding, instantiation, and reflection.
-            ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(clz);
-            runnerGeneratorMap.put(procedure.getTypeName(), prntg);
+            runnerGeneratorMap.put(procedure.getTypeName(), new ProcedureRunnerNTGenerator(clz));
         }
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
@@ -353,9 +300,8 @@ public class NTProcedureService {
         m_paused = false;
 
         // release all of the pending invocations into the real queue
-        m_pendingInvocations
-            .forEach(pi -> callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.isAdmin,
-                     pi.ntPriority, pi.task));
+        m_pendingInvocations.forEach(pi ->
+                callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.isAdmin, pi.ntPriority, pi.task));
         m_pendingInvocations.clear();
     }
 
@@ -363,19 +309,14 @@ public class NTProcedureService {
      * Invoke an NT procedure asynchronously on one of the exec services.
      * @returns ClientResponseImpl if something goes wrong.
      */
-    synchronized void callProcedureNT(final long ciHandle,
-                                      final AuthUser user,
-                                      final Connection ccxn,
-                                      final boolean isAdmin,
-                                      final boolean ntPriority,
-                                      final StoredProcedureInvocation task)
-    {
+    synchronized void callProcedureNT(
+            final long ciHandle, final AuthUser user, final Connection ccxn, final boolean isAdmin,
+            final boolean ntPriority, final StoredProcedureInvocation task) {
         // If paused, stuff a record of the invocation into a queue that gets
         // drained when un-paused. We're counting on regular upstream backpressure
         // to prevent this from getting too out of hand.
         if (m_paused) {
-            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, isAdmin, ntPriority, task);
-            m_pendingInvocations.add(pi);
+            m_pendingInvocations.add(new PendingInvocation(ciHandle, user, ccxn, isAdmin, ntPriority, task));
             return;
         }
 
@@ -384,8 +325,7 @@ public class NTProcedureService {
         final ProcedureRunnerNTGenerator prntg;
         if (procName.startsWith("@")) {
             prntg = m_sysProcs.get(procName);
-        }
-        else {
+        } else {
             prntg = m_procs.get(procName);
         }
 
@@ -395,28 +335,22 @@ public class NTProcedureService {
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
-            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                                                 new VoltTable[0],
-                                                                 "Could not create running context for " + procName + ".",
-                                                                 task.getClientHandle());
-            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
-                                                                                           ccxn.connectionId(),
-                                                                                           response);
+            ClientResponseImpl response = new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE, new VoltTable[0],
+                    "Could not create running context for " + procName + ".", task.getClientHandle());
+            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(
+                    ciHandle, ccxn.connectionId(), response);
             m_mailbox.deliver(irm);
             return;
         }
         m_outstanding.put(runner.m_id, runner);
 
-        Runnable invocationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    runner.call(task.getParams().toArray());
-                }
-                catch (Throwable ex) {
-                    ex.printStackTrace();
-                    throw ex;
-                }
+        Runnable invocationRunnable = () -> {
+            try {
+                runner.call(task.getParams().toArray());
+            } catch (Throwable ex) {
+                ex.printStackTrace();
+                throw ex;
             }
         };
 
@@ -427,25 +361,21 @@ public class NTProcedureService {
             //   immediate exec service (priority)
             if (ntPriority) {
                 m_priorityExecutorService.submit(invocationRunnable);
-            }
-            else {
+            } else {
                 m_primaryExecutorService.submit(invocationRunnable);
             }
-        }
-        catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException e) {
             handleNTProcEnd(runner);
 
             // I really don't expect this to happen... but it's here.
             // must be done as IRM to CI mailbox for backpressure accounting
-            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                                                 new VoltTable[0],
-                                                                 "Could not submit NT procedure " + procName + " to exec service for .",
-                                                                 task.getClientHandle());
-            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
-                                                                                           ccxn.connectionId(),
-                                                                                           response);
+            ClientResponseImpl response = new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE, new VoltTable[0],
+                    "Could not submit NT procedure " + procName + " to exec service for .",
+                    task.getClientHandle());
+            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(
+                    ciHandle, ccxn.connectionId(), response);
             m_mailbox.deliver(irm);
-            return;
         }
     }
 

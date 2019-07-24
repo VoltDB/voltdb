@@ -56,9 +56,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     private int m_adminPort = -1;
     private boolean m_paused = false;
 
-    public LocalSingleProcessServer(String jarFileName, int siteCount,
-                                    BackendTarget target)
-    {
+    LocalSingleProcessServer(String jarFileName, int siteCount, BackendTarget target) {
         assert(jarFileName != null);
         assert(siteCount > 0);
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
@@ -71,21 +69,25 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     }
 
     @Override
+    public boolean isUsingCalcite() {
+        return true;
+    }
+
+    @Override
     public void setCallingMethodName(String name) {
         // do nothing yet
     }
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
-        if (m_compiled == true) {
+        if (m_compiled) {
             return true;
+        } else {
+            m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0);
+            m_pathToDeployment = builder.getPathToDeployment();
+            m_pathToVoltRoot = builder.getPathToVoltRoot();
+            return m_compiled;
         }
-
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
-        return m_compiled;
     }
 
     @Override
@@ -97,31 +99,30 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
 
         if (m_compiled) {
             return true;
+        } else {
+            m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
+                    null, 0, true, snapshotPath, ppdPrefix);
+            m_pathToDeployment = builder.getPathToDeployment();
+            m_pathToVoltRoot = builder.getPathToVoltRoot();
+            return m_compiled;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, 0, true, snapshotPath, ppdPrefix);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
-        return m_compiled;
     }
 
     @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
-    {
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup) {
         int hostCount = 1;
         int replication = 0;
 
         if (m_compiled) {
             return true;
+        } else {
+            m_adminPort = adminPort;
+            m_paused = adminOnStartup;
+            m_initialCatalog = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
+            m_compiled = m_initialCatalog != null;
+            m_pathToDeployment = builder.getPathToDeployment();
+            return m_compiled;
         }
-        m_adminPort = adminPort;
-        m_paused = adminOnStartup;
-        m_initialCatalog = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
-        m_compiled = m_initialCatalog != null;
-        m_pathToDeployment = builder.getPathToDeployment();
-        return m_compiled;
-
     }
 
     @Override
@@ -132,25 +133,31 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     @Override
     public List<String> getListenerAddresses() {
         // return just "localhost"
-        if (m_server == null)
+        if (m_server == null) {
             return null;
-        ArrayList<String> listeners = new ArrayList<>();
-        listeners.add("localhost");
-        return listeners;
+        } else {
+            ArrayList<String> listeners = new ArrayList<>();
+            listeners.add("localhost");
+            return listeners;
+        }
     }
 
     @Override
     public String getListenerAddress(int hostId) {
-        if (m_server == null)
+        if (m_server == null) {
             return null;
-        return "localhost";
+        } else {
+            return "localhost";
+        }
     }
 
     @Override
     public String getAdminAddress(int hostId) {
-        if (m_server == null)
+        if (m_server == null) {
             return null;
-        return "localhost:" + m_adminPort;
+        } else {
+            return "localhost:" + m_adminPort;
+        }
     }
 
     @Override
@@ -159,18 +166,18 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
 
         String retval = "localSingleProcess-";
         retval += String.valueOf(m_siteCount);
-        if (m_target == BackendTarget.HSQLDB_BACKEND)
+        if (m_target == BackendTarget.HSQLDB_BACKEND) {
             retval += "-HSQL";
-        else if (m_target == BackendTarget.NATIVE_EE_IPC)
+        } else if (m_target == BackendTarget.NATIVE_EE_IPC) {
             retval += "-IPC";
-        else
+        } else {
             retval += "-JNI";
+        }
         return retval;
     }
 
     @Override
-    public int getNodeCount()
-    {
+    public int getNodeCount() {
         return 1;
     }
 
@@ -185,7 +192,6 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         VoltServerConfig.addInstance(this);
-
         if (clearLocalDataDirectories) {
             File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
             if (exportOverflow.exists()) {
@@ -209,10 +215,8 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         if (m_adminPort != -1) {
             config.m_adminPort = m_adminPort;
         }
-
         m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
         config.m_ipcPort = m_siteProcess.port();
-
         m_server = new ServerThread(config);
         m_server.start();
         m_server.waitForInitialization();
@@ -238,19 +242,19 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         startUp(true);
     }
     @Override
-    public void createDirectory(File path) throws IOException {
+    public void createDirectory(File path) {
         throw new UnsupportedOperationException();
     }
     @Override
-    public void deleteDirectory(File path) throws IOException {
+    public void deleteDirectory(File path) {
         throw new UnsupportedOperationException();
     }
     @Override
-    public List<File> listFiles(File path) throws IOException {
+    public List<File> listFiles(File path) {
         throw new UnsupportedOperationException();
     }
     @Override
-    public File[] getPathInSubroots(File path) throws IOException {
+    public File[] getPathInSubroots(File path) {
         throw new UnsupportedOperationException();
     }
 

@@ -61,6 +61,8 @@
 #include "executors/materializeexecutor.h"
 #include "executors/materializedscanexecutor.h"
 #include "executors/mergereceiveexecutor.h"
+#include "executors/mergejoinexecutor.h"
+#include "executors/migrateexecutor.h"
 #include "executors/nestloopexecutor.h"
 #include "executors/nestloopindexexecutor.h"
 #include "executors/orderbyexecutor.h"
@@ -109,6 +111,8 @@ AbstractExecutor* getNewExecutor(
          return new NestLoopExecutor(engine, abstract_node);
       case PLAN_NODE_TYPE_NESTLOOPINDEX:
          return new NestLoopIndexExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_MERGEJOIN:
+         return new MergeJoinExecutor(engine, abstract_node);
       case PLAN_NODE_TYPE_ORDERBY:
          if (isLargeQuery) {
             return new LargeOrderByExecutor(engine, abstract_node);

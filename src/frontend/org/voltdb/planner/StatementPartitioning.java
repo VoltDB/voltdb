@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
