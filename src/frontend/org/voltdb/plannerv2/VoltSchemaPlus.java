@@ -18,14 +18,19 @@
 package org.voltdb.plannerv2;
 
 import java.util.Map;
+
+import javassist.NotFoundException;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.schema.impl.AggregateFunctionImpl;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.AggregateFunctionDescriptor;
+import sun.reflect.Reflection;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -56,6 +61,19 @@ public class VoltSchemaPlus {
         // Get all tables from the database and add them to the SchemaPlus.
         db.getTables().forEach(table -> {
             schema.add(table.getTypeName(), new VoltTable(table));
+        });
+
+        // Get all user-defined function from the database and add them to the SchemaPlus.
+        db.getFunctions().forEach(function -> {
+            try {
+                schema.add(function.getFunctionname().toUpperCase(),
+                        ScalarFunctionImpl.create(
+                                VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname()),
+                                function.getMethodname()));
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Error syncing function in catalog to Calcite: cannot find class"
+                        + function.getClassname() + " for method " + function.getMethodname());
+            }
         });
 
         // add Volt extend SQL functions to the SchemaPlus
