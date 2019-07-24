@@ -67,9 +67,9 @@ function build() {
 # Build VoltDB: 'pro' version
 function build-pro() {
     echo -e "\n$0 performing: build-pro $BUILD_ARGS"
-    test-tools-build-pro $BUILD_ARGS
-    # For now, the same deployment file is used for 'community' and 'pro'
+    # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
+    test-tools-build-pro $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
@@ -173,6 +173,8 @@ function jars-if-needed() {
 
 # Start the VoltDB server: 'community', open-source version
 function server() {
+    find-directories-if-needed
+    build-if-needed
     echo -e "\n$0 performing: server"
     test-tools-server
     code[3]=${code_tt_server}
@@ -180,10 +182,12 @@ function server() {
 
 # Start the VoltDB server: 'pro' version
 function server-pro() {
+    find-directories-if-needed
+    build-pro-if-needed
     echo -e "\n$0 performing: server-pro"
-    test-tools-server-pro
-    # For now, the same deployment file is used for 'community' and 'pro'
+    # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
+    test-tools-server-pro
     code[3]=${code_tt_server}
 }
 
@@ -357,7 +361,7 @@ function all() {
 function all-pro() {
     echo -e "\n$0 performing: all-pro$ARGS"
     prepare-pro
-    tests
+    tests-pro
     shutdown
 }
 
