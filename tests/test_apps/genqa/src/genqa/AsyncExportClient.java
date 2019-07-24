@@ -408,9 +408,11 @@ public class AsyncExportClient
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
+                log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
                 clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
             }
             else {
+                log.info("Insert row in Done table with JiggleExportDoneTable proc");
                 clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
             }
             writer.close(true);
