@@ -139,7 +139,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             startMethod = m;
                         }
                         break;
-                    
+
                     case "assemble":
                         if (assembleMethod != null) {
                             String msg = "Class " + shortName + " has multiple methods named assemble";
@@ -153,7 +153,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             }
                         }
                         break;
-                    
+
                     case "combine":
                         if (combineMethod != null) {
                             String msg = "Class " + shortName + " has multiple methods named combine";
@@ -165,7 +165,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                             }
                         }
                         break;
-                    
+
                     case "end":
                         if (endMethod != null) {
                             String msg = "Class " + shortName + " has multiple methods named end";
@@ -181,7 +181,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
 
         // check if all four functions appear in the class
         String msg = "In the class " + shortName + " for user-defined aggregate function "
-        + functionName + " , you do not have the correctly formatted method ";
+        + functionName + ", you do not have the correctly formatted method ";
         if (startMethod == null) {
             throw m_compiler.new VoltCompilerException(msg + "start");
         }

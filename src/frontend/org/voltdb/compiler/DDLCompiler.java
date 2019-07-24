@@ -2262,8 +2262,8 @@ public class DDLCompiler {
 
         try {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-            // CREATE PROCEDURE, CREATE FUNCTION, CREATE ROLE, 
-        	// and CREATE AGGREGATE FUNCTION.
+            // CREATE PROCEDURE, CREATE FUNCTION, CREATE ROLE,
+            // and CREATE AGGREGATE FUNCTION.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
         } catch (VoltCompilerException e) {
             // Reformat the message thrown by VoltDB DDL processing to have a line number.

@@ -1,3 +1,10 @@
+-- Loads and creates the test UDAF's (user-defined aggregate functions) defined in
+-- in voltdb_testfuncs folder, using various data types, and with
+-- various numbers of arguments.
+
+-- First, drop all the test UDAF's (user-defined aggregate functions), and remove the class
+-- containing them, in case they were loaded and created previously
+
 DROP AGGREGATE FUNCTION uavg IF EXISTS;
 DROP AGGREGATE FUNCTION ucount IF EXISTS;
 DROP AGGREGATE FUNCTION umax IF EXISTS;
@@ -16,30 +23,14 @@ DROP AGGREGATE FUNCTION usum IF EXISTS;
 CREATE AGGREGATE FUNCTION uavg FROM CLASS org.voltdb_testfuncs.Uavg;
 CREATE AGGREGATE FUNCTION ucount FROM CLASS org.voltdb_testfuncs.Ucount;
 CREATE AGGREGATE FUNCTION umax FROM CLASS org.voltdb_testfuncs.Umax;
-CREATE AGGREGATE FUNCTION umaxNoSerializable FROM CLASS org.voltdb_testfuncs.UmaxNoSerializable;
 CREATE AGGREGATE FUNCTION umedian FROM CLASS org.voltdb_testfuncs.Umedian;
-CREATE AGGREGATE FUNCTION umedianEndMissing FR0M CLASS org.voltdb_testfuncs.UmedianEndMissing;
-CREATE AGGREGATE FUNCTION umedianEndNoReturn FR0M CLASS org.voltdb_testfuncs.UmedianEndNoReturn;
-CREATE AGGREGATE FUNCTION umedianEndUnsupportedReturn FR0M CLASS org.voltdb_testfuncs.UmedianEndUnsupportedReturn;
-CREATE AGGREGATE FUNCTION umedianEndWithParameter IF FR0M CLASS org.voltdb_testfuncs.UmedianEndWithParameter;
-CREATE AGGREGATE FUNCTION umedianEndOverload FR0M CLASS org.voltdb_testfuncs.UmedianEndOverload;
-CREATE AGGREGATE FUNCTION umedianEndTwo FR0M CLASS org.voltdb_testfuncs.UmedianEndTwo;
+CREATE AGGREGATE FUNCTION umedianEndTwo FROM CLASS org.voltdb_testfuncs.UmedianEndTwo;
+CREATE AGGREGATE FUNCTION umedianEndOverload FROM CLASS org.voltdb_testfuncs.UmedianEndOverload;
 CREATE AGGREGATE FUNCTION umin FROM CLASS org.voltdb_testfuncs.Umin;
-CREATE AGGREGATE FUNCTION uminStartMissing FROM CLASS org.voltdb_testfuncs.UminStartMissing;
-CREATE AGGREGATE FUNCTION uminStartOverload FROM CLASS org.voltdb_testfuncs.UminStartOverload;
 CREATE AGGREGATE FUNCTION uminStartTwo FROM CLASS org.voltdb_testfuncs.UminStartTwo;
-CREATE AGGREGATE FUNCTION uminStartWithParamter FROM CLASS org.voltdb_testfuncs.UminStartWithParamter;
-CREATE AGGREGATE FUNCTION uminStartWithReturn FROM CLASS org.voltdb_testfuncs.UminStartWithReturn;
+CREATE AGGREGATE FUNCTION uminStartOverload FROM CLASS org.voltdb_testfuncs.UminStartOverload;
 CREATE AGGREGATE FUNCTION umode FROM CLASS org.voltdb_testfuncs.Umode;
-CREATE AGGREGATE FUNCTION umodeAssembleMissing FROM CLASS org.voltdb_testfuncs.UmodeAssembleMissing;
-CREATE AGGREGATE FUNCTION umodeAssembleNoParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleNoParamete;
 CREATE AGGREGATE FUNCTION umodeAssembleTwo FROM CLASS org.voltdb_testfuncs.UmodeAssembleTwo;
-CREATE AGGREGATE FUNCTION umodeAssembleUnsupportedParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleUnsupportedParameter;
-CREATE AGGREGATE FUNCTION umodeAssembleWithReturn FROM CLASS org.voltdb_testfuncs.UmodeAssembleWithReturn;
 CREATE AGGREGATE FUNCTION uprimesum FROM CLASS org.voltdb_testfuncs.Uprimesum;
-CREATE AGGREGATE FUNCTION uprimesumCombineMissing FROM CLASS org.voltdb_testfuncs.UprimesumCombineMissing;
-CREATE AGGREGATE FUNCTION uprimesumComhineNoParameter FROM CLASS org.voltdb_testfuncs.UprimesumComhineNoParameter;
 CREATE AGGREGATE FUNCTION uprimesumCombineTwo FROM CLASS org.voltdb_testfuncs.UprimesumCombineTwo;
-CREATE AGGREGATE FUNCTION uprimesumCombineWithReturn FROM CLASS org.voltdb_testfuncs.UprimesumCombineWithReturn;
-CREATE AGGREGATE FUNCTION uprimesumCombineWrongParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineWrongParameter;
 CREATE AGGREGATE FUNCTION usum FROM CLASS org.voltdb_testfuncs.Usum;

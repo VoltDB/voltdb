@@ -744,7 +744,7 @@ void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, i
 void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
     if (returnCode != 0) {
         char buf[128];
-        sprintf(buf, "%s failed", name);
+        snprintf(buf, 128, "%s failed", name);
         throw SQLException(SQLException::volt_user_defined_function_error,
             buf);
     }

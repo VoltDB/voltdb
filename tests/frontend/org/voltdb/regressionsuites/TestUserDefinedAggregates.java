@@ -49,21 +49,21 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         super(name);
     }
 
-    @Override
-    protected void testFunction(String functionCall, Object expected, VoltType returnType,
-            String[] columnNames, String[] columnValues, String tableName)
+    protected void testFunction(String functionCall, Object[] expected, VoltType returnType,
+            String[] columnNames, String[] columnValues)
             throws IOException, ProcCallException {
-        // If table not specified, randomly decide which one to test
-        if (tableName == null) {
-            tableName = "R1";
-            if (random.nextInt(100) < 50) {
-                tableName = "P1";
-            }
+        // randomly decide which table to test
+        String tableName = "R1";
+        if (random.nextInt(100) < 50) {
+            tableName = "P1";
         }
 
-        // Set the expected result of the SELECT query using the UDF
-        Object[][] expectedTable = new Object[1][1];
-        expectedTable[0][0] = expected;
+        // Set the expected result of the SELECT query using the UDAF
+        int expectedTableLength = expected.length;
+        Object[][] expectedTable = new Object[1][expectedTableLength];
+        for (int i = 0; i < expectedTableLength; ++i) {
+            expectedTable[0][i] = expected[i];
+        }
 
         // initialize the client response and client
         ClientResponse cr = null;
@@ -104,58 +104,174 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         assertEquals(truncateStatement+" (clean-up) failed", ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testUaddstr() throws IOException, ProcCallException {
-        String[] columnNames = {"VCHAR"};
-        String[] columnValues = {"'Westbrook'", "'Ferguson'", "'George'", "'Grant'", "'Adams'"};
-        testFunction("uaddstr(VCHAR)", "Westbrook Ferguson George Grant Adams", VoltType.STRING, columnNames, columnValues);
+    protected void testCreateFunctionException(String functionCall, String errorMessage) throws IOException, ProcCallException {
+        Client client = getClient();
+        try {
+            client.callProcedure("@AdHoc", functionCall);
+            fail();
+        }
+        catch (ProcCallException ex) {
+            assertEquals(errorMessage, ex.getMessage());
+        }
     }
 
     public void testUavg() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"1", "2", "3", "4"};
-        testFunction("uavg(NUM)", 2.5D, VoltType.FLOAT, columnNames, columnValues);
+        Object[] expected = {2.5D};
+        testFunction("uavg(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUavgAndAbs() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[] columnValues = {"1", "-2", "3", "-4"};
+        Object[] expected = {2.5D};
+        testFunction("uavg(abs(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUCount() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"};
-        testFunction("ucount(NUM)", 8, VoltType.INTEGER, columnNames, columnValues);
+        Object[] expected = {8};
+        testFunction("ucount(NUM)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
     public void testUmax() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"0", "1.1", "100.4", "999.0", "-1000.4", "999"};
-        testFunction("umax(NUM)", 999.0D, VoltType.FLOAT, columnNames, columnValues);
+        Object[] expected = {999.0D};
+        testFunction("umax(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmaxNoSerializable() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umaxNoSerializable FROM CLASS org.voltdb_testfuncs.UmaxNoSerializable";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"Cannot define a aggregate function without implementing Serializable in the class declaration\"";
+        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUmedian() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"2", "4", "5", "10"};
-        testFunction("umedian(NUM)", 4.5D, VoltType.FLOAT, columnNames, columnValues);
+        Object[] expected = {4.5D};
+        testFunction("umedian(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUmedianEndMissing() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndMissing FROM CLASS org.voltdb_testfuncs.UmedianEndMissing";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndMissing for user-defined aggregate function umedianendmissing, you do not have the correctly formatted method end\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmedianEndNoReturn() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndNoReturn FROM CLASS org.voltdb_testfuncs.UmedianEndNoReturn";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndNoReturn for user-defined aggregate function umedianendnoreturn, you do not have the correctly formatted method end\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmedianEndUnsupportedReturn() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndUnsupportedReturn FROM CLASS org.voltdb_testfuncs.UmedianEndUnsupportedReturn";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndUnsupportedReturn for user-defined aggregate function umedianendunsupportedreturn, you do not have the correctly formatted method end\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmedianEndWithParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndWithParameter FROM CLASS org.voltdb_testfuncs.UmedianEndWithParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndWithParameter for user-defined aggregate function umedianendwithparameter, you do not have the correctly formatted method end\"";
+        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUmin() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"};
-        testFunction("umin(NUM)", -1000.0, VoltType.FLOAT, columnNames, columnValues);
+        Object[] expected = {-1000.0};
+        testFunction("umin(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+    }
+
+    public void testUminStartMissing() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uminStartMissing FROM CLASS org.voltdb_testfuncs.UminStartMissing";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartMissing for user-defined aggregate function uminstartmissing, you do not have the correctly formatted method start\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUminStartWithParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uminStartWithParameter FROM CLASS org.voltdb_testfuncs.UminStartWithParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartWithParameter for user-defined aggregate function uminstartwithparameter, you do not have the correctly formatted method start\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUminStartWithReturn() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uminStartWithReturn FROM CLASS org.voltdb_testfuncs.UminStartWithReturn";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartWithReturn for user-defined aggregate function uminstartwithreturn, you do not have the correctly formatted method start\"";
+        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUmode() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
         String[] columnValues = {"1", "3", "3", "3", "5", "5", "7"};
-        testFunction("umode(INT)", 3, VoltType.INTEGER, columnNames, columnValues);
+        Object[] expected = {3};
+        testFunction("umode(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUmodeAssembleMissing() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleMissing FROM CLASS org.voltdb_testfuncs.UmodeAssembleMissing";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleMissing for user-defined aggregate function umodeassemblemissing, you do not have the correctly formatted method assemble\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmodeAssembleNoParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleNoParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleNoParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleNoParameter for user-defined aggregate function umodeassemblenoparameter, you do not have the correctly formatted method assemble\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmodeAssembleUnsupportedParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleUnsupportedParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleUnsupportedParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleUnsupportedParameter for user-defined aggregate function umodeassembleunsupportedparameter, you do not have the correctly formatted method assemble\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUmodeAssembleWithReturn() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleWithReturn FROM CLASS org.voltdb_testfuncs.UmodeAssembleWithReturn;";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleWithReturn for user-defined aggregate function umodeassemblewithreturn, you do not have the correctly formatted method assemble\"";
+        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUprimesum() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String[] columnValues = {"-10", "0", "2", "13", "25", "37", "14", "87"};
-        testFunction("uprimesum(INT)", 139, VoltType.INTEGER, columnNames, columnValues);
+        String[] columnValues = {"0", "2", "13", "25", "37", "14", "87"};
+        Object[] expected = {52};
+        testFunction("uprimesum(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
+    }
+
+    public void testUprimesumCombineMissing() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineMissing FROM CLASS org.voltdb_testfuncs.UprimesumCombineMissing";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineMissing for user-defined aggregate function uprimesumcombinemissing, you do not have the correctly formatted method combine\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUprimesumCombineNoParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineNoParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineNoParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineNoParameter for user-defined aggregate function uprimesumcombinenoparameter, you do not have the correctly formatted method combine\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUprimesumCombineWithReturn() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineWithReturn FROM CLASS org.voltdb_testfuncs.UprimesumCombineWithReturn";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineWithReturn for user-defined aggregate function uprimesumcombinewithreturn, you do not have the correctly formatted method combine\"";
+        testCreateFunctionException(functionCall, errorMessage);
+    }
+
+    public void testUprimesumCombineWrongParameter() throws IOException, ProcCallException {
+        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineWrongParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineWrongParameter";
+        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineWrongParameter for user-defined aggregate function uprimesumcombinewrongparameter, you do not have the correctly formatted method combine\"";
+        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUsum() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[] columnValues = {"1.2", "2.5", "-4.6", "6.4", "-5.5"};
-        testFunction("usum(NUM)", 0.0D, VoltType.FLOAT, columnNames, columnValues);
+        Object[] expected = {0.0D};
+        testFunction("usum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
     public void testUminOverflow() throws IOException, ProcCallException {

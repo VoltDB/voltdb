@@ -635,7 +635,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // user defined aggregate functions helper functions
         /*
-         * put buffer size needed, function id, udaf index, and parameters (if there is any) 
+         * put buffer size needed, function id, udaf index, and parameters (if there is any)
          * into the buffers, so that the java side would receive them
          */
         void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);

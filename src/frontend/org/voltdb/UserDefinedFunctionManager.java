@@ -56,11 +56,11 @@ public class UserDefinedFunctionManager {
 
     ImmutableMap<Integer, UserDefinedScalarFunctionRunner> m_udfs = ImmutableMap.of();
     ImmutableMap<Integer, UserDefinedAggregateFunctionRunner> m_udafs = ImmutableMap.of();
-    
+
     public UserDefinedScalarFunctionRunner getFunctionRunnerById(int functionId) {
         return m_udfs.get(functionId);
     }
-    
+
     public UserDefinedAggregateFunctionRunner getAggregateFunctionRunnerById(int functionId) {
         return m_udafs.get(functionId);
     }
@@ -87,7 +87,7 @@ public class UserDefinedFunctionManager {
         // Build new UDF runners
         ImmutableMap.Builder<Integer, UserDefinedScalarFunctionRunner> builder =
                             ImmutableMap.<Integer, UserDefinedScalarFunctionRunner>builder();
-        ImmutableMap.Builder<Integer, UserDefinedAggregateFunctionRunner> builderAgg = 
+        ImmutableMap.Builder<Integer, UserDefinedAggregateFunctionRunner> builderAgg =
                             ImmutableMap.<Integer, UserDefinedAggregateFunctionRunner>builder();
         for (final Function catalogFunction : catalogFunctions) {
             final String className = catalogFunction.getClassname();
@@ -158,14 +158,14 @@ public class UserDefinedFunctionManager {
         final boolean[] m_boxUpByteArray;
         final VoltType m_returnType;
         final int m_paramCount;
-        
+
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
-        
+
         public UserDefinedAggregateFunctionRunner(Function catalogFunction, Class<?> funcClass) {
             this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
                     catalogFunction.getClassname(), funcClass);
         }
-        
+
         public UserDefinedAggregateFunctionRunner(String functionName, int functionId, String className, Class<?> funcClass) {
             m_functionName = functionName;
             m_functionId = functionId;
@@ -195,7 +195,7 @@ public class UserDefinedFunctionManager {
             // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
             FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
         }
-        
+
         private void initFunctionMethods() {
             try {
                 Object functionInstance = m_funcClass.newInstance();
@@ -205,7 +205,7 @@ public class UserDefinedFunctionManager {
                 throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
             }
         }
-        
+
         private void addFunctionInstance() {
             try {
                 Object tempFunctionInstance = m_funcClass.newInstance();
@@ -284,7 +284,7 @@ public class UserDefinedFunctionManager {
                 return temp_method;
             }
         }
-        
+
      // We should refactor those functions into SerializationHelper
 
         public static byte[] readVarbinary(ByteBuffer buffer) {
@@ -420,7 +420,7 @@ public class UserDefinedFunctionManager {
                 throw new RuntimeException("Cannot write to VoltDB UDF buffer.");
             }
         }
-        
+
         public void start() throws Throwable {
             addFunctionInstance();
             m_startMethod.invoke(m_functionInstances.lastElement());
@@ -448,7 +448,7 @@ public class UserDefinedFunctionManager {
             }
             return result;
         }
-        
+
         public VoltType getReturnType() {
             return m_returnType;
         }
@@ -456,14 +456,14 @@ public class UserDefinedFunctionManager {
         public Object getFunctionInstance(int udafIndex) {
             return m_functionInstances.get(udafIndex);
         }
-        
+
         public void clearFunctionInstance(int udafIndex) {
             if (udafIndex == m_functionInstances.size() - 1) {
                 m_functionInstances.clear();
             }
         }
     }
-    
+
     /**
      * This class maintains the necessary information for each UDF including the class instance and
      * the method ID for the UDF implementation. We run UDFs from this runner.

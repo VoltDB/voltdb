@@ -893,5 +893,4 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
         return builder;
     }
-
 }

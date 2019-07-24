@@ -785,7 +785,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         Object returnValue = null;
         Throwable throwable = null;
-    	try {
+        try {
             assert(udfRunner != null);
             // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);

@@ -275,11 +275,11 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS =
         SPF.statement(
-            SPF.token("create"), SPF.token("aggregate"), SPF.token("function"), 
+            SPF.token("create"), SPF.token("aggregate"), SPF.token("function"),
             SPF.capture(SPF.functionName()), SPF.token("from"), SPF.token("class"),
             SPF.capture(SPF.classPath())
         ).compile("PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS");
-    
+
     /*
      * DROP AGGREGATE FUNCTION <NAME> [IF EXISTS]
      *
@@ -294,7 +294,7 @@ public class SQLParser extends SQLPatternFactory
             SPF.token("drop"), SPF.token("aggregate"), SPF.token("function"), SPF.capture(SPF.functionName()),
             SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
         ).compile("PAT_DROP_AGGREGATE_FUNCTION");
-    
+
     /*
      * DROP FUNCTION <NAME> [IF EXISTS]
      *
@@ -457,9 +457,9 @@ public class SQLParser extends SQLPatternFactory
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
      *  one of create procedure, create role, create function, create aggregate function,
-     *  drop procedure, drop role, partition, replicate, export, import, or dr, 
-     *  the one match group is set to the matching command EXCEPT as special 
-     *  (needlessly obscure) cases, simply returns only "procedure" for "create 
+     *  drop procedure, drop role, partition, replicate, export, import, or dr,
+     *  the one match group is set to the matching command EXCEPT as special
+     *  (needlessly obscure) cases, simply returns only "procedure" for "create
      *  procedure", only "role" for "create role", only "aggregate" for "create aggregate
      *  function" and only "drop" for either "drop procedure" OR "drop role".
      *  ALSO (less than helpfully) returns "drop" for non-VoltDB-specific
@@ -931,7 +931,7 @@ public class SQLParser extends SQLPatternFactory
     {
         return PAT_DROP_AGGREGATE_FUNCTION.matcher(statement);
     }
-    
+
     /**
      * Match statement against the pattern for drop function
      * @param statement  statement to match against
