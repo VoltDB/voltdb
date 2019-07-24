@@ -206,7 +206,7 @@ public class AsyncExportClient
             }
         }
     }
-    
+
     static class TableExportCallback implements ProcedureCallback
     {
         private final TxnIdWriter m_writer;
@@ -224,7 +224,7 @@ public class AsyncExportClient
             int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
-                
+
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(transType);
                 /*********
@@ -302,7 +302,7 @@ public class AsyncExportClient
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
     // If testing Table/Export, count inserts, deletes, update fore & aft
-    
+
     private static int INSERT = 1;
     private static int DELETE = 2;
     private static int UPDATE_OLD = 3;
@@ -512,7 +512,7 @@ public class AsyncExportClient
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
                 log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
-            
+
             // 2. Print TABLE EXPORT stats if that's configured
             if (config.usetableexport) {
                 System.out.printf(
