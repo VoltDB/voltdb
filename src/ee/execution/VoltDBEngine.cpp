@@ -1219,7 +1219,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 // Updated in ENG-17013: when UAC handles non-stream change, EE will attach the stream
                 // when rebuilding migrate table so that it won't lose its stream wrapper
                 // So far this caused many test failure
-                if (isStreamUpdate || persistentTable->getStreamedTable()) {
+                if (isStreamUpdate || (persistentTable && persistentTable->getStreamedTable())) {
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                         attachTupleStream(streamedTable, name, purgedStreams, timestamp);
