@@ -1209,6 +1209,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
                     VOLT_DEBUG("Updating companion stream for %s", persistentTable->name().c_str());
+                    const std::string& name = streamedTable->name();
+                    if (tableTypeNeedsTupleStream(tcd->getTableType())) {
+                        attachTupleStream(streamedTable, name, purgedStreams, timestamp);
+                        tableSchemaChanged = haveDifferentSchema(catalogTable, streamedTable, false);
+                    }
                 }
                 tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
 
@@ -1217,7 +1222,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
-                if (isStreamUpdate || persistentTable->getStreamedTable()) {
+                if (isStreamUpdate) {
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                         attachTupleStream(streamedTable, name, purgedStreams, timestamp);
