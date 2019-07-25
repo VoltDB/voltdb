@@ -375,6 +375,31 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
+    public void testENG16982() {
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE P5(ID INTEGER, VCHAR_INLINE VARCHAR(42), VCHAR_OUTLINE_MIN VARCHAR(16), VCHAR VARCHAR);\n" +
+                "CREATE UNIQUE INDEX IDX_P5_IV ON P5 (VCHAR) WHERE ID > 0;",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of("insert INTO P5(VCHAR, VCHAR_OUTLINE_MIN, ID) VALUES('', '', 5712);",
+                    "UPDATE P5 SET VCHAR = VCHAR_OUTLINE_MIN;",
+                    "UPDATE P5 SET VCHAR = VCHAR_INLINE;")
+                    .forEachOrdered(query -> {
+                        try {
+                            assertEquals("Query \"" + query + "\" Should have passed",
+                                    ClientResponse.SUCCESS,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
     public void testSimple() throws Exception {
         System.out.println("Starting testSimple");
         TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
