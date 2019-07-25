@@ -137,155 +137,9 @@ public class UserDefinedFunctionManager {
         }
     }
 
-    /**
-     * This class maintains the necessary information for each UDAF including the class instance
-     * and the method ID for the UDAF implementation. We run UDAFs from this runner.
-     * @author russelhu
-     *
-     */
-    public static class UserDefinedAggregateFunctionRunner {
-        final String m_functionName;
-        final int m_functionId;
-        final String m_className;
-        Method m_startMethod;
-        Method m_assembleMethod;
-        Method m_combineMethod;
-        Method m_endMethod;
-        Class<?> m_funcClass;
-        Method[] m_functionMethods;
-        Vector<Object> m_functionInstances;
-        final VoltType[] m_paramTypes;
-        final boolean[] m_boxUpByteArray;
-        final VoltType m_returnType;
-        final int m_paramCount;
 
+    public static class UserDefinedFunctionRunner {
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
-
-        public UserDefinedAggregateFunctionRunner(Function catalogFunction, Class<?> funcClass) {
-            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
-                    catalogFunction.getClassname(), funcClass);
-        }
-
-        public UserDefinedAggregateFunctionRunner(String functionName, int functionId, String className, Class<?> funcClass) {
-            m_functionName = functionName;
-            m_functionId = functionId;
-            m_className = className;
-            m_funcClass = funcClass;
-            initFunctionMethods();
-            m_functionInstances = new Vector<Object>();
-            m_startMethod = initFunctionMethod("start");
-            m_assembleMethod = initFunctionMethod("assemble");
-            m_combineMethod = initFunctionMethod("combine");
-            m_endMethod = initFunctionMethod("end");
-            Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
-            m_paramCount = paramTypeClasses.length;
-            m_paramTypes = new VoltType[m_paramCount];
-            m_boxUpByteArray = new boolean[m_paramCount];
-            for (int i = 0; i < m_paramCount; i++) {
-                m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
-                m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
-            }
-            m_returnType = VoltType.typeFromClass(m_endMethod.getReturnType());
-
-            m_logger.debug(String.format("The user-defined function manager is defining aggregate function %s (ID = %s)",
-                    m_functionName, m_functionId));
-
-            // We register the token again when initializing the user-defined function manager because
-            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
-            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
-        }
-
-        private void initFunctionMethods() {
-            try {
-                Object functionInstance = m_funcClass.newInstance();
-                m_functionMethods = functionInstance.getClass().getDeclaredMethods();
-            }
-            catch (InstantiationException | IllegalAccessException e) {
-                throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
-            }
-        }
-
-        private void addFunctionInstance() {
-            try {
-                Object tempFunctionInstance = m_funcClass.newInstance();
-                m_functionInstances.add(tempFunctionInstance);
-            }
-            catch (InstantiationException | IllegalAccessException e) {
-                throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
-            }
-        }
-
-        private Method initFunctionMethod(String methodName) {
-            Method temp_method = null;
-            for (final Method m : m_functionMethods) {
-                if (m.getName().equals(methodName)) {
-                    if (!Modifier.isPublic(m.getModifiers())) {
-                        continue;
-                    }
-                    if (Modifier.isStatic(m.getModifiers())) {
-                        continue;
-                    }
-                    // The return type of start|assemble|combine function should be void
-                    if (!methodName.equals("end")) {
-                        if (!m.getReturnType().equals(Void.TYPE)) {
-                            continue;
-                        }
-                        // If the start method has at least one parameter, this is not the start
-                        // method we're looking for
-                        if (methodName.equals("start") && m.getParameterCount() > 0) {
-                            continue;
-                        }
-                        // We only support one parameter for the assemble method currently.
-                        // If we can support more parameters in the future, we need to delete this check
-                        if (methodName.equals("assemble")) {
-                            // If the number of parameter is not one, this is not a correct assemble method
-                            if (m.getParameterCount() != 1) {
-                                continue;
-                            }
-                            // This assemble method has exactly one parameter
-                            // However, this parameter's type is not one of the allowed types
-                            if (!CreateFunction.isAllowedDataType(m.getParameterTypes()[0])) {
-                                continue;
-                            }
-                        }
-                        // The combine method can have one and only one parameter which is the
-                        // same type as the current class
-                        if (methodName.equals("combine") && m.getParameterCount() > 0) {
-                            if (m.getParameterCount() != 1) {
-                                continue;
-                            }
-                            else if (m.getParameterTypes()[0] != m_funcClass) {
-                                continue;
-                            }
-                        }
-                    }
-                    // However, the return type for the end function cannot be void
-                    else {
-                        if (m.getReturnType().equals(Void.TYPE)) {
-                            continue;
-                        }
-                        // If the end method has at least one parameter, this is not the end
-                        // method we're looking for
-                        if (m.getParameterCount() > 0 || !CreateFunction.isAllowedDataType(m.getReturnType())) {
-                            continue;
-                        }
-                    }
-                    temp_method = m;
-                    break;
-                }
-            }
-            if (temp_method == null) {
-                throw new RuntimeException(
-                        String.format("Error loading function %s: cannot find the %s() method.",
-                                m_functionName, methodName));
-            }
-            else {
-                return temp_method;
-            }
-        }
-
-     // We should refactor those functions into SerializationHelper
 
         public static byte[] readVarbinary(ByteBuffer buffer) {
             // Sanity check the size against the remaining buffer size.
@@ -420,6 +274,153 @@ public class UserDefinedFunctionManager {
                 throw new RuntimeException("Cannot write to VoltDB UDF buffer.");
             }
         }
+    }
+
+    /**
+     * This class maintains the necessary information for each UDAF including the class instance
+     * and the method ID for the UDAF implementation. We run UDAFs from this runner.
+     * @author russelhu
+     *
+     */
+    public static class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunner {
+        final String m_functionName;
+        final int m_functionId;
+        final String m_className;
+        Method m_startMethod;
+        Method m_assembleMethod;
+        Method m_combineMethod;
+        Method m_endMethod;
+        Class<?> m_funcClass;
+        Method[] m_functionMethods;
+        Vector<Object> m_functionInstances;
+        final VoltType[] m_paramTypes;
+        final boolean[] m_boxUpByteArray;
+        final VoltType m_returnType;
+        final int m_paramCount;
+
+        public UserDefinedAggregateFunctionRunner(Function catalogFunction, Class<?> funcClass) {
+            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
+                    catalogFunction.getClassname(), funcClass);
+        }
+
+        public UserDefinedAggregateFunctionRunner(String functionName, int functionId, String className, Class<?> funcClass) {
+            m_functionName = functionName;
+            m_functionId = functionId;
+            m_className = className;
+            m_funcClass = funcClass;
+            initFunctionMethods();
+            m_functionInstances = new Vector<Object>();
+            m_startMethod = initFunctionMethod("start");
+            m_assembleMethod = initFunctionMethod("assemble");
+            m_combineMethod = initFunctionMethod("combine");
+            m_endMethod = initFunctionMethod("end");
+            Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
+            m_paramCount = paramTypeClasses.length;
+            m_paramTypes = new VoltType[m_paramCount];
+            m_boxUpByteArray = new boolean[m_paramCount];
+            for (int i = 0; i < m_paramCount; i++) {
+                m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
+                m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
+            }
+            m_returnType = VoltType.typeFromClass(m_endMethod.getReturnType());
+
+            m_logger.debug(String.format("The user-defined function manager is defining aggregate function %s (ID = %s)",
+                    m_functionName, m_functionId));
+
+            // We register the token again when initializing the user-defined function manager because
+            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
+            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
+        }
+
+        private void initFunctionMethods() {
+            try {
+                Object functionInstance = m_funcClass.newInstance();
+                m_functionMethods = functionInstance.getClass().getDeclaredMethods();
+            }
+            catch (InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
+            }
+        }
+
+        private void addFunctionInstance() {
+            try {
+                Object tempFunctionInstance = m_funcClass.newInstance();
+                m_functionInstances.add(tempFunctionInstance);
+            }
+            catch (InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
+            }
+        }
+
+        private Method initFunctionMethod(String methodName) {
+            Method temp_method = null;
+            for (final Method m : m_functionMethods) {
+                if (m.getName().equals(methodName)) {
+                    if (!Modifier.isPublic(m.getModifiers())) {
+                        continue;
+                    }
+                    if (Modifier.isStatic(m.getModifiers())) {
+                        continue;
+                    }
+                    // The return type of start|assemble|combine function should be void
+                    if (!methodName.equals("end")) {
+                        if (!m.getReturnType().equals(Void.TYPE)) {
+                            continue;
+                        }
+                        // If the start method has at least one parameter, this is not the start
+                        // method we're looking for
+                        if (methodName.equals("start") && m.getParameterCount() > 0) {
+                            continue;
+                        }
+                        // We only support one parameter for the assemble method currently.
+                        // If we can support more parameters in the future, we need to delete this check
+                        if (methodName.equals("assemble")) {
+                            // If the number of parameter is not one, this is not a correct assemble method
+                            if (m.getParameterCount() != 1) {
+                                continue;
+                            }
+                            // This assemble method has exactly one parameter
+                            // However, this parameter's type is not one of the allowed types
+                            if (!CreateFunction.isAllowedDataType(m.getParameterTypes()[0])) {
+                                continue;
+                            }
+                        }
+                        // The combine method can have one and only one parameter which is the
+                        // same type as the current class
+                        if (methodName.equals("combine") && m.getParameterCount() > 0) {
+                            if (m.getParameterCount() != 1) {
+                                continue;
+                            }
+                            else if (m.getParameterTypes()[0] != m_funcClass) {
+                                continue;
+                            }
+                        }
+                    }
+                    // However, the return type for the end function cannot be void
+                    else {
+                        if (m.getReturnType().equals(Void.TYPE)) {
+                            continue;
+                        }
+                        // If the end method has at least one parameter, this is not the end
+                        // method we're looking for
+                        if (m.getParameterCount() > 0 || !CreateFunction.isAllowedDataType(m.getReturnType())) {
+                            continue;
+                        }
+                    }
+                    temp_method = m;
+                    break;
+                }
+            }
+            if (temp_method == null) {
+                throw new RuntimeException(
+                        String.format("Error loading function %s: cannot find the %s() method.",
+                                m_functionName, methodName));
+            }
+            else {
+                return temp_method;
+            }
+        }
 
         public void start() throws Throwable {
             addFunctionInstance();
@@ -468,7 +469,7 @@ public class UserDefinedFunctionManager {
      * This class maintains the necessary information for each UDF including the class instance and
      * the method ID for the UDF implementation. We run UDFs from this runner.
      */
-    public static class UserDefinedScalarFunctionRunner {
+    public static class UserDefinedScalarFunctionRunner extends UserDefinedFunctionRunner {
         final String m_functionName;
         final int m_functionId;
         final Object m_functionInstance;
@@ -477,8 +478,6 @@ public class UserDefinedFunctionManager {
         final boolean[] m_boxUpByteArray;
         final VoltType m_returnType;
         final int m_paramCount;
-
-        static final int VAR_LEN_SIZE = Integer.SIZE/8;
 
         public UserDefinedScalarFunctionRunner(Function catalogFunction, Object funcInstance) {
             this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
@@ -532,142 +531,6 @@ public class UserDefinedFunctionManager {
                 throw new RuntimeException(
                         String.format("Error loading function %s: cannot find the %s() method.",
                                 m_functionName, methodName));
-            }
-        }
-
-        // We should refactor those functions into SerializationHelper
-
-        private static byte[] readVarbinary(ByteBuffer buffer) {
-            // Sanity check the size against the remaining buffer size.
-            if (VAR_LEN_SIZE > buffer.remaining()) {
-                throw new RuntimeException(String.format(
-                        "Can't read varbinary size as %d byte integer " +
-                        "from buffer with %d bytes remaining.",
-                        VAR_LEN_SIZE, buffer.remaining()));
-            }
-            final int len = buffer.getInt();
-            if (len == VoltTable.NULL_STRING_INDICATOR) {
-                return null;
-            }
-            if (len < 0) {
-                throw new RuntimeException("Invalid object length.");
-            }
-            byte[] data = new byte[len];
-            buffer.get(data);
-            return data;
-        }
-
-        public static Object getValueFromBuffer(ByteBuffer buffer, VoltType type) {
-            switch (type) {
-            case TINYINT:
-                return buffer.get();
-            case SMALLINT:
-                return buffer.getShort();
-            case INTEGER:
-                return buffer.getInt();
-            case BIGINT:
-                return buffer.getLong();
-            case FLOAT:
-                return buffer.getDouble();
-            case STRING:
-                byte[] stringAsBytes = readVarbinary(buffer);
-                if (stringAsBytes == null) {
-                    return null;
-                }
-                return new String(stringAsBytes, VoltTable.ROWDATA_ENCODING);
-            case VARBINARY:
-                return readVarbinary(buffer);
-            case TIMESTAMP:
-                long timestampValue = buffer.getLong();
-                if (timestampValue == Long.MIN_VALUE) {
-                    return null;
-                }
-                return new TimestampType(timestampValue);
-            case DECIMAL:
-                return VoltDecimalHelper.deserializeBigDecimal(buffer);
-            case GEOGRAPHY_POINT:
-                return GeographyPointValue.unflattenFromBuffer(buffer);
-            case GEOGRAPHY:
-                byte[] geographyValueBytes = readVarbinary(buffer);
-                if (geographyValueBytes == null) {
-                    return null;
-                }
-                return GeographyValue.unflattenFromBuffer(ByteBuffer.wrap(geographyValueBytes));
-            default:
-                throw new RuntimeException("Cannot read from VoltDB UDF buffer.");
-            }
-        }
-
-        public static void writeValueToBuffer(ByteBuffer buffer, VoltType type, Object value) throws IOException {
-            buffer.put(type.getValue());
-            if (VoltType.isVoltNullValue(value)) {
-                value = type.getNullValue();
-                if (value == VoltType.NULL_TIMESTAMP) {
-                    buffer.putLong(VoltType.NULL_BIGINT);  // corresponds to EE value.h isNull()
-                    return;
-                }
-                else if (value == VoltType.NULL_STRING_OR_VARBINARY) {
-                    buffer.putInt(VoltType.NULL_STRING_LENGTH);
-                    return;
-                }
-                else if (value == VoltType.NULL_DECIMAL) {
-                    VoltDecimalHelper.serializeNull(buffer);
-                    return;
-                }
-                else if (value == VoltType.NULL_POINT) {
-                    GeographyPointValue.serializeNull(buffer);
-                    return;
-                }
-                else if (value == VoltType.NULL_GEOGRAPHY) {
-                    buffer.putInt(VoltType.NULL_STRING_LENGTH);
-                    return;
-                }
-            }
-            switch (type) {
-            case TINYINT:
-                buffer.put((Byte)value);
-                break;
-            case SMALLINT:
-                buffer.putShort((Short)value);
-                break;
-            case INTEGER:
-                buffer.putInt((Integer) value);
-                break;
-            case BIGINT:
-                buffer.putLong((Long) value);
-                break;
-            case FLOAT:
-                buffer.putDouble(((Double) value).doubleValue());
-                break;
-            case STRING:
-                byte[] stringAsBytes = ((String)value).getBytes(Constants.UTF8ENCODING);
-                SerializationHelper.writeVarbinary(stringAsBytes, buffer);
-                break;
-            case VARBINARY:
-                if (value instanceof byte[]) {
-                    SerializationHelper.writeVarbinary(((byte[])value), buffer);
-                }
-                else if (value instanceof Byte[]) {
-                    SerializationHelper.writeVarbinary(((Byte[])value), buffer);
-                }
-                break;
-            case TIMESTAMP:
-                buffer.putLong(((TimestampType)value).getTime());
-                break;
-            case DECIMAL:
-                VoltDecimalHelper.serializeBigDecimal((BigDecimal)value, buffer);
-                break;
-            case GEOGRAPHY_POINT:
-                GeographyPointValue geoValue = (GeographyPointValue)value;
-                geoValue.flattenToBuffer(buffer);
-                break;
-            case GEOGRAPHY:
-                GeographyValue gv = (GeographyValue)value;
-                buffer.putInt(gv.getLengthInBytes());
-                gv.flattenToBuffer(buffer);
-                break;
-            default:
-                throw new RuntimeException("Cannot write to VoltDB UDF buffer.");
             }
         }
 
