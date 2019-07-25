@@ -66,32 +66,23 @@ class UpdateExecutor : public AbstractExecutor
 {
 public:
     UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-          m_node(NULL),
-          m_inputTargetMap(),
-          m_inputTargetMapSize(-1),
-          m_inputTable(NULL),
-          m_inputTuple(),
-          m_partitionColumn(-1),
-          m_partitionColumnIsString(false)
-    {
-    }
+        : AbstractExecutor(engine, abstract_node) { }
 
 protected:
     bool p_init(AbstractPlanNode*,
                 const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-    UpdatePlanNode* m_node;
+    UpdatePlanNode* m_node = nullptr;
 
-    std::vector<std::pair<int, int>> m_inputTargetMap;
-    int m_inputTargetMapSize;
+    std::vector<std::pair<int, int>> m_inputTargetMap{};
+    int m_inputTargetMapSize = -1;
 
-    AbstractTempTable* m_inputTable;
+    AbstractTempTable* m_inputTable = nullptr;
 
-    TableTuple m_inputTuple;
-    int m_partitionColumn;
-    bool m_partitionColumnIsString;
+    TableTuple m_inputTuple{};
+    int m_partitionColumn = -1;
+    bool m_partitionColumnIsString = false;
 
     static int64_t s_modifiedTuples;
 };

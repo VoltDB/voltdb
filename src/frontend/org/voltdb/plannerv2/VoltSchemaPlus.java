@@ -18,19 +18,15 @@
 package org.voltdb.plannerv2;
 
 import java.util.Map;
-
-import javassist.NotFoundException;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.schema.impl.AggregateFunctionImpl;
-import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.AggregateFunctionDescriptor;
-import sun.reflect.Reflection;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -75,6 +71,35 @@ public class VoltSchemaPlus {
                         + function.getClassname() + " for method " + function.getMethodname());
             }
         });
+
+        // add Volt extend SQL functions to the SchemaPlus
+        for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :
+                VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
+            switch(function.getValue().getType()){
+                case SCALAR:
+                    ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
+                    schema.add(scalarFunction.getFunctionName().toUpperCase(),
+                            ScalarFunctionImpl.create(
+                                    function.getKey(),
+                                    scalarFunction.getFunctionName(),
+                                    scalarFunction.isExactArgumentTypes(),
+                                    scalarFunction.getFunctionId(),
+                                    scalarFunction.getArgumentTypes()));
+                    break;
+                case AGGREGATE:
+                    AggregateFunctionDescriptor aggregateFunction = (AggregateFunctionDescriptor) function.getValue();
+                    schema.add(aggregateFunction.getFunctionName().toUpperCase(),
+                            AggregateFunctionImpl.create(
+                                    function.getKey(),
+                                    aggregateFunction.getFunctionName(),
+                                    aggregateFunction.isExactArgumentTypes(),
+                                    aggregateFunction.getAggType(),
+                                    aggregateFunction.getArgumentTypes()));
+                    break;
+                default:
+                    break;
+            }
+        }
 
         // add Volt extend SQL functions to the SchemaPlus
         for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :

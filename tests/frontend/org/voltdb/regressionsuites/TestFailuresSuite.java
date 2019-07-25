@@ -428,6 +428,9 @@ public class TestFailuresSuite extends RegressionSuite {
     }
 
     public void testReplicatedInsertAfterBadPartitionedInsert() throws IOException {
+        if (isValgrind()) {
+            return;
+        }
         System.out.println("STARTING testReplicatedInsertAfterBadPartitionedInsert");
         Client client = getClient();
 

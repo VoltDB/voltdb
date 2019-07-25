@@ -1009,6 +1009,7 @@ public class Table extends TableBase implements SchemaObject {
             tn.persistenceScope = persistenceScope;
         }
 
+        tn.persistentExport = this.persistentExport;
         for (int i = 0; i < getColumnCount(); i++) {
             ColumnSchema col = (ColumnSchema) columnList.get(i);
 

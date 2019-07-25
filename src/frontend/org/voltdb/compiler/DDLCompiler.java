@@ -169,9 +169,6 @@ public class DDLCompiler {
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
-    private static final String INVALID_CREATE_EXPORT = "Invalid CREATE TABLE statement: %s "
-            + "expected syntax: CREATE TABLE <table> [EXPORT TO TARGET <target> ON <OPERATIONS> (column datatype, ...);" +
-            " Only INSERT, DELETE, UPDATE (or one of UPDATE_NEW, UPDATE_OLD) are allowed for OPERATIONS.";
     static final String [][] DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS = {
         {DR_ROW_TYPE_COLUMN_NAME, "VARCHAR(3 BYTES) NOT NULL"},
         {DR_LOG_ACTION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
@@ -740,71 +737,13 @@ public class DDLCompiler {
             }
             return;
         }
-
         // if we have export to target clause
         statementMatcher = SQLParser.matchCreateTableExportTo(statement);
-        if (statementMatcher.matches()) {
-            int groups = statementMatcher.groupCount();
-            if (groups > 1 && statementMatcher.group(2) != null && !statementMatcher.group(2).isEmpty()) {
-                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-                String targetName = checkIdentifierStart(statementMatcher.group(2), statement);
-                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-                if (tableXML == null) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid DDL statement: table %s does not exist", tableName));
-                }
-
-                List<String> triggers = new ArrayList<>();
-                if (groups > 2 && statementMatcher.group(3) != null && !statementMatcher.group(3).isEmpty()) {
-                    String exportTrigger = checkIdentifierStart(statementMatcher.group(3), statement);
-                    triggers = validateExportTriggers(exportTrigger);
-                }
-                if (triggers.isEmpty()) {
-                    triggers = Arrays.asList("INSERT");
-                }
-                targetName = targetName.toUpperCase();
-                tableName = tableName.toUpperCase();
-                VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
-                pe.attributes.put("target", targetName);
-                pe.attributes.put("triggers", String.join(",", triggers));
-                tableXML.children.add(pe);
-
-                // update export to target in the cached schema
-                VoltXMLElement lastSchema = m_hsql.getLastSchema(tableName.toLowerCase());
-                if (lastSchema != null) {
-                    VoltXMLElement lastXml = lastSchema.findChild("table", tableName);
-                    if (lastXml != null) {
-                        lastXml.children.add(pe.duplicate());
-                    }
-                }
-            }
-        } else {
+        if (!statementMatcher.matches()) {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\", "
                             + "expected syntax: CREATE TABLE <table> [MIGRATE/EXPORT TO TARGET <target>] (column datatype, ...); ",
                     statement.substring(0, statement.length() - 1)));
         }
-    }
-
-    private List<String> validateExportTriggers(String triggers) throws VoltCompilerException {
-        triggers = triggers.toUpperCase();
-        List<String> exportTriggers = Arrays.asList(triggers.split(","));
-        Set<String> triggerSets = new HashSet<String>(exportTriggers);
-        if (exportTriggers.size() != triggerSets.size() || exportTriggers.size() > 3) {
-            throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
-        }
-
-        triggerSets.remove("INSERT");
-        triggerSets.remove("DELETE");
-        if (triggerSets.contains("UPDATE")) {
-            triggerSets.remove("UPDATE");
-            if (!triggerSets.isEmpty()) {
-                throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
-            }
-        }
-        if (triggerSets.contains("UPDATE_NEW") && triggerSets.contains("UPDATE_OLD")) {
-            throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
-        }
-        return exportTriggers;
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)

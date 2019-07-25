@@ -113,8 +113,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             delete s_mpEngine.stringData;
             s_mpEngine.stringData = new CompactingStringStorage();
 
-            delete s_mpEngine.allocated;
-            s_mpEngine.allocated = new std::size_t(0);
+            s_mpEngine.allocated = 0;
         }
     }
 }
@@ -134,8 +133,6 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.poolData = NULL;
             delete s_mpEngine.stringData;
             s_mpEngine.stringData = NULL;
-            delete s_mpEngine.allocated;
-            s_mpEngine.allocated = NULL;
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
             s_mpEngine.context = NULL;
@@ -170,7 +167,6 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         EngineLocals& engine = s_enginesByPartitionId[partitionId];
         engine.poolData = NULL;
         engine.stringData = NULL;
-        engine.allocated = NULL;
         engine.enginePartitionId = NULL;
         engine.context = NULL;
         s_enginesByPartitionId.erase(partitionId);
