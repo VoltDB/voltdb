@@ -89,10 +89,9 @@ ThreadLocalPool::~ThreadLocalPool() {
             VOLT_ERROR_STACK();
             vassert(false);
         }
-        {
-            std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
-            SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
-        }
+        s_sharedMemoryMutex.lock();
+        SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
+        s_sharedMemoryMutex.unlock();
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
             AllocTraceMap_t& allocMap = mapForAdd->second;
@@ -100,11 +99,11 @@ ThreadLocalPool::~ThreadLocalPool() {
             if (!allocMap.empty()) {
                 for(auto nextAlloc : allocMap) {
 #ifdef VOLT_TRACE_ALLOCATIONS
-                    VOLT_ERROR("Missing deallocation for %p at:", nextAlloc->first);
+                    VOLT_ERROR("Missing deallocation for %p at:", nextAlloc.first);
                     nextAlloc->second->printLocalTrace();
                     delete nextAlloc->second;
 #else
-                    VOLT_ERROR("Missing deallocation for %p at:", *nextAlloc);
+                    VOLT_ERROR("Missing deallocation for %p at:", nextAlloc);
 #endif
                 }
                 allocMap.clear();
@@ -305,19 +304,18 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
     int32_t enginePartitionId =  getEnginePartitionId();
-    {
-        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
-        SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
-    }
+    s_sharedMemoryMutex.lock();
+    SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
+    s_sharedMemoryMutex.unlock();
     SizeBucketMap_t::iterator mapForAdd;
 #endif
     if (iter == pools.end()) {
         pool = new PoolForObjectSize(sz);
         pools.emplace(sz, std::unique_ptr<PoolForObjectSize>(pool));
 #ifdef VOLT_POOL_CHECKING
-        auto mapForAdd = mapBySize.find(sz);
+        mapForAdd = mapBySize.find(sz);
         if (mapForAdd == mapBySize.cend()) {
-            mapForAdd = mapBySize.emplace(sz, {}).first;
+            mapForAdd = mapBySize.emplace(sz, AllocTraceMap_t{}).first;
         } else {
             vassert(mapForAdd->second.size() == 0);
         }
@@ -412,10 +410,9 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
     int32_t engineId = getEnginePartitionId();
     VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
             engineId, getThreadPartitionId());
-    {
-        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
-        SizeBucketMap_t& mapBySize = s_allocations[engineId];
-    }
+    s_sharedMemoryMutex.lock();
+    SizeBucketMap_t& mapBySize = s_allocations[engineId];
+    s_sharedMemoryMutex.unlock();
     auto const mapForAdd = mapBySize.find(sz);
     if (mapForAdd == mapBySize.cend()) {
         VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
@@ -510,7 +507,7 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
                 mapBySize.erase(mapBySize.begin());
             }
         } else {
-            s_allocations.emplace(partitionId, {});
+            s_allocations.emplace(partitionId, SizeBucketMap_t{});
         }
     }
 #endif

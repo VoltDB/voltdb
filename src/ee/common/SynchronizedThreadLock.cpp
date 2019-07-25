@@ -137,12 +137,12 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.enginePartitionId = NULL;
             s_mpEngine.context = NULL;
 #ifdef VOLT_POOL_CHECKING
-            pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
+            pthread_mutex_lock(&s_sharedEngineMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
-            pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);
-            ThreadLocalPool::SizeBucketMap_t::iterator mapForAdd = mapBySize.begin();
+            pthread_mutex_unlock(&s_sharedEngineMutex);
+            auto mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
-                ThreadLocalPool::AllocTraceMap_t& allocMap = mapForAdd->second;
+                auto& allocMap = mapForAdd->second;
                 mapForAdd++;
                 if (!allocMap.empty()) {
                     ThreadLocalPool::AllocTraceMap_t::iterator nextAlloc = allocMap.begin();
