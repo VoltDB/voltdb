@@ -491,26 +491,36 @@ public:
 class UserDefineAgg : public Agg {
     public:
     UserDefineAgg(int id, bool isWorkerIn, bool isPartitionIn, int udafIndexIn)
-        : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()), udafIndex(udafIndexIn), isPartition(isPartitionIn)
+        : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()),
+            udafIndex(udafIndexIn), isPartition(isPartitionIn)
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
 
     virtual void advance(const NValue& val)
     {
-        if (isPartition && !isWorker) {
-            engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
-        }
-        else {
+        // if this is a worker, we will need to call the assemble method to accumulate
+        // the values within this partition
+        if (isWorker) {
             engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
+        }
+        // if this is a coordinator (not worker), we will need to call the combine method
+        // to deserialize the byte arrays from other partitions and merge them
+        else {
+            engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
         }
     }
 
     virtual NValue finalize(ValueType type)
     {
+        // if this is a partitioned table and a worker, we will call the worker end method
+        // to serialize the instance to a byte array and send it to the coordinator
         if (isPartition && isWorker) {
             return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, udafIndex);
         }
+        // if this is not a partitioned table which means this is a replicated table, or this is
+        // a coordinator (not worker), we are ready to return the final result by calling the
+        // coordinator end method
         else {
             return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, udafIndex);
         }

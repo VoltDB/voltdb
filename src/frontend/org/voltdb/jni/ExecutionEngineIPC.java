@@ -38,7 +38,7 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedFunctionManager.UserDefinedScalarFunctionRunner;
+import org.voltdb.UserDefinedScalarFunctionRunner;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
