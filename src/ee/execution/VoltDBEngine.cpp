@@ -1216,8 +1216,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 persistentTable->setTableType(static_cast<TableType>(catalogTable->tableType()));
             }
             if (streamedTable) {
-                //Dont update and roll generation if this is just a non stream table update.
-                if (isStreamUpdate) {
+                // Updated in ENG-17013: when UAC handles non-stream change, EE will attach the stream
+                // when rebuilding migrate table so that it won't lose its stream wrapper
+                if (isStreamUpdate || (persistentTable && persistentTable->getStreamedTable())) {
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                         attachTupleStream(streamedTable, name, purgedStreams, timestamp);
