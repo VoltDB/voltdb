@@ -101,35 +101,6 @@ public class VoltSchemaPlus {
             }
         }
 
-        // add Volt extend SQL functions to the SchemaPlus
-        for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :
-                VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
-            switch(function.getValue().getType()){
-                case SCALAR:
-                    ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
-                    schema.add(scalarFunction.getFunctionName().toUpperCase(),
-                            ScalarFunctionImpl.create(
-                                    function.getKey(),
-                                    scalarFunction.getFunctionName(),
-                                    scalarFunction.isExactArgumentTypes(),
-                                    scalarFunction.getFunctionId(),
-                                    scalarFunction.getArgumentTypes()));
-                    break;
-                case AGGREGATE:
-                    AggregateFunctionDescriptor aggregateFunction = (AggregateFunctionDescriptor) function.getValue();
-                    schema.add(aggregateFunction.getFunctionName().toUpperCase(),
-                            AggregateFunctionImpl.create(
-                                    function.getKey(),
-                                    aggregateFunction.getFunctionName(),
-                                    aggregateFunction.isExactArgumentTypes(),
-                                    aggregateFunction.getAggType(),
-                                    aggregateFunction.getArgumentTypes()));
-                    break;
-                default:
-                    break;
-            }
-        }
-
         return schema;
     }
 }
