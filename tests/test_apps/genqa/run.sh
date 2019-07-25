@@ -52,7 +52,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar exportdata clientlog log build
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
