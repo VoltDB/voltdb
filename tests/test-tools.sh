@@ -596,13 +596,9 @@ function test-tools-server-pro-if-needed() {
     test-tools-server-count
     RETURN_CODE=$?
     if [[ "$RETURN_CODE" -gt "0" ]]; then
-        if [[ "$TT_DEBUG" -ge "2" ]]; then
-            echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
-        fi
+        echo -e "Not (re-)starting a VoltDB (pro) server, because 'ps -ef' now includes a VoltDB process."
     else
-        if [[ "$TT_DEBUG" -ge "2" ]]; then
-            echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
-        fi
+        echo -e "A VoltDB (pro) server will be started, because 'ps -ef' does not include a VoltDB process."
         test-tools-server-pro
     fi
 }
