@@ -113,6 +113,7 @@ public class StreamBlockQueue {
         m_partitionId = partitionId;
         m_initialGenerationId = genId;
 
+        // When creating, delete any existing PBD files
         constructPBD(genId, create);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
@@ -422,7 +423,7 @@ public class StreamBlockQueue {
         return m_initialGenerationId;
     }
 
-    private void constructPBD(long genId, boolean create) throws IOException {
+    private void constructPBD(long genId, boolean deleteExisting) throws IOException {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
         ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
@@ -431,7 +432,7 @@ public class StreamBlockQueue {
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
                 .initialExtraHeader(schema, serializer)
                 .compression(!DISABLE_COMPRESSION)
-                .create(create)
+                .deleteExisting(deleteExisting)
                 .build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
