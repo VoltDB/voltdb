@@ -44,7 +44,6 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-//import javafx.util.Pair;
 
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -355,12 +354,9 @@ public class VoltTrace implements Runnable {
                 p = null;
             }
             if (p != null) {
-                //double diff = (double)(endTime - p.getValue()) / 1000 - m_filterTime;
                 double diff = (double)(endTime - p.getSecond()) / 1000 - m_filterTime;
                 if (diff >= 0) {
-                    //return p.getKey();
                     return p.getFirst();
-                }
                 }
             }
             return null;
