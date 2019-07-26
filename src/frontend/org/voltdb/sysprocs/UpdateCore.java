@@ -44,7 +44,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SpecifiedException;
-import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -467,8 +466,6 @@ public class UpdateCore extends VoltSystemProcedure {
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
-        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        catalogContext.setSchemaPlus(VoltSchemaPlus.from(catalogContext.getDatabase()));
         return (new VoltTable[] {result});
     }
 }

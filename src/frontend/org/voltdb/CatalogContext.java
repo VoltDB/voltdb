@@ -27,7 +27,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -137,10 +136,6 @@ public class CatalogContext {
     private DeploymentType m_memoizedDeployment;
 
     public long m_lastUpdateCoreDuration = -1; // in nano seconds
-
-    // This is the Calcite schema for a single database. This object is used to update
-    // the Calcite schema when the catalog is updated.
-    private SchemaPlus m_schemaPlus;
 
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
@@ -259,17 +254,6 @@ public class CatalogContext {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
         return newCatalog;
-    }
-
-    public Database getDatabase() {
-        return database;
-    }
-
-    /**
-     * Get the Calcite schema associated with the default database
-     */
-    public SchemaPlus getSchemaPlus() {
-        return m_schemaPlus;
     }
 
     public CatalogContext update(
@@ -593,13 +577,5 @@ public class CatalogContext {
      */
     public byte[] getFileInJar(String key) {
         return m_catalogInfo.m_jarfile.get(key);
-    }
-
-    /**
-     * Set the Calcite schema associated with the default database
-     * @param schemaPlus the updated schema
-     */
-    public void setSchemaPlus(SchemaPlus schemaPlus) {
-        m_schemaPlus = schemaPlus;
     }
 }
