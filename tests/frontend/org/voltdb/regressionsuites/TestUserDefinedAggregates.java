@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Random;
 
 import junit.framework.Test;
 
@@ -43,7 +44,10 @@ import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
 /**
  * Tests of SQL statements that use User-Defined Aggregate Functions (UDAF's).
  */
-public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
+public class TestUserDefinedAggregates extends RegressionSuite {
+
+    static protected Random random = new Random();
+    static protected final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
 
     public TestUserDefinedAggregates(String name) {
         super(name);
@@ -59,7 +63,7 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         }
 
         // Set the expected result of the SELECT query using the UDAF
-        int expectedTableLength = expected.length;
+        int expectedTableLength = expected == null ? 0 : expected.length;
         Object[][] expectedTable = new Object[1][expectedTableLength];
         for (int i = 0; i < expectedTableLength; ++i) {
             expectedTable[0][i] = expected[i];
@@ -103,6 +107,43 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         String truncateStatement = "TRUNCATE TABLE "+tableName;
         cr = client.callProcedure("@AdHoc", truncateStatement);
         assertEquals(truncateStatement+" (clean-up) failed", ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    /** Tests the specified <i>functionCall</i>, and confirms that an Exception
+     *  is thrown, of type ProcCallException.class, with a cause (possibly null)
+     *  of <i>expectedExcepCauseType</i>.
+     *  It does this by first INSERT-ing one row, and then SELECT-ing the
+     *  <i>functionCall</i> value (as well as the ID) from that row, and then
+     *  catching any Exception (or other Throwable) thrown.
+     *  Optionally, you can also specify <i>columnNames</i> and corresponding
+     *  <i>columnValues</i> (in addition to ID=0) to be specified in the
+     *  initial INSERT statement.
+     *  The table to INSERT into and SELECT from is chosen, randomly, as either
+     *  R1 or P1. */
+    protected void testFunctionThrowsException(String functionCall, VoltType returnType,
+            Class<? extends Throwable> expectedExcepCauseType,
+            String[] columnNames, String[][] columnValues) {
+        Class<? extends Throwable> expectedExceptionType = ProcCallException.class;
+        try {
+            testFunction(functionCall, null, returnType, columnNames, columnValues);
+        } catch (Throwable ex) {
+            Class<? extends Throwable> actualExceptionType = ex.getClass();
+            Class<? extends Throwable> actualExcepCauseType = null;
+            Throwable exceptionCause = ex.getCause();
+            if (exceptionCause != null) {
+                actualExcepCauseType = exceptionCause.getClass();
+            }
+            assertEquals("Unexpected Exception type for: " + functionCall,
+                    expectedExceptionType, actualExceptionType);
+            // TODO: delete, once UDFs throwing exceptions with causes works (ENG-12863):
+            if (exceptionCause != null) {
+                assertEquals("Unexpected Exception *cause* type for " + functionCall,
+                        expectedExcepCauseType, actualExcepCauseType);
+            }
+            return;
+        }
+        fail(functionCall + " did not throw expected exception: " + expectedExceptionType +
+                " (with " + expectedExcepCauseType + " cause)");
     }
 
     protected void testCreateFunctionException(String functionCall, String errorMessage) throws IOException, ProcCallException {
@@ -424,76 +465,67 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 
     public void testUminOverflow() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"-99999999999999999999999999.999999999999, -0.000000000001"};
+        String[][] columnValues = {{"-99999999999999999999999999.999999999999, -0.000000000001"}};
         testFunctionThrowsException("umin(NUM)", VoltType.FLOAT, RuntimeException.class, columnNames, columnValues);
     }
 
     public void testUmaxOverflow() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String[] columnValues = {"99999999999999999999999999.999999999999, 0.000000000001"};
+        String[][] columnValues = {{"99999999999999999999999999.999999999999, 0.000000000001"}};
         testFunctionThrowsException("umax(NUM)", VoltType.FLOAT, RuntimeException.class, columnNames, columnValues);
     }
 
     public void testUcountNullPointerException() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String exception = Integer.toString(UDF_TEST.THROW_NullPointerException);
-        String[] columnValues = {exception, "1.3", "-3.55"};
+        String[][] columnValues = {{"UDF_TEST.THROW_NullPointerException", "1.3", "-3.55"}};
         testFunctionThrowsException("ucount(NUM)", VoltType.INTEGER, NullPointerException.class, columnNames, columnValues);
     }
 
     public void testUmedianIllegalArgumentException() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String exception = Integer.toString(UDF_TEST.THROW_IllegalArgumentException);
-        String[] columnValues = {exception, "2", "-3"};
+        String[][] columnValues = {{"UDF_TEST.THROW_IllegalArgumentException", "2", "-3"}};
         testFunctionThrowsException("umedian(INT)", VoltType.FLOAT, IllegalArgumentException.class, columnNames, columnValues);
     }
 
     public void testUmodeNumberFormatException() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String exception = Integer.toString(UDF_TEST.THROW_NumberFormatException);
-        String[] columnValues = {exception, "4", "-6"};
+        String[][] columnValues = {{"UDF_TEST.THROW_NumberFormatException", "4", "-6"}};
         testFunctionThrowsException("umode(INT)", VoltType.FLOAT, NumberFormatException.class, columnNames, columnValues);
     }
 
     public void testUavgArrayIndexOutOfBoundsException() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String exception = Integer.toString(UDF_TEST.THROW_ArrayIndexOutOfBoundsException);
-        String[] columnValues = {exception, "2.8", "28"};
+        String[][] columnValues = {{"UDF_TEST.THROW_ArrayIndexOutOfBoundsException", "2.8", "28"}};
         testFunctionThrowsException("uavg(NUM)", VoltType.FLOAT, ArrayIndexOutOfBoundsException.class, columnNames, columnValues);
     }
 
     public void testUaddstrClassCastException() throws IOException, ProcCallException {
         String[] columnNames = {"VCHAR"};
-        String exception = Integer.toString(UDF_TEST.THROW_ClassCastException);
-        String[] columnValues = {exception, "'Kawhi'", "'Paul'"};
+        String[][] columnValues = {{"UDF_TEST.THROW_ClassCastException", "'Kawhi'", "'Paul'"}};
         testFunctionThrowsException("uaddstr(VCHAR)", VoltType.STRING, ClassCastException.class, columnNames, columnValues);
     }
 
     public void testUprimesumArithmeticException() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String exception = Integer.toString(UDF_TEST.THROW_ArithmeticException);
-        String[] columnValues = {exception, "2", "3"};
+        String[][] columnValues = {{"UDF_TEST.THROW_ArithmeticException", "2", "3"}};
         testFunctionThrowsException("uprimesum(INT)", VoltType.INTEGER, ArithmeticException.class, columnNames, columnValues);
     }
 
     public void testUcountUnsupportedOperationException() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
-        String exception = Integer.toString(UDF_TEST.THROW_UnsupportedOperationException);
-        String[] columnValues = {exception, "1.3", "-3.55"};
+        String[][] columnValues = {{"UDF_TEST.THROW_UnsupportedOperationException", "1.3", "-3.55"}};
         testFunctionThrowsException("ucount(NUM)", VoltType.INTEGER, UnsupportedOperationException.class, columnNames, columnValues);
     }
 
     public void testUmedianVoltTypeException() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String exception = Integer.toString(UDF_TEST.THROW_VoltTypeException);
-        String[] columnValues = {exception, "2", "-3"};
+        String[][] columnValues = {{"UDF_TEST.THROW_VoltTypeException", "2", "-3"}};
         testFunctionThrowsException("umedian(INT)", VoltType.FLOAT, VoltTypeException.class, columnNames, columnValues);
     }
 
     public void testUmodeUserDefinedTestException() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
-        String exception = Integer.toString(UDF_TEST.THROW_UserDefinedTestException);
-        String[] columnValues = {exception, "4", "-6"};
+        String[][] columnValues = {{"UDF_TEST.THROW_UserDefinedTestException", "4", "-6"}};
         testFunctionThrowsException("umode(INT)", VoltType.FLOAT, UserDefinedTestException.class, columnNames, columnValues);
     }
 

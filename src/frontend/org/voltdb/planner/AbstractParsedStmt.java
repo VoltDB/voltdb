@@ -1216,7 +1216,8 @@ public abstract class AbstractParsedStmt {
 
     private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("optype");
-        String userAggregateId = exprNode.attributes.get("user_aggregate_id");
+        String tempId = exprNode.attributes.get("user_aggregate_id");
+        int userAggregateId = tempId == null ? -1 : Integer.parseInt(tempId);
         String functionName = exprNode.attributes.get("name");
         ExpressionType exprType = ExpressionType.get(type);
 

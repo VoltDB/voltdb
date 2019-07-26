@@ -357,8 +357,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
-    public void addUserDefineAggregateId(String id) {
-        m_userAggregateId.add(Integer.parseInt(id));
+    public void addUserDefineAggregateId(int id) {
+        m_userAggregateId.add(id);
     }
 
     /**

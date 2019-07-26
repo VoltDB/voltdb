@@ -1,0 +1,133 @@
+Received remote hangup from foreign host 0.0.0.0
+
+****** Current Thread ****** 
+java.lang.Thread.dumpThreads(Native Method)
+java.lang.Thread.getAllStackTraces(Thread.java:1610)
+org.voltdb.VoltDB.printStackTraces(VoltDB.java:1158)
+org.voltdb.VoltDB.printStackTraces(VoltDB.java:1146)
+org.voltdb.VoltDB.dropStackTrace(VoltDB.java:1129)
+org.voltcore.messaging.ForeignHost$FHInputHandler.stopping(ForeignHost.java:110)
+org.voltcore.network.PicoNetwork.safeStopping(PicoNetwork.java:322)
+org.voltcore.network.PicoNetwork.p_shutdown(PicoNetwork.java:358)
+org.voltcore.network.PicoNetwork.run(PicoNetwork.java:233)
+java.lang.Thread.run(Thread.java:748)
+****** All Threads ******
+
+****** Thread[main-SendThread(localhost:12019),5,main] ******
+sun.nio.ch.KQueueArrayWrapper.kevent0(Native Method)
+sun.nio.ch.KQueueArrayWrapper.poll(KQueueArrayWrapper.java:198)
+sun.nio.ch.KQueueSelectorImpl.doSelect(KQueueSelectorImpl.java:117)
+sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:97)
+org.apache.zookeeper_voltpatches.ClientCnxn$SendThread.run(ClientCnxn.java:1130)
+
+****** Thread[NIOServerCxn.Factory:/127.0.0.1:12019,5,main] ******
+sun.nio.ch.KQueueArrayWrapper.kevent0(Native Method)
+sun.nio.ch.KQueueArrayWrapper.poll(KQueueArrayWrapper.java:198)
+sun.nio.ch.KQueueSelectorImpl.doSelect(KQueueSelectorImpl.java:117)
+sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:97)
+org.apache.zookeeper_voltpatches.server.NIOServerCnxn$Factory.run(NIOServerCnxn.java:244)
+
+****** Thread[process reaper,10,system] ******
+sun.misc.Unsafe.park(Native Method)
+java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+java.util.concurrent.SynchronousQueue$TransferStack.awaitFulfill(SynchronousQueue.java:460)
+java.util.concurrent.SynchronousQueue$TransferStack.transfer(SynchronousQueue.java:362)
+java.util.concurrent.SynchronousQueue.poll(SynchronousQueue.java:941)
+java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1073)
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[main,5,main] ******
+sun.misc.Unsafe.park(Native Method)
+java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
+java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
+java.util.concurrent.Semaphore.tryAcquire(Semaphore.java:409)
+org.voltcore.zk.ZKUtil.getClient(ZKUtil.java:218)
+org.voltcore.messaging.HostMessenger.notifyOfHosts(HostMessenger.java:1176)
+org.voltcore.messaging.SocketJoiner.connectToPrimary(SocketJoiner.java:999)
+org.voltcore.messaging.SocketJoiner.start(SocketJoiner.java:221)
+org.voltcore.messaging.HostMessenger.start(HostMessenger.java:686)
+org.voltdb.RealVoltDB.buildClusterMesh(RealVoltDB.java:3306)
+org.voltdb.RealVoltDB.initialize(RealVoltDB.java:1138)
+org.voltdb.VoltDB.initialize(VoltDB.java:1447)
+org.voltdb.VoltDB.main(VoltDB.java:1432)
+
+****** Thread[Signal Dispatcher,9,system] ******
+
+****** Thread[Volt Server Network - 1,5,main] ******
+sun.nio.ch.KQueueArrayWrapper.kevent0(Native Method)
+sun.nio.ch.KQueueArrayWrapper.poll(KQueueArrayWrapper.java:198)
+sun.nio.ch.KQueueSelectorImpl.doSelect(KQueueSelectorImpl.java:117)
+sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:97)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:101)
+org.voltcore.network.VoltNetwork.run(VoltNetwork.java:316)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[Pico Network - 0.0.0.0,5,main] ******
+java.lang.Thread.dumpThreads(Native Method)
+java.lang.Thread.getAllStackTraces(Thread.java:1610)
+org.voltdb.VoltDB.printStackTraces(VoltDB.java:1158)
+org.voltdb.VoltDB.printStackTraces(VoltDB.java:1146)
+org.voltdb.VoltDB.dropStackTrace(VoltDB.java:1129)
+org.voltcore.messaging.ForeignHost$FHInputHandler.stopping(ForeignHost.java:110)
+org.voltcore.network.PicoNetwork.safeStopping(PicoNetwork.java:322)
+org.voltcore.network.PicoNetwork.p_shutdown(PicoNetwork.java:358)
+org.voltcore.network.PicoNetwork.run(PicoNetwork.java:233)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[Estimated Time Updater,5,main] ******
+java.lang.Thread.sleep(Native Method)
+org.voltcore.utils.EstTimeUpdater$1.run(EstTimeUpdater.java:42)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[main-EventThread,5,main] ******
+sun.misc.Unsafe.park(Native Method)
+java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+org.apache.zookeeper_voltpatches.ClientCnxn$EventThread.run(ClientCnxn.java:514)
+
+****** Thread[Finalizer,8,system] ******
+java.lang.Object.wait(Native Method)
+java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:144)
+java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:165)
+java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:216)
+
+****** Thread[Async Logger,5,main] ******
+sun.misc.Unsafe.park(Native Method)
+java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[Reference Handler,10,system] ******
+java.lang.Object.wait(Native Method)
+java.lang.Object.wait(Object.java:502)
+java.lang.ref.Reference.tryHandlePending(Reference.java:191)
+java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
+
+****** Thread[ZooKeeperServer,5,main] ******
+java.lang.Object.wait(Native Method)
+org.voltcore.messaging.SiteMailbox.recvBlocking(SiteMailbox.java:138)
+org.voltcore.messaging.SiteMailbox.recvBlocking(SiteMailbox.java:74)
+org.voltcore.agreement.AgreementSite.run(AgreementSite.java:232)
+org.apache.zookeeper_voltpatches.server.ZooKeeperServer.run(ZooKeeperServer.java:1199)
+java.lang.Thread.run(Thread.java:748)
+
+****** Thread[Volt Server Network - 0,5,main] ******
+sun.nio.ch.KQueueArrayWrapper.kevent0(Native Method)
+sun.nio.ch.KQueueArrayWrapper.poll(KQueueArrayWrapper.java:198)
+sun.nio.ch.KQueueSelectorImpl.doSelect(KQueueSelectorImpl.java:117)
+sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:97)
+sun.nio.ch.SelectorImpl.select(SelectorImpl.java:101)
+org.voltcore.network.VoltNetwork.run(VoltNetwork.java:316)
+java.lang.Thread.run(Thread.java:748)

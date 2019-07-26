@@ -26,16 +26,16 @@ public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
     private boolean m_distinct = false;
-    protected final String m_userAggregateId;
+    protected final int m_userAggregateId;
     protected final String m_name;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
-        m_userAggregateId = "-1";
-        m_name = "notUDAF";
+        m_userAggregateId = -1;
+        m_name = "";
     }
 
-    public AggregateExpression(ExpressionType type, String id, String n) {
+    public AggregateExpression(ExpressionType type, int id, String n) {
         super(type);
         m_userAggregateId = id;
         m_name = n;
@@ -47,7 +47,7 @@ public class AggregateExpression extends AbstractExpression {
     /**
      * @return user aggregate id
      */
-    public String getUserAggregateId() {
+    public int getUserAggregateId() {
         return m_userAggregateId;
     }
 
@@ -154,11 +154,7 @@ public class AggregateExpression extends AbstractExpression {
     }
 
     public boolean isUserDefined() {
-        if (m_userAggregateId != null) {
-            return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(m_userAggregateId));
-        } else {
-            return false;
-        }
+        return FunctionForVoltDB.isUserDefinedFunctionId(m_userAggregateId);
     }
 
     public String getFunctionName() {
