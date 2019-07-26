@@ -467,8 +467,10 @@ public class UpdateCore extends VoltSystemProcedure {
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
-        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        catalogContext.setSchemaPlus(VoltSchemaPlus.from(catalogContext.getDatabase()));
+        if (AdHocNTBase.USING_CALCITE) {
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            catalogContext.setSchemaPlus(VoltSchemaPlus.from(catalogContext.getDatabase()));
+        }
         return (new VoltTable[] {result});
     }
 }
