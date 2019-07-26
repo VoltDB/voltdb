@@ -381,13 +381,14 @@ CREATE STREAM export_skinny_partitioned_table_jdbc PARTITION ON COLUMN rowid exp
 , rowid                     BIGINT        NOT NULL
 );
 
-
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
@@ -398,7 +399,7 @@ CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMET
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 -- Export Stream with extra Geo columns
-CREATE STREAM export_geo_partitioned_table_kafka PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
+CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -468,8 +469,12 @@ CREATE STREAM export_geo_done_table_kafka PARTITION ON COLUMN txnid EXPORT TO TA
   txnid                     BIGINT        NOT NULL
 );
 
+CREATE STREAM export_geo_done_table_jdbc PARTITION ON COLUMN txnid EXPORT TO TARGET jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+);
 
-CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW_KAFKA
 (
   rowid
 , record_count
@@ -480,9 +485,19 @@ AS
      FROM EXPORT_PARTITIONED_TABLE_KAFKA
  GROUP BY rowid;
 
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW_JDBC
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM EXPORT_PARTITIONED_TABLE_JDBC
+ GROUP BY rowid;
 
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
-CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table_jdbc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;

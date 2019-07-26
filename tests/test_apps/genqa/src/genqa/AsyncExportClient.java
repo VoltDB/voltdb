@@ -181,6 +181,7 @@ public class AsyncExportClient
                 TrackingResults.incrementAndGet(0);
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
+                // log.info("Success " + trace);
                 try
                 {
                     m_writer.write(TxnEgo.getPartitionId(txid),trace);
@@ -194,6 +195,7 @@ public class AsyncExportClient
             {
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
+                // log.info("Fail " + trace);
                 try
                 {
                     m_writer.write(-1,trace);
