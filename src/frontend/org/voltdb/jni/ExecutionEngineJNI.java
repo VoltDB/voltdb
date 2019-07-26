@@ -888,10 +888,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // The minimum required size is 5 bytes:
             // 1 byte for the type indicator, 4 bytes for the prefixed length.
             int sizeRequired = 1 + 4;
-            if (returnValue instanceof byte[]) {
-                sizeRequired += Array.getLength(returnValue);
-            }
-            else if (returnValue instanceof Byte[]) {
+            if (returnValue instanceof byte[] || returnValue instanceof Byte[]) {
                 sizeRequired += Array.getLength(returnValue);
             }
             if (sizeRequired > m_udfBuffer.capacity()) {

@@ -1680,8 +1680,6 @@ public class ParserDQL extends ParserBase {
             throw Error.error("Expected an expression here.", "", -1);
         }
         Expression e = XreadValueExpression();
-//        read();
-//        Expression e2 = XreadValueExpression();
 
         switch (type) {
 

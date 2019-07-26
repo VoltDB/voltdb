@@ -232,10 +232,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Call user-defined function
         NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
+        // Call the start method of the user-defined aggregate function
         void callJavaUserDefinedAggregateStart(int32_t functionId);
+        // Call the assemble method of the user-defined aggregate function
         void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int udafIndex);
+        // Deserialize the byte array from each worker and call
+        // the combine method of the user-defined aggregate function
         void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int udafIndex);
+        // Serialize each worker's object to a byte array and send it to the coordinator
         NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int udafIndex);
+        // Call the end method of the user-defined aggregate function
         NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int udafIndex);
 
 

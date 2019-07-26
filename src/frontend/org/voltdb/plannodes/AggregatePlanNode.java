@@ -413,6 +413,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_aggregateTypes.set(index, aggType);
     }
 
+    // This method updates the return type of the distNode to be varbinary
+    // and size to be 1048576 (which is the maximum)
     public void updateUserDefinedAggregate(int index) {
         int outputSchemaIndex = m_aggregateOutputColumns.get(index);
         SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
@@ -421,10 +423,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         schemaExpr.setValueSize(1048576);
     }
 
+    // This method updates m_isWorker at a given index
+    // to be false which means it is a coordinator, not a worker
     public void updateWorkerOrCoordinator(int index) {
         m_isWorker.set(index, false);
     }
 
+    // This method updates m_isPartition at a given index
+    // to be false which means it is a replicated table, not a partitioned table
     public void updatePartitionOrReplicate(int index) {
         m_isPartition.set(index, false);
     }
