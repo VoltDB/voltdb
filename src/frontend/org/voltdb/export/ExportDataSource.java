@@ -916,8 +916,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     long seqNo = 0L;
                     if (action == StreamStartAction.RECOVER || action == StreamStartAction.REJOIN) {
                         seqNo = sequenceNumber;
+                        m_coordinator.setInitialSequenceNumber(seqNo);
                     }
-                    m_coordinator.setInitialSequenceNumber(seqNo);
+
                     m_tupleCount = seqNo;
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(seqNo, action);

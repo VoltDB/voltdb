@@ -27,15 +27,15 @@ import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.PlanningErrorException;
 
-public class ExplainCatalog extends AdHocNTExplain {
+public class ExplainCatalog extends AdHocNTBase {
 
     @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        return runInternal(params);
+        return runUsingLegacy(params);
     }
 
     @Override
-    public CompletableFuture<ClientResponse> run(String sql) {
+    public CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         throw new PlanningErrorException("Unsupported operation");
     }
 
