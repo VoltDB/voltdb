@@ -67,8 +67,9 @@ public class VoltSchemaPlus {
                                 VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname()),
                                 function.getMethodname()));
             } catch (ClassNotFoundException e) {
-                throw new RuntimeException("Error syncing function in catalog to Calcite: cannot find class"
-                        + function.getClassname() + " for method " + function.getMethodname());
+            } catch (Exception e) {
+                throw new RuntimeException("Error syncing function in catalog to Calcite: class "
+                        + function.getClassname() + ", method " + function.getMethodname());
             }
         });
 
