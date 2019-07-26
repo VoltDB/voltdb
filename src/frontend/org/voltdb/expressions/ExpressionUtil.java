@@ -64,6 +64,7 @@ public final class ExpressionUtil {
        put("multiply", ExpressionType.OPERATOR_MULTIPLY);
        put("divide", ExpressionType.OPERATOR_DIVIDE);
        put("is_null", ExpressionType.OPERATOR_IS_NULL);
+       put("like", ExpressionType.COMPARE_LIKE);
     }};
 
     private ExpressionUtil() {}
@@ -103,6 +104,7 @@ public final class ExpressionUtil {
                 case OPERATOR_CONCAT:
                 case OPERATOR_MOD:
                 case COMPARE_IN:
+                case COMPARE_LIKE:
                     return isParameterized(elm.children.get(0)) || isParameterized(elm.children.get(1));
                 case OPERATOR_IS_NULL:      // one operator
                 case OPERATOR_EXISTS:
@@ -254,7 +256,8 @@ public final class ExpressionUtil {
                 case COMPARE_NOTEQUAL:
                 case COMPARE_NOTDISTINCT:
                 case COMPARE_GREATERTHANOREQUALTO:
-                case COMPARE_LESSTHANOREQUALTO: {
+                case COMPARE_LESSTHANOREQUALTO:
+                case COMPARE_LIKE: {
                     final ComparisonExpression expr = new ComparisonExpression(op,
                             from(db, elm.children.get(0), hint),
                             from(db, elm.children.get(1), hint));
