@@ -104,6 +104,10 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
                 int id = aggregateColumnValue.valueForKey("USER_AGGREGATE_ID").asInt();
                 m_aggregateIds.push_back(id);
             }
+
+            // UDFTODO: If you make the change in AggregatePlanNode, you do not need
+            // the else statement here
+
             // if there is not an user_aggregate_id in the json, this is not an user-defined
             // aggregate function. Therefore, we put in -1 but we will not use it later on
             else {

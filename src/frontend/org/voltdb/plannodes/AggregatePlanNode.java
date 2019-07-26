@@ -451,6 +451,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
+            // UDFTODO: You only put in the id, is_worker, is_partition when the id is not -1
+            /*
+            if (m_userAggregateId.get(ii) != -1) {
+                stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
+                stringer.keySymbolValuePair(Members.IS_WORKER.name(), m_isWorker.get(ii));
+                stringer.keySymbolValuePair(Members.IS_PARTITION.name(), m_isPartition.get(ii));
+            }
+            */
             if (m_userAggregateId.size() > ii) {
                 stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
             }

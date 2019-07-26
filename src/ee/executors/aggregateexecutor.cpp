@@ -751,6 +751,20 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
     std::unordered_map<int, int> udafIndexes;
+    // UDFTODO: If you make the change in AggregatePlanNode, you will need another index
+    // to track the id for udaf
+    /*
+        int udafJsonIndex = 0;
+        for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        if (m_aggTypes[ii] == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE) {
+            aggs[ii] = getUDAFAggInstance(m_memoryPool, m_aggregateIds[udafJsonIndex], m_isWorker[udafJsonIndex], m_isPartition[udafJsonIndex], udafIndexes[m_aggregateIds[udafJsonIndex]]++);
+            udafJsonIndex++;
+        }
+        else {
+            aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        }
+    }
+    */
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (m_aggTypes[ii] == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE) {
             aggs[ii] = getUDAFAggInstance(m_memoryPool, m_aggregateIds[ii], m_isWorker[ii], m_isPartition[ii], udafIndexes[m_aggregateIds[ii]]++);
