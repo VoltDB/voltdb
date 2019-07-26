@@ -95,7 +95,6 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
             setup(ddl);
             queries.forEach(stmtAndExpected -> {
                 final String stmt = stmtAndExpected.getFirst();
-                System.out.println(stmt);
                 final boolean pass = stmtAndExpected.getSecond();
                 try {
                     m_client.callProcedure("@AdHoc", stmt);
