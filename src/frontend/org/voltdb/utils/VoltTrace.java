@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
-import javafx.util.Pair;
 
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -44,6 +43,8 @@ import org.codehaus.jackson.map.SerializerProvider;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+//import javafx.util.Pair;
 
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -312,7 +313,7 @@ public class VoltTrace implements Runnable {
             return s_filter;
         }
 
-        // m_filterTime is a latency target set by the customers
+        // m_filterTime (unit: microsecond) is a latency target set by the customers
         // It is used as the threshold to filter the trace events,
         // whose latencies are larger than the m_filterTime.
         private double m_filterTime;
@@ -354,9 +355,12 @@ public class VoltTrace implements Runnable {
                 p = null;
             }
             if (p != null) {
-                double diff = (double)(endTime - p.getValue()) / 1000 - m_filterTime;
+                //double diff = (double)(endTime - p.getValue()) / 1000 - m_filterTime;
+                double diff = (double)(endTime - p.getSecond()) / 1000 - m_filterTime;
                 if (diff >= 0) {
-                    return p.getKey();
+                    //return p.getKey();
+                    return p.getFirst();
+                }
                 }
             }
             return null;
