@@ -67,6 +67,11 @@ public class VoltSchemaPlus {
                                 VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname()),
                                 function.getMethodname()));
             } catch (ClassNotFoundException e) {
+                // This exception is unhandled because during catalog recovery, classes containing the UDF definitions
+                // are loaded after the catalog is restored. Thus, some function definitions may exist in the catalog
+                // when their respective classes cannot be found. This is not an issue because, when the jar file
+                // containing those classes are loaded subsequently, this function is invoked again, at which time the
+                // classes can be found.
             } catch (Exception e) {
                 throw new RuntimeException("Error syncing function in catalog to Calcite: class "
                         + function.getClassname() + ", method " + function.getMethodname());
