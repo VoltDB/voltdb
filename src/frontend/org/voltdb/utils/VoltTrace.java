@@ -327,6 +327,10 @@ public class VoltTrace implements Runnable {
             m_filterTime = time;
         }
 
+        public double getThreshold() {
+            return m_filterTime;
+        }
+
         // Put the trace events of DURATION_BEGIN or ASYNC_BGEIN type in the filter
         public void put(TraceEventType eventType, TraceEventWrapper beginWrapper, long beginTime, String eventId) {
             if (TraceEventType.DURATION_BEGIN.equals(eventType)) {
@@ -369,7 +373,7 @@ public class VoltTrace implements Runnable {
         }
     }
 
-    private static volatile TraceEventFilter s_tracingFilter;
+    private static volatile TraceEventFilter s_tracingFilter = null;
 
     /**
      * Creates and starts a filter. If one already exists, this is a no-op.
@@ -399,6 +403,13 @@ public class VoltTrace implements Runnable {
 
     public static boolean isFilterOn() {
         return s_tracingFilter != null;
+    }
+
+    public static double getFilterTime() {
+        if (s_tracingFilter == null) {
+            return 0;
+        }
+        return s_tracingFilter.getThreshold();
     }
 
     /**
