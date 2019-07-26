@@ -22,6 +22,7 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.schema.impl.AggregateFunctionImpl;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
@@ -56,6 +57,25 @@ public class VoltSchemaPlus {
         // Get all tables from the database and add them to the SchemaPlus.
         db.getTables().forEach(table -> {
             schema.add(table.getTypeName(), new VoltTable(table));
+        });
+
+        // Get all user-defined function from the database and add them to the SchemaPlus.
+        db.getFunctions().forEach(function -> {
+            try {
+                schema.add(function.getFunctionname().toUpperCase(),
+                        ScalarFunctionImpl.create(
+                                VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname()),
+                                function.getMethodname()));
+            } catch (ClassNotFoundException e) {
+                // This exception is unhandled because during catalog recovery, classes containing the UDF definitions
+                // are loaded after the catalog is restored. Thus, some function definitions may exist in the catalog
+                // when their respective classes cannot be found. This is not an issue because, when the jar file
+                // containing those classes is loaded subsequently, this function is invoked again, at which time the
+                // classes can be found.
+            } catch (Exception e) {
+                throw new RuntimeException("Error syncing function in catalog to Calcite: class "
+                        + function.getClassname() + ", method " + function.getMethodname());
+            }
         });
 
         // add Volt extend SQL functions to the SchemaPlus
