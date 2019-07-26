@@ -112,8 +112,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
 
             delete s_mpEngine.stringData;
             s_mpEngine.stringData = new CompactingStringStorage();
-
-            s_mpEngine.allocated = 0;
+            s_mpEngine.allocated = new size_t(0);   // NOTE: cannot delete allocated here
         }
     }
 }
@@ -135,11 +134,11 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.stringData = NULL;
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
+            delete s_mpEngine.allocated;
+            s_mpEngine.allocated = nullptr;
             s_mpEngine.context = NULL;
 #ifdef VOLT_POOL_CHECKING
-            pthread_mutex_lock(&s_sharedEngineMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
-            pthread_mutex_unlock(&s_sharedEngineMutex);
             auto mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
                 auto& allocMap = mapForAdd->second;
