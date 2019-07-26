@@ -101,13 +101,19 @@ public class StreamBlockQueue {
 
     public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId)
             throws java.io.IOException {
+        // Not a creation by default
+        this(path, nonce, streamName, partitionId, genId, false);
+    }
+
+    public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId, boolean create)
+            throws java.io.IOException {
         m_path = path;
         m_nonce = nonce;
         m_streamName = streamName;
         m_partitionId = partitionId;
         m_initialGenerationId = genId;
 
-        constructPBD(genId);
+        constructPBD(genId, create);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
                     (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())) +
@@ -357,7 +363,7 @@ public class StreamBlockQueue {
         // close reopen reader
         m_persistentDeque.close();
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        constructPBD(catalogContext.m_genId);
+        constructPBD(catalogContext.m_genId, false);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
@@ -407,7 +413,7 @@ public class StreamBlockQueue {
             // Close and reopen
             close();
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            constructPBD(catalogContext.m_genId);
+            constructPBD(catalogContext.m_genId, false);
         }
         return didCleanup;
     }
@@ -416,7 +422,7 @@ public class StreamBlockQueue {
         return m_initialGenerationId;
     }
 
-    private void constructPBD(long genId) throws IOException {
+    private void constructPBD(long genId, boolean create) throws IOException {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
         ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
@@ -424,7 +430,9 @@ public class StreamBlockQueue {
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
                 .initialExtraHeader(schema, serializer)
-                .compression(!DISABLE_COMPRESSION).build();
+                .compression(!DISABLE_COMPRESSION)
+                .create(create)
+                .build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
     }

@@ -330,18 +330,7 @@ public class ExportManager
         ExportDataProcessor processor = m_processor.get();
         Preconditions.checkState(processor != null, "guest processor is not set");
 
-        // Notify export datasources to check the *generation* of export buffers,
-        // delete buffers older than current generation number or generation number
-        // from snapshot. This must be done before the processor starts polling.
-        cleanupStaleBuffers(action);
-
         processor.startPolling();
-    }
-
-    private void cleanupStaleBuffers(StreamStartAction action) {
-        if (m_generation.get() != null) {
-            m_generation.get().cleanupStaleBuffers(action);
-        }
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
