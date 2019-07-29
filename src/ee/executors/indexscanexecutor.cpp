@@ -149,8 +149,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool IndexScanExecutor::p_execute(const NValueArray &params)
-{
+bool IndexScanExecutor::p_execute(const NValueArray &params) {
     vassert(m_node);
     vassert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
@@ -165,6 +164,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
+    // TODO: we may need to comment out this assertion for merge join.
     vassert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 

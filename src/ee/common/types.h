@@ -188,6 +188,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_NESTLOOP         = 20,
     PLAN_NODE_TYPE_NESTLOOPINDEX    = 21,
+    PLAN_NODE_TYPE_MERGEJOIN        = 22,
 
     //
     // Operator Nodes

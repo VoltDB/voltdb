@@ -19,7 +19,7 @@ package org.voltdb.expressions;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -174,7 +174,7 @@ public class OperatorExpression extends AbstractExpression {
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
 
-    @Override
+    @Override       // NOTE: this method does similar job of what Calcite.unparse does: to canonicalize a query, but the name is misleading. Refer to CatalogSchemaTools.toSchema().
     public String explain(String impliedTableName) {
         final String explainLeftTableName = m_left.explain(impliedTableName);
         switch(getExpressionType()) {
@@ -213,5 +213,4 @@ public class OperatorExpression extends AbstractExpression {
             return true;
         }
     }
-
 }

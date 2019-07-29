@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -26,6 +27,13 @@ public class InComparisonExpression extends ComparisonExpression {
 
     public InComparisonExpression() {
         super(ExpressionType.COMPARE_IN);
+    }
+
+    public InComparisonExpression(AbstractExpression left, AbstractExpression right) {
+        this();
+        setLeft(left);
+        setRight(right);
+        setValueType(VoltType.BOOLEAN);
     }
 
     @Override

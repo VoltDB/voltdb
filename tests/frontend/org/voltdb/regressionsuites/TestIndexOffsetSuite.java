@@ -30,7 +30,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -47,7 +46,8 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         super(name);
     }
 
-    void callWithExpectedTupleId(Client client, int tupleId, String procName, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+    private void callWithExpectedTupleId(Client client, int tupleId, String procName, Object... params)
+            throws IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
@@ -62,8 +62,8 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         }
     }
 
-    void callWithExpectedKeyValue(Client client, String columnName, VoltType type, Object value,
-            String procName, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+    private void callWithExpectedKeyValue(Client client, String columnName, VoltType type, Object value,
+            String procName, Object... params) throws IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
@@ -78,7 +78,7 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         }
     }
 
-    void checkExplainPlan(Client client, String[] procedures) throws NoConnectionsException, IOException, ProcCallException {
+    private void checkExplainPlan(Client client, String[] procedures) throws IOException, ProcCallException {
         for (String proc: procedures) {
             VoltTable vt = client.callProcedure("@ExplainProc", proc).getResults()[0];
             assertTrue(vt.toString(), vt.toString().contains("for offset rank lookup"));
@@ -90,9 +90,8 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         Client client = getClient();
 
         // check offset rank lookup plan
-        checkExplainPlan(client, new String[]{"TU1_ID", "TU1_ABS_POINTS",
-                "TU1_ID_DESC", "TU1_ABS_POINTS_DESC",
-                "TM1_POINTS"});
+        checkExplainPlan(client, new String[]{
+                "TU1_ID", "TU1_ABS_POINTS", "TU1_ID_DESC", "TU1_ABS_POINTS_DESC", "TM1_POINTS"});
 
         // Unique Map, Single column index
         client.callProcedure("TU1.insert", 1, 1);
@@ -171,8 +170,8 @@ public class TestIndexOffsetSuite extends RegressionSuite {
     public void testTwoOrMoreColumnsUniqueIndex() throws Exception {
         Client client = getClient();
 
-        checkExplainPlan(client, new String[]{"TU2_BY_UNAME_POINTS", "TU2_BY_UNAME",
-                "TU2_BY_UNAME_POINTS_DESC", "TU2_BY_UNAME_DESC"});
+        checkExplainPlan(client, new String[]{
+                "TU2_BY_UNAME_POINTS", "TU2_BY_UNAME", "TU2_BY_UNAME_POINTS_DESC", "TU2_BY_UNAME_DESC"});
 
         client.callProcedure("TU2.insert", 1, 1, "xin");
         client.callProcedure("TU2.insert", 2, 2, "xin");
@@ -292,9 +291,5 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         return builder;
-    }
-
-    public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestIndexOffsetSuite.class);
     }
 }

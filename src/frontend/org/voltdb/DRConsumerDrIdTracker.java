@@ -40,6 +40,9 @@ import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
 /*
  * WARNING:
  * The implementation assumes that the range set is never completely empty in methods like
@@ -79,6 +82,14 @@ public class DRConsumerDrIdTracker implements Serializable {
             m_lastReceivedLogId = resetLastReceived ? 0L : jsObj.getLong("lastReceivedLogId");
         }
 
+        public DRSiteDrIdTracker(ByteBuf buf, boolean resetLastReceived) {
+            super(buf);
+            m_lastReceivedLogId = buf.readLong();
+            if (resetLastReceived) {
+                m_lastReceivedLogId = 0;
+            }
+        }
+
         public long getLastReceivedLogId() {
             return m_lastReceivedLogId;
         }
@@ -114,6 +125,17 @@ public class DRConsumerDrIdTracker implements Serializable {
             sb.append("lastReceivedLogId ").append(m_lastReceivedLogId).append(" ");
             super.toString(sb);
             return sb.toString();
+        }
+
+        @Override
+        public int getSerializedSize() {
+            return super.getSerializedSize() + Long.BYTES;
+        }
+
+        @Override
+        public void serialize(ByteBuf buff) {
+            super.serialize(buff);
+            buff.writeLong(m_lastReceivedLogId);
         }
     }
 
@@ -213,19 +235,19 @@ public class DRConsumerDrIdTracker implements Serializable {
         }
     }
 
-    public DRConsumerDrIdTracker(ByteBuffer buff) {
+    public DRConsumerDrIdTracker(ByteBuf buff) {
         m_map = TreeRangeSet.create();
-        m_lastSpUniqueId = buff.getLong();
-        m_lastMpUniqueId = buff.getLong();
-        m_producerPartitionId = buff.getInt();
-        int mapSize = buff.getInt();
+        m_lastSpUniqueId = buff.readLong();
+        m_lastMpUniqueId = buff.readLong();
+        m_producerPartitionId = buff.readInt();
+        int mapSize = buff.readInt();
         for (int ii=0; ii<mapSize; ii++) {
-            m_map.add(range(buff.getLong(), buff.getLong()));
+            m_map.add(range(buff.readLong(), buff.readLong()));
         }
     }
 
     public DRConsumerDrIdTracker(byte[] flattened) {
-        this(ByteBuffer.wrap(flattened));
+        this(Unpooled.wrappedBuffer(flattened));
     }
 
     public int getProducerPartitionId() {
@@ -244,21 +266,23 @@ public class DRConsumerDrIdTracker implements Serializable {
              + (m_map.asRanges().size() * 16);
     }
 
-    public void serialize(ByteBuffer buff) {
-        assert(buff.remaining() >= getSerializedSize());
-        buff.putLong(m_lastSpUniqueId);
-        buff.putLong(m_lastMpUniqueId);
-        buff.putInt(m_producerPartitionId);
-        buff.putInt(m_map.asRanges().size());
+    public void serialize(ByteBuf buff) {
+        if (buff.maxWritableBytes() < getSerializedSize()) {
+            System.err.println(buff + " " + buff.maxWritableBytes());
+        }
+        assert (buff.maxWritableBytes() >= getSerializedSize()) : buff;
+        buff.writeLong(m_lastSpUniqueId);
+        buff.writeLong(m_lastMpUniqueId);
+        buff.writeInt(m_producerPartitionId);
+        buff.writeInt(m_map.asRanges().size());
         for(Range<Long> entry : m_map.asRanges()) {
-            buff.putLong(start(entry));
-            buff.putLong(end(entry));
+            buff.writeLong(start(entry));
+            buff.writeLong(end(entry));
         }
     }
 
     public void serialize(byte[] flattened) {
-        ByteBuffer buff = ByteBuffer.wrap(flattened);
-        serialize(buff);
+        serialize(Unpooled.wrappedBuffer(flattened).writerIndex(0));
     }
 
     /**

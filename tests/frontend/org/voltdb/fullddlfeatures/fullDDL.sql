@@ -770,8 +770,8 @@ DROP PROCEDURE T32B;
 
 -- DROP TABLE
 -- basic
-CREATE TABLE T33 (
-   C1 VARCHAR(15),
+ CREATE TABLE T33 (
+   C1 VARCHAR(15)
 );
 DROP TABLE T33;
 -- cascade and if exists

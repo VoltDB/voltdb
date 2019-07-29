@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd" [
+        <!ENTITY calcite_appender SYSTEM "calcite-appender.xml">
+        <!ENTITY calcite_logger SYSTEM "calcite-logger.xml">
+        ]>
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
     <!-- console is a special appender for the logger CONSOLE
       that allows selectively logging INFO level messages to the console.
@@ -35,6 +38,9 @@
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>
     </appender>
+
+    <!--appender config for calcite-->
+    &calcite_appender;
 
     <logger name="kafka.consumer.SimpleConsumer" additivity="false">
         <level value="ERROR"/>
@@ -130,9 +136,13 @@
         <appender-ref ref="console"/>
     </logger>
 
+    <!--logger config for calcite-->
+    &calcite_logger;
+
     <root>
         <priority value="info" />
         <appender-ref ref="file" />
         <appender-ref ref="consolefiltered" />
     </root>
+
 </log4j:configuration>

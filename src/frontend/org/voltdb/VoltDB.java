@@ -112,7 +112,7 @@ public class VoltDB {
 
     public static final String DISABLE_PLACEMENT_RESTORE = "DISABLE_PLACEMENT_RESTORE";
 
-    // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
+    // TODO: if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(GMT_TIMEZONE);
     }
@@ -172,14 +172,22 @@ public class VoltDB {
         public SslContext m_sslClientContext = null;
 
         /** enable ssl */
-        public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+        public boolean m_sslEnable = System.getenv("ENABLE_SSL") == null ?
+                Boolean.getBoolean("ENABLE_SSL") :
+                Boolean.parseBoolean(System.getenv("ENABLE_SSL"));
 
         /** enable ssl for external (https, client and admin port*/
-        public boolean m_sslExternal = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+        public boolean m_sslExternal = System.getenv("ENABLE_SSL") == null ?
+                Boolean.getBoolean("ENABLE_SSL") :
+                Boolean.parseBoolean(System.getenv("ENABLE_SSL"));
 
-        public boolean m_sslDR = Boolean.valueOf(System.getenv("ENABLE_DR_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_DR_SSL")) : System.getenv("ENABLE_DR_SSL"));
+        public boolean m_sslDR = System.getenv("ENABLE_DR_SSL") == null ?
+                Boolean.getBoolean("ENABLE_DR_SSL") :
+                Boolean.parseBoolean(System.getenv("ENABLE_DR_SSL"));
 
-        public boolean m_sslInternal = Boolean.valueOf(System.getenv("ENABLE_INTERNAL_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_INTERNAL_SSL")) : System.getenv("ENABLE_INTERNAL_SSL"));
+        public boolean m_sslInternal = System.getenv("ENABLE_INTERNAL_SSL") == null ?
+                Boolean.getBoolean("ENABLE_INTERNAL_SSL") :
+                Boolean.parseBoolean(System.getenv("ENABLE_INTERNAL_SSL"));
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
@@ -365,8 +373,7 @@ public class VoltDB {
                 arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
                 // in the array args.  Ignore them.
-                if (arg.equals(""))
-                {
+                if (arg.isEmpty()) {
                     continue;
                 }
 
@@ -381,31 +388,21 @@ public class VoltDB {
 
                 if (arg.equals("noloadlib")) {
                     m_noLoadLibVOLTDB = true;
-                }
-                else if (arg.equals("ipc")) {
+                } else if (arg.equals("ipc")) {
                     m_backend = BackendTarget.NATIVE_EE_IPC;
-                }
-                else if (arg.equals("jni")) {
+                } else if (arg.equals("jni")) {
                     m_backend = BackendTarget.NATIVE_EE_JNI;
-                }
-                else if (arg.equals("hsqldb")) {
+                } else if (arg.equals("hsqldb")) {
                     m_backend = BackendTarget.HSQLDB_BACKEND;
-                }
-                else if (arg.equals("postgresql")) {
+                } else if (arg.equals("postgresql")) {
                     m_backend = BackendTarget.POSTGRESQL_BACKEND;
-                }
-                else if (arg.equals("postgis")) {
+                } else if (arg.equals("postgis")) {
                     m_backend = BackendTarget.POSTGIS_BACKEND;
-                }
-                else if (arg.equals("valgrind")) {
+                } else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-                }
-                else if (arg.equals("quietadhoc"))
-                {
+                } else if (arg.equals("quietadhoc")) {
                     m_quietAdhoc = true;
-                }
-                // handle from the command line as two strings <catalog> <filename>
-                else if (arg.equals("port")) {
+                } else if (arg.equals("port")) { // handle from the command line as two strings <catalog> <filename>
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
@@ -497,28 +494,23 @@ public class VoltDB {
                     m_publicInterface = arg.substring("publicinterface ".length()).trim();
                 } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
-                }
-                else if (arg.startsWith("externalinterface ")) {
+                } else if (arg.startsWith("externalinterface ")) {
                     m_externalInterface = arg.substring("externalinterface ".length()).trim();
-                }
-                else if (arg.equals("internalinterface")) {
+                } else if (arg.equals("internalinterface")) {
                     m_internalInterface = args[++i].trim();
-                }
-                else if (arg.startsWith("internalinterface ")) {
+                } else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 } else if (arg.startsWith("networkbindings")) {
                     for (String core : args[++i].split(",")) {
                         m_networkCoreBindings.offer(core);
                     }
                     System.out.println("Network bindings are " + m_networkCoreBindings);
-                }
-                else if (arg.startsWith("computationbindings")) {
+                } else if (arg.startsWith("computationbindings")) {
                     for (String core : args[++i].split(",")) {
                         m_computationCoreBindings.offer(core);
                     }
                     System.out.println("Computation bindings are " + m_computationCoreBindings);
-                }
-                else if (arg.startsWith("executionbindings")) {
+                } else if (arg.startsWith("executionbindings")) {
                     for (String core : args[++i].split(",")) {
                         m_executionCoreBindings.offer(core);
                     }
@@ -530,42 +522,31 @@ public class VoltDB {
                     }
                     m_commandLogBinding = binding;
                     System.out.println("Commanglog binding is " + m_commandLogBinding);
-                }
-                else if (arg.equals("host") || arg.equals("leader")) {
+                } else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
                 } else if (arg.startsWith("host")) {
                     m_leader = arg.substring("host ".length()).trim();
                 } else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
-                }
-                // synonym for "rejoin host" for backward compatibility
-                else if (arg.equals("rejoinhost")) {
+                } else if (arg.equals("rejoinhost")) { // synonym for "rejoin host" for backward compatibility
                     m_startAction = StartAction.REJOIN;
                     m_leader = args[++i].trim();
-                }
-                else if (arg.startsWith("rejoinhost ")) {
+                } else if (arg.startsWith("rejoinhost ")) {
                     m_startAction = StartAction.REJOIN;
                     m_leader = arg.substring("rejoinhost ".length()).trim();
-                }
-
-                else if (arg.equals("initialize")) {
+                } else if (arg.equals("initialize")) {
                     m_startAction = StartAction.INITIALIZE;
-                }
-                else if (arg.equals("probe")) {
+                } else if (arg.equals("probe")) {
                     m_startAction = StartAction.PROBE;
-                    if (   args.length > i + 1
-                            && args[i+1].trim().equals("safemode")) {
-                            i += 1;
-                            m_safeMode = true;
-                        }
-                }
-                else if (arg.equals("create")) {
+                    if (args.length > i + 1 && args[i+1].trim().equals("safemode")) {
+                        i += 1;
+                        m_safeMode = true;
+                    }
+                } else if (arg.equals("create")) {
                     m_startAction = StartAction.CREATE;
-                }
-                else if (arg.equals("recover")) {
+                } else if (arg.equals("recover")) {
                     m_startAction = StartAction.RECOVER;
-                    if (   args.length > i + 1
-                        && args[i+1].trim().equals("safemode")) {
+                    if (args.length > i + 1 && args[i+1].trim().equals("safemode")) {
                         m_startAction = StartAction.SAFE_RECOVER;
                         i += 1;
                         m_safeMode = true;
@@ -589,51 +570,32 @@ public class VoltDB {
                     referToDocAndExit();
                 } else if (arg.equals("dragentportstart")) {
                     m_drAgentPortStart = Integer.parseInt(args[++i]);
-                }
-
-                // handle timestampsalt
-                else if (arg.equals("timestampsalt")) {
+                } else if (arg.equals("timestampsalt")) { // handle timestampsalt
                     m_timestampTestingSalt = Long.parseLong(args[++i]);
-                }
-                else if (arg.startsWith("timestampsalt ")) {
+                } else if (arg.startsWith("timestampsalt ")) {
                     m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
-                }
-
-                // handle behaviorless tag field
-                else if (arg.equals("tag")) {
+                } else if (arg.equals("tag")) { // handle behaviorless tag field
                     m_tag = args[++i];
-                }
-                else if (arg.startsWith("tag ")) {
+                } else if (arg.startsWith("tag ")) {
                     m_tag = arg.substring("tag ".length());
-                }
-
-                else if (arg.equals("catalog")) {
+                } else if (arg.equals("catalog")) {
                     m_pathToCatalog = args[++i];
-                }
-                // and from ant as a single string "m_catalog filename"
-                else if (arg.startsWith("catalog ")) {
+                } else if (arg.startsWith("catalog ")) { // and from ant as a single string "m_catalog filename"
                     m_pathToCatalog = arg.substring("catalog ".length());
-                }
-                else if (arg.equals("deployment")) {
+                } else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
-                }
-                else if (arg.equals("license")) {
+                } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                }
-                else if (arg.equalsIgnoreCase("ipcport")) {
+                } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
-                }
-                else if (arg.equals("forcecatalogupgrade")) {
+                } else if (arg.equals("forcecatalogupgrade")) {
                     System.out.println("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
-                }
-                // version string override for testing online upgrade
-                else if (arg.equalsIgnoreCase("versionoverride")) {
+                } else if (arg.equalsIgnoreCase("versionoverride")) { // version string override for testing online upgrade
                     m_versionStringOverrideForTest = args[++i].trim();
                     m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
-                }
-                else if (arg.equalsIgnoreCase("buildstringoverride")) {
+                } else if (arg.equalsIgnoreCase("buildstringoverride")) {
                     m_buildStringOverrideForTest = args[++i].trim();
                 } else if (arg.equalsIgnoreCase("placementgroup")) {
                     m_placementGroup = args[++i].trim();
@@ -708,8 +670,7 @@ public class VoltDB {
                             referToDocAndExit();
                         }
                         if (!userSchema.isFile()) {
-                            System.err
-                                    .println("FATAL: Supplied schema file " + userSchema + " is not an ordinary file.");
+                            System.err.println("FATAL: Supplied schema file " + userSchema + " is not an ordinary file.");
                             referToDocAndExit();
                         }
                         if (m_userSchemas == null) {
@@ -820,7 +781,7 @@ public class VoltDB {
             if (!m_voltdbRoot.exists()) {
                 try {
                     parentPath = m_voltdbRoot.getCanonicalFile().getParent();
-                } catch (IOException io) {}
+                } catch (IOException ignored) {}
                 System.err.println("FATAL: " + parentPath + " does not contain a "
                         + "valid database root directory. Use the --dir option to specify the path to the root.");
                 referToDocAndExit();
@@ -845,13 +806,13 @@ public class VoltDB {
                     if (!catalogFH.exists()) {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
-                        } catch (IOException io) {}
-                        System.err.println("FATAL: "+ m_getOption.name().toUpperCase() + " not found in the provided database directory " + parentPath  +
+                        } catch (IOException ignored) {}
+                        System.err.println("FATAL: "+ m_getOption.name().toUpperCase() +
+                                " not found in the provided database directory " + parentPath  +
                                 ". Make sure the database has been started ");
                         referToDocAndExit();
                     }
                     m_pathToCatalog = catalogFH.getAbsolutePath();
-                    return;
                 }
                 case LICENSE: {
                     if(!m_isEnterprise)
@@ -901,11 +862,8 @@ public class VoltDB {
                 currDir = new File("").getCanonicalFile();
                 voltdbroot = m_voltdbRoot.getCanonicalFile();
             } catch (IOException e) {
-                throw new SettingsException(
-                        "Failed to relativize voltdbroot " +
-                        m_voltdbRoot.getPath() +
-                        ". Reason: " +
-                        e.getMessage());
+                throw new SettingsException("Failed to relativize voltdbroot " +
+                        m_voltdbRoot.getPath() + ". Reason: " + e.getMessage());
             }
             String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
             return ImmutableMap.<String, String>builder()
@@ -1166,19 +1124,16 @@ public class VoltDB {
         }
         String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
         try {
-            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
+            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + "-log.txt");
             writer.println(message);
             printStackTraces(writer);
             writer.flush();
             writer.close();
         } catch (Exception e) {
-            try
-            {
+            try {
                 VoltLogger log = new VoltLogger("HOST");
                 log.error("Error while dropping stack trace for \"" + message + "\"", e);
-            }
-            catch (RuntimeException rt_ex)
-            {
+            } catch (RuntimeException rt_ex) {
                 e.printStackTrace();
             }
         }
@@ -1214,8 +1169,7 @@ public class VoltDB {
 
         writer.println("****** All Threads ******");
         Iterator<Thread> it = traces.keySet().iterator();
-        while (it.hasNext())
-        {
+        while (it.hasNext()) {
             Thread key = it.next();
             writer.println();
             StackTraceElement[] st = traces.get(key);
@@ -1287,14 +1241,14 @@ public class VoltDB {
         }
         try {
             OnDemandBinaryLogger.flush();
-        } catch (Throwable e) {}
+        } catch (Throwable ignored) {}
 
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
          * we get to the root cause
          */
         while (thrown instanceof InvocationTargetException) {
-            thrown = ((InvocationTargetException)thrown).getCause();
+            thrown = thrown.getCause();
         }
 
         // for test code
@@ -1326,7 +1280,7 @@ public class VoltDB {
                 try {
                     VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
                                                   TimeUnit.SECONDS.toMillis(10));
-                } catch (IOException e) {}
+                } catch (IOException ignored) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -1334,8 +1288,7 @@ public class VoltDB {
                 currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
                 // Create a special dump file to hold the stack trace
-                try
-                {
+                try {
                     TimestampType ts = new TimestampType(new java.util.Date());
                     CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
                     String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
@@ -1359,23 +1312,17 @@ public class VoltDB {
 
                     printStackTraces(writer, currentStacktrace);
                     writer.close();
-                }
-                catch (Throwable err)
-                {
+                } catch (Throwable err) {
                     // shouldn't fail, but..
                     err.printStackTrace();
                 }
 
                 VoltLogger log = null;
-                try
-                {
+                try {
                     log = new VoltLogger("HOST");
-                }
-                catch (RuntimeException rt_ex)
-                { /* ignore */ }
+                } catch (RuntimeException ignored) { }
 
-                if (log != null)
-                {
+                if (log != null) {
                     if (logFatal) {
                         log.fatal(errMsg);
                     }
@@ -1408,13 +1355,11 @@ public class VoltDB {
                         }
                     }
                 }
-            }
-            finally {
+            } finally {
                 System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
                 System.err.println("The log may contain additional information.");
             }
-        }
-        finally {
+        } finally {
             ShutdownHooks.useOnlyCrashHooks();
             System.exit(-1);
         }
@@ -1459,7 +1404,9 @@ public class VoltDB {
         } catch (Exception e) {
             e.printStackTrace();
             // sleep even on exception in case the pill got sent before the exception
-            try { Thread.sleep(500); } catch (InterruptedException e2) {}
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {}
         }
         // finally block does its best to ensure death, no matter what context this
         // is called in
@@ -1479,16 +1426,13 @@ public class VoltDB {
         try {
             if (!config.validate()) {
                 System.exit(-1);
+            } else if (config.m_startAction == StartAction.GET) {
+                cli(config);
             } else {
-                if (config.m_startAction == StartAction.GET) {
-                    cli(config);
-                } else {
-                    initialize(config);
-                    instance().run();
-                }
+                initialize(config);
+                instance().run();
             }
-        }
-        catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError e) {
             String errmsg = "VoltDB Main thread: ran out of Java memory. This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, false, e);
         }
@@ -1535,7 +1479,7 @@ public class VoltDB {
     }
 
     public static String getPublicReplicationInterface() {
-        return (m_config.m_drPublicHost == null || m_config.m_drPublicHost.isEmpty()) ?
+        return m_config.m_drPublicHost == null || m_config.m_drPublicHost.isEmpty() ?
                 "" : m_config.m_drPublicHost;
     }
 
@@ -1551,12 +1495,10 @@ public class VoltDB {
         if (m_config.m_drInterface == null || m_config.m_drInterface.isEmpty()) {
             if (m_config.m_externalInterface == null) {
                 return "";
-            }
-            else {
+            } else {
                 return m_config.m_externalInterface;
             }
-        }
-        else {
+        } else {
             return m_config.m_drInterface;
         }
     }
@@ -1564,8 +1506,7 @@ public class VoltDB {
     public static int getReplicationPort(int deploymentFilePort) {
         if (m_config.m_drAgentPortStart != -1) {
             return m_config.m_drAgentPortStart;
-        }
-        else {
+        } else {
             return deploymentFilePort;
         }
     }
