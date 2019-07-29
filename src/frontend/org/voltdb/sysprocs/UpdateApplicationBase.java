@@ -26,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -58,6 +57,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Stopwatch;
 
 /**

@@ -205,7 +205,9 @@ public abstract class CatalogSchemaTools {
                 // If there is, then we need to add it to the end of the table definition
                 boolean found = false;
                 for (Column catalog_other_col : catalog_tbl.getColumns()) {
-                    if (catalog_other_col.equals(catalog_col)) continue;
+                    if (catalog_other_col.equals(catalog_col)) {
+                        continue;
+                    }
                     if (catalog_other_col.getConstraints().getIgnoreCase(catalog_const.getTypeName()) != null) {
                         found = true;
                         break;
@@ -237,7 +239,9 @@ public abstract class CatalogSchemaTools {
 
         // Constraints
         for (Constraint catalog_const : catalog_tbl.getConstraints()) {
-            if (skip_constraints.contains(catalog_const)) continue;
+            if (skip_constraints.contains(catalog_const)) {
+                continue;
+            }
             ConstraintType const_type = ConstraintType.get(catalog_const.getType());
 
             // Primary Keys / Unique Constraints
@@ -359,7 +363,9 @@ public abstract class CatalogSchemaTools {
 
         // All other Indexes
         for (Index catalog_idx : catalog_tbl.getIndexes()) {
-            if (skip_indexes.contains(catalog_idx)) continue;
+            if (skip_indexes.contains(catalog_idx)) {
+                continue;
+            }
 
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {

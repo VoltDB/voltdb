@@ -2259,8 +2259,9 @@ public class SQLParser extends SQLPatternFactory
                     continue;
                 }
                 line = line.trim();
-                if (line.equals(""))
+                if (line.equals("")) {
                     continue;
+                }
 
                 // we have a non-blank line that contains more than just a comment.
                 return queryIsDDL(line);
