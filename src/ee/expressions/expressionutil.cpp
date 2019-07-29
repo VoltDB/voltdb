@@ -77,7 +77,7 @@ static AbstractExpression* subqueryFactory(ExpressionType subqueryType, PlannerD
         int paramSize = params.arrayLen();
         paramIdxs.reserve(paramSize);
         if (args.size() != paramSize) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "subqueryFactory: parameter indexes/tve count mismatch");
         }
         for (int i = 0; i < paramSize; ++i) {
@@ -132,7 +132,7 @@ inline AbstractExpression* subqueryComparisonFactory(ExpressionType const c,
          snprintf(message, 256, "Invalid ExpressionType '%s' called"
                " for VectorComparisonExpression",
                expressionToString(c).c_str());
-         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
    }
 }
 
@@ -203,7 +203,7 @@ static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, A
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for ComparisonExpression",
                 expressionToString(c).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
 
@@ -238,7 +238,7 @@ static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
                 " ComparisonExpression",expressionToString(c).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
 
@@ -296,10 +296,10 @@ static AbstractExpression* constantValueFactory(
 
     switch (vt) {
     case VALUE_TYPE_INVALID:
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+       throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
              "constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
     case VALUE_TYPE_NULL:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
               "constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
     case VALUE_TYPE_TINYINT:
         newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
@@ -334,7 +334,7 @@ static AbstractExpression* constantValueFactory(
         break;
     default:
         throw SerializableEEException(
-              VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "constantValueFactory: Unrecognized value type");
+              VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "constantValueFactory: Unrecognized value type");
     }
 
     return new ConstantValueExpression(newvalue);
@@ -353,7 +353,7 @@ static void raiseFunctionFactoryError(
          "in VoltDB (or may have been incorrectly parsed)",
          nameString.c_str(), functionId, args.size());
    DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
-   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+   throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
 }
 
 AbstractExpression* ExpressionUtil::vectorFactory(
@@ -365,7 +365,7 @@ static AbstractExpression* caseWhenFactory(ValueType vt, AbstractExpression *lc,
 
     OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
     if (!rc) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "operator case when has incorrect expression");
     }
     return new OperatorCaseWhenExpression(vt, lc, alternative);
@@ -536,7 +536,7 @@ AbstractExpression* ExpressionUtil::expressionFactory(
          char message[256];
          snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                expressionToString(et).c_str(), (int)et);
-         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
    }
    ret->setValueType(vt);
    ret->setValueSize(vs);
@@ -584,15 +584,15 @@ AbstractExpression* ExpressionUtil::operatorFactory(ExpressionType et, AbstractE
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+       throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "Mod operator is not yet supported.");
 
      case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+       throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "Concat operator not yet supported.");
 
      default:
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+       throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "operator ctor helper out of sync");
    }
    return ret;

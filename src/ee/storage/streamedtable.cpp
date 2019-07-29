@@ -114,30 +114,30 @@ void StreamedTable::notifyQuantumRelease() {
 }
 
 TableIterator  StreamedTable::iterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
 
 TableIterator StreamedTable::iteratorDeletingAsWeGo() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
 
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not delete all tuples of a streamed"
                                   " table.");
 }
 
 TBPtr StreamedTable::allocateNextBlock() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not use block alloc interface with "
                                   "streamed tables.");
 }
 
 void StreamedTable::nextFreeTuple(TableTuple *) {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
@@ -174,7 +174,7 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             }
             m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
             if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                                   "Migrate transaction failed, exceeding 50MB DR buffer size limit.");
             }
         }
@@ -200,7 +200,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
 }
 
 void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*) {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
 }
 

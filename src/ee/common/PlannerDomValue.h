@@ -34,7 +34,7 @@ namespace voltdb {
       Json::Value const m_value;
       public:
       static void throwTypeException(char const* msg) {
-         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
       }
 
       PlannerDomValue(Json::Value const &value) : m_value(value) {}

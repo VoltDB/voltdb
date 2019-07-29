@@ -520,7 +520,8 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
         {
             char message[128];
             snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throw SerializableEEException(
+                    VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
     return answer;

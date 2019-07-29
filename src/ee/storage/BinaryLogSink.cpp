@@ -840,8 +840,9 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
             if (canSkip) {
                 skipRow = true;
             } else {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
-                    "Binary log txns were sent to the wrong partition");
+                throw SerializableEEException(
+                        VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                        "Binary log txns were sent to the wrong partition");
             }
         }
         rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, replicatedTable, skipRow);
@@ -868,7 +869,8 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<i
     } else if (!s_replicatedApplySuccess) {
         const char* msg = "Replicated table apply binary log threw an unknown exception on other thread.";
         VOLT_DEBUG("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+        throw SerializableEEException(
+                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
     } else {
         VOLT_TRACE("Skipping applyBinaryLogMP for replicated table");
         log->skipRecordsAndValidateTxn();

@@ -315,7 +315,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         // throw runtime exception
         char message[256];
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
     // Evaluate the inner_expr. The return value is a subquery id or a value as well
@@ -325,7 +325,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         // throw runtime exception
         char message[256];
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
     if (innerExtractor.resultSize() == 0) {

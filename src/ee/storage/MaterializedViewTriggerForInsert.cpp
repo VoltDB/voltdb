@@ -447,8 +447,8 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
                 char message[128];
                 snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
                          (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              message);
+                throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                        message);
             }
         }
         if (usesComplexAgg || (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) ) {

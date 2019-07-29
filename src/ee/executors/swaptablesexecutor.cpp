@@ -119,7 +119,7 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                 snprintf(msg, 1024, "Replicated table swap threw an unknown exception on other thread for table %s",
                         theTargetTable->name().c_str());
                 VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+                throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }
     }

@@ -150,7 +150,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 snprintf(msg, 1024, "Replicated table update threw an unknown exception on other thread for table %s",
                         targetTable->name().c_str());
                 VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+                throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }
     }

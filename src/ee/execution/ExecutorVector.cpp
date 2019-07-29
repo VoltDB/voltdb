@@ -68,10 +68,11 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
         throw;
     } catch (std::exception const& e) {
         char msg[1024 * 100];
-        snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s: what(): %s",
-                 (intmax_t)fragId, jsonPlan.c_str(), e.what());
+        snprintf(msg, sizeof msg,
+                "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s: what(): %s",
+                (intmax_t)fragId, jsonPlan.c_str(), e.what());
         VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     vassert(pnf->getRootNode());
@@ -81,7 +82,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
         snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
                  (intmax_t)fragId);
         VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
 
     int64_t tempTableLogLimit = engine->tempTableLogLimit();
@@ -141,7 +142,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
         snprintf(message, sizeof(message),
                 "Unexpected error. Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
                  (intmax_t)m_fragId, (int)node->getPlanNodeType());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
     node->setExecutor(executor);
 
@@ -159,7 +160,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
                 "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
                 node->debug().c_str(), (intmax_t)m_fragId);
         VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
 }
 

@@ -214,10 +214,10 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
                 }
                 InsertExecutor* insertExecutor = dynamic_cast<InsertExecutor*>(executor);
                 if (insertExecutor != nullptr && insertExecutor->exceptionMessage() != nullptr) {
-                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                   throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                          insertExecutor->exceptionMessage());
                 } else {
-                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                   throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                          "Unspecified execution error detected");
                 }
             }

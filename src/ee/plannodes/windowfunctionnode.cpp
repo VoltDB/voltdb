@@ -106,10 +106,8 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             if (!containsExpressions) {
                 buffer << sep << "Aggregate Argument Expressions";
             }
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "WindowFunctionPlanNode::loadFromJSONObject:"
-                                      " Aggregate missing components: "
-                                      + buffer.str());
+            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                    "WindowFunctionPlanNode::loadFromJSONObject: Aggregate missing components: " + buffer.str());
         }
 
     }
@@ -133,10 +131,8 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             buffer << sep << "Order By List";
             sep = ", ";
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "WindowFunctionPlanNode::loadFromJSONObject:"
-                                  " Missing components: "
-                                  + buffer.str());
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                "WindowFunctionPlanNode::loadFromJSONObject: Missing components: " + buffer.str());
     }
 }
 

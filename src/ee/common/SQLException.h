@@ -15,12 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SQLEXCEPTION_H_
-#define SQLEXCEPTION_H_
+#pragma once
 
 #include "common/SerializableEEException.h"
 
-#define throwDynamicSQLException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::SQLException( SQLException::dynamic_sql_error, reallysuperbig_nonce_message); }
+#define throwDynamicSQLException(...) {                                                         \
+    char reallysuperbig_nonce_message[8192];                                                    \
+    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__);                                  \
+    throw voltdb::SQLException( SQLException::dynamic_sql_error, reallysuperbig_nonce_message); \
+}
+
 namespace voltdb {
 class ReferenceSerializeOutput;
 
@@ -73,4 +77,3 @@ private:
 };
 }
 
-#endif /* SQLEXCEPTION_H_ */
