@@ -24,8 +24,20 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -916,8 +928,8 @@ public class VoltCompiler {
             throws VoltCompilerException
     {
         List<VoltCompilerReader> ddlReaderList = new ArrayList<>(ddlFilePaths.length);
-        for (int i = 0; i < ddlFilePaths.length; ++i) {
-            ddlReaderList.add(createDDLFileReader(ddlFilePaths[i]));
+        for (String ddlFilePath : ddlFilePaths) {
+            ddlReaderList.add(createDDLFileReader(ddlFilePath));
         }
         return ddlReaderList;
     }

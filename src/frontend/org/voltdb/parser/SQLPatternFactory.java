@@ -17,7 +17,6 @@
 
 package org.voltdb.parser;
 
-
 /**
  * Inherit from this class in order to use the static methods without the class name
  * to build patterns.
