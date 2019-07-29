@@ -161,7 +161,7 @@ public class AdHoc extends AdHocNTBase {
                 logCatalogUpdateInvocation("@AdHoc");
                 return updateApplication("@AdHoc", null, /* operationBytes */
                         null, sqlStatements.toArray(new String[0]), /* adhocDDLStmts */
-                        sqlNodes, null, false, true);
+                        sqlNodes, null, false);
             }
         }
     }

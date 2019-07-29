@@ -378,7 +378,7 @@ public class VoltCompiler {
         }
     }
 
-    public class ProcedureDescriptor {
+    public static class ProcedureDescriptor {
         public final ArrayList<String> m_authGroups;
         public final String m_className;
         // For DDL procedures. i.e., procedures that are not defined by Java classes.
@@ -751,8 +751,8 @@ public class VoltCompiler {
         return true;
     }
 
-    private static void generateCatalogReport(Catalog catalog, String ddl, boolean standaloneCompiler,
-            ArrayList<Feedback> warnings, InMemoryJarfile jarOutput) throws IOException {
+    private static void generateCatalogReport(Catalog catalog, String ddl, ArrayList<Feedback> warnings,
+            InMemoryJarfile jarOutput) throws IOException {
         VoltDBInterface voltdb = VoltDB.instance();
         // try to get a catalog context
         CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
@@ -826,7 +826,7 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            generateCatalogReport(m_catalog, ddlWithBatchSupport, standaloneCompiler, m_warnings, jarOutput);
+            generateCatalogReport(m_catalog, ddlWithBatchSupport, m_warnings, jarOutput);
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -1014,7 +1014,7 @@ public class VoltCompiler {
 
     public static enum DdlProceduresToLoad
     {
-        NO_DDL_PROCEDURES, ONLY_SINGLE_STATEMENT_PROCEDURES, ALL_DDL_PROCEDURES
+        NO_DDL_PROCEDURES, ALL_DDL_PROCEDURES
     }
 
 
@@ -1311,16 +1311,7 @@ public class VoltCompiler {
             if (procedureDescriptor.m_stmtLiterals == null) {
                 m_currentFilename = procedureName.substring(procedureName.lastIndexOf('.') + 1);
                 m_currentFilename += ".class";
-            }
-            else if (whichProcs == DdlProceduresToLoad.ONLY_SINGLE_STATEMENT_PROCEDURES) {
-                // In planner test mode, especially within the plannerTester framework,
-                // ignore any java procedures referenced in ddl CREATE PROCEDURE statements to allow
-                // re-use of actual application ddl files without introducing class dependencies.
-                // This potentially allows automatic plannerTester regression test support
-                // for all the single-statement procedures of an unchanged application ddl file.
-                continue;
-            }
-            else {
+            } else {
                 m_currentFilename = procedureName;
             }
             ProcedureCompiler.compile(this, hsql, m_estimates, db, procedureDescriptor, jarOutput);
@@ -1994,97 +1985,93 @@ public class VoltCompiler {
         byte[] ddlBytes = jarOutput.get(AUTOGEN_DDL_FILE_NAME);
         String canonicalDDL = new String(ddlBytes, Constants.UTF8ENCODING);
 
-        try {
-            CatalogMap<Procedure> procedures = db.getProcedures();
+        CatalogMap<Procedure> procedures = db.getProcedures();
 
-            // build a cache of previous SQL stmts
-            m_previousCatalogStmts.clear();
-            for (Procedure prevProc : procedures) {
-                for (Statement prevStmt : prevProc.getStatements()) {
-                    addStatementToCache(prevStmt);
-                }
+        // build a cache of previous SQL stmts
+        m_previousCatalogStmts.clear();
+        for (Procedure prevProc : procedures) {
+            for (Statement prevStmt : prevProc.getStatements()) {
+                addStatementToCache(prevStmt);
             }
-
-            // Use the in-memory jar-file-provided class loader so that procedure
-            // classes can be found and copied to the new file that gets written.
-            ClassLoader classLoader = jarOutput.getLoader();
-
-            for (Procedure procedure : procedures) {
-                if (! procedure.getHasjava()) {
-                    // Skip the DDL statement stored procedures as @UpdateClasses does not affect them
-                    continue;
-                }
-                // default procedure is also a single statement procedure
-                assert(procedure.getDefaultproc() == false);
-
-                if (procedure.getSystemproc()) {
-                    // UpdateClasses does not need to update system procedures
-                    continue;
-                }
-
-                // clear up the previous procedure contents before recompiling java user procedures
-                procedure.getStatements().clear();
-                procedure.getParameters().clear();
-
-                final String className = procedure.getClassname();
-
-                // Load the class given the class name
-                Class<?> procClass = classLoader.loadClass(className);
-                // get the short name of the class (no package)
-                String shortName = ProcedureCompiler.deriveShortProcedureName(className);
-
-                ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
-                if (pa == null) {
-                    pa = new ProcedureAnnotation();
-                    procedure.setAnnotation(pa);
-                }
-
-                // if the procedure is non-transactional, then take this special path here
-                if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
-                    ProcedureCompiler.compileNTProcedure(this, procClass, procedure, jarOutput);
-                    continue;
-                }
-
-                // if still here, that means the procedure is transactional
-                procedure.setTransactional(true);
-
-                // iterate through the fields and get valid sql statements
-                Map<String, SQLStmt> stmtMap = ProcedureCompiler.getSQLStmtMap(this, procClass);
-                Map<String, Object> fields = ProcedureCompiler.getFiledsMap(this, stmtMap, procClass, shortName);
-                Method procMethod = (Method) fields.get("@run");
-                assert(procMethod != null);
-
-                ProcedureCompiler.compileSQLStmtUpdatingProcedureInfomation(this, hsql, m_estimates, db, procedure,
-                        procedure.getSinglepartition(), fields);
-
-                // set procedure parameter types
-                Class<?>[] paramTypes = ProcedureCompiler.setParameterTypes(this, procedure, shortName, procMethod);
-
-                ProcedurePartitionData partitionData = ProcedurePartitionData.extractPartitionData(procedure);
-                ProcedureCompiler.addPartitioningInfo(this, procedure, db, paramTypes, partitionData);
-
-                // put the compiled code for this procedure into the jarFile
-                // need to find the outermost ancestor class for the procedure in the event
-                // that it's actually an inner (or inner inner...) class.
-                // addClassToJar recursively adds all the children, which should include this
-                // class
-                Class<?> ancestor = procClass;
-                while (ancestor.getEnclosingClass() != null) {
-                    ancestor = ancestor.getEnclosingClass();
-                }
-                addClassToJar(jarOutput, ancestor);
-            }
-
-            ////////////////////////////////////////////
-            // allow gc to reclaim any cache memory here
-            m_previousCatalogStmts.clear();
-
-        } catch (final VoltCompilerException e) {
-            throw e;
         }
 
+        // Use the in-memory jar-file-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader classLoader = jarOutput.getLoader();
+
+        for (Procedure procedure : procedures) {
+            if (!procedure.getHasjava()) {
+                // Skip the DDL statement stored procedures as @UpdateClasses does not affect them
+                continue;
+            }
+            // default procedure is also a single statement procedure
+            assert (procedure.getDefaultproc() == false);
+
+            if (procedure.getSystemproc()) {
+                // UpdateClasses does not need to update system procedures
+                continue;
+            }
+
+            // clear up the previous procedure contents before recompiling java user procedures
+            procedure.getStatements().clear();
+            procedure.getParameters().clear();
+
+            final String className = procedure.getClassname();
+
+            // Load the class given the class name
+            Class<?> procClass = classLoader.loadClass(className);
+            // get the short name of the class (no package)
+            String shortName = ProcedureCompiler.deriveShortProcedureName(className);
+
+            ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
+            if (pa == null) {
+                pa = new ProcedureAnnotation();
+                procedure.setAnnotation(pa);
+            }
+
+            // if the procedure is non-transactional, then take this special path here
+            if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
+                ProcedureCompiler.compileNTProcedure(this, procClass, procedure, jarOutput);
+                continue;
+            }
+
+            // if still here, that means the procedure is transactional
+            procedure.setTransactional(true);
+
+            // iterate through the fields and get valid sql statements
+            Map<String, SQLStmt> stmtMap = ProcedureCompiler.getSQLStmtMap(this, procClass);
+            Map<String, Object> fields = ProcedureCompiler.getFiledsMap(this, stmtMap, procClass, shortName);
+            Method procMethod = (Method) fields.get("@run");
+            assert (procMethod != null);
+
+            ProcedureCompiler.compileSQLStmtUpdatingProcedureInfomation(this, hsql, m_estimates, db, procedure,
+                    procedure.getSinglepartition(), fields);
+
+            // set procedure parameter types
+            Class<?>[] paramTypes = ProcedureCompiler.setParameterTypes(this, procedure, shortName, procMethod);
+
+            ProcedurePartitionData partitionData = ProcedurePartitionData.extractPartitionData(procedure);
+            ProcedureCompiler.addPartitioningInfo(this, procedure, db, paramTypes, partitionData);
+
+            // put the compiled code for this procedure into the jarFile
+            // need to find the outermost ancestor class for the procedure in the event
+            // that it's actually an inner (or inner inner...) class.
+            // addClassToJar recursively adds all the children, which should include this
+            // class
+            Class<?> ancestor = procClass;
+            while (ancestor.getEnclosingClass() != null) {
+                ancestor = ancestor.getEnclosingClass();
+            }
+            addClassToJar(jarOutput, ancestor);
+        }
+
+        ////////////////////////////////////////////
+        // allow gc to reclaim any cache memory here
+        m_previousCatalogStmts.clear();
+
+
         // generate the catalog report and write it to disk
-        generateCatalogReport(catalog, canonicalDDL, standaloneCompiler, m_warnings, jarOutput);
+        generateCatalogReport(catalog, canonicalDDL, m_warnings, jarOutput);
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
