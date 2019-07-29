@@ -36,8 +36,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,6 +64,9 @@ import org.voltdb.catalog.ProcedureSchedule;
 import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class TestSchedulerManager {
 
@@ -97,7 +101,7 @@ public class TestSchedulerManager {
         when(m_clientInterface.getInternalConnectionHandler()).thenReturn(m_internalConnectionHandler);
         when(m_clientInterface.getProcedureFromName(eq(PROCEDURE_NAME))).thenReturn(m_procedure);
 
-        m_schedulerManager = new SchedulerManager(m_clientInterface);
+        m_schedulerManager = new SchedulerManager(m_clientInterface, 0);
 
         s_firstSchedulerCallCount.set(0);
         s_postRunSchedulerCallCount.set(0);
@@ -116,15 +120,15 @@ public class TestSchedulerManager {
      */
     @Test
     public void systemScheduleCreateDrop() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, "SYSTEM");
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
 
-        m_schedulerManager.start(Collections.emptySet(), m_authSystem, false).get();
+        startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.processUpdate(Collections.singleton(schedule), m_authSystem).get();
+        processUpdateSync(schedule);
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.promoteToLeader(Collections.singleton(schedule), m_authSystem).get();
+        promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(100);
         assertEquals(1, s_firstSchedulerCallCount.get());
@@ -139,14 +143,14 @@ public class TestSchedulerManager {
      */
     @Test
     public void hostScheduleCreateDrop() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, "HOST");
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_HOSTS);
 
         m_procedure.setTransactional(false);
 
-        m_schedulerManager.start(Collections.emptySet(), m_authSystem, false).get();
+        startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.processUpdate(Collections.singleton(schedule), m_authSystem).get();
+        processUpdateSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(100);
         assertEquals(1, s_firstSchedulerCallCount.get());
@@ -164,7 +168,8 @@ public class TestSchedulerManager {
     public void partitionScheduleCreateDrop() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, "PARTITION");
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class,
+                SchedulerManager.RUN_LOCATION_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -173,24 +178,24 @@ public class TestSchedulerManager {
         column.setType(VoltType.INTEGER.getValue());
         m_procedure.setPartitioncolumn(column);
 
-        m_schedulerManager.start(Collections.emptySet(), m_authSystem, false).get();
+        startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.processUpdate(Collections.singleton(schedule), m_authSystem).get();
+        processUpdateSync(schedule);
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.promotedPartitions(Arrays.asList(0, 4)).get();
+        promotedPartitionsSync(0, 4);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(100);
         assertEquals(2, s_firstSchedulerCallCount.get());
         assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
                 s_postRunSchedulerCallCount.get() > 0);
 
-        m_schedulerManager.demotedPartitions(Arrays.asList(0, 4)).get();
+        demotedPartitionsSync(0, 4);
         assertCountsAfterScheduleCanceled(2);
 
         int previousCount = s_postRunSchedulerCallCount.get();
-        m_schedulerManager.promotedPartitions(Collections.singleton(0));
+        promotedPartitionsSync(0);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(20);
         assertTrue("Scheduler should have been called at least " + previousCount + " times: "
@@ -204,16 +209,16 @@ public class TestSchedulerManager {
      */
     @Test
     public void schedulerWithParameters() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class, "SYSTEM", 5, "TESTING",
-                "AFFA47");
+        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM, 5, "TESTING", "AFFA47");
 
-        m_schedulerManager.start(Collections.emptySet(), m_authSystem, false).get();
+        startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.processUpdate(Collections.singleton(schedule), m_authSystem).get();
+        processUpdateSync(schedule);
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.promoteToLeader(Collections.singleton(schedule), m_authSystem).get();
+        promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(100);
         assertEquals(1, s_firstSchedulerCallCount.get());
@@ -228,17 +233,18 @@ public class TestSchedulerManager {
      */
     @Test
     public void schedulerWithBadParameters() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class, "SYSTEM", 5, "TESTING", "ZZZ");
+        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM, 5, "TESTING", "ZZZ");
 
-        m_schedulerManager.start(Collections.emptySet(), m_authSystem, false).get();
+        startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
 
-        m_schedulerManager.promoteToLeader(Collections.singleton(schedule), m_authSystem).get();
+        promoteToLeaderSync(schedule);
         assertEquals(0, s_firstSchedulerCallCount.get());
 
         schedule.getParameters().get("0").setParameter("NAN");
         schedule.getParameters().get("2").setParameter("7894");
-        m_schedulerManager.processUpdate(Collections.singleton(schedule), m_authSystem).get();
+        processUpdateSync(schedule);
         assertEquals(0, s_firstSchedulerCallCount.get());
 
         assertEquals(0, s_postRunSchedulerCallCount.get());
@@ -251,9 +257,10 @@ public class TestSchedulerManager {
     public void shutdownWithSchedulesActive() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        ProcedureSchedule schedule1 = createProcedureSchedule(TestScheduler.class, "SYSTEM");
+        ProcedureSchedule schedule1 = createProcedureSchedule(TestScheduler.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM);
         ProcedureSchedule schedule2 = createProcedureSchedule(name.getMethodName() + "_p", TestScheduler.class,
-                "PARTITION");
+                SchedulerManager.RUN_LOCATION_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -262,8 +269,9 @@ public class TestSchedulerManager {
         column.setType(VoltType.INTEGER.getValue());
         m_procedure.setPartitioncolumn(column);
 
-        m_schedulerManager.start(Arrays.asList(schedule1, schedule2), m_authSystem, true).get();
-        m_schedulerManager.promotedPartitions(Arrays.asList(0, 1, 2, 3)).get();
+        startSync(schedule1, schedule2);
+        promoteToLeaderSync(schedule1, schedule2);
+        promotedPartitionsSync(0, 1, 2, 3);
         Thread.sleep(50);
         assertEquals(5, s_firstSchedulerCallCount.get());
         m_schedulerManager.shutdown().get();
@@ -274,9 +282,11 @@ public class TestSchedulerManager {
      */
     @Test
     public void rerunScheduler() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerRerun.class, "SYSTEM", 5);
+        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerRerun.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM, 5);
 
-        m_schedulerManager.start(Arrays.asList(schedule), m_authSystem, true).get();
+        startSync(schedule);
+        promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(100);
         assertEquals(1, s_firstSchedulerCallCount.get());
@@ -288,7 +298,7 @@ public class TestSchedulerManager {
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        m_schedulerManager.processUpdate(Collections.emptySet(), m_authSystem).get();
+        processUpdateSync();
         assertCountsAfterScheduleCanceled(startCount);
     }
 
@@ -327,6 +337,34 @@ public class TestSchedulerManager {
             sp.setParameter(params[i].toString());
         }
         return ps;
+    }
+
+    private void startSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
+        m_schedulerManager.start(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+    }
+
+    public void promoteToLeaderSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
+        m_schedulerManager.promoteToLeader(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+    }
+
+    private void processUpdateSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
+        m_schedulerManager.processUpdate(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+    }
+
+    private void promotedPartitionsSync(int... partitionIds) throws InterruptedException, ExecutionException {
+        List<ListenableFuture<?>> futures = new ArrayList<>(partitionIds.length);
+        for (int partitionId : partitionIds) {
+            futures.add(m_schedulerManager.promotedPartition(partitionId));
+        }
+        Futures.whenAllSucceed(futures).call(() -> null).get();
+    }
+
+    private void demotedPartitionsSync(int... partitionIds) throws InterruptedException, ExecutionException {
+        List<ListenableFuture<?>> futures = new ArrayList<>(partitionIds.length);
+        for (int partitionId : partitionIds) {
+            futures.add(m_schedulerManager.demotedPartition(partitionId));
+        }
+        Futures.whenAllSucceed(futures).call(() -> null).get();
     }
 
     public static class TestScheduler implements Scheduler {

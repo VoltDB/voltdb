@@ -58,6 +58,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.ProcedureSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -69,6 +70,8 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.utils.CreateTableUtils;
+import org.voltdb.sched.SchedulerManager;
+import org.voltdb.sched.SchedulerManager.SchedulerValidationResult;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -259,6 +262,8 @@ public class VoltCompiler {
 
     private final boolean m_isXDCR;
 
+    private final String m_user;
+
     // Whether or not to use SQLCommand as a pre-processor for DDL (in voltdb init --classes). Default is false.
     private boolean m_filterWithSQLCommand = false;
 
@@ -435,18 +440,27 @@ public class VoltCompiler {
         }
     }
 
-    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
+    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR, String user) {
         this.standaloneCompiler = standaloneCompiler;
         this.m_isXDCR = isXDCR;
+        this.m_user = user;
 
         // reset the cache
         m_cachedAddedClasses.clear();
     }
 
+    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
+        this(standaloneCompiler, isXDCR, null);
+    }
+
     /** Parameterless constructor is for embedded VoltCompiler use only.
      * @param isXDCR*/
     public VoltCompiler(boolean isXDCR) {
-        this(false, isXDCR);
+        this(isXDCR, null);
+    }
+
+    public VoltCompiler(boolean isXDCR, String user) {
+        this(false, isXDCR, user);
     }
 
     public boolean hasErrors() {
@@ -980,6 +994,13 @@ public class VoltCompiler {
         return m_catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
+    /**
+     * @return The name of the user which initiated this compile operation or {@code null} if no user is specified
+     */
+    public String getUser() {
+        return m_user;
+    }
+
     public static Database getCatalogDatabase(Catalog catalog) {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
@@ -1115,7 +1136,7 @@ public class VoltCompiler {
             if (cannonicalDDLIfAny != null) {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
-                ddlcompiler.loadSchema(cannonicalDDLIfAny, db, previousDBIfAny, whichProcs);
+                ddlcompiler.loadSchema(cannonicalDDLIfAny, db, previousDBIfAny, whichProcs, false);
             }
 
             m_dirtyTables.clear();
@@ -1135,7 +1156,7 @@ public class VoltCompiler {
                         ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
                     }
                     else {
-                        ddlcompiler.loadSchema(schemaReader, db, previousDBIfAny, whichProcs);
+                        ddlcompiler.loadSchema(schemaReader, db, previousDBIfAny, whichProcs, true);
                     }
                 }
                 finally {
@@ -2063,6 +2084,13 @@ public class VoltCompiler {
                 ancestor = ancestor.getEnclosingClass();
             }
             addClassToJar(jarOutput, ancestor);
+        }
+
+        for (ProcedureSchedule scheule : db.getProcedureschedules()) {
+            SchedulerValidationResult result = SchedulerManager.validateScheduler(scheule, classLoader);
+            if (!result.isValid()) {
+                throw new VoltCompilerException(result.getErrorMessage());
+            }
         }
 
         ////////////////////////////////////////////
