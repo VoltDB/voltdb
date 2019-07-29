@@ -27,4 +27,15 @@ public interface Scheduler {
      * @return {@link SchedulerResult} with the result from this scheduler
      */
     SchedulerResult nextRun(ScheduledProcedure previousProcedureRun);
+
+    /**
+     * If this method is implemented then the scheduler will only be restarted when it or any classes marked as a
+     * dependency are modified. However if this method is not implemented then the Scheduler instance will be restarted
+     * any time any class is modified.
+     *
+     * @return {@link Collection} of {@code classesNames} which this instance depends upon.
+     */
+    default Collection<String> getDependencies() {
+        return null;
+    }
 }

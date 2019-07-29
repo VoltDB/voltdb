@@ -218,6 +218,10 @@ public class SQLPatternFactory
             return new SQLPatternPartElement("\\d+");
         }
 
+        public static SQLPatternPart ifExisits() {
+            return SPF.optional(SPF.capture("ifExists", SPF.clause(SPF.token("if"), SPF.token("exists"))));
+        }
+
         /**
          * One or more repetitions of a pattern separated by a comma.
          */

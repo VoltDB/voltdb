@@ -19,26 +19,33 @@ package org.voltdb.sched;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
+import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ParameterConverter;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -48,6 +55,8 @@ import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -71,14 +80,21 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class SchedulerManager {
     static final VoltLogger log = new VoltLogger("HOST");
     static final String RUN_LOCATION_SYSTEM = "SYSTEM";
-    static final String RUN_LOCATION_HOST = "HOST";
-    static final String RUN_LOCATION_PARTITION = "PARTITION";
+    static final String RUN_LOCATION_HOSTS = "HOSTS";
+    static final String RUN_LOCATION_PARTITIONS = "PARTITIONS";
+    static final String HASH_ALGO = "SHA-512";
+    public static final String RUN_LOCATION_DEFAULT = RUN_LOCATION_SYSTEM;
 
     private Map<String, SchedulerHandler> m_handlers = Collections.emptyMap();
     private volatile boolean m_leader = false;
     private AuthSystem m_authSystem;
     private boolean m_started = false;
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
+    private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
+            ClientInterface.SCHEDULER_MANAGER_CID, getClass().getSimpleName());
+
+    // Local host ID
+    final int m_hostId;
 
     // Used by the manager to perform management functions so a scheduler can not hold up the manager
     private final ListeningExecutorService m_managerExecutor = MoreExecutors
@@ -89,8 +105,6 @@ public class SchedulerManager {
     final ListeningScheduledExecutorService m_wrapperExecutor = MoreExecutors.listeningDecorator(CoreUtils.getScheduledThreadPoolExecutor("ProcedureScheduler",
                     1, CoreUtils.SMALL_STACK_SIZE));
     final ClientInterface m_clientInterface;
-    final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
-            ClientInterface.SCHEDULER_MANAGER_CID, getClass().getSimpleName());
 
     private static String generateLogMessage(String name, String body) {
         return String.format("Schedule (%s): %s", name, body);
@@ -101,35 +115,37 @@ public class SchedulerManager {
      * {@link ProcedureSchedule}. If an instance of {@link Scheduler} cannot be constructed using the provided
      * configuration {@code null} is returned and a detailed error message will be logged.
      *
-     * @param definition {@link ProcedureSchedule} defining the configuration of the schedule
-     * @return {@link Supplier} for {@link Scheduler} instances or {@code null} if there was an error
+     * @param definition  {@link ProcedureSchedule} defining the configuration of the schedule
+     * @param classLoader {@link ClassLoader} to use when loading the {@link Scheduler} in {@code definition}
+     * @return {@link SchedulerValidationResult} describing any problems encountered
      */
-    private static Supplier<Scheduler> createSchedulerSupplier(ProcedureSchedule definition) {
+    public static SchedulerValidationResult validateScheduler(ProcedureSchedule definition, ClassLoader classLoader) {
         String schedulerClassString = definition.getSchedulerclass();
         try {
-            Class<?> schedulerClass = SchedulerHandler.class.getClassLoader().loadClass(schedulerClassString);
+            Class<?> schedulerClass;
+            try {
+                schedulerClass = classLoader.loadClass(schedulerClassString);
+            } catch (ClassNotFoundException e) {
+                return new SchedulerValidationResult("Scheduler class does not exist: " + schedulerClassString);
+            }
             if (!Scheduler.class.isAssignableFrom(schedulerClass)) {
-                log.error(generateLogMessage(definition.getName(), String.format("Class %s is not an instance of %s",
-                        schedulerClassString, Scheduler.class.getName())));
-                return null;
+                return new SchedulerValidationResult(String.format("Class %s is not an instance of %s",
+                        schedulerClassString, Scheduler.class.getName()));
             }
 
             Constructor<?>[] constructors = schedulerClass.getConstructors();
             if (constructors.length != 1) {
-                log.error(generateLogMessage(definition.getName(),
-                        String.format("Scheduler class should have 1 constructor %s has %d",
-                                schedulerClassString, constructors.length)));
-                return null;
+                return new SchedulerValidationResult(String.format("Scheduler class should have 1 constructor %s has %d",
+                        schedulerClassString, constructors.length));
             }
 
             @SuppressWarnings("unchecked")
             Constructor<Scheduler> constructor = (Constructor<Scheduler>) constructors[0];
             CatalogMap<SchedulerParam> schedulerParams = definition.getParameters();
             if ((schedulerParams == null ? 0 : schedulerParams.size()) != constructor.getParameterCount()) {
-                log.error(generateLogMessage(definition.getName(), String.format(
+                return new SchedulerValidationResult(String.format(
                         "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                        schedulerClassString, constructor.getParameterCount(), schedulerParams.size())));
-                return null;
+                        schedulerClassString, constructor.getParameterCount(), schedulerParams.size()));
             }
 
             Object[] parameters;
@@ -144,31 +160,90 @@ public class SchedulerManager {
                         parameters[index] = ParameterConverter.tryToMakeCompatible(parameterTypes[index],
                                 sp.getParameter());
                     } catch (Exception e) {
-                        log.warn(generateLogMessage(definition.getName(),
-                                String.format("Could not convert parameter %d with the value \"%s\" to type %s: %s",
-                                        sp.getIndex(), sp.getParameter(), parameterTypes[index].getName(),
-                                        e.getMessage())));
-                        return null;
+                        return new SchedulerValidationResult(String.format(
+                                "Could not convert parameter %d with the value \"%s\" to type %s: %s", sp.getIndex(),
+                                sp.getParameter(), parameterTypes[index].getName(), e.getMessage()));
                     }
                 }
             }
 
-            return () -> {
-                try {
-                    return constructor.newInstance(parameters);
-                } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                    throw new IllegalArgumentException(e);
-                }
-            };
+            byte[] hash = null;
+            if (classLoader instanceof InMemoryJarfile.JarLoader) {
+                InMemoryJarfile jarFile = ((InMemoryJarfile.JarLoader) classLoader).getInMemoryJarfile();
+                hash = jarFile.getClassHash(schedulerClassString, HASH_ALGO);
+            }
+
+            return new SchedulerValidationResult(new SchedulerFactory(constructor, parameters, hash));
         } catch (Exception e) {
-            log.error(generateLogMessage(definition.getName(),
-                    String.format("Could not load and construct class: %s", schedulerClassString)), e);
-            return null;
+            return new SchedulerValidationResult(
+                    String.format("Could not load and construct class: %s", schedulerClassString), e);
         }
     }
 
-    public SchedulerManager(ClientInterface clientInterface) {
+    public SchedulerManager(ClientInterface clientInterface, int hostId) {
         m_clientInterface = clientInterface;
+        m_hostId = hostId;
+
+        m_clientInterface.bindAdapter(m_adapter, new ClientInterfaceRepairCallback() {
+            Map<Integer, Future<Boolean>> m_migratingPartitions = Collections.synchronizedMap(new HashMap<>());
+
+            @Override
+            public void repairCompleted(int partitionId, long initiatorHSId) {
+                promoteIfLocal(partitionId, initiatorHSId);
+            }
+
+            @Override
+            public void leaderMigrationStarted(int partitionId, long initiatorHSId) {
+                if (!isLocalHost(initiatorHSId)) {
+                    m_migratingPartitions.put(partitionId, demotedPartition(partitionId));
+                }
+            }
+
+            @Override
+            public void leaderMigrationFailed(int partitionId, long initiatorHSId) {
+                try {
+                    if (m_migratingPartitions.remove(partitionId).get().booleanValue()) {
+                        promotedPartition(partitionId);
+                    }
+                } catch (InterruptedException | ExecutionException e) {
+                    log.warn("Demote future encountered an enexpected error", e);
+
+                    if (isLocalHost(VoltDB.instance().getCartographer().getHSIdForMaster(partitionId))) {
+                        promotedPartition(partitionId);
+                    }
+                }
+            }
+
+            @Override
+            public void leaderMigrated(int partitionId, long initiatorHSId) {
+                m_migratingPartitions.remove(partitionId);
+                promoteIfLocal(partitionId, initiatorHSId);
+            }
+
+            private void promoteIfLocal(int partitionId, long initiatorHSId) {
+                if (partitionId == MpInitiator.MP_INIT_PID) {
+                    return;
+                }
+                if (isLocalHost(initiatorHSId)) {
+                    promotedPartition(partitionId);
+                }
+            }
+
+            private boolean isLocalHost(long hsId) {
+                return CoreUtils.getHostIdFromHSId(hsId) == m_hostId;
+            }
+        });
+    }
+
+    /**
+     * Asynchronously start the scheduler manager and any configured schedules which are eligible to be run on this
+     * host.
+     *
+     * @param context {@link CatalogContext} instance
+     * @return {@link ListenableFuture} which will be completed once the async task completes
+     */
+    public ListenableFuture<?> start(CatalogContext context) {
+        return start(context.database.getProcedureschedules(), context.authSystem, context.getCatalogJar().getLoader());
     }
 
     /**
@@ -177,15 +252,27 @@ public class SchedulerManager {
      *
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param leader             whether or not this host is the global leader
+     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
+     *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> start(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            boolean leader) {
+    ListenableFuture<?> start(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
+            ClassLoader classLoader) {
         return execute(() -> {
             m_started = true;
-            processCatalogInline(procedureSchedules, authSystem, leader);
+            processCatalogInline(procedureSchedules, authSystem, classLoader);
         });
+    }
+
+    /**
+     * Asynchronously promote this host to be the global leader
+     *
+     * @param context {@link CatalogContext} instance
+     * @return {@link ListenableFuture} which will be completed once the async task completes
+     */
+    public ListenableFuture<?> promoteToLeader(CatalogContext context) {
+        return promoteToLeader(context.database.getProcedureschedules(), context.authSystem,
+                context.getCatalogJar().getLoader());
     }
 
     /**
@@ -193,10 +280,26 @@ public class SchedulerManager {
      *
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
+     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> promoteToLeader(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem) {
-        return processSchedules(procedureSchedules, authSystem, Boolean.TRUE);
+    ListenableFuture<?> promoteToLeader(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
+            ClassLoader classLoader) {
+        return execute(() -> {
+            m_leader = true;
+            processCatalogInline(procedureSchedules, authSystem, classLoader);
+        });
+    }
+
+    /**
+     * Asynchronously process an update to the scheduler configuration
+     *
+     * @param context     {@link CatalogContext} instance
+     * @return {@link ListenableFuture} which will be completed once the async task completes
+     */
+    public ListenableFuture<?> processUpdate(CatalogContext context) {
+        return processUpdate(context.database.getProcedureschedules(), context.authSystem,
+                context.getCatalogJar().getLoader());
     }
 
     /**
@@ -204,41 +307,46 @@ public class SchedulerManager {
      *
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
+     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> processUpdate(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem) {
-        return processSchedules(procedureSchedules, authSystem, null);
+    ListenableFuture<?> processUpdate(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
+            ClassLoader classLoader) {
+        return execute(() -> processCatalogInline(procedureSchedules, authSystem, classLoader));
     }
 
     /**
      * Notify the manager that some local partitions have been promoted to leader. Any PARTITION schedules will be
      * asynchronously started for these partitions.
      *
-     * @param partitions which were promoted
+     * @param partitionId which was promoted
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> promotedPartitions(Collection<Integer> partitions) {
+    ListenableFuture<?> promotedPartition(int partitionId) {
         return execute(() -> {
             for (SchedulerHandler sd : m_handlers.values()) {
-                sd.promotedPartitions(partitions);
+                sd.promotedPartition(partitionId);
             }
-            m_locallyLedPartitions.addAll(partitions);
+            m_locallyLedPartitions.add(partitionId);
         });
     }
 
     /**
-     * Notify the manager that some local partitions have been demoted from leader. Any PARTITION schedules will be
+     * Notify the manager that a local partition has been demoted from leader. Any PARTITION schedules will be
      * asynchronously stopped for these partitions.
      *
-     * @param partitions which were demoted
+     * @param partitionId which was demoted
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> demotedPartitions(Collection<Integer> partitions) {
+    ListenableFuture<Boolean> demotedPartition(int partitionId) {
         return execute(() -> {
-            for (SchedulerHandler sd : m_handlers.values()) {
-                sd.demotedPartitions(partitions);
+            if (!m_locallyLedPartitions.remove(partitionId)) {
+                return false;
             }
-            m_locallyLedPartitions.removeAll(partitions);
+            for (SchedulerHandler sd : m_handlers.values()) {
+                sd.demotedPartition(partitionId);
+            }
+            return true;
         });
     }
 
@@ -273,6 +381,17 @@ public class SchedulerManager {
         }
     }
 
+    <T> ListenableFuture<T> execute(Callable<T> callable) {
+        try {
+            return addExceptionListener(m_managerExecutor.submit(callable));
+        } catch (RejectedExecutionException e) {
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("NONE", "Could not execute " + callable), e);
+            }
+            return Futures.immediateFailedFuture(e);
+        }
+    }
+
     AuthUser getUser(String userName) {
         return m_authSystem.getUser(userName);
     }
@@ -290,25 +409,16 @@ public class SchedulerManager {
         return future;
     }
 
-    private ListenableFuture<?> processSchedules(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            Boolean leader) {
-        return execute(() -> processCatalogInline(procedureSchedules, authSystem, leader));
-    }
-
     /**
      * Process any potential scheduler changes. Any modified schedules will be stopped and restarted with their new
      * configuration. If a schedule was not modified it will be left running.
      *
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param leader             whether or not this host is the global leader
+     * @param classLoader        {@link ClassLoader} to use to load {@link Scheduler} classes
      */
     private void processCatalogInline(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            Boolean leader) {
-        if (leader != null) {
-            m_leader = leader.booleanValue();
-        }
-
+            ClassLoader classLoader) {
         if (!m_started) {
             return;
         }
@@ -318,8 +428,11 @@ public class SchedulerManager {
 
         for (ProcedureSchedule procedureSchedule : procedureSchedules) {
             SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
+            SchedulerValidationResult result = validateScheduler(procedureSchedule, classLoader);
+
             if (handler != null) {
-                if (handler.isSameDefintion(procedureSchedule)) {
+                // Do not restart a schedule if it has not changed
+                if (handler.isSameSchedule(procedureSchedule, result.m_factory)) {
                     newHandlers.put(procedureSchedule.getName(), handler);
                     continue;
                 }
@@ -329,20 +442,21 @@ public class SchedulerManager {
             String runLocation = procedureSchedule.getRunlocation().toUpperCase();
             if (procedureSchedule.getEnabled()
                     && (m_leader || !RUN_LOCATION_SYSTEM.equals(runLocation))) {
-                Supplier<Scheduler> schedulerSupplier = createSchedulerSupplier(procedureSchedule);
-                if (schedulerSupplier == null) {
+                if (!result.isValid()) {
+                    log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
+                            result.getException());
                     continue;
                 }
 
                 SchedulerHandler definition;
                 switch (runLocation) {
-                case RUN_LOCATION_HOST:
+                case RUN_LOCATION_HOSTS:
                 case RUN_LOCATION_SYSTEM:
-                    definition = new SingleSchedulerHandler(procedureSchedule, runLocation, schedulerSupplier);
+                    definition = new SingleSchedulerHandler(procedureSchedule, runLocation, result.m_factory);
                     break;
-                case RUN_LOCATION_PARTITION:
-                    definition = new PartitionedScheduleHandler(procedureSchedule, schedulerSupplier);
-                    definition.promotedPartitions(m_locallyLedPartitions);
+                case RUN_LOCATION_PARTITIONS:
+                    definition = new PartitionedScheduleHandler(procedureSchedule, result.m_factory);
+                    m_locallyLedPartitions.forEach(definition::promotedPartition);
                     break;
                 default:
                     throw new IllegalArgumentException(
@@ -366,17 +480,73 @@ public class SchedulerManager {
     }
 
     /**
+     * Result object returned by {@link SchedulerManager#validateScheduler(ProcedureSchedule, ClassLoader)}. Used to
+     * determine if the {@link Scheduler} and {@link ProcedureSchedule#getParameters()} in a {@link ProcedureSchedule}
+     * are valid. If they are not valid then an error message and potential exception are contained within this result
+     * describing the problem.
+     */
+    public static final class SchedulerValidationResult {
+        final String m_errorMessage;
+        final Exception m_exception;
+        final SchedulerFactory m_factory;
+
+        SchedulerValidationResult(String errorMessage) {
+            this(errorMessage, null);
+        }
+
+        SchedulerValidationResult(String errorMessage, Exception exception) {
+            m_errorMessage = errorMessage;
+            m_exception = exception;
+            m_factory = null;
+        }
+
+        SchedulerValidationResult(SchedulerFactory factory) {
+            m_errorMessage = null;
+            m_exception = null;
+            m_factory = factory;
+        }
+
+        /**
+         * @return {@code true} if the scheduler and parameters which were tested are valid
+         */
+        public boolean isValid() {
+            return m_factory != null;
+        }
+
+        /**
+         * @return Description of invalid scheduler and parameters
+         */
+        public String getErrorMessage() {
+            return m_errorMessage;
+        }
+
+        /**
+         * @return Any unexpected exception which was caught while validating scheduler and parameters
+         */
+        public Exception getException() {
+            return m_exception;
+        }
+    }
+
+    /**
      * Base class for wrapping a single scheduler configuration.
      */
     private abstract class SchedulerHandler {
         private final ProcedureSchedule m_definition;
+        private final SchedulerFactory m_factory;
 
-        SchedulerHandler(ProcedureSchedule definition) {
+        SchedulerHandler(ProcedureSchedule definition, SchedulerFactory factory) {
             m_definition = definition;
+            m_factory = factory;
         }
 
-        boolean isSameDefintion(ProcedureSchedule defintion) {
-            return m_definition.equals(defintion);
+        /**
+         * @param definition {@link ProcedureSchedule} defining the schedule configuration
+         * @param factory    {@link SchedulerFactory} derived from {@code definition}
+         * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
+         */
+        boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory) {
+            return m_definition.equals(definition) && m_factory.hashesMatch(factory);
         }
 
         String getName() {
@@ -405,16 +575,20 @@ public class SchedulerManager {
         /**
          * Notify this scheduler configuration of partitions which were locally promoted to leader
          *
-         * @param partitions which were promoted
+         * @param partition which was promoted
          */
-        abstract void promotedPartitions(Iterable<Integer> partitions);
+        abstract void promotedPartition(int partitionId);
 
         /**
          * Notify this scheduler configuration of partitions which were locally demoted from leader
          *
-         * @param partitions which were demoted
+         * @param partition which was demoted
          */
-        abstract void demotedPartitions(Iterable<Integer> partitions);
+        abstract void demotedPartition(int partitionId);
+
+        Scheduler constructScheduler() {
+            return m_factory.construct();
+        }
 
         String generateLogMessage(String body) {
             return SchedulerManager.generateLogMessage(m_definition.getName(), body);
@@ -424,18 +598,17 @@ public class SchedulerManager {
     /**
      * An instance of {@link SchedulerHandler} which contains a single {@link SchedulerWrapper}. This is used for
      * schedules which are configured for {@link SchedulerManager#RUN_LOCATION_SYSTEM} or
-     * {@link SchedulerManager#RUN_LOCATION_HOST}.
+     * {@link SchedulerManager#RUN_LOCATION_HOSTS}.
      */
     private class SingleSchedulerHandler extends SchedulerHandler {
         private final SchedulerWrapper<? extends SingleSchedulerHandler> m_wrapper;
 
-        SingleSchedulerHandler(ProcedureSchedule definition, String runLocation,
-                Supplier<Scheduler> schedulerSupplier) {
-            super(definition);
+        SingleSchedulerHandler(ProcedureSchedule definition, String runLocation, SchedulerFactory factory) {
+            super(definition, factory);
 
-            Scheduler scheduler = schedulerSupplier.get();
+            Scheduler scheduler = constructScheduler();
             switch (runLocation) {
-            case RUN_LOCATION_HOST:
+            case RUN_LOCATION_HOSTS:
                 m_wrapper = new HostSchedulerWrapper(this, scheduler);
                 break;
             case RUN_LOCATION_SYSTEM:
@@ -452,10 +625,10 @@ public class SchedulerManager {
         }
 
         @Override
-        void promotedPartitions(Iterable<Integer> partitions) {}
+        void promotedPartition(int partitionId) {}
 
         @Override
-        void demotedPartitions(Iterable<Integer> partitions) {}
+        void demotedPartition(int partitionId) {}
 
         @Override
         void start() {
@@ -465,16 +638,14 @@ public class SchedulerManager {
 
     /**
      * An instance of {@link SchedulerHandler} which contains a {@link SchedulerWrapper} for each locally led partition.
-     * This is used for schedules which are configured for {@link SchedulerManager#RUN_LOCATION_PARTITION}.
+     * This is used for schedules which are configured for {@link SchedulerManager#RUN_LOCATION_PARTITIONS}.
      */
     private class PartitionedScheduleHandler extends SchedulerHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
-        private final Supplier<Scheduler> m_schedulerSupplier;
         private boolean m_started = false;
 
-        PartitionedScheduleHandler(ProcedureSchedule definition, Supplier<Scheduler> schedulerSupplier) {
-            super(definition);
-            m_schedulerSupplier = schedulerSupplier;
+        PartitionedScheduleHandler(ProcedureSchedule definition, SchedulerFactory factory) {
+            super(definition, factory);
         }
 
         @Override
@@ -486,28 +657,23 @@ public class SchedulerManager {
         }
 
         @Override
-        void promotedPartitions(Iterable<Integer> partitions) {
-            for (Integer partition : partitions) {
-                assert !m_wrappers.containsKey(partition);
-                PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, m_schedulerSupplier.get(),
-                        partition);
+        void promotedPartition(int partitionId) {
+            assert !m_wrappers.containsKey(partitionId);
+            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, constructScheduler(), partitionId);
 
-                m_wrappers.put(partition, wrapper);
+            m_wrappers.put(partitionId, wrapper);
 
-                if (m_started) {
-                    wrapper.start();
-                }
+            if (m_started) {
+                wrapper.start();
             }
         }
 
         @Override
-        void demotedPartitions(Iterable<Integer> partitions) {
-            for (Integer partition : partitions) {
-                PartitionSchedulerWrapper wrapper;
-                wrapper = m_wrappers.remove(partition);
-                if (wrapper != null) {
-                    wrapper.cancel();
-                }
+        void demotedPartition(int partitionId) {
+            PartitionSchedulerWrapper wrapper;
+            wrapper = m_wrappers.remove(partitionId);
+            if (wrapper != null) {
+                wrapper.cancel();
             }
         }
 
@@ -818,7 +984,7 @@ public class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_HOST}
+     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_HOSTS}
      */
     private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
         HostSchedulerWrapper(SingleSchedulerHandler handler, Scheduler scheduler) {
@@ -840,7 +1006,7 @@ public class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_PARTITION}
+     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_PARTITIONS}
      */
     private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedScheduleHandler> {
         private final int m_partition;
@@ -887,10 +1053,13 @@ public class SchedulerManager {
                 return null;
             }
 
+            VoltTable copy = PrivateVoltTableFactory.createVoltTableFromBuffer(keys.getBuffer(), true);
+
             // Find the key for partition destination
-            while (keys.advanceRow()) {
-                if (m_partition == keys.getLong(0)) {
-                    partitionedParams[0] = keys.get(1, keyType);
+            copy.resetRowPosition();
+            while (copy.advanceRow()) {
+                if (m_partition == copy.getLong(0)) {
+                    partitionedParams[0] = copy.get(1, keyType);
                     break;
                 }
             }
@@ -907,6 +1076,65 @@ public class SchedulerManager {
         @Override
         String generateLogMessage(String body) {
             return SchedulerManager.generateLogMessage(m_handler.getName() + " P" + m_partition, body);
+        }
+    }
+
+    private static class SchedulerFactory {
+        private final Constructor<Scheduler> m_constructor;
+        private final Object[] m_parameters;
+        private final byte[] m_classHash;
+        Collection<String> m_classDeps = null;
+
+        SchedulerFactory(Constructor<Scheduler> constructor, Object[] parameters, byte[] classHash) {
+            super();
+            this.m_constructor = constructor;
+            this.m_parameters = parameters;
+            this.m_classHash = classHash;
+        }
+
+        Scheduler construct() {
+            try {
+                Scheduler scheduler = m_constructor.newInstance(m_parameters);
+                if (m_classDeps == null) {
+                    m_classDeps = scheduler.getDependencies();
+                }
+                return scheduler;
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+
+        boolean hashesMatch(SchedulerFactory other) {
+            if (other == null || !Arrays.equals(m_classHash, other.m_classHash)) {
+                return false;
+            }
+
+            if (m_classHash == null) {
+                // Not loaded by InMemoryJarFile so it cannot have deps
+                return true;
+            }
+
+            Collection<String> deps = m_classDeps == null ? other.m_classDeps : m_classDeps;
+            if (deps == null) {
+                // No deps declared so force reload
+                return false;
+            }
+
+            try {
+                return Arrays.equals(hashDeps(deps), other.hashDeps(deps));
+            } catch (NoSuchAlgorithmException e) {
+                log.error("Failed to hash dependencies", e);
+                return false;
+            }
+        }
+
+        byte[] hashDeps(Collection<String> deps) throws NoSuchAlgorithmException {
+            ClassLoader classLoader = m_constructor.getDeclaringClass().getClassLoader();
+            if (classLoader instanceof InMemoryJarfile.JarLoader) {
+                InMemoryJarfile jarFile = ((InMemoryJarfile.JarLoader) classLoader).getInMemoryJarfile();
+                return jarFile.getClassesHash(deps, HASH_ALGO);
+            }
+            return null;
         }
     }
 }

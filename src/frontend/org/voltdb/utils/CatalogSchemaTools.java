@@ -49,6 +49,8 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
@@ -457,6 +459,24 @@ public abstract class CatalogSchemaTools {
         }
     }
 
+    public static void toSchema(StringBuilder sb, ProcedureSchedule schedule) {
+        sb.append("CREATE SCHEDULE ").append(schedule.getName()).append(" ON ").append(schedule.getRunlocation())
+                .append(" USING ").append(schedule.getSchedulerclass());
+        if (schedule.getUser() != null) {
+            sb.append(" AS USER ").append(schedule.getUser());
+        }
+        if (!schedule.getEnabled()) {
+            sb.append(" DISABLED");
+        }
+        CatalogMap<SchedulerParam> params = schedule.getParameters();
+        String delimiter = " WITH ";
+        for (int i = 0; i < params.size(); ++i) {
+            sb.append(delimiter).append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+            delimiter = ", ";
+        }
+        sb.append(";\n");
+    }
+
     /**
      * Convert a Catalog Procedure into a DDL string.
      * @param proc
@@ -625,6 +645,13 @@ public abstract class CatalogSchemaTools {
                 if (! functions.isEmpty()) {
                     for (Function func : functions) {
                         toSchema(sb, func);
+                    }
+                }
+
+                CatalogMap<ProcedureSchedule> schedules = db.getProcedureschedules();
+                if (!schedules.isEmpty()) {
+                    for (ProcedureSchedule schedule : schedules) {
+                        toSchema(sb, schedule);
                     }
                 }
 
