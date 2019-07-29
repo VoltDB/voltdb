@@ -719,7 +719,7 @@ public class DDLCompiler {
 
             // process export
             targetName = (targetName != null) ? checkIdentifierStart(
-                    targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
+                    targetName, statement) : Constants.CONNECTORLESS_STREAM_TARGET_NAME;
 
             if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
@@ -1368,7 +1368,7 @@ public class DDLCompiler {
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
         if (isStream) {
-            if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
+            if(streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget)) {
                 table.setTabletype(TableType.STREAM.get());
             } else {
                 table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());

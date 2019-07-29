@@ -36,6 +36,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -64,6 +65,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
@@ -455,8 +457,8 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
 
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-            assertFalse(connector.getEnabled());
+                get("database").getConnectors().get("noop");
+            assertTrue(connector == null);
         }
         finally {
             File jar = new File("/tmp/exportsettingstest.jar");
@@ -475,6 +477,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
                 new ProcedurePartitionData("a", "a_id"));
+        project.addExport(true, ServerExportEnum.CUSTOM, "org.voltdb.exportclient.NoOpExporter", new Properties(), "noop");
         project.addExport(true /* enabled */);
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
@@ -484,13 +487,15 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                get("database").getConnectors().get("noop");
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("b"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("c"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("d"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
-            assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
+            assertNull(connector.getTableinfo().getIgnoreCase("f"));
         }
         finally {
             File jar = new File("/tmp/exportsettingstest.jar");
@@ -3580,7 +3585,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.CONNECTORLESS_STREAM_TARGET_NAME));
 
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));",
@@ -3589,9 +3594,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
                 "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.CONNECTORLESS_STREAM_TARGET_NAME));
         assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", Constants.CONNECTORLESS_STREAM_TARGET_NAME));
         assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
         assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
         assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
