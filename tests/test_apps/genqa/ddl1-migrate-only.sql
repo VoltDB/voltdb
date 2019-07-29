@@ -131,7 +131,7 @@ CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table_rabbit ON COLUMN rowid;
+PARTITION TABLE export_partitioned_table_file ON COLUMN rowid;
 
 CREATE TABLE export_partitioned_table_jdbc MIGRATE to TARGET jdbc_target
 (

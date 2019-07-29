@@ -90,9 +90,14 @@ public class ExportRabbitMQVerifier {
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
 
             while (expectedRows > m_verifiedRows) {
-                Thread.sleep(1000);
-                log.error("Expected " + expectedRows + " " + m_verifiedRows);
-                success = false;
+                Thread.sleep(5000);
+                log.warn("Expected rows: " + expectedRows + ", Verified rows: " + m_verifiedRows +
+                    "\n\tdifference: " + (expectedRows - m_verifiedRows));
+                if (m_verifiedRows > expectedRows) {
+                    log.warn("More rows received than expected. Assume it's due to duplicates.");
+                    success = true;
+                } else
+                    success = false;
             }
         } finally {
             tearDown(channel);
