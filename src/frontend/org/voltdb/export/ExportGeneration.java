@@ -676,8 +676,7 @@ public class ExportGeneration implements Generation {
                     }
                     final String key = table.getTypeName();
                     if (!dataSourcesForPartition.containsKey(key)) {
-                        // If we're creating a NEW data source it MUST be via catalog update
-                        assert isCatalogUpdate;
+                        // Create a new EDS, discarding any pre-existing data
                         ExportDataSource exportDataSource = new ExportDataSource(this,
                                 processor,
                                 "database",
