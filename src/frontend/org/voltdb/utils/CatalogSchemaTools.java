@@ -98,7 +98,8 @@ public abstract class CatalogSchemaTools {
      * @param streamTarget - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportOnly, String streamPartitionColumn, String streamTarget) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery,
+            boolean isExportOnly, String streamPartitionColumn, String streamTarget) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -118,7 +119,8 @@ public abstract class CatalogSchemaTools {
                 if (streamPartitionColumn != null && viewQuery == null) {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
                 }
-                if (streamTarget != null && TableType.isStream(catalog_tbl.getTabletype())) {
+                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME) &&
+                        TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
             } else {
@@ -150,7 +152,8 @@ public abstract class CatalogSchemaTools {
                 continue;
             }
 
-            table_sb.append(add).append(spacer).append(catalog_col.getTypeName()).append(" ").append(col_type.toSQLString()).append(col_type.isVariableLength() &&
+            table_sb.append(add).append(spacer).append(catalog_col.getTypeName()).
+                    append(" ").append(col_type.toSQLString()).append(col_type.isVariableLength() &&
                     catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() +
                             (catalog_col.getInbytes() ? " BYTES" : "") + ")" : "");
 
@@ -189,7 +192,8 @@ public abstract class CatalogSchemaTools {
                 table_sb.append((!nullable ? " NOT NULL" : "") );
             }
             else {
-                table_sb.append(" DEFAULT ").append(defaultvalue != null ? defaultvalue : "NULL").append(!nullable ? " NOT NULL" : "");
+                table_sb.append(" DEFAULT ").append(defaultvalue != null ? defaultvalue : "NULL").
+                        append(!nullable ? " NOT NULL" : "");
             }
 
             // Single-column constraints
@@ -218,7 +222,8 @@ public abstract class CatalogSchemaTools {
                             }
 
                             assert(catalog_fkey_col != null);
-                            table_sb.append(" REFERENCES ").append(catalog_fkey_tbl.getTypeName()).append(" (").append(catalog_fkey_col.getTypeName()).append(")");
+                            table_sb.append(" REFERENCES ").append(catalog_fkey_tbl.getTypeName()).
+                                    append(" (").append(catalog_fkey_col.getTypeName()).append(")");
                             skip_constraints.add(catalog_const);
                             break;
                         }
@@ -263,7 +268,8 @@ public abstract class CatalogSchemaTools {
                             String exprStrings = new String();
                             StmtTargetTableScan tableScan = new StmtTargetTableScan(catalog_tbl);
                             try {
-                                List<AbstractExpression> expressions = AbstractExpression.fromJSONArrayString(catalog_idx.getExpressionsjson(), tableScan);
+                                List<AbstractExpression> expressions =
+                                        AbstractExpression.fromJSONArrayString(catalog_idx.getExpressionsjson(), tableScan);
                                 String sep = "";
                                 for (AbstractExpression expr : expressions) {
                                     exprStrings += sep + expr.explain(catalog_tbl.getTypeName());
@@ -275,7 +281,8 @@ public abstract class CatalogSchemaTools {
                             table_sb.append(col_add).append(exprStrings);
                         }
                         else {
-                            for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
+                            for (ColumnRef catalog_colref :
+                                    CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
                                 table_sb.append(col_add).append(catalog_colref.getColumn().getTypeName());
                                 col_add = ", ";
                             } // FOR
@@ -350,7 +357,8 @@ public abstract class CatalogSchemaTools {
 
         // Partition Table for regular tables (non-streams)
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
-            sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
+            sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").
+                    append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
         }
 
         // All other Indexes
@@ -479,7 +487,8 @@ public abstract class CatalogSchemaTools {
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
         if (CatalogUtil.isProcedurePartitioned(proc)) {
             if (annot != null && annot.classAnnotated) {
-                partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
+                partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure " +
+                        "Partitioning Statement\n--");
             }
             else {
                 partitionClause.append("\n");
@@ -597,7 +606,8 @@ public abstract class CatalogSchemaTools {
                             continue;
                         }
                         toSchema(sb, table, null, TableType.isStream(table.getTabletype()),
-                                (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                                (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null),
+                                CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {

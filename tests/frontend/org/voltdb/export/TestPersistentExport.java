@@ -148,7 +148,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON INSERT;");
         insertToStreamWithNewColumn("T3", 600, 100, client, data);
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T3", 500, true);
     }
 
