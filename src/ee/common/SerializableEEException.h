@@ -26,6 +26,13 @@
    throw voltdb::SerializableEEException(msg);                  \
 } while (false)
 
+#define throwSerializableTypedEEException(type, ...) do {       \
+   char msg[8192];                                              \
+   snprintf(msg, sizeof msg, __VA_ARGS__);                      \
+   msg[sizeof msg - 1] = '\0';                                  \
+   throw voltdb::SerializableEEException(type, msg);            \
+} while (false)
+
 namespace voltdb {
 
 class ReferenceSerializeOutput;
