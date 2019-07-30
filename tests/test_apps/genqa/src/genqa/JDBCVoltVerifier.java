@@ -159,7 +159,7 @@ public class JDBCVoltVerifier {
             e.printStackTrace();
         }
 
-        rvr = new ReadVoltRows(client);
+        rvr = new ReadVoltRows(client, config.usegeo);
         if ( ! processRows(rvr, client, jdbcConnection) ) {
             System.err.println("ERROR Check Table failed, see log for errors");
             System.exit(1);

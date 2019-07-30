@@ -397,6 +397,7 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 -- Export Stream with extra Geo columns
 CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target
