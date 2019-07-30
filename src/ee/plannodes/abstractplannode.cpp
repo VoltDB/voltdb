@@ -435,7 +435,7 @@ void AbstractPlanNode::loadSortListFromJSONObject(
         }
 
         if (!(hasExpression && hasDirection)) {
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+            throw SerializableEEException(
                     "OrderByPlanNode::loadFromJSONObject: Does not have expression and direction.");
         }
     }

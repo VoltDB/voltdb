@@ -1915,13 +1915,9 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId) {
 
     PlanSet& plans = *m_plans;
     std::string plan = m_topend->planForFragmentId(fragId);
-    if (plan.length() == 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
-                 (intmax_t)fragId);
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                msg);
+    if (plan.empty()) {
+        throwSerializableEEException(
+                "Fetched empty plan from frontend for PlanFragment '%jd'", (intmax_t)fragId);
     }
 
     boost::shared_ptr<ExecutorVector> ev_guard = ExecutorVector::fromJsonPlan(this, plan, fragId);
@@ -2248,11 +2244,9 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
         CatalogId locator = static_cast<CatalogId>(locators[ii]);
         Table* t = getTableById(locator);
         if (!t) {
-            char message[256];
-            snprintf(message, 256,  "getStats() called with selector %d, and"
-                    " an invalid locator %d that does not correspond to"
-                    " a table", selector, locator);
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throwSerializableEEException(
+                    "getStats() called with selector %d, and an invalid locator %d that does not correspond to a table",
+                    selector, locator);
         }
         auto streamTable = dynamic_cast<StreamedTable*>(t);
         if (streamTable == NULL || streamTable->getWrapper() == NULL) {
@@ -2277,11 +2271,8 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                     locatorIds, interval, now);
             break;
         default:
-            char message[256];
-            snprintf(message, 256, "getStats() called with an unrecognized selector"
-                    " %d", selector);
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            throwSerializableEEException(
+                    "getStats() called with an unrecognized selector %d", selector);
         }
     } catch (const SerializableEEException &e) {
         serializeException(e);

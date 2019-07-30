@@ -2597,11 +2597,9 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
       case VALUE_TYPE_POINT:
         return sizeof(GeographyPointValue);
       default:
-          char message[128];
-          snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
-                   getTypeName(type).c_str());
-          throw SerializableEEException(
-                  VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+          throwSerializableEEException(
+                  "NValue::getTupleStorageSize() unsupported type '%s'",
+                  getTypeName(type).c_str());
     }
 }
 
@@ -3006,11 +3004,8 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
     default:
         break;
     }
-    char message[128];
-    snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%s'",
-             getTypeName(type).c_str());
-    throw SerializableEEException(
-            VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    throwSerializableEEException(
+            "NValue::deserializeFrom() unrecognized type '%s'", getTypeName(type).c_str());
 }
 
 /**
@@ -3233,18 +3228,13 @@ inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) c
     case VALUE_TYPE_ADDRESS:
     case VALUE_TYPE_ARRAY:
     case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
-        char message[128];
-        snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s",
-                 getTypeName(getValueType()).c_str());
-        throw SerializableEEException(
-                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throwSerializableEEException(
+                "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
     }
     default:
         break;
     }
-    throw SerializableEEException(
-            VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-            "Invalid type in serializeToExport");
+    throw SerializableEEException("Invalid type in serializeToExport");
 }
 
 /** Reformat an object-typed value from its current form to its

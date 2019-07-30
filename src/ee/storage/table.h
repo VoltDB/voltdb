@@ -284,13 +284,11 @@ class Table {
 
     // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
     virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May only use releaseBlock with instances of LargeTempTable.");
+        throw SerializableEEException("May only use releaseBlock with instances of LargeTempTable.");
     }
 
     virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May only use freeLastScannedBlock with instances of TempTable.");
+        throw SerializableEEException("May only use freeLastScannedBlock with instances of TempTable.");
     }
 
     bool equals(voltdb::Table* other);

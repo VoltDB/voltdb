@@ -33,27 +33,23 @@ namespace voltdb {
    class PlannerDomValue {
       Json::Value const m_value;
       public:
-      static void throwTypeException(char const* msg) {
-         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-      }
-
       PlannerDomValue(Json::Value const &value) : m_value(value) {}
 
       int32_t asInt() const {
          if (m_value.isNull()) {
-            throwTypeException("PlannerDomValue: int value is null");
+            throw SerializableEEException("PlannerDomValue: int value is null");
          } else if (m_value.isInt()) {
             return m_value.asInt();
          } else if (m_value.isString()) {
             return (int32_t) strtoimax(m_value.asCString(), NULL, 10);
          }
-         throwTypeException("PlannerDomValue: int value is not an integer");
+         throw SerializableEEException("PlannerDomValue: int value is not an integer");
          return 0;
       }
 
       int64_t asInt64() const {
          if (m_value.isNull()) {
-            throwTypeException("PlannerDomValue: int64 value is null");
+            throw SerializableEEException("PlannerDomValue: int64 value is null");
          } else if (m_value.isInt64()) {
             return m_value.asInt64();
          } else if (m_value.isInt()) {
@@ -61,13 +57,13 @@ namespace voltdb {
          } else if (m_value.isString()) {
             return (int64_t) strtoimax(m_value.asCString(), NULL, 10);
          }
-         throwTypeException("PlannerDomValue: int64 value is non-integral");
+         throw SerializableEEException("PlannerDomValue: int64 value is non-integral");
          return 0;
       }
 
       double asDouble() const {
          if (m_value.isNull()) {
-            throwTypeException("PlannerDomValue: double value is null");
+            throw SerializableEEException("PlannerDomValue: double value is null");
          } else if (m_value.isDouble()) {
             return m_value.asDouble();
          } else if (m_value.isInt()) {
@@ -77,20 +73,20 @@ namespace voltdb {
          } else if (m_value.isString()) {
             return std::strtod(m_value.asCString(), NULL);
          }
-         throwTypeException("PlannerDomValue: double value is not a number");
+         throw SerializableEEException("PlannerDomValue: double value is not a number");
          return 0;
       }
 
       bool asBool() const {
          if (m_value.isNull() || ! m_value.isBool()) {
-            throwTypeException("PlannerDomValue: value is null or not a bool");
+            throw SerializableEEException("PlannerDomValue: value is null or not a bool");
          }
          return m_value.asBool();
       }
 
       std::string asStr() const {
          if (m_value.isNull() || ! m_value.isString()) {
-            throwTypeException("PlannerDomValue: value is null or not a string");
+            throw SerializableEEException("PlannerDomValue: value is null or not a string");
          }
          return m_value.asString();
       }
@@ -106,23 +102,21 @@ namespace voltdb {
       PlannerDomValue valueForKey(const char *key) const {
          auto const value = m_value[key];
          if (value.isNull()) {
-            char msg[1024];
-            snprintf(msg, sizeof msg, "PlannerDomValue: %s key is null or missing", key);
-            throwTypeException(msg);
+            throwSerializableEEException("PlannerDomValue: %s key is null or missing", key);
          }
          return {PlannerDomValue(value)};
       }
 
       int arrayLen() const {
          if (! m_value.isArray()) {
-            throwTypeException("PlannerDomValue: value is not an array");
+            throw SerializableEEException("PlannerDomValue: value is not an array");
          }
          return m_value.size();
       }
 
       PlannerDomValue valueAtIndex(int index) const {
          if (! m_value.isArray()) {
-            throwTypeException("PlannerDomValue: value is not an array");
+            throw SerializableEEException("PlannerDomValue: value is not an array");
          }
          return {m_value[index]};
       }

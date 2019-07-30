@@ -75,9 +75,9 @@ void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     } else if (unionTypeStr == "NOUNION") {
         m_unionType = UNION_TYPE_NOUNION;
     } else {
-        throw SerializableEEException(
-                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                "UnionPlanNode::loadFromJSONObject: Unsupported UNION_TYPE value " + unionTypeStr);
+        throwSerializableEEException(
+                "UnionPlanNode::loadFromJSONObject: Unsupported UNION_TYPE value %s",
+                unionTypeStr.c_str());
     }
 }
 

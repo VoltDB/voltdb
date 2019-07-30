@@ -67,22 +67,17 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
     } catch (SerializableEEException&) {
         throw;
     } catch (std::exception const& e) {
-        char msg[1024 * 100];
-        snprintf(msg, sizeof msg,
+        throwSerializableEEException(
                 "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s: what(): %s",
                 (intmax_t)fragId, jsonPlan.c_str(), e.what());
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     vassert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
-        char msg[1024];
-        snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
-                 (intmax_t)fragId);
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        throwSerializableEEException(
+                "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
+                (intmax_t)fragId);
     }
 
     int64_t tempTableLogLimit = engine->tempTableLogLimit();
@@ -138,11 +133,9 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     // plannode so that it can cache anything for the plannode
     AbstractExecutor* executor = getNewExecutor(engine, node, isLargeQuery());
     if (executor == NULL) {
-        char message[256];
-        snprintf(message, sizeof(message),
+        throwSerializableEEException(
                 "Unexpected error. Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
-                 (intmax_t)m_fragId, (int)node->getPlanNodeType());
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+                (intmax_t)m_fragId, (int)node->getPlanNodeType());
     }
     node->setExecutor(executor);
 
@@ -155,12 +148,9 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
 
     // Now use the plannode to initialize the executor for execution later on
     if (! executor->init(engine, *this)) {
-        char msg[1024 * 10];
-        snprintf(msg, sizeof(msg),
+        throwSerializableEEException(
                 "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
                 node->debug().c_str(), (intmax_t)m_fragId);
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
 }
 

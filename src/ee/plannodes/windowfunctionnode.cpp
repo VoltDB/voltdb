@@ -22,13 +22,9 @@
 #include <sstream>
 
 namespace voltdb {
-WindowFunctionPlanNode::~WindowFunctionPlanNode()
-{
+WindowFunctionPlanNode::~WindowFunctionPlanNode() { }
 
-}
-
-PlanNodeType WindowFunctionPlanNode::getPlanNodeType() const
-{
+PlanNodeType WindowFunctionPlanNode::getPlanNodeType() const {
     return PLAN_NODE_TYPE_WINDOWFUNCTION;
 }
 
@@ -106,8 +102,9 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             if (!containsExpressions) {
                 buffer << sep << "Aggregate Argument Expressions";
             }
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "WindowFunctionPlanNode::loadFromJSONObject: Aggregate missing components: " + buffer.str());
+            throwSerializableEEException(
+                    "WindowFunctionPlanNode::loadFromJSONObject: Aggregate missing components: %s",
+                    buffer.str().c_str());
         }
 
     }
@@ -131,8 +128,9 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             buffer << sep << "Order By List";
             sep = ", ";
         }
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                "WindowFunctionPlanNode::loadFromJSONObject: Missing components: " + buffer.str());
+        throwSerializableEEException(
+                "WindowFunctionPlanNode::loadFromJSONObject: Missing components: %s",
+                buffer.str().c_str());
     }
 }
 

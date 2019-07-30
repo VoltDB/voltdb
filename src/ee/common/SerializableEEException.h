@@ -19,10 +19,11 @@
 #include <string>
 #include <stdexcept>
 
-#define throwSerializableEEException(...) do {                            \
-   char msg[8192]; snprintf(msg, 8192, __VA_ARGS__);                      \
-   throw voltdb::SerializableEEException(                                 \
-           VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); \
+#define throwSerializableEEException(...) do {                  \
+   char msg[8192];                                              \
+   snprintf(msg, sizeof msg, __VA_ARGS__);                      \
+   msg[sizeof msg - 1] = '\0';                                  \
+   throw voltdb::SerializableEEException(msg);                  \
 } while (false)
 
 namespace voltdb {

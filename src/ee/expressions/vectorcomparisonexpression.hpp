@@ -312,20 +312,14 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     NValue lvalue = m_left->eval(tuple1, tuple2);
     ValueExtractorOuter outerExtractor(lvalue);
     if (outerExtractor.resultSize() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException("More than one row returned by a scalar/row subquery");
     }
 
     // Evaluate the inner_expr. The return value is a subquery id or a value as well
     NValue rvalue = m_right->eval(tuple1, tuple2);
     ValueExtractorInner innerExtractor(rvalue);
     if (m_quantifier == QUANTIFIER_TYPE_NONE && innerExtractor.resultSize() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException("More than one row returned by a scalar/row subquery");
     }
 
     if (innerExtractor.resultSize() == 0) {

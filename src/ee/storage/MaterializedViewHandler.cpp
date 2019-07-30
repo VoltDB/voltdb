@@ -196,13 +196,10 @@ namespace voltdb {
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
                     break; // legal value
-                default: {
-                    char message[128];
-                    snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
-                             (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-                    throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                            message);
-                }
+                default:
+                    throwSerializableEEException(
+                            "Error in materialized view aggregation %d expression type %s",
+                            (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
             }
         }
     }
