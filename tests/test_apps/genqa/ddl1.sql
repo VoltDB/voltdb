@@ -357,7 +357,7 @@ CREATE STREAM export_replicated_table_jdbc EXPORT TO TARGET jdbc_target
 );
 
 
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
+CREATE STREAM export_skinny_partitioned_table_kafka  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
