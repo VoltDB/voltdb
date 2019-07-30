@@ -2428,7 +2428,7 @@ TEST_F(DRBinaryLogTest, MissPartitionedExceptionIsThrown) {
         flushAndApply(100);
         FAIL("Should have thrown SerializableEEException");
     } catch (SerializableEEException &e) {
-        ASSERT_EQ(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED, e.getType());
+        ASSERT_EQ(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED, e.getType());
     }
 }
 

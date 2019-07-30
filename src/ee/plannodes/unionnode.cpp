@@ -52,15 +52,13 @@ UnionPlanNode::~UnionPlanNode() { }
 
 PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
 
-std::string UnionPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "UnionType[" << m_unionType << "]\n";
     return buffer.str();
 }
 
-void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;
@@ -77,10 +75,9 @@ void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
     } else if (unionTypeStr == "NOUNION") {
         m_unionType = UNION_TYPE_NOUNION;
     } else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "UnionPlanNode::loadFromJSONObject:"
-                                      " Unsupported UNION_TYPE value " +
-                                      unionTypeStr);
+        throwSerializableEEException(
+                "UnionPlanNode::loadFromJSONObject: Unsupported UNION_TYPE value %s",
+                unionTypeStr.c_str());
     }
 }
 
