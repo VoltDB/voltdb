@@ -75,6 +75,7 @@ CREATE TABLE export_partitioned_table_kafka MIGRATE TO TARGET kafka_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table_kafka ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_kafka_idx ON  export_partitioned_table_kafka(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_partitioned_table_rabbit MIGRATE TO TARGET rabbit_target
 (
@@ -103,6 +104,7 @@ CREATE TABLE export_partitioned_table_rabbit MIGRATE TO TARGET rabbit_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table_rabbit ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_rabbit_idx ON  export_partitioned_table_rabbit(type_not_null_timestamp)  where not migrating;
 
 
 CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
@@ -132,6 +134,7 @@ CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table_file ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_file_idx ON  export_partitioned_table_file(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_partitioned_table_jdbc MIGRATE to TARGET jdbc_target
 (
@@ -160,6 +163,7 @@ CREATE TABLE export_partitioned_table_jdbc MIGRATE to TARGET jdbc_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table_jdbc ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_jdbc_idx ON  export_partitioned_table_jdbc(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_mirror_partitioned_table
 (
