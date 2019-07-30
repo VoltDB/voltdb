@@ -676,6 +676,7 @@ public class ExportGeneration implements Generation {
                     }
                     final String key = table.getTypeName();
                     if (!dataSourcesForPartition.containsKey(key)) {
+                        // Create a new EDS, discarding any pre-existing data
                         ExportDataSource exportDataSource = new ExportDataSource(this,
                                 processor,
                                 "database",
@@ -1028,26 +1029,6 @@ public class ExportGeneration implements Generation {
                     source.updateGenerationId(genId);
                 }
             }
-        }
-    }
-
-    /**
-     * Iterate over sources to clean up stale buffers; this is done in a blocking fashion.
-     */
-    public void cleanupStaleBuffers(StreamStartAction action) {
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        synchronized(m_dataSourcesByPartition) {
-            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
-                for (ExportDataSource source : partitionDataSourceMap.values()) {
-                    tasks.add(source.cleanupStaleBuffers(action));
-                }
-            }
-        }
-        try {
-            if (!tasks.isEmpty())
-                Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            exportLog.error("Unexpected exception cleaning stale buffers.", e);
         }
     }
 
