@@ -107,9 +107,9 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         private static final int FUNC_VOLT_SQL_ERROR     = 20000;
         private static final int FUNC_VOLT_DECODE        = 20001;
-        private static final int FUNC_VOLT_FIELD         = 20002;
-        private static final int FUNC_VOLT_ARRAY_ELEMENT = 20003;
-        private static final int FUNC_VOLT_ARRAY_LENGTH  = 20004;
+        public static final int FUNC_VOLT_FIELD          = 20002;
+        public static final int FUNC_VOLT_ARRAY_ELEMENT  = 20003;
+        public static final int FUNC_VOLT_ARRAY_LENGTH   = 20004;
 
         static final int FUNC_VOLT_SINCE_EPOCH               = 20005;
         static final int FUNC_VOLT_SINCE_EPOCH_SECOND        = 20006;
@@ -134,14 +134,15 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
-        static final int FUNC_VOLT_SET_FIELD              = 20024;
+        public static final int FUNC_VOLT_SET_FIELD       = 20024;
 
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
-        static final int FUNC_VOLT_BITNOT                 = 20026;
-        static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
-        static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
-        static final int FUNC_VOLT_HEX                    = 20029;
+
+        public static final int FUNC_VOLT_BITNOT          = 20026;
+        public static final int FUNC_VOLT_BIT_SHIFT_LEFT  = 20027;
+        public static final int FUNC_VOLT_BIT_SHIFT_RIGHT = 20028;
+        public static final int FUNC_VOLT_HEX             = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
         static final int FUNC_VOLT_DATEADD                = 20031;
@@ -160,10 +161,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_STR                    = 20043;
 
         // our local functions for networking
-        static final int FUNC_VOLT_INET_NTOA                   = 20044;
-        static final int FUNC_VOLT_INET_ATON                   = 20045;
-        static final int FUNC_VOLT_INET6_NTOA                  = 20046;
-        static final int FUNC_VOLT_INET6_ATON                  = 20047;
+        public static final int FUNC_VOLT_INET_NTOA       = 20044;
+        public static final int FUNC_VOLT_INET_ATON       = 20045;
+        public static final int FUNC_VOLT_INET6_NTOA      = 20046;
+        public static final int FUNC_VOLT_INET6_ATON      = 20047;
 
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;

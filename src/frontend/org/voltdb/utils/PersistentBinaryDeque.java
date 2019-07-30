@@ -361,7 +361,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     "|| !writable || !executable || !directory)");
         }
 
-        parseFiles();
+        parseFiles(builder.m_deleteExisting);
 
         // Find the first and last segment for polling and writing (after); ensure the
         // writing segment is not final
@@ -427,9 +427,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     /**
+     * Parse files for this PBD; if creating, delete any crud left by a previous homonym.
+     *
+     * @param deleteExisting true if should delete any existing PBD files
+     *
      * @throws IOException
      */
-    private void parseFiles() throws IOException {
+    private void parseFiles(boolean deleteExisting) throws IOException {
 
         HashMap<Long, PbdSegmentName> filesById = new HashMap<>();
         PairSequencer<Long> sequencer = new PairSequencer<>();
@@ -459,8 +463,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
 
                 // From now on we're dealing with one of our PBD files
-                if (file.length() == 0) {
-                    deleteStalePbdFile(file);
+                if (file.length() == 0 || deleteExisting) {
+                    deleteStalePbdFile(file, deleteExisting);
                     continue;
                 }
 
@@ -539,15 +543,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
      * Note that this file may be concurrently deleted from multiple instances so we ignore
      * NoSuchFileException.
      *
-     * @param file
+     * @param file  file to delete
+     * @param create true if creating PBD
      * @throws IOException
      */
-    private void deleteStalePbdFile(File file) throws IOException {
+    private void deleteStalePbdFile(File file, boolean create) throws IOException {
         try {
             PBDSegment.setFinal(file, false);
             if (m_usageSpecificLog.isDebugEnabled()) {
+                String createStr = create ? ", forced by creation." : "";
                 m_usageSpecificLog.debug("Segment " + file.getName()
-                        + " (final: " + PBDSegment.isFinal(file) + "), will be closed and deleted during init");
+                        + " (final: " + PBDSegment.isFinal(file) + "), is closed and deleted during init" + createStr);
             }
             file.delete();
         } catch (Exception e) {
@@ -1321,6 +1327,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         final File m_path;
         final VoltLogger m_logger;
         boolean m_useCompression = false;
+        boolean m_deleteExisting = false;
         BinaryDequeSerializer<M> m_extraHeaderSerializer;
         M m_initialExtraHeader;
         PBDSegmentFactory m_pbdSegmentFactory = PBDRegularSegment::new;
@@ -1350,6 +1357,19 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         public Builder<M> compression(boolean enabled) {
             m_useCompression = enabled;
+            return this;
+        }
+
+        /**
+         * Set whether the pre-existing PBD files should be deleted.
+         * <p>
+         * Default: {@code false}
+         *
+         * @param deleteExisting {@code true} if existing PBD files should be deleted.
+         * @return An updated {@link Builder} instance
+         */
+        public Builder<M> deleteExisting(boolean deleteExisting) {
+            m_deleteExisting = deleteExisting;
             return this;
         }
 
