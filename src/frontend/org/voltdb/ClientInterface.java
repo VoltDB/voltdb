@@ -210,12 +210,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ZooKeeper m_zk;
 
     /**
-     * The CIHM is unique to the connection and the ACG is shared by all connections
-     * serviced by the associated network thread. They are paired so as to only do a single
-     * lookup.
+     * The CIHM is unique to the connection and the ACG is shared by all connections serviced by the associated network
+     * thread. They are paired so as to only do a single lookup.
+     * <p>
+     * Note: An initialSize of 1024 actually creates an array of 2048 in the map
      */
-    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
+    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm = new ConcurrentHashMap<>(1024);
 
     private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
 
