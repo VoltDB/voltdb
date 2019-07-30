@@ -19,6 +19,7 @@ package org.voltdb.sched;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Parameter;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -106,7 +107,7 @@ public class SchedulerManager {
                     1, CoreUtils.SMALL_STACK_SIZE));
     final ClientInterface m_clientInterface;
 
-    private static String generateLogMessage(String name, String body) {
+    static String generateLogMessage(String name, String body) {
         return String.format("Schedule (%s): %s", name, body);
     }
 
@@ -142,7 +143,10 @@ public class SchedulerManager {
             @SuppressWarnings("unchecked")
             Constructor<Scheduler> constructor = (Constructor<Scheduler>) constructors[0];
             CatalogMap<SchedulerParam> schedulerParams = definition.getParameters();
-            if ((schedulerParams == null ? 0 : schedulerParams.size()) != constructor.getParameterCount()) {
+            int actualParamCount = schedulerParams == null ? 0 : schedulerParams.size();
+            int minVarArgParamCount = isLastParamaterVarArgs(constructor) ? constructor.getParameterCount() - 1
+                    : Integer.MAX_VALUE;
+            if (constructor.getParameterCount() != actualParamCount && minVarArgParamCount > actualParamCount) {
                 return new SchedulerValidationResult(String.format(
                         "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
                         schedulerClassString, constructor.getParameterCount(), schedulerParams.size()));
@@ -153,16 +157,25 @@ public class SchedulerManager {
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
                 Class<?>[] parameterTypes = constructor.getParameterTypes();
-                parameters = new Object[schedulerParams.size()];
+                parameters = new Object[constructor.getParameterCount()];
+                String[] varArgParams = null;
+                if (minVarArgParamCount < Integer.MAX_VALUE) {
+                    parameters[parameters.length
+                            - 1] = varArgParams = new String[actualParamCount - minVarArgParamCount];
+                }
                 for (SchedulerParam sp : schedulerParams) {
                     int index = sp.getIndex();
-                    try {
-                        parameters[index] = ParameterConverter.tryToMakeCompatible(parameterTypes[index],
-                                sp.getParameter());
-                    } catch (Exception e) {
-                        return new SchedulerValidationResult(String.format(
-                                "Could not convert parameter %d with the value \"%s\" to type %s: %s", sp.getIndex(),
-                                sp.getParameter(), parameterTypes[index].getName(), e.getMessage()));
+                    if (index < minVarArgParamCount) {
+                        try {
+                            parameters[index] = ParameterConverter.tryToMakeCompatible(parameterTypes[index],
+                                    sp.getParameter());
+                        } catch (Exception e) {
+                            return new SchedulerValidationResult(String.format(
+                                    "Could not convert parameter %d with the value \"%s\" to type %s: %s",
+                                    sp.getIndex(), sp.getParameter(), parameterTypes[index].getName(), e.getMessage()));
+                        }
+                    } else {
+                        varArgParams[index - minVarArgParamCount] = sp.getParameter();
                     }
                 }
             }
@@ -178,6 +191,15 @@ public class SchedulerManager {
             return new SchedulerValidationResult(
                     String.format("Could not load and construct class: %s", schedulerClassString), e);
         }
+    }
+
+    private static boolean isLastParamaterVarArgs(Constructor<Scheduler> constructor) {
+        if (constructor.getParameterCount() == 0) {
+            return false;
+        }
+        Parameter[] params = constructor.getParameters();
+        Parameter lastParam = params[params.length - 1];
+        return lastParam.getType() == String[].class || lastParam.getType() == Object[].class;
     }
 
     public SchedulerManager(ClientInterface clientInterface, int hostId) {
@@ -692,7 +714,7 @@ public class SchedulerManager {
     /**
      * Enum to represent the current state of a {@link SchedulerWrapper}
      */
-    enum SchedulerWrapperState {
+    private enum SchedulerWrapperState {
         /** Scheduler wrapper initialized but not started yet */
         INITIALIZED,
         /** Scheduler is currently active and running */

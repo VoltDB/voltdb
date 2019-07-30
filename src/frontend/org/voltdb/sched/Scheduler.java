@@ -17,6 +17,14 @@
 
 package org.voltdb.sched;
 
+import java.util.Collection;
+
+/**
+ * Interface used to create a custom scheduler. All parameters passed to a Scheduler instance are done through the
+ * Scheduler's constructor. Only valid column types are allowed as constructor parameters with one exception the last
+ * parameter can be either {@code String[]} or {@code Object[]}. If the last parameter is an array then it will be
+ * treated as a var args parameter.
+ */
 public interface Scheduler {
     /**
      * Process the result of the previous run if there was a previous run. Then return a {@link SchedulerResult} which
