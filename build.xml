@@ -1262,7 +1262,7 @@ JAVA COMPILATION
 
 <target name='using_calcite'>
     <exec executable="awk" failonerror="false" resultproperty="using_calcite">
-        <arg value='BEGIN{ while(("git branch --no-color" | getline) > 0) { if (match($0, ".* .*calcite-")) exit 0} exit 1}'/>
+        <arg value='BEGIN{ while(("git branch --no-color" | getline) > 0) { if (match($0, "\\* .*calcite-")) exit 0} exit 1}'/>
     </exec>
     <condition property='plan_with_calcite'>
         <equals arg1='${using_calcite}' arg2='0'/>
