@@ -377,12 +377,15 @@ public class SQLCommand {
                 case "configuration":
                     execListConfigurations();
                     break;
+                case "schedules":
+                    executeListSchedules();
+                    break;
                 default:
                     String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + subcommand + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are proc, procedures, tables, or classes.");
+                            "The valid SHOW command completions are proc, procedures, tables, classes or schedules.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
@@ -553,6 +556,14 @@ public class SQLCommand {
         VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
         if (configData.getRowCount() != 0) {
             printConfig(configData);
+        }
+    }
+
+    private static void executeListSchedules() throws Exception {
+        VoltTable schedules = m_client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
+        System.out.println("--- Schedules ------------------------------------------------");
+        while (schedules.advanceRow()) {
+            System.out.println(schedules.getString(0));
         }
     }
 
