@@ -21,11 +21,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Parameter;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -45,9 +47,13 @@ import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ParameterConverter;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
+import org.voltdb.StatsAgent;
+import org.voltdb.StatsSelector;
+import org.voltdb.StatsSource;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
@@ -106,6 +112,7 @@ public class SchedulerManager {
     final ListeningScheduledExecutorService m_wrapperExecutor = MoreExecutors.listeningDecorator(CoreUtils.getScheduledThreadPoolExecutor("ProcedureScheduler",
                     1, CoreUtils.SMALL_STACK_SIZE));
     final ClientInterface m_clientInterface;
+    final StatsAgent m_statsAgent;
 
     static String generateLogMessage(String name, String body) {
         return String.format("Schedule (%s): %s", name, body);
@@ -202,8 +209,9 @@ public class SchedulerManager {
         return lastParam.getType() == String[].class || lastParam.getType() == Object[].class;
     }
 
-    public SchedulerManager(ClientInterface clientInterface, int hostId) {
+    public SchedulerManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId) {
         m_clientInterface = clientInterface;
+        m_statsAgent = statsAgent;
         m_hostId = hostId;
 
         m_clientInterface.bindAdapter(m_adapter, new ClientInterfaceRepairCallback() {
@@ -282,6 +290,20 @@ public class SchedulerManager {
             ClassLoader classLoader) {
         return execute(() -> {
             m_started = true;
+
+            // Create a dummy stats source so something is always reported
+            m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, -1,
+                    new StatsSource(false) {
+                        @Override
+                        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+                            return Collections.emptyIterator();
+                        }
+
+                        @Override
+                        protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
+                            columns.addAll(ScheduleStatsSource.s_columns);
+                        }
+                    });
             processCatalogInline(procedureSchedules, authSystem, classLoader);
         });
     }
@@ -750,6 +772,10 @@ public class SchedulerManager {
         private final Scheduler m_scheduler;
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
+        private ScheduleStatsSource m_stats;
+
+        // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
+        private volatile long m_expectedExecutionTime;
 
         SchedulerWrapper(H handler, Scheduler scheduler) {
             m_handler = handler;
@@ -763,7 +789,9 @@ public class SchedulerManager {
             if (m_state != SchedulerWrapperState.INITIALIZED) {
                 return;
             }
-            m_state = SchedulerWrapperState.RUNNING;
+            m_stats = new ScheduleStatsSource(m_handler.getName(), getRunLocation(), m_hostId, getSiteId());
+            m_statsAgent.registerStatsSource(StatsSelector.SCHEDULER, getSiteId(), m_stats);
+            setState(SchedulerWrapperState.RUNNING);
             submitHandleNextRun();
         }
 
@@ -777,6 +805,8 @@ public class SchedulerManager {
             if (m_state != SchedulerWrapperState.RUNNING) {
                 return;
             }
+            long startTime = System.nanoTime();
+            long waitTime = startTime - m_expectedExecutionTime;
 
             SchedulerResult result;
             try {
@@ -784,6 +814,8 @@ public class SchedulerManager {
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
+            } finally {
+                m_stats.addSchedulerCall(System.nanoTime() - startTime, waitTime);
             }
 
             if (result == null) {
@@ -820,9 +852,11 @@ public class SchedulerManager {
                 m_procedure = result.getScheduledProcedure();
 
                 try {
+                    long delay = calculateDelay();
+                    m_expectedExecutionTime = System.nanoTime() + delay;
+                    m_procedure.expectedExecutionTime(m_expectedExecutionTime);
                     m_scheduledFuture = addExceptionListener(
-                            m_wrapperExecutor.schedule(runnable, calculateDelay(), TimeUnit.NANOSECONDS));
-                    m_procedure.scheduled();
+                            m_wrapperExecutor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
                     if (log.isDebugEnabled()) {
                         log.debug(generateLogMessage(
@@ -866,11 +900,14 @@ public class SchedulerManager {
                 return;
             }
             m_procedure.setResponse(response);
+            m_stats.addProcedureCall(m_procedure.getExecutionTime(), m_procedure.getWaitTime(),
+                    response.getStatus() != ClientResponse.SUCCESS);
             submitHandleNextRun();
         }
 
         private synchronized void submitHandleNextRun() {
             try {
+                m_expectedExecutionTime = System.nanoTime();
                 addExceptionListener(m_wrapperExecutor.submit(this::handleNextRun));
             } catch (RejectedExecutionException e) {
                 if (log.isDebugEnabled()) {
@@ -892,6 +929,7 @@ public class SchedulerManager {
          */
         void cancel() {
             shutdown(SchedulerWrapperState.CANCELED);
+            m_statsAgent.deregisterStatsSource(StatsSelector.SCHEDULER, getSiteId(), m_stats);
         }
 
         /**
@@ -965,7 +1003,7 @@ public class SchedulerManager {
             if (!(m_state == SchedulerWrapperState.INITIALIZED || m_state == SchedulerWrapperState.RUNNING)) {
                 return;
             }
-            m_state = state;
+            setState(state);
 
             m_procedure = null;
 
@@ -989,6 +1027,15 @@ public class SchedulerManager {
         String generateLogMessage(String body) {
             return m_handler.generateLogMessage(body);
         }
+
+        abstract String getRunLocation();
+
+        abstract int getSiteId();
+
+        private void setState(SchedulerWrapperState state) {
+            m_state = state;
+            m_stats.setState(m_state.name());
+        }
     }
 
     /**
@@ -1002,6 +1049,16 @@ public class SchedulerManager {
         @Override
         boolean isValidProcedure(Procedure procedure) {
             return true;
+        }
+
+        @Override
+        String getRunLocation() {
+            return RUN_LOCATION_SYSTEM;
+        }
+
+        @Override
+        int getSiteId() {
+            return -1;
         }
     }
 
@@ -1024,6 +1081,16 @@ public class SchedulerManager {
                 return false;
             }
             return true;
+        }
+
+        @Override
+        String getRunLocation() {
+            return RUN_LOCATION_HOSTS;
+        }
+
+        @Override
+        int getSiteId() {
+            return -1;
         }
     }
 
@@ -1098,6 +1165,16 @@ public class SchedulerManager {
         @Override
         String generateLogMessage(String body) {
             return SchedulerManager.generateLogMessage(m_handler.getName() + " P" + m_partition, body);
+        }
+
+        @Override
+        String getRunLocation() {
+            return RUN_LOCATION_PARTITIONS;
+        }
+
+        @Override
+        int getSiteId() {
+            return m_partition;
         }
     }
 
