@@ -577,6 +577,9 @@ public class StatsAgent extends OpsAgent
         case EXPORT:
             stats = collectStats(StatsSelector.EXPORT, interval);
             break;
+        case SCHEDULES:
+            stats = collectStats(subselector, false);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly

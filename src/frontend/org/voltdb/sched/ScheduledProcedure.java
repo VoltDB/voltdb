@@ -26,18 +26,18 @@ import org.voltdb.client.ClientResponse;
  * A class to define a scheduled execution from a {@link Scheduler} and the result of the procedure execution
  */
 public final class ScheduledProcedure {
-    private final long m_delayNs;
+    private final long m_requestedDelayNs;
     private final String m_procedure;
     private final Object[] m_procedureParameters;
     private ClientResponse m_response;
     private Object m_attachment;
 
-    long m_scheduledAtNs;
+    long m_expectedExecutionTimeNs;
     long m_startedAtNs;
     long m_completedAtNs;
 
     ScheduledProcedure(long delay, TimeUnit timeUnit, String procedure, Object... procedureParameters) {
-        m_delayNs = Math.max(timeUnit.toNanos(delay), 0);
+        m_requestedDelayNs = Math.max(timeUnit.toNanos(delay), 0);
         m_procedure = procedure;
         m_procedureParameters = procedureParameters.clone();
     }
@@ -47,7 +47,7 @@ public final class ScheduledProcedure {
      * @return Time delay in {@code timeUnit}
      */
     public long getDelay(TimeUnit timeUnit) {
-        return timeUnit.convert(m_delayNs, TimeUnit.NANOSECONDS);
+        return timeUnit.convert(m_requestedDelayNs, TimeUnit.NANOSECONDS);
     }
 
     /**
@@ -105,13 +105,21 @@ public final class ScheduledProcedure {
         return this;
     }
 
-    ScheduledProcedure scheduled() {
-        m_scheduledAtNs = System.nanoTime();
+    ScheduledProcedure expectedExecutionTime(long expectedExecutionTimeNs) {
+        m_expectedExecutionTimeNs = expectedExecutionTimeNs;
         return this;
     }
 
     ScheduledProcedure setStarted() {
         m_startedAtNs = System.nanoTime();
         return this;
+    }
+
+    long getExecutionTime() {
+        return m_completedAtNs - m_startedAtNs;
+    }
+
+    long getWaitTime() {
+        return m_startedAtNs - m_expectedExecutionTimeNs;
     }
 }

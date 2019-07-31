@@ -53,7 +53,10 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.InternalConnectionHandler;
+import org.voltdb.StatsAgent;
+import org.voltdb.StatsSelector;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -84,6 +87,7 @@ public class TestSchedulerManager {
     private SchedulerManager m_schedulerManager;
     private Database m_database;
     private Procedure m_procedure = new Procedure();
+    private StatsAgent m_statsAgent = new StatsAgent();
 
     @Before
     public void setup() {
@@ -101,7 +105,7 @@ public class TestSchedulerManager {
         when(m_clientInterface.getInternalConnectionHandler()).thenReturn(m_internalConnectionHandler);
         when(m_clientInterface.getProcedureFromName(eq(PROCEDURE_NAME))).thenReturn(m_procedure);
 
-        m_schedulerManager = new SchedulerManager(m_clientInterface, 0);
+        m_schedulerManager = new SchedulerManager(m_clientInterface, m_statsAgent, 0);
 
         s_firstSchedulerCallCount.set(0);
         s_postRunSchedulerCallCount.set(0);
@@ -298,6 +302,7 @@ public class TestSchedulerManager {
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
+        validateStats();
         processUpdateSync();
         assertCountsAfterScheduleCanceled(startCount);
     }
@@ -365,6 +370,19 @@ public class TestSchedulerManager {
             futures.add(m_schedulerManager.demotedPartition(partitionId));
         }
         Futures.whenAllSucceed(futures).call(() -> null).get();
+    }
+
+    private void validateStats() {
+        VoltTable table = m_statsAgent.getStatsAggregate(StatsSelector.SCHEDULER, false, System.currentTimeMillis());
+        long totalSchedulerInvocations = 0;
+        long totalProcedureInvocations = 0;
+        while (table.advanceRow()) {
+            totalSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
+            totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
+        }
+
+        assertTrue(totalSchedulerInvocations > totalProcedureInvocations);
+        assertTrue(totalSchedulerInvocations <= s_firstSchedulerCallCount.get() + s_postRunSchedulerCallCount.get());
     }
 
     public static class TestScheduler implements Scheduler {

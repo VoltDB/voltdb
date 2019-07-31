@@ -1519,7 +1519,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            m_schedulerManager = new SchedulerManager(m_clientInterface, m_myHostId);
+            m_schedulerManager = new SchedulerManager(m_clientInterface, getStatsAgent(), m_myHostId);
             m_globalServiceElector.registerService(() -> m_schedulerManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
