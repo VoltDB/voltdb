@@ -37,10 +37,9 @@ class StringRef {
     // Only called from destroy and only for persistent strings.
     ~StringRef();
 
-    // Only called from destroy and only for persistent strings.
-    void operator delete(void* object);
-
+    size_t const m_size;
     char* m_stringPtr;
+    static StringRef const EMPTY_STRING;
 public:
     /// Utility method to extract the amount of memory that was
     /// used by non-inline storage for this string/varbinary.
@@ -48,6 +47,9 @@ public:
     /// backpointer, and excess memory allocated in the compacting
     /// string pool.
     int32_t getAllocatedSizeInPersistentStorage() const;
+    size_t size() const {
+        return m_size;
+    }
 
     /// This method is just like getAllocatedSizeInPersistentStorage()
     /// but it returns the amount of memory required to store this

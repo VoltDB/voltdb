@@ -26,6 +26,8 @@ using namespace voltdb;
 
 char const* empty_string = "";
 
+StringRef const StringRef::EMPTY_STRING(0);
+
 inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
    return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
 }
@@ -43,17 +45,13 @@ int32_t StringRef::getObjectLength() const {
 }
 
 const char* StringRef::getObject(int32_t& lengthOut) const {
-    /*/ enable to debug
-    std::cout << this << " DEBUG: getting [" << asSizedObject(m_stringPtr)->m_size << "]"
-              << std::string(asSizedObject(m_stringPtr)->m_data,
-                             asSizedObject(m_stringPtr)->m_size)
-              << std::endl;
-    // */
-    auto const* sized = asSizedObject(m_stringPtr);
-    lengthOut = sized->m_size;
-    if (lengthOut > 0) {
+    if (m_size > 0) {
+        auto const* sized = asSizedObject(m_stringPtr);
+        lengthOut = sized->m_size;
+        vassert(lengthOut > 0);
         return sized->m_data;
     } else {
+        vassert(m_size == 0);
         lengthOut = 0;
         return empty_string;
     }
@@ -61,18 +59,16 @@ const char* StringRef::getObject(int32_t& lengthOut) const {
 
 int32_t StringRef::getAllocatedSizeInPersistentStorage() const {
     // The CompactingPool allocated a chunk of this size for storage.
-    int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
-    //cout << "Pool allocation size: " << alloc_size << endl;
-    // One of these was allocated in the thread local pool for the string
-    alloc_size += static_cast<int32_t>(sizeof(StringRef));
-    //cout << "StringRef size: " << sizeof(StringRef) << endl;
-    //cout << "Total allocation size: " << alloc_size << endl;
-    return alloc_size;
+    return m_size > 0 ?
+        ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr)) +
+        static_cast<int32_t>(sizeof(StringRef)) :
+        m_size;
 }
 
 int32_t StringRef::getAllocatedSizeInTempStorage() const {
-    int32_t size = asSizedObject(m_stringPtr)->m_size;
-    return size + sizeof(StringRef) + sizeof(ThreadLocalPool::Sized);
+    return m_size > 0 ?
+        asSizedObject(m_stringPtr)->m_size + sizeof(StringRef) + sizeof(ThreadLocalPool::Sized) :
+        m_size;
 }
 
 // Persistent strings are initialized to point to relocatable storage.
@@ -91,33 +87,37 @@ int32_t StringRef::getAllocatedSizeInTempStorage() const {
 // The alternative would be to require the allocator to be aware of the
 // StringRef class so that it can call a proper accessor method.
 // An earlier implementation taking this approach proved hard to follow.
-inline StringRef::StringRef(int32_t sz):
-    m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) { }
+inline StringRef::StringRef(int32_t sz) : m_size(sz),
+    m_stringPtr(m_size > 0 ?
+            reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, m_size)) :
+            const_cast<char*>(empty_string)) {
+    vassert(sz >= 0);
+}
 
 // Temporary strings are allocated in one piece with their referring
 // StringRefs -- the string data starts just past the StringRef object,
 // which by the rules of object pointer math is just "this+1".
-inline StringRef::StringRef(Pool* unused, int32_t sz) : m_stringPtr(reinterpret_cast<char*>(this+1)) {
-    asSizedObject(m_stringPtr)->m_size = sz;
+inline StringRef::StringRef(Pool* unused, int32_t sz) : m_size(sz),
+    m_stringPtr(m_size > 0 ? reinterpret_cast<char*>(this+1) : const_cast<char*>(empty_string)) {
+    vassert(sz >= 0);
+    if (m_size > 0) {
+        asSizedObject(m_stringPtr)->m_size = m_size;
+    }
 }
 
 // The destroy method keeps this from getting run on temporary strings.
 inline StringRef::~StringRef() {
-    ThreadLocalPool::freeRelocatable(asSizedObject(m_stringPtr));
+    if (m_size > 0) {
+        ThreadLocalPool::freeRelocatable(asSizedObject(m_stringPtr));
+    }
 }
 
 StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
-    /*/ enable to debug
-    if (source) {
-        std::cout << "DEBUG: setting [" << sz << "]" << std::string(source, sz) << std::endl;
-    }
-    else {
-        std::cout << "DEBUG: setting up [" << sz << "]" << std::endl;
-    }
-    // */
     vassert(sz >= 0);
     StringRef* result;
-    if (tempPool) {
+    if (sz == 0) {                         // Empty string is not stored on heap.
+        return const_cast<StringRef*>(&EMPTY_STRING);
+    } else if (tempPool) {
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(tempPool, sz);
     } else {
 #ifdef MEMCHECK
@@ -126,35 +126,31 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
         result = new (ThreadLocalPool::allocateExactSizedObject(sizeof(StringRef))) StringRef(sz);
 #endif
     }
-    if (source && sz > 0) {
-        ::memcpy(result->getObjectValue(), source, sz);
+    if (source) {
+        memcpy(result->getObjectValue(), source, sz);
     }
     return result;
 }
 
 StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock) {
     vassert(lttBlock != nullptr);
-    StringRef* result;
-    result = new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(NULL, sz);
-
-    if (source) {
-        ::memcpy(result->getObjectValue(), source, sz);
+    vassert(sz >= 0);
+    if (sz == 0) {
+        return const_cast<StringRef*>(&EMPTY_STRING);
+    } else {
+        StringRef* result =
+            new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(nullptr, sz);
+        if (source) {
+            memcpy(result->getObjectValue(), source, sz);
+        }
+        return result;
     }
-    return result;
-
 }
 
 void StringRef::relocate(std::ptrdiff_t offset) {
-    m_stringPtr += offset;
-}
-
-// The destroy method keeps this from getting run on temporary strings.
-void StringRef::operator delete(void* sref) {
-#ifdef MEMCHECK
-    ::operator delete(sref);
-#else
-    ThreadLocalPool::freeExactSizedObject(sizeof(StringRef), sref);
-#endif
+    if (m_size > 0) {
+        m_stringPtr += offset;
+    }
 }
 
 void StringRef::destroy(StringRef* sref) {
@@ -169,8 +165,11 @@ void StringRef::destroy(StringRef* sref) {
     // unlikely event that the two allocations were very close to each other,
     // they would still be separated by that offset and would fail this
     // test.
-    if (sref->m_stringPtr == reinterpret_cast<char*>(sref+1)) {
-        return;
+    if (sref->size() > 0 && sref->m_stringPtr != reinterpret_cast<char*>(sref+1)) {
+#ifdef MEMCHECK
+        delete(sref);
+#else
+        ThreadLocalPool::freeExactSizedObject(sizeof(StringRef), sref);
+#endif
     }
-    delete sref;
 }
