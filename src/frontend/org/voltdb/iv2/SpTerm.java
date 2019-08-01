@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,7 @@ import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -166,12 +167,12 @@ public class SpTerm implements Term
 
     //replica update is delayed till this is called during joining or rejoing snapshot
     // mpTxnId: the MP transaction id of ongoing stream snapshot save
-    public long[] updateReplicas(long snapshotSaveTxnId) {
+    public long[] updateReplicas(TransactionState snapshotTransactionState) {
         long[] replicasAdded = new long[0];
         if (m_replicasUpdatedRequired) {
             tmLog.info(m_whoami + " updated replica list to: "
                     + CoreUtils.hsIdCollectionToString(m_replicas));
-            replicasAdded = m_mailbox.updateReplicas(m_replicas, null, snapshotSaveTxnId);
+            replicasAdded = m_mailbox.updateReplicas(m_replicas, null, snapshotTransactionState);
             m_replicasUpdatedRequired = false;
         }
         return replicasAdded;

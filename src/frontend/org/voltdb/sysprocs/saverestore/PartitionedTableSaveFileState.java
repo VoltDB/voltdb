@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -76,6 +76,21 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 Pair.of(
                         originalPartitionId,
                         (int) row.getLong("ORIGINAL_HOST_ID")));
+    }
+
+    @Override
+    public String debug() {
+        StringBuilder builder = new StringBuilder("Partitioned table ");
+        builder.append(getTableName()).append("\n");
+        for (Entry<Integer, Set<Pair<Integer, Integer>>> entry : m_partitionsAtHost.entrySet()) {
+            int hostId = entry.getKey();
+            builder.append("Host ").append(hostId).append(" got (originalPartitionId, originalHostId): ");
+            for (Pair<Integer, Integer> pair : entry.getValue()) {
+                builder.append("(").append(pair.getFirst()).append(",")
+                .append(pair.getSecond()).append(") ");
+            }
+        }
+        return builder.toString();
     }
 
     @Override
@@ -189,7 +204,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         restorePlan.add(constructDistributePartitionedTableAggregatorFragment(true));
         assert(coveredPartitions.size() == m_partitionsSeen.size());
-        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
+        return restorePlan.toArray(new SynthesizedPlanFragment[restorePlan.size()]);
     }
 
     private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
@@ -269,8 +284,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
             int originalHostsArray[] = new int[originalHosts.size()];
             int qq = 0;
-            for (int originalHostId : originalHosts)
+            for (int originalHostId : originalHosts) {
                 originalHostsArray[qq++] = originalHostId;
+            }
             int uncoveredPartitionsAtHost[] = new int[uncoveredPartitionsAtHostList
                     .size()];
             for (int ii = 0; ii < uncoveredPartitionsAtHostList.size(); ii++) {
@@ -298,7 +314,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         restorePlan
                 .add(constructDistributePartitionedTableAggregatorFragment(false));
-        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
+        return restorePlan.toArray(new SynthesizedPlanFragment[restorePlan.size()]);
     }
 
     private SynthesizedPlanFragment
@@ -308,43 +324,28 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             int originalHostsArray[],           // used to locate .vpt files
             boolean asReplicated)
     {
-        int result_dependency_id = getNextDependencyId();
-        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
-        plan_fragment.fragmentId =
-                (asReplicated ? SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated
-                              : SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned);
-        plan_fragment.multipartition = false;
-        plan_fragment.siteId = distributorSiteId;
-        plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = new int[] {};
-        addPlanDependencyId(result_dependency_id);
-        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
-                getTableName(),
-                originalHostsArray,
-                uncoveredPartitionsAtHost,
-                result_dependency_id,
-                getIsRecoverParam());
-        return plan_fragment;
+        int fragmentId = (asReplicated ? SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated
+                : SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned);
+        int resultDependencyId = getNextDependencyId();
+        ParameterSet params = ParameterSet.fromArrayNoCopy(getTableName(), originalHostsArray,
+                uncoveredPartitionsAtHost, resultDependencyId, getIsRecoverParam());
+
+        return new SynthesizedPlanFragment(distributorSiteId, fragmentId, resultDependencyId, false, params);
     }
 
     private SynthesizedPlanFragment
     constructDistributePartitionedTableAggregatorFragment(boolean asReplicated)
     {
-        int result_dependency_id = getNextDependencyId();
-        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
-        plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreReceiveResultTables;
-        plan_fragment.multipartition = false;
-        plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = getPlanDependencyIds();
-        setRootDependencyId(result_dependency_id);
-        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
-                result_dependency_id,
+        int resultDependencyId = getNextDependencyId();
+        setRootDependencyId(resultDependencyId);
+        ParameterSet parameters = ParameterSet.fromArrayNoCopy(
+                resultDependencyId,
                 (asReplicated ?
                         "Aggregating partitioned-to-replicated table restore results"
                         : "Aggregating partitioned table restore results"),
                 getIsRecoverParam());
-        return plan_fragment;
+        return new SynthesizedPlanFragment(SysProcFragmentId.PF_restoreReceiveResultTables, resultDependencyId,
+                false, parameters);
     }
 
     // XXX-BLAH should this move to SiteTracker?

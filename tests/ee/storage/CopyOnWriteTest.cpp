@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,6 @@
 #include "harness.h"
 
 #include "common/NValue.hpp"
-#include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/TupleSchema.h"
@@ -53,7 +52,7 @@
 
 #include <murmur3/MurmurHash3.h>
 
-#include "jsoncpp/jsoncpp.h"
+#include "json/json.h"
 
 #include <iostream>
 #include <stdint.h>
@@ -241,7 +240,7 @@ public:
                                              voltdb::BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, false, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         if (m_table != NULL) {
@@ -250,7 +249,7 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
-                                                         m_columnNames, signature, false, 0, false, false,
+                                                         m_columnNames, signature, false, 0, PERSISTENT,
                                                          tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
@@ -488,6 +487,7 @@ public:
         m_outputStreams.reset(new TupleOutputStreamProcessor(m_serializationBuffer, sizeof(m_serializationBuffer)));
         m_outputStream = &m_outputStreams->at(0);
         return m_table->activateWithCustomStreamer(streamType,
+                                                   HiddenColumnFilter::NONE,
                                                    streamer,
                                                    m_tableId,
                                                    predicateStrings,
@@ -970,7 +970,7 @@ public:
 
     void streamElasticIndex(std::vector<std::string> &predicateStrings, bool checkCalls) {
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getPredicateSerializeInput(predicateStrings);
-        bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+        bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInput);
         ASSERT_TRUE(ok);
 
         // Force index streaming to need multiple streamMore() calls.
@@ -998,7 +998,7 @@ public:
 
         totalInserted = 0;
 
-        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, predicateInput);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, predicateInput);
 
         while (true) {
             TupleOutputStreamProcessor outputStreams(m_serializationBuffer, sizeof(m_serializationBuffer));
@@ -1054,7 +1054,7 @@ public:
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
 
         m_engine->setUndoToken(m_undoToken);
-        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ,
+        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ, HiddenColumnFilter::NONE,
                                                  0, m_tableId, *predicateInput);
         ASSERT_TRUE(activated);
 
@@ -1101,7 +1101,7 @@ public:
 
     void clearIndex(const T_HashRange &testRange, bool expected) {
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
-        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR,
+        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR, HiddenColumnFilter::NONE,
                                                  0, m_tableId, *predicateInput);
         ASSERT_EQ(expected,activated);
     }
@@ -1217,7 +1217,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);
     // activate snapshot
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
     // insert tuples
     addRandomUniqueTuples(m_table, tupleCount);
     // do work - start taking snapshot of the table
@@ -1244,7 +1244,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
 
-        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1311,7 +1311,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         char config[4];
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
-        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1379,7 +1379,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         char config[4];
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
-        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1500,7 +1500,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("activate");
 
         ReferenceSerializeInputBE input(buffer, output.position());
-        bool success = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        bool success = m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
         if (!success) {
             error("COW was previously activated");
         }
@@ -1590,7 +1590,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     char config[4];
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
@@ -1614,6 +1614,7 @@ public:
 
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TableStreamType streamType,
+                                const HiddenColumnFilter &filter,
                                 const std::vector<std::string> &predicateStrings) {
         return false;
     }
@@ -1784,6 +1785,7 @@ public:
 
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TableStreamType streamType,
+                                const HiddenColumnFilter &filter,
                                 const std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
                                            m_predicateStrings));
@@ -2040,7 +2042,7 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
     boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
     m_outputStreams.reset(new TupleOutputStreamProcessor(m_serializationBuffer, sizeof(m_serializationBuffer)));
     m_outputStream = &m_outputStreams->at(0);
-    bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+    bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInput);
     ASSERT_TRUE(ok);
 
     // scan all the index
@@ -2049,7 +2051,7 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
     }
 
     // try activate snapshot
-    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
     ASSERT_TRUE(ok);
     // insert tuples
     int tupleCount = 4;
@@ -2057,17 +2059,17 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
 
     // try activate another Snapshot
     ReferenceSerializeInputBE input2(config, 4);
-    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
+    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input2);
     ASSERT_FALSE(ok);
 
     // try reactive elastic_index
-    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInput);
     ASSERT_FALSE(ok);
 
     // try materialize elastic_index
     boost::shared_ptr<ReferenceSerializeInputBE> predicateInputRead = getHashRangePredicateInput(ranges[0]);
     m_engine->setUndoToken(m_undoToken);
-    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ, 0, m_tableId, *predicateInputRead);
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInputRead);
     ASSERT_TRUE(ok);
     while ( m_table->streamMore(*m_outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, m_retPositions) != 0) {
         ;
@@ -2076,7 +2078,7 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
 
     // try clear elastic_index
     boost::shared_ptr<ReferenceSerializeInputBE> predicateInputClear = getHashRangePredicateInput(ranges[0]);
-    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR, 0, m_tableId, *predicateInputClear);
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInputClear);
     ASSERT_TRUE(ok);
 }
 

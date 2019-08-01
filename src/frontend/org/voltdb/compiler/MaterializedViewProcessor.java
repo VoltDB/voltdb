@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,15 +43,13 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.ParsedColInfo;
-import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.planner.SubPlanAssembler;
+import org.voltdb.planner.*;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -112,6 +110,14 @@ public class MaterializedViewProcessor {
                 throw m_compiler.new VoltCompilerException(e.getMessage());
             }
             assert(stmt != null);
+            // NOTE: it is hard to check for display columns at DDLCompiler time when we get from HSQL, so we
+            // have to guard in here (the actual parsing is done in ParseSelectStmt)
+            if (stmt.m_displayColumns.stream().anyMatch(col ->
+                    col.m_expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT &&
+                            ((AggregateExpression) col.m_expression).isDistinct())) {
+                throw new PlanningErrorException(String.format("View does not support COUNT(DISTINCT) expression: \"%s\"",
+                        stmt.m_sql));
+            }
 
             String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited world view
@@ -272,9 +278,6 @@ public class MaterializedViewProcessor {
                 // Materialized view on single table
                 // create the materializedviewinfo catalog node for the source table
                 Table srcTable = stmt.m_tableList.get(0);
-                if (srcTable.getViews().get(viewName) != null) {
-                    return;
-                }
                 MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
                 matviewinfo.setDest(destTable);
 
@@ -944,9 +947,9 @@ public class MaterializedViewProcessor {
                 }
                 String predicatejson = index.getPredicatejson();
                 if ( ! predicatejson.isEmpty() &&
-                        ! SubPlanAssembler.isPartialIndexPredicateCovered(
+                        ! SubPlanAssembler.evaluatePartialIndexPredicate(
                                 tableScan, coveringExprs,
-                                predicatejson, exactMatchCoveringExprs)) {
+                                predicatejson, exactMatchCoveringExprs).getFirst()) {
                     // the partial index predicate does not match the MatView's
                     // where clause -- give up on this index
                     continue;

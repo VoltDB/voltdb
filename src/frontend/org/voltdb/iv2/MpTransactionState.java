@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -36,8 +35,8 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PartitionDRGateway.DRRecordType;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
@@ -54,6 +53,7 @@ import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 
 public class MpTransactionState extends TransactionState
@@ -61,6 +61,11 @@ public class MpTransactionState extends TransactionState
     static VoltLogger tmLog = new VoltLogger("TM");
 
     public static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
+    public static final long MP_MAX_TOTAL_RESP_SIZE = calculateMpMaxTotalResponse();
+
+    static final long MP_MAX_TOTAL_RESP_SIZE_MIN = 50 * 1024 * 1024; // 50MB
+    static final String MP_MAX_TOTAL_RESP_SIZE_KEY = "MP_MAX_TOTAL_RESP_SIZE";
+
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
     private static final String dr_max_consumer_messageheader_room_str = "DR_MAX_CONSUMER_MESSAGEHEADER_ROOM";
     private static final String volt_output_buffer_overflow = "V0001";
@@ -95,6 +100,7 @@ public class MpTransactionState extends TransactionState
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
+    int m_fragmentIndex = 0;
     final boolean m_nPartTxn;
     boolean m_haveSentfragment = false;
 
@@ -174,6 +180,47 @@ public class MpTransactionState extends TransactionState
         return serializedParamSize;
     }
 
+    static long calculateMpMaxTotalResponse() {
+        String key = MP_MAX_TOTAL_RESP_SIZE_KEY;
+        String mpHeapString = System.getProperty(key, System.getenv(key));
+        long maxTotalResponse = 0;
+        if (mpHeapString != null) {
+            try {
+                if (mpHeapString.endsWith("%")) {
+                    double percent = Double.parseDouble(mpHeapString.substring(0, mpHeapString.length() - 1));
+                    if (percent > 0) {
+                        maxTotalResponse = percentOfTotalHeap(percent);
+                    }
+                } else {
+                    maxTotalResponse = Long.parseLong(mpHeapString);
+                }
+
+                if (maxTotalResponse < MP_MAX_TOTAL_RESP_SIZE_MIN) {
+                    tmLog.warn(String.format(
+                            "Invalid value, '%s', provided for config  %s. Value must result in a size greater than %d : %d",
+                            mpHeapString, key, MP_MAX_TOTAL_RESP_SIZE, maxTotalResponse));
+                    return MP_MAX_TOTAL_RESP_SIZE_MIN;
+                }
+                tmLog.info(String.format("Config %s set to %s evaluated to max mp response total of %d", key,
+                        mpHeapString, maxTotalResponse));
+                return maxTotalResponse;
+            } catch (NumberFormatException e) {
+                tmLog.warn(String.format("Could not parse value for config %s: '%s'", key, mpHeapString));
+            }
+        }
+
+        maxTotalResponse = percentOfTotalHeap(65.0);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Using default mp max total response of " + maxTotalResponse);
+        }
+        return maxTotalResponse;
+    }
+
+    private static long percentOfTotalHeap(double percent) {
+        double percentOfMemory = Runtime.getRuntime().maxMemory() * percent / 100;
+        return (long) Math.min(percentOfMemory, Long.MAX_VALUE);
+    }
+
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         // TODO separate NPTransactionState from MPTransactionState when work on concurrent np transaction
@@ -212,7 +259,9 @@ public class MpTransactionState extends TransactionState
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
         m_isRestart = true;
+        m_fragmentIndex = 0;
         m_haveSentfragment = false;
+        m_drBufferChangedAgg = 0;
     }
 
     @Override
@@ -236,7 +285,6 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
         m_remoteDeps = null;
         m_remoteDepTables.clear();
-        m_drBufferChangedAgg = 0;
     }
 
     // I met this List at bandcamp...
@@ -351,7 +399,6 @@ public class MpTransactionState extends TransactionState
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
-
             // clear up DR buffer size tracker
             m_drBufferChangedAgg = 0;
             // if there are remote deps, block on them
@@ -466,40 +513,41 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     tmLog.warn(deadlockMsg.toString());
-                    m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
-                    m_mbox.send(m_mbox.getHSId(), new DumpMessage());
-                }
-
-                SerializableException se = msg.getException();
-                if (se instanceof TransactionRestartException) {
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
-                                + " msg: " + msg);
-                    }
-
-                    // If this is a restart exception from the inject poison pill, we don't need to match up the DependencyId
-                    // Don't rely on the restartTimeStamp check since it's not reliable for poison
-                    if (!((TransactionRestartException) se).isMisrouted()) {
-                        setNeedsRollback(true);
-                        throw se;
-                    }
-                }
-
-                // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
-                if (m_restartTimestamp != msg.getRestartTimestamp()) {
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
-                                " actually receives: " + msg);
-                    }
-                    msg = null;
+                    m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage(txnId));
+                    m_mbox.send(m_mbox.getHSId(), new DumpMessage(txnId));
                 }
 
                 if (msg != null) {
+                    SerializableException se = msg.getException();
                     if (se instanceof TransactionRestartException) {
-                        // If this is an misrouted exception, rerouted only this fragment
-                        if (((TransactionRestartException) se).isMisrouted()) {
-                            restartFragment(msg, ((TransactionRestartException) se).getMasterList(), ((TransactionRestartException) se).getPartitionMasterMap());
-                            msg = null;
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
+                                    + " msg: " + msg);
+                        }
+
+                        // If this is a restart exception from the inject poison pill, we don't need to match up the DependencyId
+                        // Don't rely on the restartTimeStamp check since it's not reliable for poison
+                        if (!((TransactionRestartException) se).isMisrouted()) {
+                            setNeedsRollback(true);
+                            throw se;
+                        }
+                    }
+
+                    // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+                    if (m_restartTimestamp != msg.getRestartTimestamp()) {
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                                    " actually receives: " + msg);
+                        }
+                        msg = null;
+                    }
+                    if (msg != null) {
+                        if (se instanceof TransactionRestartException) {
+                            // If this is an misrouted exception, rerouted only this fragment
+                            if (((TransactionRestartException) se).isMisrouted()) {
+                                restartFragment(msg, ((TransactionRestartException) se).getMasterList(), ((TransactionRestartException) se).getPartitionMasterMap());
+                                msg = null;
+                            }
                         }
                     }
                 }
@@ -632,6 +680,9 @@ public class MpTransactionState extends TransactionState
     }
 
     public boolean drTxnDataCanBeRolledBack() {
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("DR Txn can be rolled back=" + (m_drBufferChangedAgg == 0));
+        }
         return m_drBufferChangedAgg == 0;
     }
 
@@ -708,9 +759,14 @@ public class MpTransactionState extends TransactionState
         return m_nPartTxn;
     }
 
+    public int getNextFragmentIndex() {
+        return m_fragmentIndex++;
+    }
+
     // Have MPI sent out at least one round of fragment to leaders?
     // When MP txn is restarted, the flag is reset to false.
     public boolean haveSentFragment() {
         return m_haveSentfragment;
     }
 }
+

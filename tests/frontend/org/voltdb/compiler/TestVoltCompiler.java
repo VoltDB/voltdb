@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@
 
 package org.voltdb.compiler;
 
-import static org.mockito.Matchers.contains;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -62,7 +64,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -88,23 +90,73 @@ public class TestVoltCompiler extends TestCase {
         File tjar = new File(testout_jar);
         tjar.delete();
     }
+    public void testExportTarget() throws Exception {
+        String ddl = "create table foo EXPORT TO TARGET foo (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        // cann't alter target
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+        "alter table foo  alter EXPORT TO TARGET foox ON UPDATE_NEW;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+                "alter table foo  alter EXPORT TO TARGET foo ON UPDATE_NEW;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+    }
 
     public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n" +
                      "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // can not drop ttl column
+        ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
+              "alter table ttl drop column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // max_fequency must be positive integer
+        ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
+              "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
-    public void testDDLFiltering() throws Exception {
+    public void testDDLFiltering() {
 
         String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
                      "-- This comment is inside a batch\n" +
@@ -122,7 +174,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLFilteringNoEndBatch() throws Exception {
+    public void testDDLFilteringNoEndBatch() {
 
         String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
                      "-- This comment is inside a batch\n" +
@@ -135,7 +187,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLFilteringCaseInsensitve() throws Exception {
+    public void testDDLFilteringCaseInsensitve() {
 
         String ddl = "FiLe -inlinebatch END_OF_DROP_BATCH\n" +
                      "-- This comment is inside a batch\n" +
@@ -199,7 +251,7 @@ public class TestVoltCompiler extends TestCase {
         return false;
     }
 
-    public void testMismatchedPartitionParams() throws IOException {
+    public void testMismatchedPartitionParams() {
         String expectedError;
         ArrayList<Feedback> fbs;
 
@@ -320,7 +372,7 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
-    public void testPartitionProcedureWarningMessage() throws IOException {
+    public void testPartitionProcedureWarningMessage() {
         String ddl = "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, NUM INTEGER, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
@@ -385,7 +437,15 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
+        StringBuilder ddl = new StringBuilder();
+        String ddlTemplate = "CREATE STREAM T%d PARTITION ON COLUMN ID (\n" +
+                "  CLIENT INTEGER NOT NULL,\n" +
+                "  ID INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  VAL INTEGER);";
+        for (int i = 0; i < 2; i++) {
+            ddl.append(String.format(ddlTemplate, i));
+        }
+        project.addLiteralSchema(ddl.toString());
         project.addExport(false /* disabled */);
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
@@ -407,9 +467,9 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
-        if (!MiscUtils.isPro()) {
-            return;
-        }// not supported in community
+        if (! MiscUtils.isPro()) {
+            return; // not supported in community
+        }
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
@@ -438,7 +498,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testViewSourceExportOnlyValid() throws IOException {
+    public void testViewSourceExportOnlyValid() {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-good-ddl.sql"));
         try {
@@ -450,7 +510,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
+    public void testViewSourceExportOnlyInvalidNoPartitionColumn() {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad2-ddl.sql"));
         try {
@@ -462,7 +522,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
+    public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad1-ddl.sql"));
         try {
@@ -480,7 +540,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testProcWithBoxedParam() throws IOException {
+    public void testProcWithBoxedParam() {
         String schema =
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));\n"
                     + "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;";
@@ -491,7 +551,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testDDLWithNoLengthString() throws IOException {
+    public void testDDLWithNoLengthString() {
 
         // DO NOT COPY PASTE THIS INVALID EXAMPLE!
         String schema1 =
@@ -503,7 +563,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testDDLWithLongStringInCharacters() throws IOException {
+    public void testDDLWithLongStringInCharacters() {
         int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
         String schema1 =
             "create table books (cash integer default 23, " +
@@ -541,7 +601,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(expectedMsg, warningMsg);
     }
 
-    public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
+    public void testDDLWithTooLongVarbinaryVarchar() {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String schema1 =
                 "create table books (cash integer default 23, " +
@@ -560,7 +620,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(schema2, error2);
     }
 
-    public void testNullablePartitionColumn() throws IOException {
+    public void testNullablePartitionColumn() {
         String schema =
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;";
@@ -571,8 +631,9 @@ public class TestVoltCompiler extends TestCase {
 
         boolean found = false;
         for (VoltCompiler.Feedback fb : compiler.m_errors) {
-            if (fb.message.indexOf("Partition column") > 0)
+            if (fb.message.indexOf("Partition column") > 0) {
                 found = true;
+            }
         }
         assertTrue(found);
     }
@@ -593,7 +654,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testDDLTableTooManyColumns() throws IOException {
+    public void testDDLTableTooManyColumns() {
         String schemaPath = "";
         try {
             URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
@@ -635,7 +696,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(sql);
     }
 
-    public void testBadDdlStmtProcName() throws IOException {
+    public void testBadDdlStmtProcName() {
         String schema =
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;\n" +
@@ -646,7 +707,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testGoodStmtProcName() throws IOException {
+    public void testGoodStmtProcName() {
         String schema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "create procedure Foo as select * from books;\n" +
@@ -657,7 +718,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testGoodDdlStmtProcName() throws IOException {
+    public void testGoodDdlStmtProcName() {
         String schema =
             "create table books" +
             " (cash integer default 23 not null," +
@@ -672,7 +733,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testCreateProcedureWithPartition() throws IOException {
+    public void testCreateProcedureWithPartition() {
         class Tester {
             VoltCompiler compiler = new VoltCompiler(false);
             String baseDDL =
@@ -933,7 +994,7 @@ public class TestVoltCompiler extends TestCase {
                 + "end");
     }
 
-    public void testUseInnerClassAsProc() throws Exception {
+    public void testUseInnerClassAsProc() {
         String schema =
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
@@ -1030,7 +1091,7 @@ public class TestVoltCompiler extends TestCase {
         return tbl;
     }
 
-    public void testDDLCompilerLeadingGarbage() throws IOException {
+    public void testDDLCompilerLeadingGarbage() {
         String schema =
             "-- a valid comment\n" +
             "- an invalid comment\n" +
@@ -1040,7 +1101,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerLeadingWhitespace() throws IOException {
+    public void testDDLCompilerLeadingWhitespace() {
         String schema =
             "     \n" +
             "\n" +
@@ -1050,7 +1111,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerLeadingComment() throws IOException {
+    public void testDDLCompilerLeadingComment() {
         String schema =
             "-- this is a leading comment\n" +
             "  -- with some leading whitespace\n" +
@@ -1060,7 +1121,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerLeadingCommentAndHashMarks() throws IOException {
+    public void testDDLCompilerLeadingCommentAndHashMarks() {
         String schema =
             "-- ### this is a leading comment\n" +
             "  -- with some ### leading whitespace\n" +
@@ -1070,7 +1131,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerNoNewlines() throws IOException {
+    public void testDDLCompilerNoNewlines() {
         String schema =
             "create table t(id integer); create table r(id integer);";
         VoltCompiler c = compileSchemaForDDLTest(schema, true);
@@ -1079,7 +1140,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, tables.size());
     }
 
-    public void testDDLCompilerSplitLines() throws IOException {
+    public void testDDLCompilerSplitLines() {
         String schema =
             "create\n" +
             "table\n" +
@@ -1090,7 +1151,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment1() throws IOException {
+    public void testDDLCompilerTrailingComment1() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1100,7 +1161,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment2() throws IOException {
+    public void testDDLCompilerTrailingComment2() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             ";\n";
@@ -1109,7 +1170,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingCommentAndHashMarks() throws IOException {
+    public void testDDLCompilerTrailingCommentAndHashMarks() {
         String schema =
             "create table t(id varchar(128) default '###')  " +
             "-- ### this ###### is a trailing comment\n" +
@@ -1119,7 +1180,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment3() throws IOException {
+    public void testDDLCompilerTrailingComment3() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1129,7 +1190,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment4() throws IOException {
+    public void testDDLCompilerTrailingComment4() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             ";";
@@ -1138,7 +1199,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment5() throws IOException {
+    public void testDDLCompilerTrailingComment5() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1148,7 +1209,7 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerTrailingComment6() throws IOException {
+    public void testDDLCompilerTrailingComment6() {
         String schema =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1160,14 +1221,14 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testDDLCompilerInvalidStatement() throws IOException {
+    public void testDDLCompilerInvalidStatement() {
         String schema =
             "create table t for justice -- with a comment\n";
         VoltCompiler c = compileSchemaForDDLTest(schema, false);
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerCommentThatLooksLikeStatement() throws IOException {
+    public void testDDLCompilerCommentThatLooksLikeStatement() {
         String schema =
             "create table t(id integer); -- create table r(id integer);";
         VoltCompiler c = compileSchemaForDDLTest(schema, true);
@@ -1175,13 +1236,13 @@ public class TestVoltCompiler extends TestCase {
         assertTableT(c);
     }
 
-    public void testDDLCompilerLeadingSemicolon() throws IOException {
+    public void testDDLCompilerLeadingSemicolon() {
         String schema = "; create table t(id integer);";
         VoltCompiler c = compileSchemaForDDLTest(schema, false);
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
+    public void testDDLCompilerMultipleStatementsOnMultipleLines() {
         String schema =
             "create table t(id integer); create\n" +
             "table r(id integer); -- second table";
@@ -1191,7 +1252,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, tables.size());
     }
 
-    public void testDDLCompilerMultiStmtProc() throws IOException {
+    public void testDDLCompilerMultiStmtProc() {
         // multi statement proc with one statement
         String schema =
             "create table t(a integer); create procedure multipr as begin\n" +
@@ -1225,7 +1286,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkDDLCompilerDefaultStringLiteral(
-            String literalIn, String literalOut) throws IOException {
+            String literalIn, String literalOut) {
         String schema = "create table t(id varchar(6) default '" +
                 literalIn + "');";
         VoltCompiler c = compileSchemaForDDLTest(schema, true);
@@ -1252,11 +1313,11 @@ public class TestVoltCompiler extends TestCase {
         checkDDLCompilerDefaultStringLiteral("a--bc");
     }
 
-    public void testDDLCompilerNewlineInStringLiteral() throws IOException {
+    public void testDDLCompilerNewlineInStringLiteral() {
         checkDDLCompilerDefaultStringLiteral("a\nbc", null);
     }
 
-    public void testDDLCompilerEscapedStringLiterals() throws IOException {
+    public void testDDLCompilerEscapedStringLiterals() {
         checkDDLCompilerDefaultStringLiteral("a''b''''c", "a'b''c");
     }
 
@@ -2540,7 +2601,7 @@ public class TestVoltCompiler extends TestCase {
         // System.out.println(diagnostics);
     }
 
-    public void testBadDDLErrorLineNumber() throws IOException {
+    public void testBadDDLErrorLineNumber() {
         String schema =
             "-- a comment\n" +                          // 1
             "create table books (\n" +                  // 2
@@ -2567,7 +2628,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testInvalidCreateFunctionDDL() throws Exception {
+    public void testInvalidCreateFunctionDDL() {
         ArrayList<Feedback> fbs;
         // Test CREATE FUNCTION syntax
         String[] ddls = new String[] {
@@ -2650,7 +2711,7 @@ public class TestVoltCompiler extends TestCase {
         VoltCompiler.setVoltLogger(new VoltLogger("COMPILER"));
     }
 
-    public void testInvalidCreateProcedureDDL() throws Exception {
+    public void testInvalidCreateProcedureDDL() {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -2880,7 +2941,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidSingleStatementCreateProcedureDDL() throws Exception {
+    public void testInvalidSingleStatementCreateProcedureDDL() {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -2932,7 +2993,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidMultipleStatementCreateProcedureDDL() throws Exception {
+    public void testInvalidMultipleStatementCreateProcedureDDL() {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -3171,7 +3232,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    private void checkRoleDDL(String ddl, String errorRegex, TestRole... roles) throws Exception {
+    private void checkRoleDDL(String ddl, String errorRegex, TestRole... roles) {
         VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
 
@@ -3210,11 +3271,11 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    private void goodRoleDDL(String ddl, TestRole... roles) throws Exception {
+    private void goodRoleDDL(String ddl, TestRole... roles) {
         checkRoleDDL(ddl, null, roles);
     }
 
-    private void badRoleDDL(String ddl, String errorRegex) throws Exception {
+    private void badRoleDDL(String ddl, String errorRegex) {
         checkRoleDDL(ddl, errorRegex);
     }
 
@@ -3260,7 +3321,7 @@ public class TestVoltCompiler extends TestCase {
         return checkDDLAgainstGivenSchema(errorRegex, schema, ddl);
     }
 
-    private Database checkDDLAgainstGivenSchema(String errorRegex, String givenSchema, String... ddl) throws Exception {
+    private Database checkDDLAgainstGivenSchema(String errorRegex, String givenSchema, String... ddl) {
         String schemaDDL =
             givenSchema +
             StringUtils.join(ddl, " ");
@@ -3469,6 +3530,19 @@ public class TestVoltCompiler extends TestCase {
         return table.getPartitioncolumn().getName();
     }
 
+    private String getColumnInfoFor(Database db, String tableName, String columnName) {
+        Table table = getTableInfoFor(db, tableName);
+        if (table == null) {
+            return null;
+        }
+        for (Column column: table.getColumns()) {
+            if (column.getName().equalsIgnoreCase(columnName)) {
+                return columnName;
+            }
+        }
+        return null;
+
+    }
     private  MaterializedViewInfo getViewInfoFor(Database db, String tableName, String viewName) {
         Table table = db.getTables().getIgnoreCase(tableName);
         if (table == null) {
@@ -3594,6 +3668,44 @@ public class TestVoltCompiler extends TestCase {
         assertNull(getTableInfoFor(db, "User_LoginLastTime"));
     }
 
+    public void testAlterStream() throws Exception {
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "ALTER STREAM e DROP COLUMN D2 ;\n" +
+                "ALTER STREAM e ADD COLUMN D4 VARCHAR(1);\n" +
+                "ALTER STREAM e ALTER COLUMN D4 INTEGER;\n"
+                );
+        // test drop, add and modify column
+        assertNull(getColumnInfoFor(db, "e", "D2"));
+        assertNotNull(getColumnInfoFor(db, "e", "D4"));
+        Table t = getTableInfoFor(db, "e");
+        for (Column c : t.getColumns()) {
+            if ("D4".equalsIgnoreCase(c.getName())) {
+                assert(c.getType() == Types.SMALLINT);
+            }
+        }
+    }
+
+    public void testDDLCompilerStreamType() {
+        String ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                " USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+                "partition table ttl on column a;" +
+                "ALTER TABLE TTL DROP COLUMN B;";
+        Database db = checkDDLAgainstGivenSchema(null,
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER);\n",
+                "CREATE STREAM e1 PARTITION ON COLUMN D1 EXPORT TO TARGET T(D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                ddl
+                );
+        Table t = getTableInfoFor(db, "e");
+        assert(t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get());
+
+        t = getTableInfoFor(db, "e1");
+        assert(t.getTabletype() == TableType.STREAM.get());
+
+        t = getTableInfoFor(db, "ttl");
+        assert(t.getTabletype() == TableType.PERSISTENT_MIGRATE.get());
+
+    }
     public void testBadDropStream() throws Exception {
         // non-existent stream
         badDDLAgainstSimpleSchema(".+object not found: E1.*",
@@ -3703,7 +3815,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testCompileFromDDL() throws IOException {
+    public void testCompileFromDDL() {
         String schema1 =
                 "create table table1r_el " +
                 " (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -3731,7 +3843,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLStmtProcNameWithDots() throws Exception {
+    public void testDDLStmtProcNameWithDots() {
         File ddlFile = VoltProjectBuilder.writeStringToTempFile(StringUtils.join(new String[] {
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));",
             "create procedure a.Foo as select * from books;"
@@ -3748,7 +3860,7 @@ public class TestVoltCompiler extends TestCase {
     /*
      * Test some ddl with a schema tailored for illegal scalar subqueries.
      */
-    private Database checkDDLAgainstScalarSubquerySchema(String errorRegex, String... ddl) throws Exception {
+    private Database checkDDLAgainstScalarSubquerySchema(String errorRegex, String... ddl) {
         String scalarSubquerySchema = "create table books (cash integer default 23 NOT NULL, title varchar(10) default NULL, PRIMARY KEY(cash)); " +
                                          "partition table books on column cash;";
         return checkDDLAgainstGivenSchema(errorRegex, scalarSubquerySchema, ddl);
@@ -3761,7 +3873,7 @@ public class TestVoltCompiler extends TestCase {
      *
      * @throws Exception
      */
-    public void testScalarSubqueriesExpectedFailures() throws Exception {
+    public void testScalarSubqueriesExpectedFailures() {
         // Scalar subquery not allowed in partial indices.
         checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
         checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
@@ -3787,19 +3899,19 @@ public class TestVoltCompiler extends TestCase {
     /*
      * When ENG-8727 is addressed, reenable this test.
      */
-    public void notest8727SubqueriesInViewDisplayLists() throws Exception {
+    public void notest8727SubqueriesInViewDisplayLists() {
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
 
-    public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
+    public void test8291UnhelpfulSubqueryErrorMessage() {
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.CASH\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
     }
 
-    public void test8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
+    public void test8290UnboundIdentifiersNotCaughtEarlyEnough() {
         // The name parent is not defined here.  This is an
         // HSQL bug somehow.
         checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
@@ -3808,7 +3920,7 @@ public class TestVoltCompiler extends TestCase {
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
 
-    public void testAggregateExpressionsInIndices() throws Exception {
+    public void testAggregateExpressionsInIndices() {
         String ddl = "create table alpha (id integer not null, seqnum float);";
         // Test for time sensitive queries.
         checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
@@ -3841,6 +3953,84 @@ public class TestVoltCompiler extends TestCase {
                                    "which is not supported.*",
                                    ddl,
                                    "create index faulty on alpha(id = (select id + id from alpha));");
+    }
+
+    public void testDDLCompilerNibbleExport() throws Exception {
+        String ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                " USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+                "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        // does not alter target but other params
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+              "partition table ttl on column a;\n" +
+              "dr table ttl;";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+
+        // can not create target via alter
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+              "partition table ttl on column a;\n" +
+              "alter table ttl drop TTL;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+
+        // can not drop target
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+              "partition table ttl on column a;\n";
+                pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "USING TTL 20 MINUTES ON COLUMN a;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a));\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // shouldn't have batch size here since it is a parameter for ttl
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "BATCH_SIZE 10;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

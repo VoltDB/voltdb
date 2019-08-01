@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,9 +29,9 @@ import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class encapsulates the representation and common operations for
@@ -375,7 +375,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      * Append the provided schema to this schema and return the result
      * as a new schema. Columns order: [this][provided schema columns].
      */
-    NodeSchema join(NodeSchema schema) {
+    public NodeSchema join(NodeSchema schema) {
         NodeSchema copy = this.clone();
         for (SchemaColumn column: schema.getColumns()) {
             copy.addColumn(column.clone());

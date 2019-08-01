@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@ public class TestMpRestartSequenceGenerator extends TestCase {
         MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(0, forRestart);
         long seq = seqGen.getNextSeqNum();
         assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(0, MpRestartSequenceGenerator.getNodeId(seq));
+        assertEquals(0, MpRestartSequenceGenerator.getLeaderId(seq));
         assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
     }
 
@@ -45,7 +45,7 @@ public class TestMpRestartSequenceGenerator extends TestCase {
         MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(12, forRestart);
         long seq = seqGen.getNextSeqNum();
         assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(12, MpRestartSequenceGenerator.getNodeId(seq));
+        assertEquals(12, MpRestartSequenceGenerator.getLeaderId(seq));
         assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -115,6 +115,60 @@ public class SQLParser extends SQLPatternFactory
             SPF.token("on"), SPF.token("column"), SPF.capture(SPF.databaseObjectName())
         ).compile("PAT_PARTITION_TABLE");
 
+    /**
+     * Pattern: CREATE TABLE table_name [EXPORT TO target migrate_target_name [ON...]].
+     *
+     * Capture groups:
+     *  (1) table name
+     *  (2) target name
+     *  (3) [triggers, comma separated]
+     */
+    private static final Pattern PAT_CREATE_EXPORT_TABLE =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture("tableName", SPF.databaseObjectName()),
+                    SPF.token("export"), SPF.token("to"), SPF.token("target"),
+                    SPF.capture("migrateTargetName", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(
+                            SPF.token("on"),
+                            SPF.group(true, SPF.commaList(SPF.userName())))),
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_EXPORT_TABLE");
+
+    /**
+     * Pattern: CREATE TABLE table_name [MIGRATE TO target migrate_target_name].
+     *
+     * Capture groups:
+     *  (1) table name
+     *  [(2) target name]
+     */
+    private static final Pattern PAT_CREATE_TABLE =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture("tableName", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(SPF.token("migrate"), SPF.token("to"),
+                            SPF.token("target"),
+                            SPF.capture("migrateTargetName", SPF.databaseObjectName()))),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_TABLE");
+
+    /**
+     * Pattern: CREATE TABLE tablename
+     *
+     *
+     * Capture groups:
+     *  (1) table name
+     */
+    private static final Pattern PAT_ALTER_TTL =
+        SPF.statement(
+            SPF.token("alter"), SPF.token("table"), SPF.capture("name", SPF.databaseObjectName()),
+            SPF.token("using"), SPF.token("TTL"),
+            SPF.anythingOrNothing()
+        ).compile("PAT_ALTER_TTL");
     /**
      * PARTITION PROCEDURE procname ON TABLE tablename COLUMN columnname [PARAMETER paramnum]
      *
@@ -707,6 +761,29 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateStream(String statement)
     {
         return PAT_CREATE_STREAM.matcher(statement);
+    }
+
+    /**
+     * Match statement against create table ... migrate to target ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableMigrateTo(String statement) {
+        return PAT_CREATE_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against create table ... export to target ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableExportTo(String statement) {
+        return PAT_CREATE_EXPORT_TABLE.matcher(statement);
+    }
+
+    public static Matcher matchAlterTTL(String statement)
+    {
+        return PAT_ALTER_TTL.matcher(statement);
     }
 
     /**

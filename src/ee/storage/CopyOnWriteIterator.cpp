@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
     if (m_tableEmpty) {
         // snapshot was activated when the table was empty.
         // Tuple is not in  snapshot region, don't care about this tuple
-        assert(m_currentBlock == NULL);
+        vassert(m_currentBlock == NULL);
         return false;
     }
     /**
@@ -77,7 +77,7 @@ bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
         return false;
     }
 
-    assert(m_currentBlock != NULL);
+    vassert(m_currentBlock != NULL);
 
     /**
      * Now check where this is relative to the COWIterator.
@@ -87,7 +87,7 @@ bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
         return true;
     }
 
-    assert(blockAddress == m_currentBlock->address());
+    vassert(blockAddress == m_currentBlock->address());
     if (tupleAddress >= m_location) {
         return true;
     } else {
@@ -115,7 +115,7 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
 
             m_location = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
-            assert(m_currentBlock->address() == m_location);
+            vassert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
             // Remove the finished block from the map so that it can be released
@@ -128,9 +128,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
             m_end = m_blocks.end();
         }
-        assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
-        assert(m_location < m_currentBlock.get()->address() + (m_table->getTupleLength() * m_table->getTuplesPerBlock()));
-        assert (out.columnCount() == m_table->columnCount());
+        vassert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
+        vassert(m_location < m_currentBlock.get()->address() + (m_table->getTupleLength() * m_table->getTuplesPerBlock()));
+        vassert(out.columnCount() == m_table->columnCount());
         m_blockOffset++;
         out.move(m_location);
         const bool active = out.isActive();
@@ -170,7 +170,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
             }
             location = blockIterator.key();
             currentBlock = blockIterator.data();
-            assert(currentBlock->address() == location);
+            vassert(currentBlock->address() == location);
             blockOffset = 0;
             blockIterator++;
         }

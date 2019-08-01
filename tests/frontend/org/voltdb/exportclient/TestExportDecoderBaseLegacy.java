@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,13 +27,12 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.TimeZone;
-
-import junit.framework.TestCase;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -48,6 +47,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import junit.framework.TestCase;
 
 public class TestExportDecoderBaseLegacy extends TestCase
 {
@@ -129,7 +129,7 @@ public class TestExportDecoderBaseLegacy extends TestCase
         }
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", "yankeelover", partitionColumn, 0, 32,
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "yankeelover", partitionColumn, 0, 32,
                 col_names, col_types, Arrays.asList(COLUMN_LENGTHS), ExportFormat.SEVENDOTX);
         return source;
     }
@@ -167,7 +167,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);
-        ExportRowData rowdata = dut.decodeRow(rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        int size = bb.getInt(); // row size
+        byte[] rawRow = new byte[size];
+        bb.get(rawRow);
+        ExportRowData rowdata = dut.decodeRow(rawRow);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -233,7 +240,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
             //Check for bad values.
             dut.setPartitionColumnName("unknown");
             byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", -1, 1L);
-            ExportRowData rowdata = dut.decodeRow(rowBytes);
+            ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            int schemaSize = bb.getInt();
+            ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+            int size = bb.getInt(); // row size
+            byte[] rawRow = new byte[size];
+            bb.get(rawRow);
+            ExportRowData rowdata = dut.decodeRow(rawRow);
             Object[] rd = rowdata.values;
             assertEquals(rd[0], l);
             assertEquals(rd[1], l);
@@ -249,7 +263,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
             //After this I should get correct col set for partition value.
             int pidx = dut.setPartitionColumnName(pnames[i]);
             rowBytes = ExportEncoder.encodeRow(vtable, "mytable", pidx, 1L);
-            rowdata = dut.decodeRow(rowBytes);
+            bb = ByteBuffer.wrap(rowBytes);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            schemaSize = bb.getInt();
+            ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+            size = bb.getInt(); // row size
+            rawRow = new byte[size];
+            bb.get(rawRow);
+            rowdata = dut.decodeRow(rawRow);
             rd = rowdata.values;
             assertEquals(rd[0], l);
             assertEquals(rd[1], l);

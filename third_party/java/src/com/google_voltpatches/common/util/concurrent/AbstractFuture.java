@@ -20,9 +20,6 @@ import static com.google_voltpatches.common.util.concurrent.Futures.getDone;
 import static com.google_voltpatches.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.atomic.AtomicReferenceFieldUpdater.newUpdater;
 
-import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.annotations.GwtCompatible;
-import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -36,7 +33,12 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.annotation_voltpatches.Nullable;
+
+import com.google_voltpatches.common.annotations.Beta;
+import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
  * An abstract implementation of {@link ListenableFuture}, intended for advanced users only. More
@@ -102,6 +104,11 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
     @Override
     public final boolean cancel(boolean mayInterruptIfRunning) {
       return super.cancel(mayInterruptIfRunning);
+    }
+
+    protected TrustedFuture() {}
+    protected TrustedFuture(boolean maskExecutorExceptions) {
+        super(maskExecutorExceptions);
     }
   }
 
@@ -317,10 +324,19 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
   /** All waiting threads. */
   private volatile Waiter waiters;
 
+  // ENG15763: {@code ExportDataSource} needs to see executor exceptions
+  private final boolean maskExecutorExceptions;
+
   /**
-   * Constructor for use by subclasses.
+   * Constructors for use by subclasses.
    */
-  protected AbstractFuture() {}
+  protected AbstractFuture() {
+      maskExecutorExceptions = true;
+  }
+
+  protected AbstractFuture(boolean maskExecutorExceptions) {
+      this.maskExecutorExceptions = maskExecutorExceptions;
+  }
 
   // Gets and Timed Gets
   //
@@ -631,7 +647,7 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
     }
     // If we get here then the Listener TOMBSTONE was set, which means the future is done, call
     // the listener.
-    executeListener(listener, executor);
+    executeListener(listener, executor, maskExecutorExceptions);
   }
 
   /**
@@ -777,6 +793,7 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
 
   /** Unblocks all threads and runs all listeners. */
   private static void complete(AbstractFuture<?> future) {
+    boolean maskExecutorExceptions = future.maskExecutorExceptions;
     Listener next = null;
     outer: while (true) {
       future.releaseWaiters();
@@ -808,7 +825,7 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
           }
           // other wise the future we were trying to set is already done.
         } else {
-          executeListener(task, curr.executor);
+          executeListener(task, curr.executor, maskExecutorExceptions);
         }
       }
       break;
@@ -895,17 +912,21 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
    * Submits the given runnable to the given {@link Executor} catching and logging all
    * {@linkplain RuntimeException runtime exceptions} thrown by the executor.
    */
-  private static void executeListener(Runnable runnable, Executor executor) {
+  private static void executeListener(Runnable runnable, Executor executor, boolean maskExecutorExceptions) {
     try {
       executor.execute(runnable);
     } catch (RuntimeException e) {
-      // Log it and keep going -- bad runnable and/or executor. Don't punish the other runnables if
-      // we're given a bad one. We only catch RuntimeException because we want Errors to propagate
-      // up.
-      log.log(
-          Level.SEVERE,
-          "RuntimeException while executing runnable " + runnable + " with executor " + executor,
-          e);
+        if (!maskExecutorExceptions) {
+            // Caller wants to handle those exceptions
+            throw e;
+        }
+        // Log it and keep going -- bad runnable and/or executor. Don't punish the other runnables if
+        // we're given a bad one. We only catch RuntimeException because we want Errors to propagate
+        // up.
+        log.log(
+                Level.SEVERE,
+                "RuntimeException while executing runnable " + runnable + " with executor " + executor,
+                e);
     }
   }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,7 @@
 
 #include <cstring>
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 #include <stdlib.h>
 #include <stx/btree_map>
 #include <murmur3/MurmurHash3.h>
@@ -110,8 +110,8 @@ protected:
         int32_t max = tokenCount - 1;
 
         while (min <= max) {
-            assert(min >= 0);
-            assert(max >= 0);
+            vassert(min >= 0);
+            vassert(max >= 0);
             uint32_t mid = (min + max) >> 1;
             int32_t midval = tokens[mid * 2];
 

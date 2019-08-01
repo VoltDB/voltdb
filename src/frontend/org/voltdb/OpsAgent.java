@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -91,6 +92,7 @@ public abstract class OpsAgent
         protected VoltTable[] aggregateTables = null;
         protected final long startTime;
         private final JSONObject request;
+        Future<?> timer;
         public PendingOpsRequest(
                 OpsSelector selector,
                 String subselector,
@@ -104,6 +106,13 @@ public abstract class OpsAgent
             this.c = c;
             this.clientData = clientData;
             this.request = request;
+        }
+
+        @Override
+        public String toString() {
+            return "PendingOpsRequest [subselector=" + subselector + ", clientData=" + clientData
+                    + ", expectedOpsResponses=" + expectedOpsResponses + ", startTime=" + startTime + ", request="
+                    + request + "]";
         }
     }
 
@@ -234,21 +243,32 @@ public abstract class OpsAgent
         else if (!dummy) {
             for (int ii = 0; ii < request.aggregateTables.length; ii++) {
                 if (buf.hasRemaining()) {
-                    final int tableLength = buf.getInt();
-                    int oldLimit = buf.limit();
-                    buf.limit(buf.position() + tableLength);
-                    ByteBuffer tableBuf = buf.slice();
-                    buf.position(buf.limit()).limit(oldLimit);
-                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
-                    while (vt.advanceRow()) {
-                        request.aggregateTables[ii].add(vt);
+                    try {
+                        final int tableLength = buf.getInt();
+                        int oldLimit = buf.limit();
+                        buf.limit(buf.position() + tableLength);
+                        ByteBuffer tableBuf = buf.slice();
+                        buf.position(buf.limit()).limit(oldLimit);
+                        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBuf, true);
+                        request.aggregateTables[ii].addTable(vt);
+                    } catch (Exception e) {
+                        hostLog.error("Failed to merge table into index " + ii + " for request " + request, e);
+
+                        request.timer.cancel(false);
+                        m_pendingRequests.remove(requestId);
+                        sendErrorResponse(request.c, ClientResponse.UNEXPECTED_FAILURE,
+                                "Unexpected error occurred. Check logs for more details.", request.clientData);
+                        return;
                     }
                 }
             }
         }
 
-        request.expectedOpsResponses--;
-        if (request.expectedOpsResponses > 0) return;
+        if (--request.expectedOpsResponses > 0) {
+            return;
+        }
+
+        request.timer.cancel(false);
 
         m_pendingRequests.remove(requestId);
 
@@ -270,6 +290,10 @@ public abstract class OpsAgent
                     collectStatsImpl(c, clientHandle, selector, params);
                 } catch (Exception e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
+                    // ENG-14639, prevent clients like sqlcmd from hanging on exception
+                    sendErrorResponse(c, ClientResponse.OPERATIONAL_FAILURE,
+                            "Failed to get statistics (" + e.getMessage() + ").",
+                            clientHandle);
                 }
             }
         });
@@ -308,7 +332,7 @@ public abstract class OpsAgent
 
         final long requestId = m_nextRequestId++;
         m_pendingRequests.put(requestId, newRequest);
-        m_es.schedule(new Runnable() {
+        newRequest.timer = m_es.schedule(new Runnable() {
             @Override
             public void run() {
                 checkForRequestTimeout(requestId);
@@ -414,9 +438,9 @@ public abstract class OpsAgent
                 4 * results.length + // length prefix for each stats table
                 + statbytes);
         responseBuffer.putLong(requestId);
-        for (int i = 0; i < bufs.length; i++) {
-            responseBuffer.putInt(bufs[i].remaining());
-            responseBuffer.put(bufs[i]);
+        for (ByteBuffer buf : bufs) {
+            responseBuffer.putInt(buf.remaining());
+            responseBuffer.put(buf);
         }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 

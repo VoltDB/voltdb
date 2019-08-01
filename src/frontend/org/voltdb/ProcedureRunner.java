@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -49,18 +50,16 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -328,7 +327,7 @@ public class ProcedureRunner {
         m_spBigBatchBeginToken = -1;
 
         // set procedure name in the site/ee
-        m_site.setProcedureName(m_procedureName);
+        m_site.setupProcedure(m_procedureName);
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -391,7 +390,6 @@ public class ProcedureRunner {
                     log.trace("invoked");
                 }
                 catch (InvocationTargetException itex) {
-                    //itex.printStackTrace();
                     Throwable ex = itex.getCause();
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
@@ -504,7 +502,7 @@ public class ProcedureRunner {
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
 
-            m_site.setProcedureName(null);
+            m_site.completeProcedure();
         }
 
         return retval;
@@ -863,16 +861,13 @@ public class ProcedureRunner {
         return results;
     }
 
-    public byte[] voltLoadTable(String clusterName, String databaseName,
-                    String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean undo)
+    public byte[] voltLoadTable(String tableName, VoltTable data, LoadTableCaller caller)
                     throws VoltAbortException {
         if (data == null || data.getRowCount() == 0) {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
-                    clusterName, databaseName,
-                    tableName, data, returnUniqueViolations, shouldDRStream, undo);
+            return m_site.loadTable(m_txnState, tableName, data, caller);
         } catch (EEException e) {
             String msg = "Failed to load table \"" + tableName + "\"";
             if (e.getMessage() != null) {
@@ -1199,78 +1194,35 @@ public class ProcedureRunner {
                                                       byte appStatus,
                                                       String appStatusString,
                                                       NonVoltDBBackend nonVoltDBBackend,
-                                                      Throwable eIn) {
-        // use local var to avoid warnings about reassigning method argument
-        Throwable e = eIn;
+                                                      Throwable e) {
         boolean expected_failure = true;
-        boolean hideStackTrace = false;
-        StackTraceElement[] stack = e.getStackTrace();
-        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
-        for (StackTraceElement ste : stack) {
-            if (isProcedureStackTraceElement(procedureName, ste)) {
-                matches.add(ste);
-            }
-        }
 
         byte status = ClientResponse.UNEXPECTED_FAILURE;
         StringBuilder msg = new StringBuilder();
 
-        if (e.getClass() == VoltAbortException.class) {
-            status = ClientResponse.USER_ABORT;
-            msg.append("USER ABORT\n");
-        } else if (e.getClass() == org.voltdb.exceptions.ConstraintFailureException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("CONSTRAINT VIOLATION\n");
-        } else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("SQL ERROR\n");
-        }
-        // Interrupt exception will be thrown when the procedure is killed by a user
-        // or by a timeout in the middle of executing.
-        else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("Transaction Interrupted\n");
+        if (e instanceof VoltAbortException) {
+            VoltAbortException voltAbort = (VoltAbortException) e;
+            status = voltAbort.getClientResponseStatus();
+            msg.append(voltAbort.getShortStatusString());
         } else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
             String backendType = "HSQL";
             if (nonVoltDBBackend instanceof PostgreSQLBackend) {
                 backendType = "PostgreSQL";
             }
             msg.append(backendType);
-            msg.append("-BACKEND ERROR\n");
+            msg.append("-BACKEND ERROR");
             if (e.getCause() != null) {
                 e = e.getCause();
             }
-        } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
-            if (te.isMisrouted()) {
-                status = ClientResponse.TXN_MISROUTED;
-                msg.append("TRANSACTION MISROUTED\n");
-            } else {
-                status = ClientResponse.TXN_RESTART;
-                msg.append("TRANSACTION RESTART\n");
-            }
-        } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
-            msg.append("Transaction Interrupted\n");
-        }
-        // SpecifiedException means the dev wants control over status and
-        // message
-        else if (e.getClass() == SpecifiedException.class) {
-            SpecifiedException se = (SpecifiedException) e;
-            status = se.getStatus();
-            expected_failure = true;
-            hideStackTrace = true;
-        } else if (e.getClass() == MispartitionedException.class) {
-            status = ClientResponse.TXN_MISPARTITIONED;
-            msg.append("TRANSACTION MISPARTITIONED\n");
         } else {
-            msg.append("UNEXPECTED FAILURE:\n");
+            msg.append("UNEXPECTED FAILURE:");
             expected_failure = false;
         }
 
         // ensure the message is returned if we're not going to hit the verbose
         // condition below
-        if (expected_failure || hideStackTrace) {
-            msg.append("  ").append(e.getMessage());
+        if (expected_failure) {
+            msg.append(" ").append(e.getMessage());
             if (e instanceof org.voltdb.exceptions.InterruptException && readOnly) {
                 int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
                 if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
@@ -1289,28 +1241,23 @@ public class ProcedureRunner {
             }
         }
 
-        // Rarely hide the stack trace.
-        // Right now, just for SpecifiedException, which is usually from
-        // sysprocs where the error is totally
-        // known and not helpful to the user.
-        if (!hideStackTrace) {
-            // If the error is something we know can happen as part of normal
-            // operation,
-            // reduce the verbosity.
-            // Otherwise, generate more output for debuggability
-            if (expected_failure) {
-                for (StackTraceElement ste : matches) {
+        // If the error is something we know can happen as part of normal operation,
+        // reduce the verbosity.
+        // Otherwise, generate more output for debuggability
+        if (expected_failure) {
+            for (StackTraceElement ste : e.getStackTrace()) {
+                if (isProcedureStackTraceElement(procedureName, ste)) {
                     msg.append("\n    at ");
                     msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
                     msg.append("(").append(ste.getFileName()).append(":");
                     msg.append(ste.getLineNumber()).append(")");
                 }
-            } else {
-                Writer result = new StringWriter();
-                PrintWriter pw = new PrintWriter(result);
-                e.printStackTrace(pw);
-                msg.append("  ").append(result.toString());
             }
+        } else {
+            Writer result = new StringWriter();
+            PrintWriter pw = new PrintWriter(result);
+            e.printStackTrace(pw);
+            msg.append(" ").append(result.toString());
         }
 
         return getErrorResponse(status, appStatus, appStatusString, msg.toString(),
@@ -1325,9 +1272,9 @@ public class ProcedureRunner {
                 appStatusString,
                 new VoltTable[0],
                 "VOLTDB ERROR: " + msg);
-       if (status == ClientResponse.TXN_MISPARTITIONED) {
-           response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
-       }
+        if (e != null) {
+            e.setClientResponseResults(response);
+        }
 
        return response;
     }
@@ -1426,7 +1373,7 @@ public class ProcedureRunner {
         final VoltTable[] m_results;
 
         BatchState(int batchSize, MpTransactionState txnState, long siteId, boolean finalTask, String procedureName,
-                byte[] procToLoad, boolean perFragmentStatsRecording) {
+                byte[] procToLoad, boolean perFragmentStatsRecording, int maxMpResponseSize) {
             m_batchSize = batchSize;
             m_txnState = txnState;
 
@@ -1449,6 +1396,8 @@ public class ProcedureRunner {
             m_distributedTask.setProcNameToLoad(procToLoad);
             m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
+
+            m_distributedTask.setMaxResponseSize(maxMpResponseSize);
         }
 
         /*
@@ -1479,7 +1428,7 @@ public class ProcedureRunner {
             }
             // two fragments
             else {
-                int outputDepId = m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                int outputDepId = m_txnState.getNextDependencyId();
                 m_depsForLocalTask[index] = outputDepId;
                 // Add local and distributed fragments.
                 if (stmt.inCatalog) {
@@ -1504,8 +1453,10 @@ public class ProcedureRunner {
     VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
         MpTransactionState txnState = (MpTransactionState)m_txnState;
         assert(txnState != null);
+        long perPartitionMaxResponse = m_site.getMaxTotalMpResponseSize() / txnState.getMasterHSIDs().size();
         BatchState state = new BatchState(batch.size(), txnState, m_site.getCorrespondingSiteId(), finalTask,
-                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts());
+                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts(),
+                (int) Math.min(perPartitionMaxResponse, VoltPort.MAX_MESSAGE_LENGTH - 1024));
 
         // iterate over all sql in the batch, filling out the above data
         // structures
@@ -1552,7 +1503,7 @@ public class ProcedureRunner {
             if (state.m_depsForLocalTask[i] < 0) {
                 continue;
             }
-            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
+            state.m_localTask.setInputDepId(i, state.m_depsForLocalTask[i]);
         }
 
         // note: non-transactional work only helps us if it's final work

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DevNullSnapshotTarget;
 import org.voltdb.ExtensibleSnapshotDigestData;
+import org.voltdb.PostSnapshotTask;
 import org.voltdb.SnapshotDataTarget;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
@@ -230,6 +232,37 @@ public abstract class SnapshotWritePlan
             robin.add(hsids.get(siteIndex));
             placeTask(task, robin);
             siteIndex = (siteIndex + 1) % hsids.size();
+        }
+    }
+
+    protected static void createUpdatePartitionCountTasksForSites(SiteTracker tracker,
+            SystemProcedureExecutionContext context, int newPartitionCount) {
+        PostSnapshotTask task = new UpdatePartitionCount(newPartitionCount);
+        List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
+        assert !localPartitions.isEmpty();
+        for (Integer partition : localPartitions) {
+            SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(partition, task);
+        }
+    }
+
+    /**
+     * A post-snapshot site task that updates the partition count on each site.
+     */
+    private static class UpdatePartitionCount implements PostSnapshotTask {
+        private final int m_newPartitionCount;
+
+        public UpdatePartitionCount(int newPartitionCount) {
+            m_newPartitionCount = newPartitionCount;
+        }
+
+        @Override
+        public void run(SystemProcedureExecutionContext context) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("P" + context.getPartitionId() + " updating partition count to: " + m_newPartitionCount);
+            }
+
+            // Update partition count stored on this site
+            context.setNumberOfPartitions(m_newPartitionCount);
         }
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,23 +24,20 @@
 
 namespace voltdb {
 
-void TempTableLimits::reduceAllocated(int bytes)
-{
+void TempTableLimits::reduceAllocated(int bytes) {
     m_currMemoryInBytes -= bytes;
     if (m_currMemoryInBytes < m_logThreshold) {
         m_logLatch = false;
     }
 }
 
-void TempTableLimits::increaseAllocated(int bytes)
-{
+void TempTableLimits::increaseAllocated(int bytes) {
     m_currMemoryInBytes += bytes;
     if (m_memoryLimit > 0 && m_currMemoryInBytes > m_memoryLimit) {
         int limit_mb = static_cast<int>(m_memoryLimit / (1024 * 1024));
         char msg[1024];
-        snprintf(msg, 1024,
-                 "More than %d MB of temp table memory used while executing SQL.  Aborting.",
-                 limit_mb);
+        snprintf(msg, 1024, "More than %d MB of temp table memory used while executing SQL.  Aborting.",
+                limit_mb);
         throw SQLException(SQLException::volt_temp_table_memory_overflow, msg);
     }
 
@@ -48,7 +45,7 @@ void TempTableLimits::increaseAllocated(int bytes)
         m_peakMemoryInBytes = m_currMemoryInBytes;
     }
 
-    if ( m_logLatch || m_logThreshold <= 0 || m_currMemoryInBytes <= m_logThreshold) {
+    if (m_logLatch || m_logThreshold <= 0 || m_currMemoryInBytes <= m_logThreshold) {
         return;
     }
 

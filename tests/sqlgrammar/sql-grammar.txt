@@ -80,6 +80,29 @@
 #      table R1 has been specified elsewhere in the SQL statement, so using a
 #      definition such as {table-name;t1,t2,t3,t4,t5}.{any-column-name} makes
 #      this much more likely.
+#  11. An addition to the colon syntax for reusable names, described in #9
+#      above: if you wish to set multiple (possibly unique) values to multiple
+#      reusable names, you may use, for example, this syntax:
+#      {column-name:c1,c2,c3,c4,c5:10}. The first time that this is used (in a
+#      given SQL statement), it will find one possible value of {column-name},
+#      and set 'c1' equal to that; the second time, it will find another
+#      possible value, and set 'c2' to that; the third time, to 'c3', etc. The
+#      final number after the second colon, here '10', means that there is a 10%
+#      chance that repeat values of {column-name} will be allowed; if that value
+#      is instead '0', then distinct values of {column-name} will be used, with
+#      no duplicates, though if it runs out of distinct possible values of
+#      {column-name}, or out of reusable names, then duplicates will be used.
+#      The second colon and the repeat-percentage following it are optional; if
+#      not specified, there will be no attempt to avoid repeats.
+#  12. An addition to the semi-colon syntax for reusable names, described in
+#      #10 above: if you wish to get a list of reusable values, such as those
+#      defined in #11 above, you may use, for example, this syntax:
+#      {column-name;c1,c2,c3,c4,c5;', '}. This will produce a list of all the
+#      values of all of the reusable names listed, separated by the separator
+#      string (here, ', '); any reusable names that have not yet been given
+#      values (e.g., 'c4, 'c5') will be omitted from the list. The second semi-
+#      colon and the separator string are required to get a list in this manner,
+#      but the separator string may be the empty string, ''.
 #
 ################################################################################
 
@@ -91,34 +114,64 @@
 # Table names broken down by the number and data type(s) of their primary key;
 # this includes both Replicated and Partitioned Tables:
 table-name-w-no-pk      ::= R0 | P0
-table-name-w-pk-int     ::= R1 9| P1 9| R2 9| P2 9| R11 9| P11 9| R12 | P12 | R21 9| P21 9| R22 | P22
+table-name-w-pk-int     ::= R1 9| P1 9| R2 9| P2 9| R11 9| P11 9| R12 | P12 | R13 9| P13 9| R14 | P14
 table-name-w-pk-str     ::= R3 | P3
 table-name-w-pk-int-str ::= R4 | P4
 table-name-w-pk-str-int ::= R5 | P5
 table-name-w-pk-varbin  ::= R6 | P6
 table-name-w-pk-i-s-v   ::= R7 | P7
 
+# These tables are declared with TTL columns and/or MIGRATE targets:
+table-w-ttl-column-only ::= R21 | P21
+table-w-migrate-only    ::= R31 | P31
+table-name-w-migrate    ::= {table-w-migrate-only}
+table-name-ttl-or-migr  ::= {table-w-migrate-only} | {table-w-ttl-column-only}
+
+# These are definitions that are to be used only when running SQL grammar
+# generator with the 'pro' version of VoltDB, due to the limited number of
+# streams in 'community'
+table-w-ttl-and-migrate ::= R141 | P141
+pro-table-name-w-migrate::= {table-w-migrate-only} | {table-w-ttl-and-migrate}
+pro-tbl-name-ttl-or-migr::= {table-w-ttl-column-only} | {pro-table-name-w-migrate}
+
+# Stream names are also only to be used only when running SQL grammar generator
+# with the 'pro' version of VoltDB; so they're set to something else, otherwise
+stream-name             ::= {ddl-table-name}
+pro-stream-name         ::= S100
+
+# MIGRATE (DML) statements will usually use a table with a declared MIGRATE
+# target; but occasionally will use a regular, non-MIGRATE table, which is
+# invalid, so it should return a reasonable error message but not crash
+migrate-table-name      ::= {table-name-w-migrate} 19| {table-or-view-name}
+
 # Only identical tables (including indexes) without views can be swapped;
 # the swap of two generic {table-name} will usually not work, but should
 # return a reasonable error message (commas and single quotes are optional)
-swappable-tables        ::= R11[,] R12 | P11[,] P12 | R21[,] R22 | P21[,] P22 | \
-                            R12[,] R11 | P12[,] P11 | R22[,] R21 | P22[,] P21 | \
-                            'R11'[,] 'R12' | 'P11'[,] 'P12' | 'R21'[,] 'R22' | 'P21'[,] 'P22' | \
-                            'R12'[,] 'R11' | 'P12'[,] 'P11' | 'R22'[,] 'R21' | 'P22'[,] 'P21' | \
-                            'R11'[,] R12 | P11[,] 'P12' | R21[,] 'R22' | 'P21'[,] P22 | \
-                            'R12'[,] R11 | P12[,] 'P11' | R22[,] 'R21' | 'P22'[,] P21 | \
+swappable-tables        ::= R11[,] R12 | P11[,] P12 | R13[,] R14 | P13[,] P14 | \
+                            R12[,] R11 | P12[,] P11 | R14[,] R13 | P14[,] P13 | \
+                            R11[,] 'R12' | P11[,] 'P12' | R13[,] 'R14' | P13[,] 'P14' | \
+                            R12[,] 'R11' | P12[,] 'P11' | R14[,] 'R13' | P14[,] 'P13' | \
+                            'R11'[,] R12 | 'P11'[,] P12 | 'R13'[,] R14 | 'P13'[,] P14 | \
+                            'R12'[,] R11 | 'P12'[,] P11 | 'R14'[,] R13 | 'P14'[,] P13 | \
+                            'R11'[,] 'R12' | 'P11'[,] 'P12' | 'R13'[,] 'R14' | 'P13'[,] 'P14' | \
+                            'R12'[,] 'R11' | 'P12'[,] 'P11' | 'R14'[,] 'R13' | 'P14'[,] 'P13' | \
                             {table-name}[,] {table-name} | '{table-name}'[,] '{table-name}'
 
-legit-table-name        ::= {table-name-w-no-pk} | {table-name-w-pk-int} 4| {table-name-w-pk-str} | \
+legit-table-name        ::= {ddl-table-name}         5| {stream-name} | \
+                            {table-name-ttl-or-migr} 5| {table-name-w-no-pk}      | \
+                            {table-name-w-pk-int}    4| {table-name-w-pk-str}     | \
                             {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
                             {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
 
-legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
+legit-view-name         ::= {ddl-view-name} 6| \
+                            VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | \
+                            VR5 | VP5 | VR6 | VP6 | VR7 | VP7
 
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
 table-or-view-name      ::= {table-name} 3| {view-name}
 
+########################################
 # User-defined Stored Procedures: this includes both Java and SQL Stored
 # Procedures; e.g., SSPR1min is a SQL Stored Procedure that returns the MIN ID
 # from table R1, JSPP1insMax is a Java Stored Procedure that inserts a row with
@@ -171,10 +224,13 @@ sql-proc-1param         ::= SSPR0ins | SSPR0sel | SSPP0ins | SSPP0sel | \
 # TODO: could define random (SQL) Stored Procs, that take 1 parameter (or more?)
 random-proc-1param      ::= RPROC6 | RPROC7 | RPROC8 | RPROC9
 
+########################################
 # Column names used in the pre-defined DDL, of every possible data type ...
-int-non-id-column-name  ::= TINY | SMALL | INT | BIG
-int-column-name         ::= {int-non-id-column-name} 4| ID
 byte-column-name        ::= TINY
+int-non-small-non-id-col::= INT1 | BIG
+int-non-small-col-name  ::= {int-non-small-non-id-col} 2| ID
+int-non-id-column-name  ::= {int-non-small-non-id-col} 2| {byte-column-name} | SMALL
+int-column-name         ::= {int-non-id-column-name}   4| ID
 
 # The "5" before the "|" makes the "int-column-name" option 5 times as likely
 # as the other options, making each numeric column name equally likely
@@ -182,7 +238,7 @@ numeric-column-name     ::= {int-column-name}        5| NUM | DEC
 numeric-non-id-col-name ::= {int-non-id-column-name} 4| NUM | DEC
 
 string-column-name      ::= VCHAR_INLINE | VCHAR_INLINE_MAX | VCHAR_OUTLINE_MIN | VCHAR
-timestamp-column-name   ::= TIME
+timestamp-column-name   ::= TIME1
 varbinary-column-name   ::= VARBIN
 point-column-name       ::= POINT
 polygon-column-name     ::= POLYGON
@@ -193,11 +249,13 @@ non-int-str-column-name ::= {geo-column-name} 2| {timestamp-column-name} | {varb
 pg-point-column-name    ::= _variable\[point\]
 pg-polygon-column-name  ::= _variable\[polygon\]
 
+# For now, at least, TABLE and VIEW column names are the same
 table-column-name       ::= {numeric-column-name} 2| {string-column-name} | {non-int-str-column-name}
 view-column-name        ::= {table-column-name}
-legit-column-name       ::= {table-column-name} 9| {view-column-name}
-column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
+legit-column-name       ::= {table-column-name} 3| {view-column-name}
+column-name             ::= {legit-column-name} 999| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
+column-expression-list  ::= {column-expression} [, {column-expression-list}]
 
 # These versions include the JSON and 'internet' columns (used with the INET... functions),
 # which we don't normally want to set to invalid values (but selecting them is fine)
@@ -212,20 +270,34 @@ any-string-column-name  ::= {string-column-name} 4| {string-ipv-column-name} 2| 
 any-varbin-column-name  ::= {varbin-ipv-column-name} 2| {varbinary-column-name}
 any-table-column-name   ::= {table-column-name} 15| {varbin-ipv-column-name} 2| {string-ipv-column-name} 2| {json-column-name}
 any-view-column-name    ::= {any-table-column-name}
-any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
-any-column-name         ::= {any-legit-column-name} 399| NONEXISTENT_COLUMN
+any-legit-column-name   ::= {any-table-column-name} 3| {any-view-column-name}
+any-column-name         ::= {any-legit-column-name} 999| NONEXISTENT_COLUMN
 
 # Note: if you add a new column to the DDL file, add it here
 # (and in other places with this comment)
 # (and in the appropriate section above)
-every-column-name       ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+every-column-name       ::= ID, TINY, SMALL, INT1, BIG, NUM, DEC, \
                             VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
-                            TIME, VARBIN, POINT, POLYGON, \
+                            TIME1, VARBIN, POINT, POLYGON, \
                             IPV4, IPV6, VBIPV4, VBIPV6
 every-col-name-backward ::= VBIPV6, VBIPV4, IPV6, IPV4, \
-                            POLYGON, POINT, VARBIN, TIME, \
+                            POLYGON, POINT, VARBIN, TIME1, \
                             VCHAR_JSON, VCHAR, VCHAR_OUTLINE_MIN, VCHAR_INLINE_MAX, VCHAR_INLINE, \
-                            DEC, NUM, BIG, INT, SMALL, TINY, ID
+                            DEC, NUM, BIG, INT1, SMALL, TINY, ID
+# With the string (VARCHAR) columns listed first
+# TODO: these are not currently used
+every-column-name-str   ::= VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            ID, TINY, SMALL, INT1, BIG, NUM, DEC, \
+                            TIME1, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
+every-column-name-gb    ::= TINY, SMALL, ID, INT1, BIG, NUM, DEC, \
+                            VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            TIME1, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
+every-column-name-str-gb::= VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            ID, TINY, SMALL, INT1, BIG, NUM, DEC, \
+                            TIME1, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
 
 # These are obviously not the complete lists of all possible table and column
 # aliases, but using a short list makes it more likely that when you refer to
@@ -233,6 +305,7 @@ every-col-name-backward ::= VBIPV6, VBIPV4, IPV6, IPV4, \
 table-alias             ::= TA1 96| TA2 48| TA3 24| TA4 12| TA5 6| TA6 3| TA7 2| TA8
 column-alias            ::= CA1 96| CA2 48| CA3 24| CA4 12| CA5 6| CA6 3| CA7 2| CA8
 
+########################################
 # These '...-set' definitions (using ':t1', ':t2', etc.) are used to set a
 # table (or view or sub-query) name or alias that may be referred to elsewhere
 # in the SQL statement
@@ -262,6 +335,13 @@ sub-query-set           ::= {sub-query} [AS ]{table-alias:t1} 6| \
                             {sub-query} [AS ]{table-alias:t4} 2| \
                             {sub-query} [AS ]{table-alias:t5}
 
+# Same as above, but for tables created with TTL and/or MIGRATE clauses
+migrate-table-name-set  ::= {migrate-table-name:t1} 6| \
+                            {migrate-table-name:t2} 6| \
+                            {migrate-table-name:t3} 3| \
+                            {migrate-table-name:t4} 2| \
+                            {migrate-table-name:t5}
+
 # Special case: when a "T0" table alias gets used, make sure that it gets "set"
 # as one of the table definitions (':t1', ':t2', etc.) used above
 t0-set                  ::= T0
@@ -274,10 +354,11 @@ t0                      ::= {t0-set:t5} 6| \
 table-name-or-alias-set ::= {table-name-set} 3| {table-alias-set}
 view-name-or-alias-set  ::= {view-name-set}  3| {view-alias-set}
 
-table-ref-set           ::= {table-name-or-alias-set} 5| \
+table-ref-set           ::= {table-name-or-alias-set} 7| \
                             {view-name-or-alias-set}  2| \
                             {sub-query-set}
 
+########################################
 # These '...-ref' definitions (using ';t1,t2,t3,t4,t5') are used to refer to a
 # table (or view or sub-query) name or alias that was previously set, elsewhere
 # in the SQL statement
@@ -286,24 +367,39 @@ table-alias-ref         ::= {table-alias;t1,t2,t3,t4,t5}
 view-name-ref           ::= {view-name;t1,t2,t3,t4,t5}
 table-ref               ::= {table-name-ref} 2| {table-alias-ref} 2| {view-name-ref}
 
+# The use of "{table-ref}" is useful to refer to a table name or alias that has
+# already been defined, elsewhere in the SQL statement
+column-table-ref        ::= {table-ref}.{any-column-name} 19| {any-column-name}
+
+########################################
 # Same '...-set' and '...-ref' ideas as above, but here for a column alias
-column-alias-set        ::= {column-alias:ca1} 6| \
-                            {column-alias:ca2} 6| \
-                            {column-alias:ca3} 3| \
-                            {column-alias:ca4} 2| \
-                            {column-alias:ca5}
-column-alias-ref        ::= {column-alias;ca1,ca2,ca3,ca4,ca5,c1,c2,c3,c4}
+column-alias-set        ::= {column-alias:ca0} | \
+                            {column-alias:ca1} | \
+                            {column-alias:ca2} | \
+                            {column-alias:ca3} | \
+                            {column-alias:ca4} | \
+                            {column-alias:ca5} | \
+                            {column-alias:ca6} | \
+                            {column-alias:ca7} | \
+                            {column-alias:ca8} | \
+                            {column-alias:ca9}
+column-alias-ref        ::= {column-alias;ca0,ca1,ca2,ca3,ca4,ca5,ca6,ca7,ca8,ca9,cj1,cj2,cj3,cj4}
 
 ################################################################################
-# Any (non-DDL) SQL statement:
+# Any SQL statement (this now includes some DDL statements):
 # The "50" before the first "|" makes the "select-statement" option 50 times as
 # likely as the least likely (last) option; so half of these SQL statements will
-# be SELECT statements; but only 1% will be "delete-statement", since we don't
-# want to delete all the rows in a table too often.
+# be SELECT statements; but only 1% will be "ddl-statement", since we don't want
+# to change the schema too often. Similarly, only 1% will be "delete-statement",
+# since we don't want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 50| {cte-statement} 5| \
-                            {insert-statement} 14| {upsert-statement} 13| {update-statement} 12| \
-                            {special-sql-statement} 5| {delete-statement}
+sql-statement           ::= {select-statement} 50| {cte-statement}     5| \
+                            {dml-statement}    40| {sqlcmd-statement}  4| \
+                            {ddl-statement}
+
+dml-statement           ::= {insert-statement} 10| {upsert-statement}  10| \
+                            {update-statement} 10| {migrate-statement}  9| \
+                            {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:
@@ -319,7 +415,7 @@ insert-select-statement ::= {simple-insert-select} 9| {insert-clause} {select-st
 values-list             ::= {ordered-values-list}  9| {random-order-value-list}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-insert-clause           ::= INSERT INTO {table-name-set} [[({column-list})]]
+insert-clause           ::= INSERT INTO {table-name} [[({column-list})]]
 
 ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
                             {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
@@ -519,7 +615,7 @@ upsert-values-statement ::= {simple-upsert-values} 9| {upsert-clause} VALUES ({v
 upsert-select-statement ::= {simple-upsert-select} 9| {upsert-clause} {select-statement}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-upsert-clause           ::= UPSERT INTO {table-name-set} [[({column-list})]]
+upsert-clause           ::= UPSERT INTO {table-name} [[({column-list})]]
 
 simple-upsert-values    ::= UP{in-or-up-sert-values}
 simple-upsert-select    ::= UP{in-or-up-sert-select}
@@ -582,10 +678,33 @@ corltd-t1-column-update ::= {column-update} 5| \
 #
 delete-statement        ::= {basic-delete-statement} 19| {truncate-statement}
 
-basic-delete-statement  ::= DELETE FROM {table-name-set} [{where-clause}] [{sort-clause}] 4| \
+basic-delete-statement  ::= DELETE FROM {table-name-set}[ {where-clause}][ {sort-clause}] 4| \
                             DELETE FROM {table-name:t1} WHERE {correlated-t1-bool-expr}
 
 truncate-statement      ::= TRUNCATE TABLE {table-name}
+
+################################################################################
+# Grammar rules for a MIGRATE statement:
+################################################################################
+#
+migrate-statement       ::= MIGRATE FROM {migrate-table-name-set}  {where-not-migrating}[     {sort-clause}] 4| \
+                            MIGRATE FROM {migrate-table-name-set}[ {where-not-migrating}][    {sort-clause}]  | \
+                            MIGRATE FROM {migrate-table-name:t1}   {where-corl-t1-not-migr}[  {sort-clause}] 4| \
+                            MIGRATE FROM {migrate-table-name:t1}[  {where-corl-t1-not-migr}][ {sort-clause}]
+
+# Test MIGRATE with a NOT MIGRATING() where clause most of the time,
+# but not always
+where-not-migrating     ::= WHERE {not-migrating-where-cls} 3| \
+                            [WHERE {not-migrating-where-cls}]
+not-migrating-where-cls ::= {not-migrating} {probably-and} {boolean-expression}   4| \
+                            {boolean-expression} {probably-and} {not-migrating}      \
+                                          [[{probably-and} {boolean-expression}]] 5| \
+                            {boolean-expression}
+not-migrating           ::= NOT MIGRATING[()] 8| MIGRATING[()] | {boolean-expression}
+probably-and            ::= AND 19| OR
+
+where-corl-t1-not-migr  ::= WHERE {not-migrating} AND {correlated-t1-bool-expr} | \
+                            WHERE {correlated-t1-bool-expr} AND {not-migrating}
 
 ################################################################################
 # Grammar rules for a Common Table Expression (CTE) statement, i.e. using a
@@ -794,34 +913,44 @@ aggregate-depth-funcs2  ::=  , MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD,
                             [, MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD] | \
                             [, MIN(DEPTH) MND][, MAX(DEPTH) MXD][, COUNT(DEPTH) CTD][, SUM(DEPTH) SMD][, AVG(DEPTH) AVD]
 
+aggregate-func-ctec1    ::= {aggregate-function}({:ctec1}) 18| \
+                            COUNT(DISTINCT {:ctec1})         | \
+                            COUNT(*)
+aggregate-func-ctec2    ::= {aggregate-function}({:ctec2}) 18| \
+                            COUNT(DISTINCT {:ctec2})         | \
+                            COUNT(*)
+aggregate-func-ctec3    ::= {aggregate-function}({:ctec3}) 18| \
+                            COUNT(DISTINCT {:ctec3})         | \
+                            COUNT(*)
+
 # TODO: lots more options could be used here
 final-query-1num        ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1})    AG1 {aggregate-depth-funcs} FROM cte
+                            SELECT {aggregate-func-ctec1}            AG1 {aggregate-depth-funcs} FROM cte
 final-query-1non-num    ::= SELECT {star} FROM cte | \
                             SELECT {non-num-arg-aggr-func}({:ctec1}) AG1 {aggregate-depth-funcs} FROM cte
 final-query-1num-1non   ::= SELECT {star} FROM cte | \
-                            SELECT    {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                            SELECT {aggregate-func-ctec1}            AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
                                 {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,    {aggregate-function}({:ctec1}) AG1]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,            {aggregate-func-ctec1} AG1]\
                                 {aggregate-depth-funcs} FROM cte
 final-query-1non-1num   ::= SELECT {star} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,    {aggregate-function}({:ctec1}) AG2]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,            {aggregate-func-ctec2} AG2]\
                                 {aggregate-depth-funcs} FROM cte | \
-                            SELECT    {aggregate-function}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                            SELECT           {aggregate-func-ctec2}  AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
                                 {aggregate-depth-funcs} FROM cte
 final-query-3num        ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG1[, {aggregate-function}({:ctec1}) AG2]\
-                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG2[, {aggregate-function}({:ctec1}) AG1]\
-                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG3[, {aggregate-function}({:ctec1}) AG2]\
-                                [, {aggregate-function}({:ctec1}) AG1] {aggregate-depth-funcs} FROM cte
+                            SELECT {aggregate-func-ctec1} AG1[, {aggregate-func-ctec2} AG2]\
+                                [, {aggregate-func-ctec3} AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-func-ctec2} AG2[, {aggregate-func-ctec1} AG1]\
+                                [, {aggregate-func-ctec3} AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-func-ctec3} AG3[, {aggregate-func-ctec2} AG2]\
+                                [, {aggregate-func-ctec1} AG1] {aggregate-depth-funcs} FROM cte
 final-query-3non-num    ::= SELECT {star} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
-                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
-                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG3[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec3}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec2}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                [, {non-num-arg-aggr-func}({:ctec3}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec3}) AG3[, {non-num-arg-aggr-func}({:ctec2}) AG2]\
                                 [, {non-num-arg-aggr-func}({:ctec1}) AG1]   {aggregate-depth-funcs} FROM cte
 final-query-9num        ::= SELECT {star} FROM cte | \
                             SELECT {aggregate-function}({ctec1-9}) AG1[, {aggregate-function}({ctec1-9}) AG2][, {aggregate-function}({ctec1-9}) AG3] \
@@ -834,13 +963,13 @@ final-query-9non-num    ::= SELECT {star} FROM cte | \
                                 [, {non-num-arg-aggr-func}({ctec1-9}) AG7,  {non-num-arg-aggr-func}({ctec1-9}) AG8,   {non-num-arg-aggr-func}({ctec1-9}) AG9] \
                             {aggregate-depth-funcs} FROM cte
 final-query-9-mixed     ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,  {aggregate-function}({:ctec3}) AG3] \
+                            SELECT {aggregate-func-ctec1}         AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,         {aggregate-func-ctec3}  AG3] \
                                 [, {aggregate-function}({:ctec4}) AG4,  {non-num-arg-aggr-func}({:ctec5}) AG5, {non-num-arg-aggr-func}({:ctec6}) AG6] \
                                 [, {aggregate-function}({:ctec7}) AG7,  {non-num-arg-aggr-func}({:ctec8}) AG8, {non-num-arg-aggr-func}({:ctec9}) AG9] \
                             {aggregate-depth-funcs} FROM cte | \
                             SELECT {non-num-arg-aggr-func}({:ctec9}) AG9[, {non-num-arg-aggr-func}({:ctec8}) AG8][, {aggregate-function}({:ctec7}) AG7] \
                                 [, {non-num-arg-aggr-func}({:ctec6}) AG6,  {non-num-arg-aggr-func}({:ctec5}) AG5,   {aggregate-function}({:ctec4}) AG4] \
-                                [,    {aggregate-function}({:ctec3}) AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-function}({:ctec1}) AG1] \
+                                [,           {aggregate-func-ctec3}  AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-func-ctec1}         AG1] \
                             {aggregate-depth-funcs} FROM cte
 
 ########################################
@@ -1177,17 +1306,16 @@ recursive-clause-point1 ::= add2GeographyPoint({cte-col1:ctec1}, {point-rarely-n
 recursive-clause-poly1  ::= addGeographyPointToGeography({cte-col1:ctec1}, {point-rarely-null-value})
 
 ################################################################################
-# Grammar rules for special non-standard SQL statements that can be used in
-# sqlcmd (and therefore should be tested), even though they are not part of
-# standard SQL. The most important such statements are the ones that 'exec'
-# a (System, Default, or User-defined) Stored Procedure; but you can also
-# CREATE or DROP a Stored Procedure (which are DDL statements); or 'explain'
-# a SQL statement, procedure, or view; or 'show' a list of tables, classes,
+# Grammar rules for special non-standard statements that can be used in sqlcmd
+# (and therefore should be tested), even though they are not part of standard
+# SQL. The most important such statements are the ones that 'exec' a (System,
+# Default, or User-defined) Stored Procedure; but you can also 'explain' a SQL
+# statement, procedure, or view; or 'show' a list of tables, classes,
 # procedures, or functions.
 ################################################################################
 #
-special-sql-statement   ::= {exec-stored-proc} 80| {explain-statement} 10| \
-                            {random-proc-statement} 9| {show-statement}
+sqlcmd-statement        ::= {exec-stored-proc} 89| {explain-statement} 10| \
+                            {show-statement}
 
 # Note: both 'exec' and 'show' have two spaces after them; this is a kludge
 # so that all 'exec' statements, and similarly all 'show' statements, will be
@@ -1206,10 +1334,6 @@ explainproc-statement   ::= explainproc {stored-proc-name}
 explainview-statement   ::= explainview {view-name}
 
 stored-proc-name        ::= {user-proc-name} 5| {default-proc-name} 4| {system-proc-name}
-
-# Note that these are DDL statements
-# TODO: enable {drop-create-proc-stmnt}, once hanging issues resolved
-random-proc-statement   ::= {drop-create-proc-stmnt} 0| {create-proc-as-statement} 2| {drop-proc-statement}
 
 ################################################################################
 # System Stored Procedures
@@ -1230,7 +1354,7 @@ system-proc-name        ::= @AdHocLarge | @Explain | @ExplainProc | @ExplainView
 #                            @AdHocLarge '{sql-statement}' | \
 system-stored-proc      ::= @Explain '{sql-statement}' | @ExplainProc '{stored-proc-name}' | @ExplainView '{view-name}' | \
                             @GetPartitionKeys {partition-keys-datatype} | \
-                            @Statistics {statistics-component}[,] {zero-or-one} | \
+                            @Statistics {statistics-component}[,] {digit-0-or-1} | \
                             @SwapTables {swappable-tables} | \
                             @SystemCatalog {system-catalog-component}  | \
                             @SystemInformation {system-info-component} | \
@@ -1349,7 +1473,8 @@ user-stored-proc        ::= {user-proc-0params} 2| {user-proc-1param} {integer-v
 # Grammar rules for a SELECT statement (lots of these!):
 ################################################################################
 #
-select-statement        ::= {basic-select-statement} 9| \
+select-statement        ::= {basic-select-statement}  8| \
+                            {groupby-select-statement} | \
                             {select-statement} {set-operator} {select-statement}
 set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
@@ -1357,34 +1482,31 @@ set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 # brackets makes them less likely
 basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} {from-clause}
 top-all-or-distinct     ::= [[[{top-clause}]]] [[{all-or-distinct}]]
-from-clause             ::= FROM {table-refs} [[{where-clause}]] [[{group-clause}]] [{sort-clause}] 38| \
+from-clause             ::= {simple-from-clause} [[[[{group-clause}]]]] [{sort-clause}] 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
+simple-from-clause      ::= FROM {table-refs} [[{where-clause}]]
 from-clause-no-limit    ::= FROM {table-refs} [[{where-clause}]] {group-order-no-limit} 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
-group-order-no-limit    ::= [[{group-clause}]] [{order-by-clause}]
+group-order-no-limit    ::= [[[[{group-clause}]]]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
 select-list             ::= {select-list-item}[[, {select-list}]]
-select-list-item        ::= {star} 5| {column-name-ref} [[AS ]{column-alias-set}] 14| \
+select-list-item        ::= {star} 5| {column-table-ref} [[AS ]{column-alias-set}] 14| \
                             {window-function-expr} [[AS ]{column-alias-set}]
 
 column-name-or-alias    ::= {any-column-name} 9| {column-alias-ref}
-column-expression       ::= {column-name-ref} 3| {selection-expression}
-
-# The use of "{table-ref}" is useful to refer to a table name or alias that has
-# already been defined, elsewhere in the SQL statement
-column-name-ref         ::= {table-ref}.{any-column-name} 4| {any-column-name}
-column-reference        ::= {column-name-ref} 18| {column-alias-ref} | \
+column-expression       ::= {column-table-ref} 3| {selection-expression}
+column-reference        ::= {column-table-ref} 18| {column-alias-ref} | \
                             {selection-expression}
 
 # Putting the ", {table-ref-list}" in more than one set of brackets makes it less likely
-table-refs              ::= {table-list} 8| {table-ref-list} | {join-clause}
-table-ref-list          ::= {table-ref-set}[[, {table-ref-list}]]
+table-refs              ::= {table-list} 16| {table-ref-list} 3| {join-clause}
+table-ref-list          ::= {table-ref-set}[[[[, {table-ref-list}]]]]
 table-list              ::= {table-reference-t1} \
-                            [[, {table-reference-t2} \
-                            [[, {table-reference-t3} \
-                            [[, {table-reference-t4} \
-                            [[, {table-reference-t5}]] ]] ]] ]]
+                            [[[[, {table-reference-t2} \
+                              [[, {table-reference-t3} \
+                              [[, {table-reference-t4} \
+                              [[, {table-reference-t5}]] ]] ]] ]]]]
 
 # Table/view/sub-query references that can be reused later in a SQL statement,
 # as ":t1", ":t2", etc.
@@ -1421,9 +1543,9 @@ limit-one               ::= LIMIT 1 98| LIMIT 0 | LIMIT {byte-non-null-value}
 # with Geospatial types; and involving TOP, which PostgreSQL does not support.
 # Note: if you add a new column to the DDL file, add it here
 # (and in other places with this comment)
-pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+pg-star                 ::= ID, TINY, SMALL, INT1, BIG, NUM, DEC, \
                             VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
-                            TIME, VARBIN, AsText(POINT), AsText(POLYGON), \
+                            TIME1, VARBIN, AsText(POINT), AsText(POLYGON), \
                             IPV4, IPV6, VBIPV4, VBIPV6
 pg-top-clause           ::=
 pg-top-one              ::=
@@ -1449,27 +1571,74 @@ value-expression        ::= {numeric-expression}  7| {string-expression}     4| 
                             {json-expression}      | {string-ipv4-expression} | {string-ipv6-expression} | \
                             {varbinary-expression} | {varbin-ipv4-expression} | {varbin-ipv6-expression} | \
                             {point-expression}     | {polygon-expression}
-selection-expression    ::= {value-expression} 9| COUNT(*)
+selection-expression    ::= {value-expression} 18| COUNT(DISTINCT {value-expression}) | COUNT(*)
 boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [NOT ]NULL | \
                             {boolean-numeric-expr}  7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
                             {boolean-varbinary-expr} | {boolean-point-expr}   | {boolean-polygon-expr} | \
-                            EXISTS {sub-query} | {bool-val-timestamp-expr} | {bool-valued-polygon-expr}
+                            EXISTS {sub-query}
 boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
                             {numeric-column-name}   IN {numeric-sub-query}
 boolean-string-expr     ::= {string-expression}    {comparison-operator} {string-expression}    4| \
                             {string-column-name}    IN {string-sub-query} | \
                             {string-like-expression}
 boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression} 4| \
-                            {timestamp-column-name} IN {timestamp-sub-query}
+                            {timestamp-column-name} IN {timestamp-sub-query} | \
+                            {bool-val-timestamp-expr}
 boolean-varbinary-expr  ::= {varbinary-expression} {comparison-operator} {varbinary-expression} 4| \
                             {varbinary-column-name} IN {varbinary-sub-query}
 boolean-point-expr      ::= {point-expression} {comparison-operator} {point-expression} 4| \
                             {point-column-name}     IN {point-sub-query}
 boolean-polygon-expr    ::= {polygon-expression} {comparison-operator} {polygon-expression} 4| \
-                            {polygon-column-name}   IN {polygon-sub-query}
+                            {polygon-column-name}   IN {polygon-sub-query} | \
+                            {bool-valued-polygon-expr}
 comparison-operator     ::= {simple-comparison-op} 19| {str-comparison-operator}
 simple-comparison-op    ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FROM
 str-comparison-operator ::= {simple-comparison-op} | LIKE | STARTS WITH
+
+################################################################################
+# GROUP BY clauses, and the SELECT statements that use them; including SELECT
+# statements without GROUP BY that use aggregate functions in a similar way
+#
+groupby-select-statement::= {simple-groupby-select} 3| {random-groupby-select}
+
+simple-groupby-select   ::= SELECT [{top-all-or-distinct}] {groupby-select-list} \
+                            {simple-from-clause:sfc} {groupby-w-column-list}
+
+groupby-select-list     ::= {groupby-column-list;gcl}{comma;cm1}{comma;cm2} \
+                            {count-star}{comma;cm3} {aggregate-func-terms}
+comma                   ::= ,
+count-star              ::= COUNT(*) {count-star-alias:csa}{empty:cm2} 3| \
+                            {empty:cm1}{empty:csa}{empty:cm3}
+count-star-alias        ::= CS
+
+groupby-w-column-list   ::= GROUP BY {groupby-column-list0} 4| \
+                            {empty:gcl}{empty:cm1}{empty:cm2}
+groupby-column-list0    ::= {groupby-column-list:gcl}
+groupby-column-list     ::= {groupby-col-name-set}[, {groupby-column-list}]
+
+groupby-col-name-set    ::= {any-column-name:gc0,gc1,gc2,gc3,gc4,gc5,gc6,gc7,gc8,gc9,gc10,gc11,gc12,gc13,gc14,gc15,gc16,gc17,gc18,gc19:1}
+
+aggregate-func-terms    ::= {aggregate-func-terms0} 4| {empty:cm2}{empty:cm3}
+aggregate-func-terms0   ::= {aggregate-func-term}[, {aggregate-func-terms0}]
+aggregate-func-term     ::=   {aggr-func-for-group-by}({num-aggr-col-name-set})  9| \
+                            {non-num-arg-aggr-func-gb}({aggregate-col-name-set}) 9| \
+                                        COUNT(DISTINCT {aggregate-col-name-set})
+
+aggregate-col-name-set  ::= {any-column-name:ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19}
+num-aggr-col-name-set   ::= {numeric-column-name:ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19}
+aggregate-col-name-list ::= {;ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19;', '}
+
+# A CREATE VIEW statement needs to include a 'simple' SELECT statement,
+# usually using a GROUP BY clause (i.e., a {simple-groupby-select}); this
+# 'create-view-column-list' makes sure that the number, names, and types
+# of the columns match (mostly)
+create-view-column-list ::= {groupby-column-list;gcl}{comma;cm1}{comma;cm2} \
+                            {count-star-alias;csa}{comma;cm3} {aggregate-col-name-list}
+
+# TODO: better support for SELECT ... GROUP BY statements, without the
+# restrictions that exist for CREATE VIEW, e.g., no HAVING or ORDER BY
+# clauses; for now, only the CREATE VIEW types are supported
+random-groupby-select   ::= {simple-groupby-select}
 
 ################################################################################
 # Joins, of various types, including multi-joins of up to 5 tables
@@ -1481,24 +1650,24 @@ join-clause             ::= {table-reference-t1} [{join-type} ]JOIN {table-refer
 join-type               ::= INNER | {left-or-right}[ OUTER]
 left-or-right           ::= LEFT | RIGHT | FULL
 
-join-condition1         ::= USING ({column-name-or-alias:c1}) 2| \
-                            ON {:t1}.{column-name-or-alias:c1} = {:t2}.{:c1} | \
-                            ON {:t2}.{column-name-or-alias:c1} = {:t1}.{:c1} | \
+join-condition1         ::= USING ({column-name-or-alias:cj1}) 2| \
+                            ON {:t1}.{column-name-or-alias:cj1} = {:t2}.{:cj1} | \
+                            ON {:t2}.{column-name-or-alias:cj1} = {:t1}.{:cj1} | \
                             ON {:t1}.{column-name-or-alias} {comparison-operator} {:t2}.{column-name-or-alias} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias}
-join-condition2         ::= USING ({column-name-or-alias:c2}) 2| \
-                            ON {:t2}.{column-name-or-alias:c2} = {:t3}.{:c2} | \
-                            ON {:t3}.{column-name-or-alias:c2} = {:t1}.{:c2} | \
+join-condition2         ::= USING ({column-name-or-alias:cj2}) 2| \
+                            ON {:t2}.{column-name-or-alias:cj2} = {:t3}.{:cj2} | \
+                            ON {:t3}.{column-name-or-alias:cj2} = {:t1}.{:cj2} | \
                             ON {:t3}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
-join-condition3         ::= USING ({column-name-or-alias:c3}) 2| \
-                            ON {:t3}.{column-name-or-alias:c3} = {:t4}.{:c3} | \
-                            ON {:t4}.{column-name-or-alias:c3} = {:t1}.{:c3} | \
+join-condition3         ::= USING ({column-name-or-alias:cj3}) 2| \
+                            ON {:t3}.{column-name-or-alias:cj3} = {:t4}.{:cj3} | \
+                            ON {:t4}.{column-name-or-alias:cj3} = {:t1}.{:cj3} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t4}.{column-name-or-alias} | \
                             ON {:t4}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
-join-condition4         ::= USING ({column-name-or-alias:c4}) 2| \
-                            ON {:t1}.{column-name-or-alias:c4} = {:t5}.{:c4} | \
-                            ON {:t5}.{column-name-or-alias:c4} = {:t4}.{:c4} | \
+join-condition4         ::= USING ({column-name-or-alias:cj4}) 2| \
+                            ON {:t1}.{column-name-or-alias:cj4} = {:t5}.{:cj4} | \
+                            ON {:t5}.{column-name-or-alias:cj4} = {:t4}.{:cj4} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t5}.{column-name-or-alias} | \
                             ON {:t5}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
 
@@ -1518,12 +1687,14 @@ point-sub-query         ::= (SELECT {top-all-or-distinct}     {point-expression}
 polygon-sub-query       ::= (SELECT {top-all-or-distinct}   {polygon-expression} {from-clause})
 numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  {from-clause}) 3| \
                             (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
-                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT         COUNT(DISTINCT {column-expression})  {from-clause})  | \
+                            (SELECT         COUNT(*)                             {from-clause})  | \
                             (SELECT {top-one}   {numeric-expression} {from-clause-no-limit})     | \
                             (SELECT             {numeric-expression} {from-clause-no-limit} {limit-one})
 integer-scalar-sub-q    ::= (SELECT  {aggregate-function}({int-expression})      {from-clause}) 3| \
                             (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
-                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT         COUNT(DISTINCT {column-expression})  {from-clause})  | \
+                            (SELECT         COUNT(*)                             {from-clause})  | \
                             (SELECT {top-one}   {int-expression}     {from-clause-no-limit})     | \
                             (SELECT             {int-expression}     {from-clause-no-limit} {limit-one})
 string-scalar-sub-q     ::= (SELECT {non-num-aggregate-func}({string-expression})  {from-clause}) 6| \
@@ -1593,7 +1764,8 @@ corltd-t0-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numer
 
 numeric-corltd-t0-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t0} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t0} 3| \
-                            SELECT COUNT(*)                                    {from-clause-corltd-t0}  | \
+                            SELECT         COUNT(DISTINCT {column-expression}) {from-clause-corltd-t0}  | \
+                            SELECT         COUNT(*)                            {from-clause-corltd-t0}  | \
                             SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t0}  | \
                             SELECT                       {numeric-expression}  {from-clause-corltd-t0} {limit-one}
 string-corltd-t0-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t0} 6| \
@@ -1645,7 +1817,8 @@ corltd-t1-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numer
 
 numeric-corltd-t1-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t1} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t1} 3| \
-                            SELECT COUNT(*)                                    {from-clause-corltd-t1}  | \
+                            SELECT         COUNT(DISTINCT {column-expression}) {from-clause-corltd-t1}  | \
+                            SELECT         COUNT(*)                            {from-clause-corltd-t1}  | \
                             SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t1}  | \
                             SELECT                       {numeric-expression}  {from-clause-corltd-t1} {limit-one}
 string-corltd-t1-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t1} 6| \
@@ -1732,12 +1905,18 @@ window-order-by-item    ::= {column-expression} 2| {int-expression} | {timestamp
 # Aggregate functions - used with various data types defined below
 # (and in the window functions and scalar sub-queries above)
 #
-# TODO: More use of these in GROUP BY queries
 num-only-aggregate-func ::= SUM | AVG
 num-result-aggr-func    ::= COUNT 3| APPROX_COUNT_DISTINCT
-non-num-aggregate-func  ::= MIN | MAX
+legit-non-num-aggr-func ::= MIN | MAX
+non-num-aggregate-func  ::= {legit-non-num-aggr-func} 399| NONEXISTENT_AGGR_FUNC
 non-num-arg-aggr-func   ::= {non-num-aggregate-func} 2| {num-result-aggr-func}
 aggregate-function      ::= {non-num-arg-aggr-func}  2| {num-only-aggregate-func}
+
+# For use with a GROUP BY clause, in a CREATE VIEW (DDL) statement, where only
+# SUM, COUNT, MIN, or MAX aggregate functions are allowed
+legit-non-num-aggr-f-gb ::= {non-num-aggregate-func}    2| {pg-num-result-aggr-func}
+non-num-arg-aggr-func-gb::= {legit-non-num-aggr-f-gb} 798| AVG | APPROX_COUNT_DISTINCT
+aggr-func-for-group-by  ::= {non-num-arg-aggr-func-gb}  3| SUM
 
 # PostgreSQL-compatible version of the above: avoids APPROX_COUNT_DISTINCT
 pg-num-result-aggr-func ::= COUNT
@@ -1745,8 +1924,14 @@ pg-num-result-aggr-func ::= COUNT
 ################################################################################
 # Numeric constant values, functions, operators and expressions
 #
+digit-0-or-1            ::= 0 | 1
+digit-0-to-4            ::= {digit-0-or-1} 2| 2 | 3 | 4
+digit-0-to-5            ::= {digit-0-to-4} 5| 5
+digit-0-to-7            ::= {digit-0-to-5} 6| 6 | 7
+digit-0-to-8            ::= {digit-0-to-7} 8| 8
 non-zero-digit          ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 digit                   ::= {non-zero-digit} 9| 0
+
 non-negative-int-value  ::= [{non-zero-digit}[{digit}][{non-negative-int-value}]]{digit}
 integer-non-null-value  ::= [-]{non-negative-int-value}
 numeric-non-null-value  ::= {integer-non-null-value}.{non-negative-int-value}[{non-negative-int-value}]  3| \
@@ -1947,7 +2132,6 @@ json-function-1arg      ::= TODO
 #
 month                   ::= 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12
 hour-more-than-12       ::= 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23
-digit-0-to-5            ::= 0 | 1 | 2 | 3 | 4 | 5
 century                 ::= 18 | 19 | 20 | 21 | {digit}{digit}
 year                    ::= {century}{digit}{digit}
 
@@ -1983,8 +2167,11 @@ timestamp-udf-func-expr ::= addYearsToTimestamp({timestamp-expression}, {int-exp
 pg-timestamp-func-0args ::= CURRENT_TIMESTAMP | NOW()
 pg-timest-udf-func-expr ::= {pg-timestamp-func-0args}
 
-# One function of a timestamp produces a boolean result
-bool-val-timestamp-expr ::= IS_VALID_TIMESTAMP({timestamp-expression})
+# One function of a timestamp produces a boolean result; as does the MIGRATING
+# function, which does not take any argument, of any type (but is perhaps
+# vaguely timestamp related, since it sometimes involves a TTL column)
+bool-val-timestamp-expr ::= IS_VALID_TIMESTAMP({timestamp-expression}) 4| \
+                            MIGRATING[()]
 
 # Some functions of a timestamp produce an integer value
 int-valued-time-func    ::= DAY | DAYOFMONTH | DAYOFWEEK | DAYOFYEAR | HOUR | MINUTE | \
@@ -2046,10 +2233,7 @@ string-valued-varb-expr ::= {string-valued-int-func}({int-expression})
 # would simply always give an error message, which would not test much.)
 #
 
-zero-or-one             ::= 0 | 1
-zero-to-four            ::= {zero-or-one} 2| 2 | 3 | 4
-zero-to-five            ::= {zero-to-four} 5| 5
-zero-to-255             ::= 25{zero-to-five} | 2{zero-to-four}{digit} 5| 1{digit}{digit} 10| \
+zero-to-255             ::= 25{digit-0-to-5} | 2{digit-0-to-4}{digit} 5| 1{digit}{digit} 10| \
                             {non-zero-digit}{digit} 9| {digit}
 
 # Note: "-nnull-value" is short for "-non-null-value"
@@ -2089,10 +2273,8 @@ string-ipv6-func-expr   ::= INET6_NTOA({varbin-ipv6-expression})
 # Geospatial Point constant values, functions, operators and expressions
 #
 
-digit-less-than-8       ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-digit-less-than-9       ::= {digit-less-than-8} 8| 8
-number-less-than-80     ::= {digit-less-than-8}[{digit}][.{non-negative-int-value}]
-number-less-than-90     ::= {digit-less-than-9}[{digit}][.{non-negative-int-value}]
+number-less-than-80     ::= {digit-0-to-7}[{digit}][.{non-negative-int-value}]
+number-less-than-90     ::= {digit-0-to-8}[{digit}][.{non-negative-int-value}]
 number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
 
 # Latitude is a number between -100 and 100 (exclusive); longitude is between
@@ -2187,12 +2369,12 @@ ng-insert-values-multiple  ::= SERT INTO {table-name} (ID, {numeric-column-name}
                                {varbinary-column-name} ) VALUES ({integer-non-null-value}, \
                                {numeric-value}, {string-value}, {timestamp-value}, {varbinary-value} )
 ng-insert-values-all       ::= SERT INTO {table-name} ( \
-                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN \
+                               ID, TINY, SMALL, INT1, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME1, VARBIN \
                                ) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
                                {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, {timestamp-value}, \
                                {varbinary-value} )
 ng-insert-values-backward  ::= SERT INTO {table-name} ( \
-                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID \
+                               VARBIN, TIME1, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT1, SMALL, TINY, ID \
                                ) VALUES ( {varbinary-value}, {timestamp-value}, {string-value}, \
                                {string-value}, {string-value}, {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
                                {integer-value}, {byte-value}, {integer-non-null-value} )
@@ -2201,20 +2383,200 @@ ng-insert-select-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name
                                {numeric-column-name}, {string-column-name}, {timestamp-column-name}, {varbinary-column-name} \
                                FROM {table-ref}
 ng-insert-select-all       ::= SERT INTO {table-name} ( \
-                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN ) SELECT \
-                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN FROM {table-ref}
+                               ID, TINY, SMALL, INT1, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME1, VARBIN ) SELECT \
+                               ID, TINY, SMALL, INT1, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME1, VARBIN FROM {table-ref}
 ng-insert-select-backward  ::= SERT INTO {table-name} ( \
-                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID ) SELECT \
-                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-ref}
-ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
+                               VARBIN, TIME1, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT1, SMALL, TINY, ID ) SELECT \
+                               VARBIN, TIME1, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT1, SMALL, TINY, ID FROM {table-ref}
+ng-star                    ::= ID, TINY, SMALL, INT1, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME1, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
 
 
 ################################################################################
+################################################################################
+################################################################################
+#
+# DDL statements
+#
 # TODO: we probably should eventually combine the sql-ddl-grammar.txt file with
 # this one (i.e., copy it to here), but what follows are the only sections that
-# we need so far (formerly in that file but moved here).
+# we need so far (formerly in that file but moved here, with modifications).
+
+################################################################################
+# Grammar rules for all DDL statements:
+#
+# TODO: include all DDL statements (with non-zero weights), once implemented,
+# especially CREATE TABLE, ALTER TABLE, and PARTITION statements
+#
+ddl-statement           ::= {create-statement}      | {alter-table-statement} 0| \
+                            {partition-table-stmnt} | {drop-statement}
+
+create-statement        ::= {create-non-table-stmnt} 3| {create-table-statement}
+
+create-non-table-stmnt  ::= {create-view-statement} | {create-index-statement} | \
+                            {create-proc-statement}
+
+################################################################################
+# Names for tables, views, indexes, and stored procedures, to be used in DDL
+# statements: some, listed elsewhere, use a fixed schema; others, listed here,
+# may be changed via DDL:
+#
+ddl-table-name          ::= DT{digit-0-or-1}{digit}
+ddl-view-name           ::= DV{digit-0-or-1}{digit}
+ddl-index-name          ::= DIDX{digit-0-or-1}{digit}
+ddl-proc-name           ::= {random-proc-0params}
+
+################################################################################
+# Grammar rules for CREATE TABLE statements:
+################################################################################
+#
+# TODO: flesh this out more: not just for MIGRATE and TTL (see ENG-15795)
+#
+create-table-statement  ::= {create-simple-table} 2| {create-migrating-table} | \
+                            {drop-create-part-table} 999| {create-table-statement}
+
+create-simple-table     ::= CREATE TABLE {ddl-table-name:tn} \
+                            [{migrate-to-target}] \
+                            ({create-table-column-list}) \
+                            [{ttl-definition}]
+
+create-migrating-table  ::= CREATE TABLE {ddl-table-name:tn} \
+                            {migrate-to-target} \
+                            ({create-table-column-list}) \
+                            [{ttl-definition}][; \
+                            {create-non-migrating-idx}]
+
+drop-create-part-table  ::= [DROP TABLE {ddl-table-name:tn} IF EXISTS CASCADE;] \
+                            {create-simple-table}[; \
+                            {partition-table-stmnt}][; \
+                            {create-index-statement}]
+
+migrate-to-target       ::= MIGRATE TO TARGET grammartarget
+ttl-definition          ::= USING TTL {ttl-value} [{ttl-time-unit}] \
+                            ON COLUMN {ttl-column:ttl} \
+                            [{batch-size}][ {max-frequency}]
+ttl-value               ::= {non-negative-int-value}
+ttl-time-unit           ::= SECONDS 5| MINUTES 3| HOURS | DAYS
+ttl-column              ::= {int-non-small-col-name} 2| {timestamp-column-name}
+batch-size              ::= BATCH_SIZE {non-negative-int-value}[{digit}[{digit}]]
+max-frequency           ::= MAX_FREQUENCY {non-negative-int-value}
+
+create-table-column-list::= {standard-column-list} 3| {varied-column-list}
+
+# Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
+standard-column-list    ::= \
+  ID      INTEGER  {probable-primary-key},   \
+  TINY    TINYINT  {column-byte-attributes}, \
+  SMALL   SMALLINT {column-num-attributes},  \
+  INT1     INTEGER  {probable-not-null-num},  \
+  BIG     BIGINT   {probable-not-null-num},  \
+  NUM     FLOAT    {column-num-attributes},  \
+  DEC     DECIMAL  {column-num-attributes},  \
+  VCHAR_INLINE      VARCHAR(14)       {probable-not-null-str}, \
+  VCHAR_INLINE_MAX  VARCHAR(63 BYTES) {probable-not-null-str}, \
+  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) {probable-not-null-str}, \
+  VCHAR             VARCHAR           {probable-not-null-str}, \
+  VCHAR_JSON        VARCHAR(1000)     {column-json-attributes}, \
+  TIME1    TIMESTAMP       {probable-not-null-time}, \
+  VARBIN  VARBINARY(100)  {probable-not-null-varb}, \
+  POINT   GEOGRAPHY_POINT {column-null-attributes}, \
+  POLYGON GEOGRAPHY       {column-null-attributes}, \
+  IPV4    VARCHAR(15)     {column-null-attributes}, \
+  IPV6    VARCHAR(60)     {column-null-attributes}, \
+  VBIPV4  VARBINARY(4)    {column-null-attributes}, \
+  VBIPV6  VARBINARY(16)   {column-null-attributes}
+
+# Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
+varied-column-list      ::= \
+     ID      INTEGER  {probable-primary-key}     \
+[[,  TINY    TINYINT  {column-byte-attributes}]] \
+[[,  SMALL   SMALLINT {column-num-attributes}]]  \
+[ ,  INT1     INTEGER  {probable-not-null-num}]   \
+[ ,  BIG     BIGINT   {probable-not-null-num}]   \
+[[,  NUM     FLOAT    {column-num-attributes}]]  \
+[[,  DEC     DECIMAL  {column-num-attributes}]]  \
+[[,  VCHAR_INLINE      VARCHAR(14)       {probable-not-null-str}]]  \
+[[,  VCHAR_INLINE_MAX  VARCHAR(63 BYTES) {probable-not-null-str}]]  \
+[[,  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) {probable-not-null-str}]]  \
+[[,  VCHAR             VARCHAR           {probable-not-null-str}]]  \
+[[,  VCHAR_JSON        VARCHAR(1000)     {column-json-attributes}]] \
+[ ,  TIME1    TIMESTAMP       {probable-not-null-time}]  \
+[[,  VARBIN  VARBINARY(100)  {probable-not-null-varb}]] \
+[[,  POINT   GEOGRAPHY_POINT {column-null-attributes}]] \
+[[,  POLYGON GEOGRAPHY       {column-null-attributes}]] \
+[[,  IPV4    VARCHAR(15)     {column-null-attributes}]] \
+[[,  IPV6    VARCHAR(60)     {column-null-attributes}]] \
+[[,  VBIPV4  VARBINARY(4)    {column-null-attributes}]] \
+[[,  VBIPV6  VARBINARY(16)   {column-null-attributes}]]
+
+# TODO: work this out better??:
+probable-primary-key    ::= {not-null-primary-key} 18| {not-null} | {column-num-attributes}
+probable-not-null-num   ::= {not-null} 9| {column-num-attributes}
+probable-not-null-str   ::= {not-null} 9| {column-str-attributes}
+probable-not-null-time  ::= {not-null} 9| {column-time-attributes}
+probable-not-null-varb  ::= {not-null} 9| {column-varb-attributes}
+not-null-maybe-pk       ::= {not-null} 9| {not-null-primary-key:mpk}
+not-null-primary-key    ::= {not-null} {primary-key}{empty:mpk}
+not-null                ::= NOT NULL
+primary-key             ::= PRIMARY KEY
+
+column-byte-attributes  ::= [{default-byte}     ][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-num-attributes   ::= [{default-numeric}  ][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-str-attributes   ::= [{default-string}   ][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-json-attributes  ::= [{default-json}     ][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-time-attributes  ::= [{default-timestamp}][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-varb-attributes  ::= [{default-varbinary}][[ {not-null-maybe-pk}]][ {unique-or-assume-unique:uau}]
+column-null-attributes  ::= [{default-null}     ][[ {not-null-maybe-pk}]]  {empty}
+
+default-byte            ::= DEFAULT {byte-value}      | DEFAULT 0
+default-numeric         ::= DEFAULT {numeric-value}   | DEFAULT 0
+default-string          ::= DEFAULT {string-value}    | DEFAULT '0'
+default-json            ::= DEFAULT {json-text-value} | DEFAULT '\{\}'
+default-timestamp       ::= DEFAULT {timestamp-value} | DEFAULT '2018-10-28 23:14:59'
+default-varbinary       ::= DEFAULT {varbinary-value} | DEFAULT x'00'
+# GEOGRAPHY_POINT and GEOGRAPHY columns cannot have a non-null default;
+# and we don't bother to set one for the 'internet' (IPV) columns
+default-null            ::= DEFAULT NULL
+
+################################################################################
+# Grammar rules for CREATE VIEW statements:
+################################################################################
+#
+create-view-statement   ::= CREATE VIEW {ddl-view-name} ({create-view-column-list;cvcl}) AS \
+                            {simple-groupby-select}
+
+################################################################################
+# Grammar rules for a CREATE INDEX statement:
+# indexes may be created on any table or view, not only on the 'ddl-...' ones
+# defined above.
+################################################################################
+#
+create-index-statement  ::= {create-simple-index} 3| {create-non-migrating-idx}
+
+create-index-clause     ::= CREATE[ {unique-or-assume-unique}] INDEX {ddl-index-name} \
+                            ON {ddl-table-name:tn} ({column-expression-list}) \
+
+unique-or-assume-unique ::= UNIQUE | ASSUMEUNIQUE
+
+create-simple-index     ::= {create-index-clause} [{where-clause}]
+
+create-non-migrating-idx::= {create-index-clause} {where-not-migrating}
+
+################################################################################
+# Grammar rules for CREATE / DROP PROCEDURE statements:
+# stored procedures may be created on any table or view, not only on the
+# 'ddl-...' ones defined above.
+################################################################################
+#
+create-proc-statement   ::= {create-proc-as-statement} 2| {drop-create-proc-stmnt}
+
+# This version drops a procedure first (if it exists), before creating a new
+# one using the same procedure name, so this is more likely to be valid
+drop-create-proc-stmnt  ::= DROP PROCEDURE {ddl-proc-name:p0} IF EXISTS; \
+                            {create-proc-as-statement}
 
 ################################################################################
 # Grammar rules for a CREATE PROCEDURE AS statement:
@@ -2222,15 +2584,20 @@ ng-polygon-value           ::= NULL
 #
 # TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
 # role-name-list, and dealing with roles generally)
-create-proc-as-statement::= CREATE PROCEDURE {random-proc-0params:p0} \
-                            [PARTITION ON TABLE {table-name} COLUMN {column-name}[ PARAMETER {digit}]] \
+create-proc-as-statement::= CREATE PROCEDURE {ddl-proc-name:p0} \
+                            [PARTITION ON TABLE {table-name-ref} \
+                              COLUMN {column-name}[ PARAMETER {digit}]] \
 #                           [[[ALLOW {role-name-list}]]] \
                             AS {sql-statement}
 
-# This version drops a procedure first (if it exists), before creating a new
-# one using the same procedure name, so this is more likely to be valid
-drop-create-proc-stmnt  ::= DROP PROCEDURE {random-proc-0params:p0} IF EXISTS; \
-                            {create-proc-as-statement}
+################################################################################
+# Grammar rules for a PARTITION TABLE  statement:
+################################################################################
+#
+partition-table-stmnt   ::= PARTITION TABLE {ddl-table-name:tn} ON COLUMN {partition-column}
+
+partition-column        ::= {int-non-small-col-name} 8| {string-column-name} 8| \
+                            {varbinary-column-name}  3| {any-column-name}
 
 ################################################################################
 # Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
@@ -2239,7 +2606,7 @@ drop-create-proc-stmnt  ::= DROP PROCEDURE {random-proc-0params:p0} IF EXISTS; \
 #
 drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
                             {drop-index-statement} | {drop-proc-statement}
-drop-table-statement    ::= DROP TABLE {table-name}[[ IF EXISTS]][[ CASCADE]]
-drop-view-statement     ::= DROP VIEW  {view-name}[   IF EXISTS]
-drop-index-statement    ::= DROP INDEX {index-name}[  IF EXISTS]
-drop-proc-statement     ::= DROP PROCEDURE {random-proc-0params}[ IF EXISTS]
+drop-table-statement    ::= DROP TABLE     {ddl-table-name}[[ IF EXISTS]][[ CASCADE]]
+drop-view-statement     ::= DROP VIEW      {ddl-view-name}[   IF EXISTS]
+drop-index-statement    ::= DROP INDEX     {ddl-index-name}[  IF EXISTS]
+drop-proc-statement     ::= DROP PROCEDURE {ddl-proc-name}[   IF EXISTS]

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,21 +21,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.CatalogContext;
+import org.voltdb.*;
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.DefaultProcedureManager;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.utils.Encoder;
 
-public class ExplainProc extends AdHocNTBase {
+public class ExplainProc extends AdHocNTExplain {
 
+    @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
+
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
+        return run(stringOf(params));
+    }
+
+    @Override
     public CompletableFuture<ClientResponse> run(String procedureNames) {
         // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
 
@@ -52,7 +58,6 @@ public class ExplainProc extends AdHocNTBase {
 
         for (int i = 0; i < size; i++) {
             String procName = procNames.get(i);
-
             // look in the catalog
             Procedure proc = context.procedures.get(procName);
             if (proc == null) {
@@ -68,32 +73,22 @@ public class ExplainProc extends AdHocNTBase {
                     String sql = DefaultProcedureManager.sqlForDefaultProc(proc);
                     List<String> sqlStatements = new ArrayList<>(1);
                     sqlStatements.add(sql);
-                    return runNonDDLAdHoc(context,
-                            sqlStatements,
-                            true, // infer partitioning
-                            null, // no partition key
-                            ExplainMode.EXPLAIN_DEFAULT_PROC,
-                            false, // not a large query
-                            false, // not swap tables
-                            new Object[0]);
+                    return runNonDDLAdHoc(context, sqlStatements, true, null,
+                            ExplainMode.EXPLAIN_DEFAULT_PROC, false, false, new Object[0]);
                 }
 
             }
-
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("STATEMENT_NAME", VoltType.STRING),
                                   new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
                                   new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-
             for(Statement stmt : proc.getStatements()) {
                 vt[i].addRow(stmt.getTypeName(), stmt.getSqltext(), Encoder.hexDecodeToString(stmt.getExplainplan()));
             }
         }
 
-        ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                                             null,
-                                                             vt,
-                                                             null);
+        final ClientResponseImpl response = new ClientResponseImpl(
+                ClientResponseImpl.SUCCESS, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null,
+                vt, null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);

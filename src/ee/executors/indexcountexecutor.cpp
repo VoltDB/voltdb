@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,9 +48,9 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_DEBUG("init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getPredicate() == NULL);
+    vassert(m_node);
+    vassert(m_node->getTargetTable());
+    vassert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -93,7 +93,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //output table should be temptable
     m_outputTable = static_cast<AbstractTempTable*>(m_node->getOutputTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
-    assert(m_numOfColumns == 1);
+    vassert(m_numOfColumns == 1);
 
     // Miscellanous Information
     m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
@@ -108,13 +108,13 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // The target table should be a persistent table
     // Grab the Index from the table. Throw an error if the index is missing.
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    assert (tableIndex != NULL);
+    vassert(tableIndex != NULL);
 
     // This index should have a true countable flag
-    assert(tableIndex->isCountableIndex());
+    vassert(tableIndex->isCountableIndex());
 
     if (m_numOfSearchkeys != 0) {
         m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
@@ -133,7 +133,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
     // update local target table with its most recent reference
-    assert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
+    vassert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
     PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
     IndexCursor indexCursor(tableIndex->getTupleSchema());
@@ -151,7 +151,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+    vassert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
             searchKey.getSchema()->columnCount() == m_numOfEndkeys);
 
@@ -203,7 +203,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // e.g. TINYINT < 1000 should return all values
                 if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                     (ctr == (activeNumOfSearchKeys - 1))) {
-                    assert (localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
+                    vassert(localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
 
                     // See throwCastSQLValueOutOfRangeException to see that
                     // these three cases, TYPE_OVERFLOW, TYPE_UNDERFLOW and
@@ -226,7 +226,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                                 localLookupType = INDEX_LOOKUP_TYPE_GT;
                                 break;
                             default:
-                                assert(!"IndexCountExecutor::p_execute - can't index on not equals");
+                                vassert(!"IndexCountExecutor::p_execute - can't index on not equals");
                                 return false;
                         }
                     }
@@ -275,7 +275,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 }
 
                 if (ctr == (m_numOfEndkeys - 1)) {
-                    assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
+                    vassert(m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
@@ -304,7 +304,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                                 m_endType = INDEX_LOOKUP_TYPE_LTE;
                                 break;
                             default:
-                                assert(!"IndexCountExecutor::p_execute - invalid end type.");
+                                vassert(!"IndexCountExecutor::p_execute - invalid end type.");
                                 return false;
                         }
                     }
@@ -328,7 +328,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // POST EXPRESSION
     //
-    assert (m_node->getPredicate() == NULL);
+    vassert(m_node->getPredicate() == NULL);
 
     //
     // COUNT NULL EXPRESSION
@@ -376,7 +376,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         } else {
             // Do not count null row or columns
             tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-            assert(countNULLExpr);
+            vassert(countNULLExpr);
             long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor);
             rkStart += numNULLs;
             VOLT_DEBUG("Index count[underflow case]: "
@@ -389,7 +389,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
             tableIndex->moveToEnd(true, indexCursor);
         }
-        assert(countNULLExpr);
+        vassert(countNULLExpr);
         long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor);
         rkStart += numNULLs;
         VOLT_DEBUG("Index count[reverse case]: "

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@
 #include "LogDefs.h"
 #include "LogProxy.h"
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -44,7 +44,7 @@ public:
      * @returns true if the level is loggable, false otherwise
      */
     inline bool isLoggable(LogLevel level) const {
-        assert (level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         return (level >= m_level);
     }
 
@@ -54,7 +54,7 @@ public:
      * @param statement Statement to log
      */
     inline void log(const voltdb::LogLevel level, const std::string *statement) const {
-        assert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         if (level >= m_level && m_logProxy != NULL) {
             m_logProxy->log( m_id, level, statement->c_str());
         }
@@ -66,7 +66,7 @@ public:
      * @param statement null terminated UTF-8 string containg the statement to log
      */
     inline void log(const voltdb::LogLevel level, const char *statement) const {
-        assert (level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         if (level >= m_level && m_logProxy != NULL) {
             m_logProxy->log( m_id, level, statement);
         }

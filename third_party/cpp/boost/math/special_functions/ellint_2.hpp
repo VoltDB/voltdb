@@ -18,11 +18,14 @@
 #pragma once
 #endif
 
+#include <boost/math/special_functions/math_fwd.hpp>
 #include <boost/math/special_functions/ellint_rf.hpp>
 #include <boost/math/special_functions/ellint_rd.hpp>
+#include <boost/math/special_functions/ellint_rg.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/tools/workaround.hpp>
+#include <boost/math/special_functions/round.hpp>
 
 // Elliptic integrals (complete and incomplete) of the second kind
 // Carlson, Numerische Mathematik, vol 33, 1 (1979)
@@ -65,6 +68,14 @@ T ellint_e_imp(T phi, T k, const Policy& pol)
        // just return the second part of the duplication formula:
        result = 2 * phi * ellint_e_imp(k, pol) / constants::pi<T>();
     }
+    else if(k == 0)
+    {
+       return invert ? T(-phi) : phi;
+    }
+    else if(fabs(k) == 1)
+    {
+       return invert ? T(-sin(phi)) : T(sin(phi));
+    }
     else
     {
        // Carlson's algorithm works only for |phi| <= pi/2,
@@ -74,22 +85,34 @@ T ellint_e_imp(T phi, T k, const Policy& pol)
        // but that fails if T has more digits than a long long,
        // so rewritten to use fmod instead:
        //
-       T rphi = boost::math::tools::fmod_workaround(phi, T(constants::pi<T>() / 2));
-       T m = floor((2 * phi) / constants::pi<T>());
+       T rphi = boost::math::tools::fmod_workaround(phi, T(constants::half_pi<T>()));
+       T m = boost::math::round((phi - rphi) / constants::half_pi<T>());
        int s = 1;
        if(boost::math::tools::fmod_workaround(m, T(2)) > 0.5)
        {
           m += 1;
           s = -1;
-          rphi = constants::pi<T>() / 2 - rphi;
+          rphi = constants::half_pi<T>() - rphi;
        }
-       T sinp = sin(rphi);
-       T cosp = cos(rphi);
-       T x = cosp * cosp;
-       T t = k * k * sinp * sinp;
-       T y = 1 - t;
-       T z = 1;
-       result = s * sinp * (ellint_rf_imp(x, y, z, pol) - t * ellint_rd_imp(x, y, z, pol) / 3);
+       T k2 = k * k;
+       if(k2 > 1)
+       {
+          return policies::raise_domain_error<T>("boost::math::ellint_2<%1%>(%1%, %1%)", "The parameter k is out of range, got k = %1%", k, pol);
+       }
+       else if(rphi < tools::root_epsilon<T>())
+       {
+          // See http://functions.wolfram.com/EllipticIntegrals/EllipticE2/06/01/03/0001/
+          result = s * rphi;
+       }
+       else
+       {
+          // http://dlmf.nist.gov/19.25#E10
+          T sinp = sin(rphi);
+          T cosp = cos(rphi);
+          T c = 1 / (sinp * sinp);
+          T cm1 = cosp * cosp / (sinp * sinp);  // c - 1
+          result = s * ((1 - k2) * ellint_rf_imp(cm1, T(c - k2), c, pol) + k2 * (1 - k2) * ellint_rd(cm1, c, T(c - k2), pol) / 3 + k2 * sqrt(cm1 / (c * (c - k2))));
+       }
        if(m != 0)
           result += m * ellint_e_imp(k, pol);
     }
@@ -117,7 +140,7 @@ T ellint_e_imp(T k, const Policy& pol)
     T t = k * k;
     T y = 1 - t;
     T z = 1;
-    T value = ellint_rf_imp(x, y, z, pol) - t * ellint_rd_imp(x, y, z, pol) / 3;
+    T value = 2 * ellint_rg_imp(x, y, z, pol);
 
     return value;
 }

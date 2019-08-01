@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -138,7 +138,7 @@ class TempTable : public AbstractTempTable {
      */
     virtual void swapContents(AbstractTempTable* otherTable) {
         TempTable* otherTempTable = dynamic_cast<TempTable*>(otherTable);
-        assert (otherTempTable);
+        vassert (otherTempTable);
         AbstractTempTable::swapContents(otherTable);
         m_data.swap(otherTempTable->m_data);
     }

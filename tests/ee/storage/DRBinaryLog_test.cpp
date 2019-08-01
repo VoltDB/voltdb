@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -61,6 +61,12 @@ const int CLUSTER_ID_REPLICA = 2;
 const int BUFFER_SIZE = 4096;
 const int LARGE_BUFFER_SIZE = 32768;
 
+static const string exportColumnNamesArray[12] = { "ROW_TYPE", "ACTION_TYPE", "CONFLICT_TYPE", "CONFLICTS_ON_PRIMARY_KEY",
+                                                   "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
+                                                   "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
+static const std::string tableName = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
+
+
 static bool s_multiPartitionFlag = false;
 static int64_t addPartitionId(int64_t value) {
     return s_multiPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 0);
@@ -112,31 +118,34 @@ static std::map<int, ClusterCtx> s_clusterMap;
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature)
-        : ExportTupleStream(partitionId, siteId, generation, signature)
+    MockExportTupleStream(VoltDBEngine* engine, CatalogId partitionId, int64_t siteId,
+                          int64_t generation, const std::string &tableName)
+        : ExportTupleStream(partitionId, siteId, generation, tableName),
+          m_engine(engine)
     { }
 
-    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
-                                           int64_t spHandle,
-                                           int64_t seqNo,
-                                           int64_t uniqueId,
-                                           int64_t timestamp,
-                                           const std::string &tableName,
-                                           const TableTuple &tuple,
-                                           const std::vector<std::string> &columnNames,
-                                           int partitionColumn,
-                                           ExportTupleStream::Type type) {
+    virtual size_t appendTuple(VoltDBEngine* engine,
+                               int64_t spHandle,
+                               int64_t seqNo,
+                               int64_t uniqueId,
+                               const TableTuple &tuple,
+                               int partitionColumn,
+                               ExportTupleStream::STREAM_ROW_TYPE type) {
         receivedTuples.push_back(tuple);
-        return 0;
+        return ExportTupleStream::appendTuple(m_engine, spHandle, seqNo,
+                                              uniqueId, tuple, partitionColumn, type);
     }
 
     std::vector<TableTuple> receivedTuples;
+
+private:
+    VoltDBEngine* m_engine;
 };
 
 class MockHashinator : public TheHashinator {
 public:
-    static MockHashinator* newInstance() {
-        return new MockHashinator();
+    static MockHashinator* newInstance(int32_t partition = 0) {
+        return new MockHashinator(partition);
     }
 
     std::string debug() const {
@@ -156,51 +165,51 @@ protected:
 
     int32_t partitionForToken(int32_t hashCode) const {
         // partition of VoltDBEngine super of MockVoltDBEngine is 0
-        return 0;
+        return m_partition;
     }
+
+private:
+    MockHashinator(int32_t partition) : m_partition(partition) {}
+
+    int32_t m_partition;
 };
 
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
                      DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
-      : m_context(new ExecutorContext(0, 0, NULL, topend, pool, this,
+      : m_exportColumnAllowNull(12, false),
+        m_exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12),
+        m_context(new ExecutorContext(0, 0, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
         setPartitionIdForTest(0);
         ThreadLocalPool::setPartitionIds(0);
-        std::vector<ValueType> exportColumnType;
-        std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(12, false);
-        exportColumnAllowNull[2] = true;
-        exportColumnAllowNull[3] = true;
-        exportColumnAllowNull[8] = true;
-        exportColumnAllowNull[11] = true;
+        m_exportColumnAllowNull[2] = true;
+        m_exportColumnAllowNull[3] = true;
+        m_exportColumnAllowNull[8] = true;
+        m_exportColumnAllowNull[11] = true;
         // See DDLCompiler.java to find conflict export table schema
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(3); //row type
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1); // action type
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(4); // conflict type
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // conflicts on PK
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1); // action decision
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // remote cluster id
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // remote timestamp
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1);  // flag of divergence
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1024); // table name
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // local cluster id
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // local timestamp
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1048576); // tuple data
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(3); //row type
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1); // action type
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(4); // conflict type
+        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // conflicts on PK
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1); // action decision
+        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // remote cluster id
+        m_exportColumnType.push_back(VALUE_TYPE_BIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // remote timestamp
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1);  // flag of divergence
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1024); // table name
+        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // local cluster id
+        m_exportColumnType.push_back(VALUE_TYPE_BIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // local timestamp
+        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1048576); // tuple data
 
-        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[12] = { "ROW_TYPE", "ACTION_TYPE", "CONFLICT_TYPE", "CONFLICTS_ON_PRIMARY_KEY",
-                                           "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
-                                           "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(m_exportColumnType, m_exportColumnLength, m_exportColumnAllowNull);
 
-        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign");
+        m_exportStream = new MockExportTupleStream((VoltDBEngine*)this, 1, 1, 0, tableName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
-                "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
+                tableName,
                 m_exportSchema,
-                exportColumnName,
+                m_exportColumnName,
                 m_exportStream,
                 true));
         setHashinator(MockHashinator::newInstance());
@@ -216,16 +225,26 @@ public:
     ~MockVoltDBEngine() { }
 
     StreamedTable* getConflictStreamedTable() const { return m_conflictStreamedTable.get(); }
+    UndoLog* getUndoLog() { return & m_undoLog; }
 
     ExportTupleStream* getExportTupleStream() { return m_exportStream; }
     ExecutorContext* getExecutorContext() { return m_context.get(); }
     void prepareContext() { m_context.get()->bindToThread(); }
 
+    void setHashinator(TheHashinator *hashinator) {
+        VoltDBEngine::setHashinator(hashinator);
+    }
+
 private:
     boost::scoped_ptr<StreamedTable> m_conflictStreamedTable;
+    std::vector<ValueType> m_exportColumnType;
+    std::vector<int32_t> m_exportColumnLength;
+    std::vector<bool> m_exportColumnAllowNull;
+    const vector<string> m_exportColumnName;
     MockExportTupleStream* m_exportStream;
     TupleSchema* m_exportSchema;
     boost::scoped_ptr<ExecutorContext> m_context;
+    UndoLog m_undoLog;
 };
 
 
@@ -252,10 +271,10 @@ public:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(0, 64*1024),
-        m_drReplicatedStream(16383, 64*1024),
-        m_drStreamReplica(0, 64*1024),
-        m_drReplicatedStreamReplica(16383, 64*1024),
+      : m_drStream(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drStreamReplica(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStreamReplica(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
         m_undoToken(0),
         m_spHandleReplica(0)
     {
@@ -310,19 +329,13 @@ public:
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
         columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
 
-        std::vector<ValueType> hiddenTypes;
-        std::vector<int32_t> hiddenColumnLengths;
-        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, false);
-        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+        std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT,HiddenColumn::XDCR_TIMESTAMP);
 
-        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-
-
-        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
         columnAllowNull[0] = false;
-        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
 
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_BIGINT", "C_DECIMAL",
@@ -340,8 +353,7 @@ public:
                                                                                                              columnNames,
                                                                                                              replicatedTableHandle,
                                                                                                              false, -1,
-                                                                                                             false,
-                                                                                                             false, 0,
+                                                                                                             PERSISTENT, 0,
                                                                                                              INT_MAX,
                                                                                                              95, true,
                                                                                                              true));
@@ -349,11 +361,24 @@ public:
 
         {
             ReplicaProcessContextSwitcher switcher;
-            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
+            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                         "P_TABLE_REPLICA",
+                                                                                                         m_schemaReplica,
+                                                                                                         columnNames,
+                                                                                                         tableHandle,
+                                                                                                         false, 0));
             ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory useMpMemory;
-            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1,
-                false, false, 0, INT_MAX, 95, false, true));
+            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                                   "R_TABLE_REPLICA",
+                                                                                                                   m_replicatedSchemaReplica,
+                                                                                                                   columnNames,
+                                                                                                                   replicatedTableHandle,
+                                                                                                                   false, -1,
+                                                                                                                   PERSISTENT, 0,
+                                                                                                                   INT_MAX,
+                                                                                                                   95, false,
+                                                                                                                   true));
         }
         m_table->setDR(true);
 
@@ -390,7 +415,7 @@ public:
         columnIndices.push_back(0);
         TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
                                                    columnIndices, TableIndex::simplyIndexColumns(),
-                                                   true, true, m_otherSchemaWithIndex);
+                                                   true, true, false, m_otherSchemaWithIndex);
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         m_otherTableWithIndex->addIndex(index);
 
@@ -398,7 +423,7 @@ public:
             ReplicaProcessContextSwitcher switcher;
             scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
                                       columnIndices, TableIndex::simplyIndexColumns(),
-                                      true, true, m_otherSchemaWithIndexReplica);
+                                      true, true, false, m_otherSchemaWithIndexReplica);
             TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
             m_otherTableWithIndexReplica->addIndex(replicaIndex);
         }
@@ -468,7 +493,7 @@ public:
         engine->prepareContext();
         m_currTxnUniqueId = addPartitionId(uniqueId);
 
-        UndoQuantum* uq = isReadOnly() ? NULL : m_undoLog.generateUndoQuantum(m_undoToken);
+        UndoQuantum* uq = isReadOnly() ? NULL : engine->getUndoLog()->generateUndoQuantum(m_undoToken);
         engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                                                             addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId), false);
         engine->getExecutorContext()->checkTransactionForDR();
@@ -480,9 +505,9 @@ public:
         }
 
         if (!success) {
-            m_undoLog.undo(m_undoToken);
+            engine->getUndoLog()->undo(m_undoToken++);
         } else {
-            m_undoLog.release(m_undoToken++);
+            engine->getUndoLog()->release(m_undoToken++);
             if (engine->getExecutorContext()->drStream() != NULL) {
                 engine->getExecutorContext()->drStream()->endTransaction(m_currTxnUniqueId);
             }
@@ -493,7 +518,7 @@ public:
     }
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
-        if (table->isCatalogTableReplicated()) {
+        if (table->isReplicatedTable()) {
             return insertTupleForReplicated(table, temp_tuple);
         }
         table->insertTuple(temp_tuple);
@@ -527,7 +552,7 @@ public:
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         table->updateTuple(oldTuple, newTuple);
         TableTuple tuple = table->lookupTupleByValues(newTuple);
         assert(!tuple.isNullTuple());
@@ -535,14 +560,14 @@ public:
     }
 
     void deleteTuple(PersistentTable* table, TableTuple tuple) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -554,7 +579,7 @@ public:
     }
 
     TableTuple updateTupleFirstAndSecondColumn(PersistentTable* table, TableTuple tuple, int8_t new_tinyint_value, int64_t new_bigint_value) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -599,8 +624,8 @@ public:
     }
 
     void applyNull() {
-        for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
-            m_topend.blocks.pop_back();
+        for (int i = static_cast<int>(m_topend.drBlocks.size()); i > 0; i--) {
+            m_topend.drBlocks.pop_back();
             m_topend.data.pop_back();
         }
     }
@@ -612,8 +637,8 @@ public:
 
     typedef std::pair<boost::shared_array<char>, size_t> DRStreamData;
     DRStreamData getDRStreamData() {
-        boost::shared_ptr<StreamBlock> sb = m_topend.blocks.front();
-        m_topend.blocks.pop_front();
+        boost::shared_ptr<DrStreamBlock> sb = m_topend.drBlocks.front();
+        m_topend.drBlocks.pop_front();
         boost::shared_array<char> data = m_topend.data.front();
         m_topend.data.pop_front();
 
@@ -651,7 +676,7 @@ public:
         tables[44] = m_otherTableWithoutIndexReplica;
         tables[24] = m_replicatedTableReplica;
 
-        while (!m_topend.blocks.empty()) {
+        while (!m_topend.drBlocks.empty()) {
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
             DRStreamData data = getDRStreamData();
@@ -676,7 +701,7 @@ public:
         firstColumnIndices.push_back(0); // TINYINT
         TableIndexScheme scheme = TableIndexScheme("first_unique_index", HASH_TABLE_INDEX,
                                                    firstColumnIndices, TableIndex::simplyIndexColumns(),
-                                                   true, true, m_schema);
+                                                   true, true, false, m_schema);
         TableIndex *firstIndex = TableIndexFactory::getInstance(scheme);
         m_table->addIndex(firstIndex);
 
@@ -684,7 +709,7 @@ public:
             ReplicaProcessContextSwitcher switcher;
             scheme = TableIndexScheme("first_unique_index", HASH_TABLE_INDEX,
                                       firstColumnIndices, TableIndex::simplyIndexColumns(),
-                                      true, true, m_schemaReplica);
+                                      true, true, false, m_schemaReplica);
             TableIndex *firstReplicaIndex = TableIndexFactory::getInstance(scheme);
             m_tableReplica->addIndex(firstReplicaIndex);
         }
@@ -695,7 +720,7 @@ public:
         secondColumnIndices.push_back(4); // non-inline VARCHAR
         scheme = TableIndexScheme("second_unique_index", HASH_TABLE_INDEX,
                                   secondColumnIndices, TableIndex::simplyIndexColumns(),
-                                  true, true, m_schema);
+                                  true, true, false, m_schema);
         TableIndex *secondIndex = TableIndexFactory::getInstance(scheme);
         m_table->addIndex(secondIndex);
 
@@ -703,7 +728,7 @@ public:
             ReplicaProcessContextSwitcher switcher;
             scheme = TableIndexScheme("second_unique_index", HASH_TABLE_INDEX,
                                       secondColumnIndices, TableIndex::simplyIndexColumns(),
-                                      true, true, m_schemaReplica);
+                                      true, true, false, m_schemaReplica);
             TableIndex *secondReplicaIndex = TableIndexFactory::getInstance(scheme);
             m_tableReplica->addIndex(secondReplicaIndex);
         }
@@ -712,7 +737,7 @@ public:
         vector<int> thirdColumnIndices(1, 0);
         scheme = TableIndexScheme("third_index", HASH_TABLE_INDEX,
                                   secondColumnIndices, TableIndex::simplyIndexColumns(),
-                                  false, false, m_schema);
+                                  false, false, false, m_schema);
         TableIndex *thirdIndex = TableIndexFactory::getInstance(scheme);
         m_table->addIndex(thirdIndex);
     }
@@ -759,7 +784,7 @@ public:
         TableIndexScheme scheme = TableIndexScheme("UniqueIndex", HASH_TABLE_INDEX,
                                                     columnIndices,
                                                     TableIndex::simplyIndexColumns(),
-                                                    true, true, table->schema());
+                                                    true, true, false, table->schema());
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(scheme);
         assert(pkeyIndex);
         table->addIndex(pkeyIndex);
@@ -1010,7 +1035,6 @@ protected:
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
 
-    UndoLog m_undoLog;
     int64_t m_undoToken;
     int64_t m_currTxnUniqueId;
 
@@ -1197,20 +1221,6 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
 }
-
-// ENG-13685: this test seems to fail due to an issue
-// with how the tuple stream is created on the master cluster.
-//TEST_F(DRBinaryLogTest, ReplicatedTableWritesNoReplicatedStream) {
-//    // Use the NO_REPLICATED_STREAM protocol version so that dr replicated stream won't be used
-//    m_drStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    m_drReplicatedStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    replicatedTableWritesCommon();
-//
-//    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(3, committed.seqNum);
-//    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(0, committed.seqNum);
-//}
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
     beginTxn(m_engine, 109, 99, 98, 70);
@@ -1408,7 +1418,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNoninlineVarchar) {
     columnIndices.push_back(4); // non-inline VARCHAR
     TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
                                                columnIndices, TableIndex::simplyIndexColumns(),
-                                               true, true, m_schema);
+                                               true, true, false, m_schema);
     TableIndex *index = TableIndexFactory::getInstance(scheme);
     m_table->addIndex(index);
 
@@ -1416,7 +1426,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNoninlineVarchar) {
         ReplicaProcessContextSwitcher switcher;
         scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
                                   columnIndices, TableIndex::simplyIndexColumns(),
-                                  true, true, m_schemaReplica);
+                                  true, true, false, m_schemaReplica);
         TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
         m_tableReplica->addIndex(replicaIndex);
     }
@@ -1450,13 +1460,13 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
     TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
 
     // Simulate a second batch within the same txn
-    UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
+    UndoQuantum* uq = m_engine->getUndoLog()->generateUndoQuantum(m_undoToken + 1);
     m_engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
                                                           addPartitionId(98), addPartitionId(70), false);
 
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
 
-    m_undoLog.undo(m_undoToken + 1);
+    m_engine->getUndoLog()->undo(m_undoToken + 1);
 
     endTxn(m_engine, true);
 
@@ -2339,7 +2349,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     beginTxn(m_engine, 98, 98, 97, 69);
     endTxn(m_engine, true);
     ASSERT_FALSE(flush(98));
-    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(0, m_topend.drBlocks.size());
 
     s_multiPartitionFlag = true;
 
@@ -2349,7 +2359,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
 
     EXPECT_EQ(0, m_table->activeTupleCount());
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
-    ASSERT_EQ(2, m_topend.blocks.size());
+    ASSERT_EQ(2, m_topend.drBlocks.size());
 
     std::unique_ptr<CopySerializeInputLE> taskInfo(getDRTaskInfo());
     taskInfo->readByte(); // DR version
@@ -2367,7 +2377,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     ASSERT_EQ(DR_RECORD_END_TXN, type);
 
     applyNull();
-    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(0, m_topend.drBlocks.size());
 
     beginTxn(m_engine, 100, 100, 99, 71);
     endTxn(m_engine, true);
@@ -2375,7 +2385,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
 
     EXPECT_EQ(0, m_table->activeTupleCount());
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
-    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(0, m_topend.drBlocks.size());
 
     // read-only
     int64_t prevUndoToken = m_undoToken;
@@ -2383,11 +2393,43 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     beginTxn(m_engine, 101, 101, 100, 72);
     endTxn(m_engine, true);
     ASSERT_FALSE(flush(101));
-    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(0, m_topend.drBlocks.size());
     ASSERT_EQ(INT64_MAX, m_undoToken);
     m_undoToken = prevUndoToken;
 
     s_multiPartitionFlag = false;
+}
+
+TEST_F(DRBinaryLogTest, MissPartitionedExceptionIsThrown) {
+    // replica hashinator puts everything in partition 1
+    m_engineReplica->setHashinator(MockHashinator::newInstance(1));
+
+    // Replicated table updates do not throw TXN_MISPARTITIONED
+    beginTxn(m_engine, 99, 99, 98, 70);
+    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(m_engine, true);
+
+    {
+        ReplicaProcessContextSwitcher switcher;
+        flushAndApply(99, true, true);
+    }
+
+    EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(source_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+
+    // Partitioned table updates do throw TXN_MISPARTITIONED
+    beginTxn(m_engine, 100, 100, 99, 71);
+    insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    endTxn(m_engine, true);
+
+    try {
+        flushAndApply(100);
+        FAIL("Should have thrown SerializableEEException");
+    } catch (SerializableEEException &e) {
+        ASSERT_EQ(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED, e.getType());
+    }
 }
 
 int main() {

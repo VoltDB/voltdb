@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,15 @@
 
 package org.voltdb.export;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
 import java.io.File;
@@ -36,7 +39,12 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,16 +55,21 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
+import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -67,7 +80,7 @@ import junit.framework.TestCase;
 public class TestExportDataSource extends TestCase {
 
     static {
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
     }
     private final static File TEST_DIR = new File("/tmp/" + System.getProperty("user.name"));
 
@@ -76,6 +89,7 @@ public class TestExportDataSource extends TestCase {
     int m_site = 1;
     int m_part = 2;
     TestGeneration m_generation;
+    ExportDataProcessor m_processor;
 
     private static TreeSet<String> getSortedDirectoryListingSegments() {
         TreeSet<String> names = new TreeSet<String>();
@@ -95,38 +109,71 @@ public class TestExportDataSource extends TestCase {
     class TestGeneration implements Generation {
 
         @Override
-        public void acceptMastership(int partitionId) {
+        public void becomeLeader(int partitionId) {
         }
 
         @Override
-        public void close(HostMessenger messenger) {
+        public void close() {
         }
 
         @Override
-        public long getQueuedExportBytes(int partitionId, String signature) {
-            return 0;
+        public List<ExportStatsRow> getStats(boolean interval) {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
 
         @Override
-        public void onSourceDone(int partitionId, String signature) {
+        public void onSourceDrained(int partitionId, String tableName) {
+
         }
 
         @Override
-        public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+        public void pushExportBuffer(int partitionId, String signature,
+                long seqNo, long committedSeqNo, int tupleCount,
+                long uniqueId, ByteBuffer buffer) {
         }
 
         @Override
-        public void pushEndOfStream(int partitionId, String signature) {
-        }
-
-        @Override
-        public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
+        public void updateInitialExportStateToSeqNo(int partitionId,
+                String signature, StreamStartAction action,
+                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
+                boolean isLowestSite) {
         }
 
         @Override
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
+
+        @Override
+        public int getCatalogVersion() {
+            return 0;
+        }
+
+        @Override
+        public void updateGenerationId(long genId) {
+        }
+    }
+
+    // Define a class derived from {@code ExportDataSource} allowing mocking
+    // the {@code ExportCoordinator}
+    class MockExportDataSource extends ExportDataSource {
+
+        public MockExportDataSource(Generation generation, ExportDataProcessor processor, String db, String tableName,
+                int partitionId, int siteId, long genId, CatalogMap<Column> catalogMap, Column partitionColumn,
+                String overflowPath) throws IOException {
+            super(generation, processor, db, tableName, partitionId, siteId, genId, catalogMap, partitionColumn, overflowPath);
+            setMockCoordination();
+        }
+
+        void setMockCoordination() {
+            m_coordinator = mock(ExportCoordinator.class);
+            when(m_coordinator.isCoordinatorInitialized()).thenReturn(true);
+            when(m_coordinator.isPartitionLeader()).thenReturn(true);
+            when(m_coordinator.isMaster()).thenReturn(true);
+            when(m_coordinator.isSafePoint(anyLong())).thenReturn(true);
+            when(m_coordinator.isExportMaster(anyLong())).thenReturn(true);
+        }
+
     }
 
     @Override
@@ -139,7 +186,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addTable("RepTableName", false);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
-
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
                 VoltFile.recursivelyDelete(f);
@@ -148,14 +195,42 @@ public class TestExportDataSource extends TestCase {
         }
         TEST_DIR.mkdir();
         m_generation = new TestGeneration();
+        m_processor = getProcessor();
     }
 
     @Override
     public void tearDown() throws Exception {
         m_mockVoltDB.shutdown(null);
+        m_generation = null;
+        m_processor = null;
         System.gc();
         System.runFinalization();
         Thread.sleep(200);
+    }
+
+    private ExportDataProcessor getProcessor() {
+        Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
+        Properties props = new Properties();
+        props.put("nonce", "mynonce");
+        props.put("type", "csv");
+        props.put("__EXPORT_TO_TYPE__", "org.voltdb.exportclient.ExportToFileClient");
+        props.put("replicated", false);
+        props.put("outdir", TEST_DIR + "/my_exports");
+        Set<String> tables = new HashSet<>();
+        tables.add("TableName");
+        tables.add("RepTableName");
+        config.put("LOG", new Pair<>(props, tables));
+        ExportDataProcessor processor = new GuestProcessor();
+        processor.setProcessorConfig(config);
+        return processor;
+    }
+
+    private void waitForMaster(ExportDataSource s) throws InterruptedException {
+        int i = 0;
+        while (!s.isMaster()) {
+            assertFalse(++i > 2);
+            Thread.sleep(500);
+        }
     }
 
     public void testExportDataSource() throws Exception {
@@ -163,10 +238,11 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(null, "database",
+            ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                     table.getTypeName(),
                     m_part,
-                    table.getSignature(),
+                    CoreUtils.getSiteIdFromHSId(m_site),
+                    0,
                     table.getColumns(),
                     table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
@@ -174,7 +250,6 @@ public class TestExportDataSource extends TestCase {
                 assertEquals("database", s.getDatabase());
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
-                assertEquals(table.getSignature(), s.getSignature());
             } finally {
                 s.close();
             }
@@ -183,58 +258,52 @@ public class TestExportDataSource extends TestCase {
 
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
-                table.getSignature(),
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
 
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter, false);
-            s.acceptMastership();
-            cdl.await();
-
-            ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(23, foo, false);
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(43, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
             assertEquals(s.sizeInBytes(), 40);
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(63, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 3, 1, 0, foo);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(63, null, true);
+            s.pushExportBuffer(3, -1L, 1, 0, null);
 
             assertEquals( 60, s.sizeInBytes());
 
-            AckingContainer cont = (AckingContainer)s.poll().get();
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
             assertEquals( 60, s.sizeInBytes());
-            assertEquals( 42, cont.m_uso);
+            assertEquals( 1, cont.m_lastSeqNo);
 
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
             foo.position(StreamBlock.HEADER_SIZE);
             foo = foo.slice();
             foo.order(ByteOrder.LITTLE_ENDIAN);
@@ -243,35 +312,105 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
 
             //Should lose 20 bytes for the stuff in memory
             assertEquals( 40, s.sizeInBytes());
 
-            assertEquals( 62, cont.m_uso);
+            assertEquals( 2, cont.m_lastSeqNo);
             assertTrue( foo.equals(cont.b()));
 
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
             assertEquals( 20, s.sizeInBytes());
-            assertEquals( 82, cont.m_uso);
+            assertEquals( 3, cont.m_lastSeqNo);
             assertEquals( foo, cont.b());
 
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<BBContainer> fut = s.poll();
+            ListenableFuture<AckingContainer> fut = s.poll();
             try {
-                cont = (AckingContainer)fut.get(100,TimeUnit.MILLISECONDS);
+                cont = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
-//            s.pushExportBuffer(83, null, true);
-//            assertNull(fut.get());
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testDoublePoll() throws Exception{
+        System.out.println("Running testDoublePoll");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            // Push a first buffer - and read it back
+            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
+            foo0.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo0);
+
+            AckingContainer cont0 = s.poll().get();
+            cont0.updateStartTime(System.currentTimeMillis());
+
+            cont0.discard();
+            cont0 = null;
+            System.gc(); System.runFinalization(); Thread.sleep(200);
+
+            // Poll once with no data left - EDS sould set m_pollFuture
+            ListenableFuture<AckingContainer> fut1 = s.poll();
+            assertFalse(fut1.isDone());
+
+            // Do a reentrant poll - the returned fut should have the expected exception
+            ListenableFuture<AckingContainer> fut2 = s.poll();
+            try {
+                AckingContainer c = fut2.get();
+                fail("Did not get expected exception");
+            }
+            catch (Exception e) {
+                if (e.getCause() instanceof ReentrantPollException) {
+                    System.out.println("Got expected exception: " + e);
+
+                } else {
+                    fail("Got unexpected exception: " + e);
+                }
+            }
+
+            // Push a buffer - should satisfy fut1
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo1);
+
+            // Verify the pushed buffer can be got
+            AckingContainer cont1 = fut1.get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            cont1.discard();
+            cont1 = null;
+            System.gc(); System.runFinalization(); Thread.sleep(200);
+
         } finally {
             s.close();
         }
@@ -279,23 +418,16 @@ public class TestExportDataSource extends TestCase {
 
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
-                table.getSignature(),
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-        final CountDownLatch cdl = new CountDownLatch(1);
-        Runnable cdlWaiter = new Runnable() {
-            @Override
-            public void run() {
-                cdl.countDown();
-            }
-        };
         Mailbox mockedMbox = Mockito.mock(Mailbox.class);
         final AtomicReference<CountDownLatch> refSendCdl = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         doAnswer(new Answer<Void>() {
@@ -308,39 +440,40 @@ public class TestExportDataSource extends TestCase {
 
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
-        s.setOnMastership(cdlWaiter, false);
-        s.acceptMastership();
-        cdl.await();
+        s.setReadyForPolling(true);
+        s.becomeLeader();
+        waitForMaster(s);
 
         ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(23, foo, false);
+        s.pushExportBuffer(1, 1, 1, 0, foo);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(43, foo, false);
+        s.pushExportBuffer(2, 2, 1, 0, foo);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(63, foo, false);
+        s.pushExportBuffer(3, 3, 1, 0, foo);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(63, null, true);
+        s.pushExportBuffer(3, -1L, 1, 0, null);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        AckingContainer cont = (AckingContainer)s.poll().get();
+        AckingContainer cont = s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 60, s.sizeInBytes());
-        assertEquals( 42, cont.m_uso);
+        assertEquals( 1, cont.m_lastSeqNo);
 
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
@@ -355,11 +488,13 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 42))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 1, s.getGenerationIdCreated()))
                 );
 
-        // Poll and discard buffer 63, too
-        s.poll().get().discard();
+        // Poll and discard buffer 2, too
+        cont = s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
+        cont.discard();
 
         int i = 1000;
         while( i > 0 && s.sizeInBytes() > 32) {
@@ -368,9 +503,10 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        cont = (AckingContainer)s.poll().get();
+        cont = s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
-        assertEquals(82, cont.m_uso);
+        assertEquals(3, cont.m_lastSeqNo);
         cont.discard();
 
         } finally {
@@ -380,76 +516,69 @@ public class TestExportDataSource extends TestCase {
 
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
-                table.getSignature(),
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
+            s.setReadyForPolling(true);
+
             //Ack before push
-            s.ack(100);
+            s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(203, foo, true);
+            s.pushExportBuffer(101, 101, 1, 0, foo);
             long sz = s.sizeInBytes();
-            assertEquals(sz, 200);
+            assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Ack after push beyond size...last segment kept.
-            s.ack(1000);
+            s.remoteAck(110);
             sz = s.sizeInBytes();
-            assertEquals(sz, 0);
+            assertEquals(0, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(903, foo2, true);
+            s.pushExportBuffer(111, 111, 1, 0, foo2);
             sz = s.sizeInBytes();
-            assertEquals(sz, 802);
+            assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Low ack should have no effect.
-            s.ack(100);
+            s.remoteAck(100);
             sz = s.sizeInBytes();
-            assertEquals(sz, 802);
+            assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter, false);
-            s.acceptMastership();
-            cdl.await();
+            s.becomeLeader();
+            waitForMaster(s);
 
             //Poll and check before and after discard segment files.
-            AckingContainer cont = (AckingContainer) s.poll().get();
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
             cont.discard();
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
-            s.unacceptMastership();
-
             //Last segment is always kept.
-            s.ack(2000);
+            s.remoteAck(2000);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();
@@ -460,7 +589,149 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
-//    /**
+    // Test that gap release operates even when no further export rows are inserted
+    public void testGapRelease() throws Exception{
+        System.out.println("Running testGapRelease");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Push 2 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
+
+            // Push 2 more creating a gap
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(10, 10, 1, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(11, 11, 1, 0, foo);
+
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll once more, should hit the gap (wait for the state to be changed)
+            ListenableFuture<AckingContainer> fut1 = s.poll();
+
+            Thread.sleep(1000);
+            assertFalse(fut1.isDone());
+            assertEquals(ExportDataSource.StreamStatus.BLOCKED, s.getStatus());
+
+            // Do a release
+            assertTrue(s.processStreamControl(OperationMode.RELEASE));
+
+            // Verify we can poll the 2 buffers past the gap
+            try {
+                // cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                cont = fut1.get(100,TimeUnit.DAYS);
+            }
+            catch( TimeoutException to) {
+                fail("did not expect timeout");
+            }
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(10, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(11, cont.m_lastSeqNo);
+            cont.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testPendingContainer() throws Exception{
+        System.out.println("Running testPendingContainer");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Push 4 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 3, 1, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(4, 4, 1, 0, foo);
+
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll 3rd buffer but set it pending
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            s.setPendingContainer(cont);
+
+            // Poll 3rd buffer once more
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll last buffer
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 4, cont.m_lastSeqNo);
+            cont.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    //    /**
 //     * Test that releasing everything in steps and then polling results in
 //     * the right StreamBlock
 //     */

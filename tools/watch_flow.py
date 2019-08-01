@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -51,7 +51,7 @@ class ProcedureCaller:
 
     def __init__(self, args):
         try:
-            self.client = voltdbclient.FastSerializer(args.server, args.port, args.username, args.password)
+            self.client = voltdbclient.FastSerializer(args.server, args.port, False, args.username, args.password)
         except socket.error,e:
             print "Can't connect to " + args.server + ":" + str(args.port)
             print str(e)

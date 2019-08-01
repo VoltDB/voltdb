@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,14 +74,14 @@ public class TestExistsNotFactoringSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc","INSERT INTO R2 VALUES (23, 'ClerOQlohIlIZz', NULL, 4.49327610653072695435e-01);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("@AdHoc", "select * from R1 where EXISTS (select RATIO from R1 INTERSECT select RATIO from R2);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        int rowCount = 0;
-        VoltTable tbl = cr.getResults()[0];
-        while (tbl.advanceRow()) {
-            rowCount += 1;
-        }
-        assertEquals("Expected an empty result.", 0, rowCount);
+       cr = client.callProcedure("@AdHoc", "select * from R1 where EXISTS (select RATIO from R1 INTERSECT select RATIO from R2);");
+       assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+       int rowCount = 0;
+       VoltTable tbl = cr.getResults()[0];
+       while (tbl.advanceRow()) {
+           rowCount += 1;
+       }
+       assertEquals("Expected an empty result.", 0, rowCount);
     }
     /**
      * Build a test configurations for testing ENG-8442.
@@ -89,8 +89,6 @@ public class TestExistsNotFactoringSuite extends RegressionSuite {
      * @throws Exception
      */
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestExistsNotFactoringSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
@@ -115,11 +113,9 @@ public class TestExistsNotFactoringSuite extends RegressionSuite {
         } catch (IOException e) {
             assertFalse(true);
         }
-        boolean success;
 
-        config = new LocalCluster("sqlinsert-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        VoltServerConfig config = new LocalCluster("sqlinsert-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue("Failed to compile cluster configuration", config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

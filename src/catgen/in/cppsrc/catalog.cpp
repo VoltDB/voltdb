@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@
 #include "cluster.h"
 #include "common/SerializableEEException.h"
 #include "common/MiscUtil.h"
+#include "common/debuglog.h"
 
 using namespace voltdb;
 using namespace catalog;
@@ -254,7 +255,7 @@ void Catalog::registerGlobally(CatalogType *catObj) {
         // this is a defect if it happens
         printf("Replacing object at path: %s (%p,%p)\n",
                catObj->path().c_str(), iter->second, catObj);
-        assert(false);
+        vassert(false);
     }
     m_allCatalogObjects[catObj->path()] = catObj;
 }
@@ -276,7 +277,7 @@ void Catalog::update() {
  * the referenced value appears
  */
 void Catalog::addUnresolvedInfo(std::string path, CatalogType *type, std::string fieldName) {
-    assert(type != NULL);
+    vassert(type != NULL);
 
     UnresolvedInfo ui;
     ui.field = fieldName;
@@ -328,7 +329,7 @@ Catalog::getChild(const string &collectionName, const string &childName) const {
 
 bool
 Catalog::removeChild(const std::string &collectionName, const std::string &childName) {
-    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    vassert(m_childCollections.find(collectionName) != m_childCollections.end());
     if (collectionName.compare("clusters") == 0) {
         return m_clusters.remove(childName);
     }
@@ -338,7 +339,7 @@ Catalog::removeChild(const std::string &collectionName, const std::string &child
 /** takes in 0-F, returns 0-15 */
 int32_t hexCharToInt(char c) {
     c = static_cast<char>(toupper(c));
-    assert ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'));
+    vassert((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'));
     int32_t retval;
     if (c >= 'A') {
         retval = c - 'A' + 10;
@@ -346,20 +347,20 @@ int32_t hexCharToInt(char c) {
     else {
         retval = c - '0';
     }
-    assert(retval >=0 && retval < 16);
+    vassert(retval >=0 && retval < 16);
     return retval;
 }
 
 /** pass in a buffer at least (len(hexString)/2+1) */
 void Catalog::hexDecodeString(const string &hexString, char *buffer) {
-    assert (buffer);
+    vassert(buffer);
     int32_t i;
     for (i = 0; i < hexString.length() / 2; i++) {
         int32_t high = hexCharToInt(hexString[i * 2]);
 
         int32_t low = hexCharToInt(hexString[i * 2 + 1]);
         int32_t result = high * 16 + low;
-        assert (result >= 0 && result < 256);
+        vassert(result >= 0 && result < 256);
         buffer[i] = static_cast<char>(result);
     }
     buffer[i] = '\0';
@@ -367,7 +368,7 @@ void Catalog::hexDecodeString(const string &hexString, char *buffer) {
 
 /** pass in a buffer at least (2*len+1) */
 void Catalog::hexEncodeString(const char *string, char *buffer, size_t len) {
-    assert (buffer);
+    vassert(buffer);
     int32_t i = 0;
     for (; i < len; i++) {
         char ch[2];

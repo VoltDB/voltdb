@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb.rejoin;
 
-import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
@@ -62,7 +61,7 @@ public class TestStreamSnapshotRequestConfig {
         pairs.put(1l, 3l);
         pairs.put(1l, 4l);
         pairs.put(2l, 3l);
-        StreamSnapshotRequestConfig.Stream stream = new StreamSnapshotRequestConfig.Stream(pairs, null, 3L);
+        StreamSnapshotRequestConfig.Stream stream = new StreamSnapshotRequestConfig.Stream(pairs, 3L);
 
         JSONStringer stringer = new JSONStringer();
         stringer.object();
@@ -75,7 +74,6 @@ public class TestStreamSnapshotRequestConfig {
                                                                              database);
         assertEquals(1, config.streams.size());
         assertFalse(config.shouldTruncate);
-        assertNull(config.streams.get(0).newPartition);
         assertEquals(Sets.newHashSet(3l, 4l), Sets.newHashSet(config.streams.get(0).streamPairs.get(1l)));
         assertEquals(Sets.newHashSet(3l), Sets.newHashSet(config.streams.get(0).streamPairs.get(2l)));
     }
@@ -87,21 +85,21 @@ public class TestStreamSnapshotRequestConfig {
         pairs.put(1l, 3l);
         pairs.put(1l, 4l);
         pairs.put(2l, 3l);
-        StreamSnapshotRequestConfig.Stream stream = new StreamSnapshotRequestConfig.Stream(pairs, 5, 3L);
+        StreamSnapshotRequestConfig.Stream stream = new StreamSnapshotRequestConfig.Stream(pairs, 3L);
 
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(database),
+        new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(database), 6,
                                         Arrays.asList(stream),
-                                        false).toJSONString(stringer);
+                false).toJSONString(stringer);
         stringer.endObject();
 
         StreamSnapshotRequestConfig config = new StreamSnapshotRequestConfig(new JSONObject(stringer.toString()),
                                                                              database);
         assertEquals(1, config.streams.size());
         assertFalse(config.shouldTruncate);
-        assertEquals(5, config.streams.get(0).newPartition.intValue());
         assertEquals(Sets.newHashSet(3l, 4l), Sets.newHashSet(config.streams.get(0).streamPairs.get(1l)));
         assertEquals(Sets.newHashSet(3l), Sets.newHashSet(config.streams.get(0).streamPairs.get(2l)));
+        assertEquals(6, config.newPartitionCount.intValue());
     }
 }

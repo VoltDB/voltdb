@@ -2,6 +2,7 @@
 <project name="genqa" basedir="." default="all">
 
     <property name="procedures.dir"     value="${basedir}/src/genqa/procedures"/>
+    <property name="procedures2.dir"     value="${basedir}/src/genqa2/procedures"/>
     <property name="clientsrc.dir"     value="${basedir}/src/genqa"/>
 
     <property name="build.dir"   value="build"/>
@@ -32,9 +33,6 @@
        <fileset dir="/home/opt/rabbitmq">
            <include name="*.jar"/>
        </fileset>
-       <fileset dir="/home/opt/kafka/libs">
-           <include name="*.jar"/>
-       </fileset>
     </path>
 
     <target name="client-compile">
@@ -54,6 +52,9 @@
     <target name="procedures-compile">
         <mkdir dir="${proceduresclasses.dir}"/>
         <javac debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}">
+            <classpath refid="build-classpath"/>
+        </javac>
+        <javac debug="on" srcdir="${procedures2.dir}" destdir="${proceduresclasses.dir}">
             <classpath refid="build-classpath"/>
         </javac>
     </target>

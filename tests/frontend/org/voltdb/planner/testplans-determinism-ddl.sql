@@ -61,7 +61,7 @@ CREATE TABLE eng4155 (
   foo bigint NOT NULL,
   CONSTRAINT PK_id_eng4155 PRIMARY KEY (id)
 );
-CREATE INDEX TSINDEX ON eng4155 (ts DESC);
+CREATE INDEX TSINDEX ON eng4155 (ts);
 
 create table ptree (
   a bigint not null,

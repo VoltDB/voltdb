@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -233,8 +233,23 @@ public interface NodeSettings extends Settings {
     }
 
     default void store() {
+        for (File f : Settings.getConfigDir().listFiles()) {
+            if (f.getName().endsWith(".tmp")) {
+                f.delete();
+            }
+        }
+        File tempFH = null;
+        try {
+            tempFH = File.createTempFile("path", null, Settings.getConfigDir());
+        } catch (IOException e) {
+            throw new SettingsException("failed to create temp file in config dir");
+        }
         File configFH = new File(Settings.getConfigDir(), "path.properties");
-        store(configFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
+        store(tempFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
+        // need rename to be atomic on the platform...
+        if (!tempFH.renameTo(configFH)) {
+            throw new SettingsException("unable to rename path properties");
+        }
 
         File deprectedConfigFH = new File(getVoltDBRoot(),".paths");
         if (deprectedConfigFH.exists()) deprectedConfigFH.delete();

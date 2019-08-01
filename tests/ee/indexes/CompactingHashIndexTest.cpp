@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -93,7 +93,7 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
-                            false, false, schema);
+                            false, false, false, schema);
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);

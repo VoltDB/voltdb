@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,7 @@ namespace voltdb {
 NValue OperatorExistsExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
 {
     // Execute the subquery and get its subquery id
-    assert(m_left != NULL);
+    vassert(m_left != NULL);
     NValue lnv = m_left->eval(tuple1, tuple2);
     int subqueryId = ValuePeeker::peekInteger(lnv);
 
@@ -41,7 +41,7 @@ NValue OperatorExistsExpression::eval(const TableTuple *tuple1, const TableTuple
     // The subquery produces a row => TRUE
     // The subquery produces an empty result set => FALSE
     Table* outputTable = exeContext->getSubqueryOutputTable(subqueryId);
-    assert(outputTable != NULL);
+    vassert(outputTable != NULL);
     if (outputTable->activeTupleCount() > 0) {
         return NValue::getTrue();
     } else {

@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2012-09-22 15:33:33 -0700 (Sat, 22 Sep 2012) $
+ * $Date$
  */
 
 /*! @file date_generators.hpp
@@ -25,7 +25,7 @@ namespace date_time {
   //! Base class for all generators that take a year and produce a date.
   /*! This class is a base class for polymorphic function objects that take
     a year and produce a concrete date.
-    @param date_type The type representing a date.  This type must
+    @tparam date_type The type representing a date.  This type must
     export a calender_type which defines a year_type.
   */
   template<class date_type>
@@ -307,7 +307,7 @@ namespace date_time {
   /*! Useful generator functor for finding holidays and daylight savings
    *  Get the last day of the month and then calculate the difference
    *  to the last previous day.
-   *  @param date_type A date class that exports day_of_week, month_type, etc.
+   *  @tparam date_type A date class that exports day_of_week, month_type, etc.
    *  \ingroup date_alg
    */
   template<class date_type>

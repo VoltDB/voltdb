@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,7 @@ public:
                     m_blocks.erase(block->address());
                     m_blockIterator = m_blocks.find(newNextBlock->address());
                     m_end = m_blocks.end();
-                    assert(m_blockIterator != m_end);
+                    vassert(m_blockIterator != m_end);
                 } else {
                     //No block after the one compacted away
                     //set everything to end
@@ -66,7 +66,7 @@ public:
                 m_blocks.erase(block->address());
                 m_blockIterator = m_blocks.find(nextBlock->address());
                 m_end = m_blocks.end();
-                assert(m_blockIterator != m_end);
+                vassert(m_blockIterator != m_end);
             }
         }
     }

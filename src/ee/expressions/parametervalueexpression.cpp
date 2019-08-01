@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -59,7 +59,7 @@ namespace voltdb {
 
         NValueArray& params = context->getParameterContainer();
 
-        assert(value_idx < params.size());
+        vassert(value_idx < params.size());
         m_paramValue = &params[value_idx];
     };
 

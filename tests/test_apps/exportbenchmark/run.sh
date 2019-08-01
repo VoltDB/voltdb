@@ -28,8 +28,14 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput voltdbroot statement-plans catalog-report.html log *.jar
+    rm -rf obj debugoutput voltdbroot statement-plans catalog-report.html log *.jar *.csv
     find . -name '*.class' | xargs rm -f
+    if [ -e ${VOLTDB_LIB}/extension/exportbenchmark-exporter.jar ]; then
+      echo
+      echo "Removing exportbenchmark-exporter.jar from ${VOLTDB_LIB}/extension"
+      echo
+      rm -f ${VOLTDB_LIB}/extension/exportbenchmark-exporter.jar
+    fi
 }
 
 # Grab the necessary command line arguments
@@ -55,10 +61,6 @@ function parse_command_line() {
     RUN=$@
 }
 
-function build_deployment_file() {
-    exit
-}
-
 # compile the source code for procedures and the client into jarfiles
 function srccompile() {
     javac -classpath $APPCLASSPATH procedures/exportbenchmark/*.java
@@ -77,23 +79,23 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function srccompile-ifneeded() {
-    if [ ! -e ExportBenchmark.jar ] || [ ! -e exportbenchmark-client.jar ]; then
+    if [ ! -e ExportBenchmark.jar ] || [ ! -e exportbenchmark-client.jar ] || [ ! -e exportbenchmark-exporter.jar ]; then
         srccompile;
     fi
 }
 
 # run the voltdb server locally
 function server() {
-    voltdb init --force
-    FR_TEMP=/tmp/${USER}/fr
-    mkdir -p ${FR_TEMP}
-    # Set up flight recorder options
-    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+    srccompile-ifneeded
+    voltdb init --force --config=deployment.xml
+    echo
+    echo "Installing exportbenchmark-exporter.jar to ${VOLTDB_LIB}/extension"
+    echo
+    cp exportbenchmark-exporter.jar ${VOLTDB_LIB}/extension
+
+    # Set up options
+    VOLTDB_OPTS="-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
-    # VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
-    # VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
-    # VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
-    # truncate the voltdb log
     [[ -d log && -w log ]] && > log/volt.log
     # run the server
     echo "Starting the VoltDB server."
@@ -101,7 +103,8 @@ function server() {
     echo
     echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} start -H $HOST -l ${LICENSE}"
     echo
-    #VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    echo "VOLTDB_BIN=\"${VOLTDB_BIN}\""
+    echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
 }
 
@@ -130,8 +133,32 @@ function run_benchmark() {
         --statsfile=exportbench.csv
 }
 
+function run_benchmark_10x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=30 \
+	--multiply=10 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function run_benchmark_100x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=60 \
+	--multiply=100 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function shutdown() {
+    voltadmin shutdown
+}
+
 function help() {
-    echo "Usage: ./run.sh {clean|server|run-benchmark|run-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|jars|server|init|run-benchmark|run-benchmark-help|shutdown}"
 }
 
 parse_command_line $@

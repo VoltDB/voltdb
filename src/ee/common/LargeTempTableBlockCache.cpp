@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,6 @@
 
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
-#include "FixUnusedAssertHack.h"
 
 namespace voltdb {
 
@@ -36,7 +35,7 @@ LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend,
     , m_totalAllocatedBytes(0) { }
 
 LargeTempTableBlockCache::~LargeTempTableBlockCache() {
-    assert (m_blockList.size() == 0);
+    vassert(m_blockList.size() == 0);
 }
 
 LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(const TupleSchema* schema) {
@@ -62,14 +61,14 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId 
     }
 
     auto listIt = mapIt->second;
-    assert ((*listIt)->id() == blockId);
+    vassert((*listIt)->id() == blockId);
     if (! (*listIt)->isResident()) {
         ++m_numCacheMisses;
         ensureSpaceForNewBlock();
 
         bool rc = m_topend->loadLargeTempTableBlock(listIt->get());
-        assert(rc);
-        assert (! (*listIt)->isPinned());
+        vassert(rc);
+        vassert(! (*listIt)->isPinned());
         m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
     }
     else {
@@ -89,7 +88,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId 
     m_idToBlockMap[blockId] = it;
 
     LargeTempTableBlock* block = it->get();
-    assert (block->id() == blockId);
+    vassert(block->id() == blockId);
     return block;
 }
 
@@ -145,7 +144,7 @@ void LargeTempTableBlockCache::releaseBlock(LargeTempTableBlockId blockId) {
 
     if ((*it)->isResident()) {
         m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
-        assert (m_totalAllocatedBytes >= 0);
+        vassert(m_totalAllocatedBytes >= 0);
     }
 
     m_idToBlockMap.erase(blockId);
@@ -163,12 +162,12 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
 
             if (block->isStored()) {
                 bool rc = m_topend->releaseLargeTempTableBlock(block->id());
-                assert(rc);
+                vassert(rc);
             }
 
             if (block->isResident()) {
                 m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
-                assert (m_totalAllocatedBytes >= 0);
+                vassert(m_totalAllocatedBytes >= 0);
             }
 
             m_idToBlockMap.erase(block->id());
@@ -176,9 +175,9 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
         m_blockList.clear();
     }
 
-    assert (m_totalAllocatedBytes == 0);
-    assert (m_blockList.empty());
-    assert (m_idToBlockMap.empty());
+    vassert(m_totalAllocatedBytes == 0);
+    vassert(m_blockList.empty());
+    vassert(m_idToBlockMap.empty());
 }
 
 void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
@@ -187,7 +186,7 @@ void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
     }
 
     if (m_blockList.empty()) {
-        assert (m_totalAllocatedBytes == 0);
+        vassert(m_totalAllocatedBytes == 0);
         throwSerializableEEException("LTT block cache needs a block be stored but there are no blocks");
     }
 
@@ -195,7 +194,7 @@ void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
     do {
         --it;
         LargeTempTableBlock *block = it->get();
-        assert (block != NULL);
+        vassert(block != NULL);
         if (!block->isPinned() && block->isResident()) {
             // this block may have already been stored, in which case
             // we do not need to store it again.
@@ -211,8 +210,8 @@ void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
             }
 
             m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
-            assert (m_totalAllocatedBytes >= 0);
-            assert (! block->isResident());
+            vassert(m_totalAllocatedBytes >= 0);
+            vassert(! block->isResident());
             return;
         }
     }

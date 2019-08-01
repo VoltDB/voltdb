@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -262,10 +262,8 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                         "approx_count_distinct(", col, tbl);
                 String exactStmt = String.format(queryFormat,
                         "count( distinct ", col, tbl);
-
                 VoltTable estimateTable = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 VoltTable exactTable = client.callProcedure("@AdHoc", exactStmt).getResults()[0];
-
                 assertEstimatesAreWithin(col, exactTable, estimateTable, ALLOWED_PERCENT_ERROR);
             }
         }
@@ -418,29 +416,42 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         Client client = getClient();
 
         // Currently only fixed-width types are allowed
-
+        String expectedPattern = USING_CALCITE ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARCHAR\\(256\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vc) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = USING_CALCITE ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARBINARY\\(256\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vb) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = USING_CALCITE ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARCHAR\\(4\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vc_inline) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = USING_CALCITE ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARBINARY\\(4\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vb_inline) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
         // FLOAT is not allowed because wierdnesses of the floating point type:
         // NaN, positive and negative zero, [de]normalized numbers.
-
+        expectedPattern = USING_CALCITE ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<FLOAT>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(ff) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
     }
 
     public TestApproxCountDistinctSuite(String name) {

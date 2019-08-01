@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -255,7 +255,7 @@ public class HSQLInterface {
         VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
 
         // now find any views that might be missing and make sure the diff reflects that
-        // they're gone NOTE!!!
+        // they're gone
         if (stmtInfo.cascade) {
             Set<String> finalTableNames = getTableNames();
             for (String tableName : existingTableNames) {
@@ -279,6 +279,10 @@ public class HSQLInterface {
             lastSchema.put(expectedTableAffected, tableXMLNew.duplicate());
         }
         return diff;
+    }
+
+    public VoltXMLElement getLastSchema(String expectedTableAffected) {
+        return lastSchema.get(expectedTableAffected);
     }
 
     /**
@@ -337,8 +341,7 @@ public class HSQLInterface {
 
         try {
             cs = sessionProxy.compileStatement(sql);
-        }
-        catch (HsqlException caught) {
+        } catch (HsqlException caught) {
             // a switch in case we want to give more error details on additional error codes
             switch(caught.getErrorCode()) {
             case -ErrorCode.X_42581:
@@ -348,16 +351,14 @@ public class HSQLInterface {
             default:
                 throw new HSQLParseException("Error in \"" + sql + "\" - " + caught.getMessage(), caught);
             }
-        }
-        catch (StackOverflowError caught) {
+        } catch (StackOverflowError caught) {
             // Handle this consistently in high level callers
             // regardless of where it is thrown.
             // It should be presumed to be a user error where the user is
             // exceeding a soft limit on the supportable complexity of a
             // SQL statement causing unreasonable levels of recursion.
             throw caught;
-        }
-        catch (Throwable caught) {
+        } catch (Throwable caught) {
             // Expectable user errors should have been thrown as HSQLException.
             // So, this throwable should be an unexpected system error.
             // The details of these arbitrary Throwables are not typically

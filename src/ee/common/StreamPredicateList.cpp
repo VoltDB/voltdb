@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,7 @@ bool StreamPredicateList::parseStrings(
             try {
                 PlannerDomRoot domRoot((*iter).c_str());
                 if (!domRoot.isNull()) {
-                    PlannerDomValue predicateObject = domRoot.rootObject();
+                    PlannerDomValue predicateObject = domRoot();
 
                     predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
 

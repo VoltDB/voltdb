@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,14 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
@@ -124,6 +126,134 @@ public class TestAdhocCreateDropView extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOOVIEW"));
         }
         finally {
+            teardownSystem();
+        }
+    }
+
+    @Test
+    public void testMultiLineCreateView() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // create tables
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE TABLE T1 (\n" +
+                        "ID INTEGER DEFAULT 0,\n" +
+                        "BIG BIGINT DEFAULT 0,\n" +
+                        "VCHAR_INLINE VARCHAR(14) DEFAULT '0',\n" +
+                        "VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) DEFAULT '0' NOT NULL,\n" +
+                        "VCHAR VARCHAR DEFAULT '0',\n" +
+                        "VARBIN VARBINARY(100) DEFAULT x'00',\n" +
+                        "POINT GEOGRAPHY_POINT,\n" +
+                        "PRIMARY KEY (ID, VCHAR_OUTLINE_MIN)\n" +
+                        ");");
+                m_client.callProcedure("@AdHoc",
+                        "CREATE TABLE T2 (\n" +
+                        "ID INTEGER DEFAULT 0,\n" +
+                        "BIG BIGINT DEFAULT 0,\n" +
+                        "VCHAR_INLINE VARCHAR(14) DEFAULT '0',\n" +
+                        "VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) DEFAULT '0' NOT NULL,\n" +
+                        "VCHAR VARCHAR DEFAULT '0',\n" +
+                        "VARBIN VARBINARY(100) DEFAULT x'00',\n" +
+                        "POINT GEOGRAPHY_POINT,\n" +
+                        "PRIMARY KEY (ID, VCHAR_OUTLINE_MIN)\n" +
+                        ");");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("create table should have succeeded");
+            }
+
+            // This create view test will throw exception because column VCHAR
+            // is not a column in temp table
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertTrue(findTableInSystemCatalogResults("T1"));
+            assertTrue(findTableInSystemCatalogResults("T2"));
+            System.out.println(resp.getResults()[0]);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE VIEW DV1 (VCHAR_OUTLINE_MIN)\n"
+                        + "AS SELECT MIN(VCHAR_OUTLINE_MIN)\n"
+                        + "FROM T2\n"
+                        + "WHERE NOT VCHAR_INLINE IN (\n"
+                        + "    SELECT VCHAR FROM (\n"
+                        + "        SELECT ALL T2.BIG CA3 FROM T1 AS T2\n"
+                        + "    ) AS T2\n"
+                        + ");");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertEquals(threw, true);
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertFalse(findTableInSystemCatalogResults("DV1"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    @Test
+    public void testENG15870_count_distinct() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE TABLE T1 (a int, b int);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("create table should have succeeded");
+            }
+
+            // This create view test will throw exception because column VCHAR
+            // is not a column in temp table
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertTrue(findTableInSystemCatalogResults("T1"));
+            System.out.println(resp.getResults()[0]);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE VIEW DV1 AS SELECT a, COUNT(*), COUNT(DISTINCT b) FROM T1 GROUP BY A ORDER BY A;");
+            } catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertEquals(threw, true);
+            m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("DV1"));
+        } finally {
             teardownSystem();
         }
     }

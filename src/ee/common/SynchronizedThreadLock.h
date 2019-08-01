@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,7 @@
 //#include "boost/scoped_ptr.hpp"
 //#include "boost/unordered_map.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <map>
 #include <stack>
 #include <string>
@@ -92,16 +92,16 @@ public:
      * Wrapper around calling UndoQuantum::registerUndoAction
      */
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-            PersistentTable *interest = NULL, PersistentTable *removeInterest = NULL);
+            PersistentTable *interest = NULL);
+    static void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+            PersistentTable *deletedTable);
 
     static bool isInSingleThreadMode();
     static void setIsInSingleThreadMode(bool value);
     static bool isInLocalEngineContext();
-#ifndef  NDEBUG
     static bool usingMpMemory();
     static void setUsingMpMemory(bool isUsingMpMemory);
     static bool isHoldingResourceLock();
-#endif
     static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
         s_inSingleThreadMode = inSingleThreadMode;
     }
@@ -131,8 +131,8 @@ private:
     static bool s_inSingleThreadMode;
 #ifndef  NDEBUG
     static bool s_usingMpMemory;
-    static bool s_holdingReplicatedTableLock;
 #endif
+    static bool s_holdingReplicatedTableLock;
     static pthread_mutex_t s_sharedEngineMutex;
     static pthread_cond_t s_sharedEngineCondition;
     static pthread_cond_t s_wakeLowestEngineCondition;

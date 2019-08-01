@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2012-09-30 16:25:22 -0700 (Sun, 30 Sep 2012) $
+ * $Date$
  */
 
 /*! @file dst_rules.hpp
@@ -94,7 +94,7 @@ namespace boost {
        *  @param dst_start_offset Time offset within day for dst boundary
        *  @param dst_end_day    Ending day of dst for the given locality
        *  @param dst_end_offset Time offset within day given in dst for dst boundary
-       *  @param dst_length lenght of dst adjusment
+       *  @param dst_length_minutes length of dst adjusment
        *  @retval The time is either ambiguous, invalid, in dst, or not in dst
        */
       static time_is_dst_result 
@@ -104,14 +104,14 @@ namespace boost {
                    const time_duration_type& dst_start_offset,
                    const date_type& dst_end_day,
                    const time_duration_type& dst_end_offset,
-                   const time_duration_type& dst_length_minutes)
+                   const time_duration_type& dst_length)
       {
-        unsigned int start_minutes = 
-          dst_start_offset.hours() * 60 + dst_start_offset.minutes();
-        unsigned int end_minutes = 
-          dst_end_offset.hours() * 60 + dst_end_offset.minutes();
-        long length_minutes =  
-          dst_length_minutes.hours() * 60 + dst_length_minutes.minutes();
+        unsigned int start_minutes = static_cast<unsigned>(
+          dst_start_offset.hours() * 60 + dst_start_offset.minutes());
+        unsigned int end_minutes = static_cast<unsigned>(
+          dst_end_offset.hours() * 60 + dst_end_offset.minutes());
+        long length_minutes = static_cast<long>(
+          dst_length.hours() * 60 + dst_length.minutes());
 
         return local_is_dst(current_day, time_of_day,
                             dst_start_day, start_minutes,

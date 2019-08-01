@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 #include "BinaryLogSink.h"
 
 #include "ConstraintFailureException.h"
+#include "DRTableNotFoundException.h"
 #include "persistenttable.h"
 #include "streamedtable.h"
 #include "tablefactory.h"
@@ -25,6 +26,7 @@
 
 #include "catalog/database.h"
 
+#include "common/debuglog.h"
 #include "common/ExecuteWithMpMemory.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
@@ -39,6 +41,9 @@
 #include <crc/crc32c.h>
 
 #include <string>
+
+#define throwDRTableNotFoundException(tableHash, ...) \
+do { char _msg_[1024]; snprintf(_msg_, 1024, __VA_ARGS__); throw DRTableNotFoundException(tableHash, _msg_); } while (false)
 
 namespace voltdb {
 
@@ -66,6 +71,8 @@ const static int RESOLVED_BIT = 1 << 1;
 
 // a c++ style way to limit access from outside this file
 namespace {
+
+TIMER_LVLS(applyLogs, micro, 100000, 10000, 1000, 100)
 
 // Utility functions to convert types to strings. Each type string has a fixed
 // length. Check the schema of the conflict export table for the limits.
@@ -224,7 +231,7 @@ void findConflictTuple(PersistentTable *table, const TableTuple *existingTuple, 
 void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable,
         Pool *pool, const TableTuple *tupleToBeWrote, DRConflictOnPK conflictOnPKType, DRRecordType actionType,
         DRConflictType conflictType, DRConflictRowType rowType, int64_t remoteUniqueId, int32_t remoteClusterId) {
-    assert(ExecutorContext::getExecutorContext() != NULL);
+    vassert(ExecutorContext::getExecutorContext() != NULL);
 
     int32_t localClusterId = ExecutorContext::getExecutorContext()->drClusterId();
     int64_t localTsCounter = UniqueId::timestampSinceUnixEpoch(ExecutorContext::getExecutorContext()->currentUniqueId());
@@ -266,14 +273,14 @@ void exportDRConflict(StreamedTable *exportTable,
                       TempTable *deletedMetaTableForDelete,
                       TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
                       TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert) {
-    assert(exportTable != NULL);
-    assert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
+    vassert(exportTable != NULL);
+    vassert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
            (existingMetaTableForDelete != NULL && existingTupleTableForDelete != NULL));
-    assert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||
+    vassert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||
            (expectedMetaTableForDelete != NULL && expectedTupleTableForDelete != NULL));
-    assert((existingMetaTableForInsert == NULL && existingTupleTableForInsert == NULL) ||
+    vassert((existingMetaTableForInsert == NULL && existingTupleTableForInsert == NULL) ||
            (existingMetaTableForInsert != NULL && existingTupleTableForInsert != NULL));
-    assert((newMetaTableForInsert == NULL && newTupleTableForInsert == NULL) ||
+    vassert((newMetaTableForInsert == NULL && newTupleTableForInsert == NULL) ||
            (newMetaTableForInsert != NULL && newTupleTableForInsert != NULL));
 
     if (existingMetaTableForDelete) {
@@ -384,7 +391,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (newTuple) {
-        assert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
+        vassert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
                == UniqueId::timestampSinceUnixEpoch(uniqueId));
 
         newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable));
@@ -412,7 +419,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
-    assert(resolved || !applyRemoteChange);
+    vassert(resolved || !applyRemoteChange);
 
     if (existingMetaTableForDelete) {
         setConflictOutcome(existingMetaTableForDelete, applyRemoteChange, resolved);
@@ -490,8 +497,8 @@ inline void truncateTable(boost::unordered_map<int64_t, PersistentTable*> &table
         VoltDBEngine *engine, bool replicatedTableOperation, int64_t tableHandle, std::string *tableName) {
     boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
     if (tableIter == tables.end()) {
-        throwSerializableEEException("Unable to find table %s hash %jd while applying binary log for truncate record",
-                                     tableName->c_str(), (intmax_t)tableHandle);
+        throwDRTableNotFoundException(tableHandle, "Unable to find table %s hash %jd while applying binary log for truncate record",
+                                      tableName->c_str(), (intmax_t) tableHandle);
     }
 
     PersistentTable *table = tableIter->second;
@@ -536,7 +543,7 @@ public:
         m_taskInfo.getRawPointer(
                 (m_txnStart + m_txnLen) - (m_taskInfo.getRawPointer() + DRTupleStream::END_RECORD_SIZE));
         DRRecordType __attribute__ ((unused)) type = readRecordType();
-        assert(type = DR_RECORD_END_TXN);
+        vassert(type = DR_RECORD_END_TXN);
         validateEndTxn();
     }
 
@@ -552,7 +559,7 @@ public:
                     (intmax_t )m_sequenceNumber, (intmax_t )tempSequenceNumber);
         }
         uint32_t checksum = m_taskInfo.readInt();
-        assert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
+        vassert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
         validateChecksum(checksum, m_txnStart, m_taskInfo.getRawPointer());
     }
 
@@ -574,16 +581,15 @@ public:
         }
 
         DRRecordType __attribute__ ((unused)) type = readRecordType();
-        assert(type == DR_RECORD_BEGIN_TXN);
+        vassert(type == DR_RECORD_BEGIN_TXN);
 
         m_uniqueId = m_taskInfo.readLong();
         m_sequenceNumber = m_taskInfo.readLong();
 
         m_hashFlag = static_cast<DRTxnPartitionHashFlag>(m_taskInfo.readByte());
-        assert((m_hashFlag & REPLICATED_TABLE_MASK) != REPLICATED_TABLE_MASK);
 
         m_txnLen = m_taskInfo.readInt();
-        assert(m_txnStart + m_txnLen <= m_logEnd);
+        vassert(m_txnStart + m_txnLen <= m_logEnd);
         m_partitionHash = m_taskInfo.readInt();
 
         return true;
@@ -616,11 +622,11 @@ private:
     }
 
     void initialize(int32_t logLength) {
-        assert(m_taskInfo.hasRemaining());
+        vassert(m_taskInfo.hasRemaining());
         m_logEnd = m_taskInfo.getRawPointer() + logLength;
 
         bool __attribute__ ((unused)) success = readNextTransaction();
-        assert(success);
+        vassert(success);
     }
 
     static int32_t readRawInt(const char *log) {
@@ -649,6 +655,8 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
     rawLogs += sizeof(int32_t);
     int64_t rowCount = 0;
 
+    START_TIMER(apply);
+
     if (logCount == 1) {
         // Optimization for single log
         VOLT_DEBUG("Handling single binary log");
@@ -661,6 +669,7 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
         rowCount = applyMpTxn(rawLogs, logCount, tables, pool, engine, remoteClusterId, localUniqueId);
     }
 
+    STOP_TIMER(apply, applyLogs, "applied %d logs", logCount);
     VOLT_DEBUG("Completed applying %d log(s) resulting in %jd rows", logCount, (intmax_t ) rowCount);
     return rowCount;
 }
@@ -718,10 +727,10 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         return rowCount;
     }
 
-    assert(UniqueId::isMpUniqueId(localUniqueId));
+    vassert(UniqueId::isMpUniqueId(localUniqueId));
 
     VOLT_DEBUG("Applying MP binary log: log count: %d, unique ID: %jd, sequence number: %jd", logCount,
-            logs[0]->m_uniqueId, logs[0]->m_sequenceNumber);
+            (intmax_t) logs[0]->m_uniqueId, (intmax_t) logs[0]->m_sequenceNumber);
 
     /*
      * Iterate over all of the logs until they are depleted. If a TRUNCATE_TABLE is encountered stop processing
@@ -735,7 +744,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         std::string truncateTableName = std::string();
 
         for (int i = 0; i < logCount; ++i) {
-            assert(!logs[i]->isReplicatedTableLog());
+            vassert(!logs[i]->isReplicatedTableLog());
 
             if (!logs[i]->m_taskInfo.hasRemaining() ||
                     // Skip processing log if a truncate has been encountered but this log does not have one
@@ -749,7 +758,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
                 if (type == DR_RECORD_TRUNCATE_TABLE) {
                     ++truncateCount;
                     if (i == 0) {
-                        assert(truncateTableName.size() == 0);
+                        vassert(truncateTableName.size() == 0);
                         truncateTableHandle = logs[i]->m_taskInfo.readLong();
                         truncateTableName = logs[i]->m_taskInfo.readTextString();
                     } else {
@@ -770,7 +779,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
             }
 
             if (type == DR_RECORD_END_TXN) {
-                assert(truncateCount == 0);
+                vassert(truncateCount == 0);
 
                 logs[i]->validateEndTxn();
                 ++completedLogs;
@@ -778,7 +787,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         }
 
         if (truncateTableName.size() > 0) {
-            assert(truncateCount == specialLogCount);
+            vassert(truncateCount == specialLogCount);
             truncateCount = 0;
 
             VOLT_DEBUG("Applying MP binary log truncate to %s", truncateTableName.c_str());
@@ -789,7 +798,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
 
 #ifndef NDEBUG
     for (int i = 0; i < logCount; ++i) {
-        assert(!logs[i]->m_taskInfo.hasRemaining());
+        vassert(!logs[i]->m_taskInfo.hasRemaining());
     }
 #endif
 
@@ -819,15 +828,29 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
 
     DRRecordType type;
     int64_t rowCount = 0;
-    bool checkForSkip = !log->isReplicatedTableLog() && UniqueId::isMpUniqueId(localUniqueId);
+    bool checkForSkip = !log->isReplicatedTableLog();
+    bool canSkip = UniqueId::isMpUniqueId(localUniqueId);
+
+    START_TIMER(timer);
 
     while ((type = log->readRecordType()) != DR_RECORD_END_TXN) {
-        assert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
-        bool skipRow = checkForSkip && !engine->isLocalSite(log->m_partitionHash);
+        vassert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
+        bool skipRow = false;
+        if (checkForSkip && !engine->isLocalSite(log->m_partitionHash)) {
+            if (canSkip) {
+                skipRow = true;
+            } else {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                    "Binary log txns were sent to the wrong partition");
+            }
+        }
         rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, replicatedTable, skipRow);
     }
 
     log->validateEndTxn();
+
+    STOP_TIMER(timer, applyLogs, "applied %ld rows from %d uniqueId: %ld, sequenceNumber: %ld", rowCount,
+            remoteClusterId, log->m_uniqueId, log->m_sequenceNumber);
 
     return rowCount;
 }
@@ -851,7 +874,7 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<i
         log->skipRecordsAndValidateTxn();
     }
 
-    assert(!log->m_taskInfo.hasRemaining());
+    vassert(!log->m_taskInfo.hasRemaining());
 
     return rowCount;
 }
@@ -868,6 +891,12 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
     int64_t uniqueId = log->m_uniqueId;
     int64_t sequenceNumber = log->m_sequenceNumber;
 
+    START_TIMER(startTime);
+
+#define STOP_TIMER_OP(msg, ...) STOP_TIMER(startTime, applyLogs,             \
+        "Applying transaction from %d uniqueId: %ld, sequenceNumber: %ld " msg, \
+        remoteClusterId, uniqueId, sequenceNumber, ##__VA_ARGS__)
+
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
@@ -879,8 +908,8 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert record",
-                                         (intmax_t)tableHandle);
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log insert record",
+                                          (intmax_t) tableHandle);
         }
         PersistentTable *table = tableIter->second;
 
@@ -905,6 +934,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             }
             throw;
         }
+        STOP_TIMER_OP("INSERT into %s of %s", table->name().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_DELETE: {
@@ -917,7 +947,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log delete record",
                                          (intmax_t)tableHandle);
         }
         PersistentTable *table = tableIter->second;
@@ -958,6 +988,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
         }
 
         table->deleteTuple(deleteTuple, true);
+        STOP_TIMER_OP("DELETE from %s of %s", table->name().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_UPDATE: {
@@ -972,7 +1003,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log update record",
                                          (intmax_t)tableHandle);
         }
         PersistentTable *table = tableIter->second;
@@ -1044,6 +1075,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             }
             throw;
         }
+        STOP_TIMER_OP("UPDATE in %s of %s to %s", table->name().c_str(), oldTuple.toJsonArray().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_DELETE_BY_INDEX: {
@@ -1057,6 +1089,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
         std::string tableName = taskInfo->readTextString();
 
         truncateTable(tables, engine, replicatedTable, tableHandle, &tableName);
+        STOP_TIMER_OP("TRUNCATE TABLE %s", tableName.c_str());
 
         break;
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,7 +49,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
@@ -71,6 +70,7 @@ import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.common.Constants;
 
+import com.google_voltpatches.common.base.Strings;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -78,6 +78,8 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 import jsr166y.ThreadLocalRandom;
 
 /**
@@ -107,7 +109,7 @@ class Distributer {
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
 
-    private final SSLContext m_sslContext;
+    private final SslContext m_sslContext;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -148,8 +150,7 @@ class Distributer {
     private final long m_procedureCallTimeoutNanos;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutNanos;
-    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
-        new HashMap<>();
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats = new HashMap<>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
@@ -157,7 +158,6 @@ class Distributer {
     private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
     private boolean m_topologyChangeAware;
 
-    //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
         Executors.newSingleThreadScheduledExecutor(
                 CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
@@ -188,6 +188,9 @@ class Distributer {
 
     // executor service for ssl encryption/decryption, if ssl is enabled.
     private CipherExecutor m_cipherService;
+
+    // Indicate shutting down if it is true
+    private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     /**
      * Handles topology updates for client affinity
@@ -247,6 +250,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
+            if (m_shutdown.get()) {
+                return;
+            }
             //Pre 4.1 clusers don't know about subscribe, don't stress over it.
             if (response.getStatusString() != null &&
                 response.getStatusString().contains("@Subscribe was not found")) {
@@ -255,16 +261,17 @@ class Distributer {
                 }
                 return;
             }
+
             //Fast path subscribing retry if the connection was lost before getting a response
-            if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
-                subscribeToNewNode();
-                return;
-            } else if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST ) {
+                if (!m_connections.isEmpty()) {
+                    subscribeToNewNode();
+                }
                 return;
             }
 
             //Slow path, god knows why it didn't succeed, server could be paused and in admin mode. Don't firehose attempts.
-            if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
+            if (response.getStatus() != ClientResponse.SUCCESS && !m_shutdown.get()) {
                 //Retry on the off chance that it will work the Nth time, or work at a different node
                 m_ex.schedule(new Runnable() {
                     @Override
@@ -452,7 +459,7 @@ class Distributer {
                  * the transaction out on the wire due to max outstanding
                  */
                 final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
-                    invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
+                invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos, timeoutNanos, handle, ignoreBackpressure);
                 return;
             }
 
@@ -811,7 +818,7 @@ class Distributer {
                 if (m_useClientAffinity &&
                     m_subscribedConnection == this &&
                     m_subscriptionRequestPending == false &&
-                    !m_ex.isShutdown()) {
+                    !m_shutdown.get()) {
                     //Don't subscribe to a new node immediately
                     //to somewhat prevent a thundering herd
                     try {
@@ -944,7 +951,7 @@ class Distributer {
             boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
             Subject subject,
-            SSLContext sslContext) {
+            SslContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
         m_sslContext = sslContext;
         if (m_sslContext != null) {
@@ -980,7 +987,7 @@ class Distributer {
         SSLEngine sslEngine = null;
 
         if (m_sslContext != null) {
-            sslEngine = m_sslContext.createSSLEngine("client", port);
+            sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port);
             sslEngine.setUseClientMode(true);
 
             Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
@@ -1066,6 +1073,9 @@ class Distributer {
      * failure. If the cluster hasn't finished resolving the failure it is fine, we will get the new topo through\
      */
     private void subscribeToNewNode() {
+        if (m_shutdown.get()) {
+            return;
+        }
         //Technically necessary to synchronize for safe publication of this store
         NodeConnection cxn = null;
         synchronized (Distributer.this) {
@@ -1078,6 +1088,7 @@ class Distributer {
                 return;
             }
         }
+
         try {
 
             //Subscribe to topology updates before retrieving the current topo
@@ -1138,6 +1149,11 @@ class Distributer {
             ProcedureCallback cb,
             final boolean ignoreBackpressure, final long nowNanos, final long timeoutNanos)
             throws NoConnectionsException {
+        // Shutting down, no more tasks
+        if (m_shutdown.get()) {
+            return false;
+        }
+
         assert(invocation != null);
         assert(cb != null);
 
@@ -1283,12 +1299,14 @@ class Distributer {
      * @throws InterruptedException
      */
     final void shutdown() throws InterruptedException {
-        // stop the old proc call reaper
-        m_timeoutReaperHandle.cancel(false);
-        m_ex.shutdown();
+        m_shutdown.set(true);
         if (CoreUtils.isJunitTest()) {
-            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+            m_timeoutReaperHandle.cancel(true);
+            m_ex.shutdownNow();
         } else {
+            // stop the old proc call reaper
+            m_timeoutReaperHandle.cancel(false);
+            m_ex.shutdown();
             m_ex.awaitTermination(365, TimeUnit.DAYS);
         }
 
@@ -1453,8 +1471,14 @@ class Distributer {
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 
+            String leader = vt.getString("Leader");
+            String sites = vt.getString("Sites");
+            if (Strings.isNullOrEmpty(sites) || Strings.isNullOrEmpty(leader)) {
+                continue;
+            }
+
             ArrayList<NodeConnection> connections = new ArrayList<>();
-            for (String site : vt.getString("Sites").split(",")) {
+            for (String site : sites.split(",")) {
                 site = site.trim();
                 Integer hostId = Integer.valueOf(site.split(":")[0]);
                 if (m_hostIdToConnection.containsKey(hostId)) {
@@ -1465,7 +1489,8 @@ class Distributer {
             }
             m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
 
-            Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
+
+            Integer leaderHostId = Integer.valueOf(leader.split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
@@ -1572,6 +1597,9 @@ class Distributer {
      */
     private void refreshPartitionKeys(boolean topologyUpdate)  {
 
+        if (m_shutdown.get()) {
+            return;
+        }
         long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
         if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
             return;
@@ -1590,7 +1618,7 @@ class Distributer {
                         "Fails to queue the partition update query, please try later."));
             }
             if (!topologyUpdate) {
-                latch.await();
+                latch.await(1, TimeUnit.MINUTES);
             }
             m_lastPartitionKeyFetched.set(System.currentTimeMillis());
         } catch (InterruptedException | IOException e) {

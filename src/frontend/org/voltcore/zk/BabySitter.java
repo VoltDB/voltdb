@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,19 +20,25 @@ package org.voltcore.zk;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
@@ -177,10 +183,13 @@ public class BabySitter
         public void process(WatchedEvent event)
         {
             try {
-                m_es.submit(m_eventHandler);
+                if (event.getType() != EventType.NodeDeleted) {
+                    m_es.submit(m_eventHandler);
+                }
             } catch (RejectedExecutionException e) {
-                if (m_shutdown.get()) return;
-                VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", true, e);
+                if (!m_shutdown.get()) {
+                    VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", true, e);
+                }
             }
         }
     };
@@ -188,16 +197,20 @@ public class BabySitter
     private List<String> watch() throws InterruptedException, KeeperException
     {
         Stat stat = new Stat();
-        List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
-        // Sort on the ephemeral sequential part, the prefix is not padded, so string sort doesn't work
-        Collections.sort(zkchildren, new Comparator<String>() {
-            @Override
-            public int compare(String left, String right)
-            {
-                return CoreZK.getSuffixFromChildName(left).compareTo(CoreZK.getSuffixFromChildName(right));
-            }
-        });
-        m_children = ImmutableList.copyOf(zkchildren);
-        return m_children;
+        try {
+            List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
+
+            // Sort on the ephemeral sequential part, the prefix is not padded, so string sort doesn't work
+            Collections.sort(zkchildren, new Comparator<String>() {
+                @Override
+                public int compare(String left, String right) {
+                    return CoreZK.getSuffixFromChildName(left).compareTo(CoreZK.getSuffixFromChildName(right));
+                }
+            });
+            m_children = ImmutableList.copyOf(zkchildren);
+            return m_children;
+        } catch (KeeperException.NoNodeException e) {
+            return Collections.emptyList();
+        }
     }
 }

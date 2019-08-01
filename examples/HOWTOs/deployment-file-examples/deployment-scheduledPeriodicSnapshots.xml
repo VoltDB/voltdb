@@ -13,7 +13,7 @@
     https://docs.voltdb.com/UsingVoltDB/SaveSnapshotAuto.php
 -->
 <deployment>
-    <cluster hostcount="1"/>
+    <cluster kfactor="0"/>
     <snapshot prefix="exampleprefix"
           frequency="30m"
           retain="3"

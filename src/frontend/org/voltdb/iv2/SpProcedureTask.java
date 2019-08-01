@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,11 +44,9 @@ public class SpProcedureTask extends ProcedureTask
 {
     private static final boolean EXEC_TRACE_ENABLED;
     private static final boolean HOST_DEBUG_ENABLED;
-    private static final boolean HOST_TRACE_ENABLED;
     static {
         EXEC_TRACE_ENABLED = execLog.isTraceEnabled();
         HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
-        HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
     }
 
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
@@ -78,7 +76,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginDuration("runsptask",
+            traceLog.add(() -> VoltTrace.beginDuration("runSpTask",
                                                        "txnId", TxnEgo.txnIdToString(getTxnId()),
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
@@ -110,9 +108,14 @@ public class SpProcedureTask extends ProcedureTask
             m_txnState.setNeedsRollback(true);
         }
         completeInitiateTask(siteConnection);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endDuration("runSpTask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+        }
         response.m_sourceHSId = m_initiator.getHSId();
         if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isForReplica())) {
-            response.setForOldLeader(true);
+            response.setExecutedOnPreviousLeader(true);
         }
         m_initiator.deliver(response);
         if (EXEC_TRACE_ENABLED) {
@@ -136,6 +139,9 @@ public class SpProcedureTask extends ProcedureTask
 
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
+        }
+        if (HOST_DEBUG_ENABLED) {
+            hostLog.debug("START for rejoin: " + this);
         }
 
         SpTransactionState txnState = (SpTransactionState)m_txnState;
@@ -162,7 +168,7 @@ public class SpProcedureTask extends ProcedureTask
         LatencyWatchdog.pet();
 
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("START replaying txn: " + this);
+            hostLog.debug("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
             m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -196,7 +202,7 @@ public class SpProcedureTask extends ProcedureTask
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         }
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("COMPLETE replaying txn: " + this);
+            hostLog.debug("COMPLETE replaying txn: " + this);
         }
 
         logToDR(siteConnection.getDRGateway(), txnState);
@@ -241,6 +247,12 @@ public class SpProcedureTask extends ProcedureTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        if (m_txnState != null) {
+            SpTransactionState txnState = (SpTransactionState)m_txnState;
+            if (txnState.m_initiationMsg != null) {
+                sb.append("  TRUNCATION HANDLE: ").append(TxnEgo.txnIdToString(txnState.m_initiationMsg.getTruncationHandle()));
+            }
+        }
         return sb.toString();
     }
 

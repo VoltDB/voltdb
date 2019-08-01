@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -417,7 +417,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 else {
                     // TSV
-                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 4096 * 4));
+                    writer = CSVWriter.getTSVWriter(new BufferedWriter(osw, 4096 * 4));
                 }
             }
             catch (Exception e) {

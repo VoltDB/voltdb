@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -93,8 +93,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 5, 2, 1,
-                                                BackendTarget.NATIVE_EE_JNI, false);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 5, 2, 1, BackendTarget.NATIVE_EE_JNI);
         cluster.setMaxHeap(1300);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -179,8 +178,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
 
-        cluster = new LocalCluster("rejoin.jar", 4, 4, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+        cluster = new LocalCluster("rejoin.jar", 4, 4, 1, BackendTarget.NATIVE_EE_JNI);
         cluster.setMaxHeap(1300);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -281,7 +279,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING,
-                false, true, null);
+                false, null);
         cluster.setMaxHeap(1300);
         cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
@@ -480,7 +478,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
             cluster = new LocalCluster("rejoin.jar", 4, 3, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true, null);
+                    false, null);
             cluster.setMaxHeap(1300);
             cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
@@ -653,9 +651,13 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
             assertFalse(adhocThreadHasFailed.get());
 
             shouldContinue.set(false);
-            if (loadThread != null) loadThread.join();
+            if (loadThread != null) {
+                loadThread.join();
+            }
             loadThread = null;
-            if (adHocThread != null) adHocThread.join();
+            if (adHocThread != null) {
+                adHocThread.join();
+            }
             adHocThread = null;
 
             for (int i = 0; i < 10; i++) {
@@ -685,12 +687,20 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         }
         finally {
             shouldContinue.set(false);
-            if (loadThread != null) loadThread.join();
-            if (adHocThread != null) adHocThread.join();
+            if (loadThread != null) {
+                loadThread.join();
+            }
+            if (adHocThread != null) {
+                adHocThread.join();
+            }
 
             try {
-                if (clientForLoadThread2 != null) clientForLoadThread2.close();
-                if (client != null) client.close();
+                if (clientForLoadThread2 != null) {
+                    clientForLoadThread2.close();
+                }
+                if (client != null) {
+                    client.close();
+                }
             }
             catch (Exception e) {}
         }

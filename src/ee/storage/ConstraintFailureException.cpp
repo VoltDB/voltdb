@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/constraintutil.h"
 #include "storage/table.h"
-#include <cassert>
+#include <common/debuglog.h>
 
 using namespace voltdb;
 using std::string;
@@ -28,24 +28,22 @@ ConstraintFailureException::ConstraintFailureException(
         TableTuple otherTuple,
         ConstraintType type,
         PersistentTableSurgeon *surgeon) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
+    SQLException(SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
             VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
     m_type(type),
-    m_surgeon(surgeon)
-{
-    assert(table);
-    assert(!tuple.isNullTuple());
+    m_surgeon(surgeon) {
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
-        string message,
+        string const& message,
         PersistentTableSurgeon *surgeon) :
         SQLException(
                 SQLException::integrity_constraint_violation,
@@ -57,8 +55,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_type(CONSTRAINT_TYPE_PARTITIONING),
     m_surgeon(surgeon)
 {
-    assert(table);
-    assert(!tuple.isNullTuple());
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
@@ -75,7 +73,7 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
     output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
 }
 
-ConstraintFailureException::~ConstraintFailureException() {
+ConstraintFailureException::~ConstraintFailureException() throw () {
     // if delayed tuple deallocation for serialization (by passing in tableSurgeon),
     // do cleanup here
     VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));
@@ -84,9 +82,7 @@ ConstraintFailureException::~ConstraintFailureException() {
     }
 }
 
-const string
-ConstraintFailureException::message() const
-{
+string ConstraintFailureException::message() const {
     // This should probably be an override of the << operator and then used here, but meh
     string msg = SQLException::message();
     msg.append("\nConstraint violation type: ");

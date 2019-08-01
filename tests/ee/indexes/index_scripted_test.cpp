@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -212,49 +212,49 @@ void setNewCurrent(const char *testName,
         if (strcmp(indexName, kMultiIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, false, schema);
+                                            false, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, true, schema);
+                                            false, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, false, schema);
+                                            false, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, true, schema);
+                                            false, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, false, schema);
+                                            true, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, true, schema);
+                                            true, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, false, schema);
+                                            true, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, true, schema);
+                                            true, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else {

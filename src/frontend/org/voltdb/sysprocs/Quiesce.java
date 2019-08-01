@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.dtxn.DtxnConstants;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -38,9 +37,6 @@ import org.voltdb.dtxn.DtxnConstants;
  * Export data.
   */
 public class Quiesce extends VoltSystemProcedure {
-
-    static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_PROCESSED_SITES = (int) SysProcFragmentId.PF_quiesce_processed_sites;
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -57,12 +53,12 @@ public class Quiesce extends VoltSystemProcedure {
                 context.getSiteProcedureConnection().quiesce();
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
-                return new DependencyPair.TableDependencyPair(DEP_SITES, results);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_quiesce_sites, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_sites) {
                 VoltTable dummy = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
                 dummy.addRow(VoltSystemProcedure.STATUS_OK);
-                return new DependencyPair.TableDependencyPair(DEP_PROCESSED_SITES, dummy);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_quiesce_processed_sites, dummy);
             }
         }
         catch (Exception ex) {
@@ -77,30 +73,15 @@ public class Quiesce extends VoltSystemProcedure {
      * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-            VoltTable[] result = null;
+        VoltTable[] result = null;
 
-            SynthesizedPlanFragment pfs1[] = new SynthesizedPlanFragment[2];
-            pfs1[0] = new SynthesizedPlanFragment();
-            pfs1[0].fragmentId = SysProcFragmentId.PF_quiesce_sites;
-            pfs1[0].outputDepId = DEP_SITES;
-            pfs1[0].inputDepIds = new int[]{};
-            pfs1[0].multipartition = true;
-            pfs1[0].parameters = ParameterSet.emptyParameterSet();
-
-            pfs1[1] = new SynthesizedPlanFragment();
-            pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
-            pfs1[1].outputDepId = DEP_PROCESSED_SITES;
-            pfs1[1].inputDepIds = new int[] { DEP_SITES };
-            pfs1[1].multipartition = false;
-            pfs1[1].parameters = ParameterSet.emptyParameterSet();
-
-            try {
-                result = executeSysProcPlanFragments(pfs1, DEP_PROCESSED_SITES);
-            }
-            catch (Exception ex) {
-                ex.printStackTrace();
-            }
-            return result;
+        try {
+            result = createAndExecuteSysProcPlan(SysProcFragmentId.PF_quiesce_sites,
+                    SysProcFragmentId.PF_quiesce_processed_sites);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return result;
     }
 
 }

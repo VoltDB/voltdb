@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,6 +66,7 @@ public class LoopbackExportClient extends ExportClientBase {
     private String m_procedure;
     private String m_failureLog;
     private File m_rejectedDH;
+    private boolean m_skipInternals = true;
 
     public LoopbackExportClient() {
     }
@@ -73,9 +74,13 @@ public class LoopbackExportClient extends ExportClientBase {
     public interface Config extends Accessible {
         final static String PROCEDURE = "procedure";
         final static String FAILURE_LOG_FILE = "failurelogfile";
+        final static String SKIP_INTERNALS = "skipinternals";
 
         @Key(PROCEDURE)
         public String getProcedureName();
+
+        @Key(SKIP_INTERNALS)
+        public String getSkipInternals();
 
         @Key(FAILURE_LOG_FILE)
         public String getFailureLogFile();
@@ -94,6 +99,12 @@ public class LoopbackExportClient extends ExportClientBase {
         Config config = Config.create(props);
         checkArgument(isNotBlank(config.getProcedureName()), "procedure name is not defined");
         m_procedure = config.getProcedureName();
+
+        String skipVal = config.getSkipInternals();
+        if (skipVal != null && !skipVal.isEmpty()) {
+            m_skipInternals = Boolean.parseBoolean(skipVal);
+        }
+
         m_failureLog = config.getFailureLogFile();
         if (m_failureLog != null && m_failureLog.trim().length() > 0) {
             File rejectedDH = new File(m_failureLog);
@@ -172,7 +183,7 @@ public class LoopbackExportClient extends ExportClientBase {
             CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
             builder
                 .dateFormatter(tmpl)
-                .skipInternalFields(true)
+                .skipInternalFields(m_skipInternals)
             ;
             m_csvWriterDecoder = builder.build();
             m_es = CoreUtils.getListeningSingleThreadExecutor(
@@ -233,11 +244,12 @@ public class LoopbackExportClient extends ExportClientBase {
                 }
                 return true;
             }
+            int firstFieldOffset = m_skipInternals ? INTERNAL_FIELD_COUNT : 0;
             LoopbackCallback cb = m_ctx.createCallback(bix);
             if (m_invoker.callProcedure(m_user, false,
                     BatchTimeoutOverrideType.NO_TIMEOUT,
                     cb, false, m_shouldContinue, m_procedure,
-                    Arrays.copyOfRange(rd.values, 6, rd.values.length))) {
+                    Arrays.copyOfRange(rd.values, firstFieldOffset, rd.values.length))) {
                 ++m_ctx.invokes;
             } else {
                 LOG.error("failed to Invoke procedure: " + m_procedure);

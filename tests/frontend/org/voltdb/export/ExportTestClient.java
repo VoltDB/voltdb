@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -70,7 +70,7 @@ public class ExportTestClient extends ExportClientBase
         if (verifier == null) {
             System.out.println("No verifier for table " + tableName + " and partition " + partition);
             System.out.println("Expected Verifiers registered: " + m_verifiers);
-            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, "foo", tableName,
+            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, tableName,
                     "", 0, 0, null, null, null,
                     AdvertisedDataSource.ExportFormat.SEVENDOTX);
             verifier = new ExportTestVerifier(source);

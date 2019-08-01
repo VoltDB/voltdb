@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,8 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Date;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -293,15 +295,21 @@ public class TestElasticSearchHttpExportClient extends ExportClientTestBase
                 /* partitioning column */(short) 2, 3, 4, 5.5, new TimestampType(
                         new Date()), "x x", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
-        byte[] rowBytes = ExportEncoder.encodeRow(vtable,
+        byte[] bufBytes = ExportEncoder.encodeRow(vtable,
                 "mytable",
                 0,
                 1L);
 
-        ExportRow r = null;
+        ByteBuffer bb = ByteBuffer.wrap(bufBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        int size = bb.getInt(); // row size
+        byte [] rowBytes = new byte[size];
+        bb.get(rowBytes);
         while (true) {
             try {
-                r = ExportRow.decodeRow(r, 0, 0L, rowBytes);
+                ExportRow r = ExportRow.decodeRow(schemaRow, 0, 0L, rowBytes);
                 decoder.onBlockStart(r);
                 decoder.processRow(r);
                 decoder.onBlockCompletion(r);

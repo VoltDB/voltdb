@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,7 +46,7 @@
 #ifndef NATIVEEXPORTSERIALIZEIO_H
 #define NATIVEEXPORTSERIALIZEIO_H
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <limits>
 #include <stdint.h>
@@ -123,14 +123,14 @@ class ExportSerializeInput {
     const void* getRawPointer(size_t length) {
         const void* result = current_;
         current_ += length;
-        assert(current_ <= end_);
+        vassert(current_ <= end_);
         return result;
     }
 
     /** Copy a string from the buffer. */
     inline std::string readTextString() {
         int32_t stringLength = readInt();
-        assert(stringLength >= 0);
+        vassert(stringLength >= 0);
         return std::string(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
     };
@@ -174,7 +174,7 @@ class ExportSerializeOutput {
         buffer_(NULL), position_(0), capacity_(0)
     {
         buffer_ = reinterpret_cast<char*>(buffer);
-        assert(position_ <= capacity);
+        vassert(position_ <= capacity);
         capacity_ = capacity;
     }
 
@@ -226,7 +226,7 @@ class ExportSerializeOutput {
     }
 
     inline size_t writeEnumInSingleByte(int value) {
-        assert(std::numeric_limits<int8_t>::min() <= value &&
+        vassert(std::numeric_limits<int8_t>::min() <= value &&
                 value <= std::numeric_limits<int8_t>::max());
         return writeByte(static_cast<int8_t>(value));
     }
@@ -298,7 +298,7 @@ private:
         if (minimum_desired > capacity_) {
             // TODO: die
         }
-        assert(capacity_ >= minimum_desired);
+        vassert(capacity_ >= minimum_desired);
     }
 
     // Beginning of the buffer.

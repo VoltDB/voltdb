@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,7 @@
 #include "common/StreamPredicateList.h"
 #include "logging/LogManager.h"
 #include <algorithm>
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 
 namespace voltdb {
@@ -37,6 +37,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
+        const HiddenColumnFilter &hiddenColumnFilter,
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
@@ -52,7 +53,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_skippedDirtyRows(0),
              m_skippedInactiveRows(0),
-             m_replicated(table.isCatalogTableReplicated())
+             m_replicated(table.isReplicatedTable()),
+             m_hiddenColumnFilter(hiddenColumnFilter)
 {
     if (m_replicated) {
         // There is a corner case where a replicated table is streamed from a thread other than the lowest
@@ -126,7 +128,7 @@ CopyOnWriteContext::handleReactivation(TableStreamType streamType)
  */
 int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                              std::vector<int> &retPositions) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_totalTuples != 0 && m_tuplesRemaining == 0) {
@@ -168,7 +170,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
             bool deleteTuple = false;
-            yield = outputStreams.writeRow(tuple, &deleteTuple);
+            yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
             /*
              * May want to delete tuple if processing the actual table.
              */
@@ -178,7 +180,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                  * delete and return the tuple if it iscop
                  */
                 if (tuple.isPendingDelete()) {
-                    assert(!tuple.isPendingDeleteOnUndoRelease());
+                    vassert(!tuple.isPendingDeleteOnUndoRelease());
                     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                     //Save the extra lookup if possible
                     m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
@@ -213,8 +215,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
             if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
 
-                char message[1024 * 16];
-                snprintf(message, 1024 * 16,
+                char message[1024 * 8];
+                snprintf(message, sizeof(message),
                          "serializeMore(): tuple count > 0 after streaming:\n"
                          "Table name: %s\n"
                          "Table type: %s\n"
@@ -310,9 +312,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
             if (hasMore) {
                 hasMore = m_iterator->next(tuple);
-                if (hasMore) {
-                    assert(false);
-                }
+                vassert(!hasMore);
             }
             yield = true;
         }
@@ -343,7 +343,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 }
 
 bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     if (tuple.isDirty() || m_finishedTableScan) {
         return true;
@@ -371,7 +371,7 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
 
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
@@ -414,7 +414,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 }
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
-    assert(m_iterator.get() != NULL);
+    vassert(m_iterator.get() != NULL);
     if (m_finishedTableScan) {
         // There was a compaction while we are iterating through the m_backedUpTuples
         // TempTable. Don't do anything because the passed in block is a PersistentTable
@@ -444,8 +444,8 @@ bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
  * Only call it while m_finishedTableScan==false.
  */
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
-    assert(m_iterator.get() != NULL);
-    assert(!m_finishedTableScan);
+    vassert(m_iterator.get() != NULL);
+    vassert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
     TableIterator iter = m_backedUpTuples->iterator();

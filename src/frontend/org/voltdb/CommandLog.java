@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,7 @@ public interface CommandLog {
      */
     public abstract void init(int logSize,
                                  long txnId,
-                                 int partitionCount, String coreBinding,
+                                 String coreBinding,
                                  Map<Integer, Long> perPartitionTxnId);
 
     /**
@@ -52,7 +52,7 @@ public interface CommandLog {
      */
     public abstract void initForRejoin(int logSize,
                                           long txnId,
-                                          int partitionCount, boolean isRejoin,
+                                          boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
 
     public abstract boolean needsInitialization();

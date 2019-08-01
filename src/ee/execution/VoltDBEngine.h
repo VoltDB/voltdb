@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,6 +48,8 @@
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
+#include "common/LoadTableCaller.h"
+#include "common/HiddenColumnFilter.h"
 #include "common/ThreadLocalPool.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
@@ -63,7 +65,7 @@
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <map>
 #include <unordered_map>
 #include <string>
@@ -95,7 +97,6 @@ class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
 class ExecutorVector;
 class PersistentTable;
-class RecoveryProtoMsg;
 class StreamedTable;
 class Table;
 class TableCatalogDelegate;
@@ -168,6 +169,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Table* getCatalogTable(std::string const& name) const;
 
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
+
+        static int getDRHiddenColumnSize() { return s_drHiddenColumnSize; }
 
         StreamedTable* getPartitionedDRConflictStreamedTable() const {
             return m_drPartitionedConflictStreamedTable;
@@ -262,7 +265,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return processCatalogAdditions(timestamp, true, isStreamUpdate, purgedStreams);
         }
         void purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams);
-        void markAllExportingStreamsNew();
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -274,9 +276,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle,
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
-                       bool returnConflictRows,
-                       bool shouldDRStream,
-                       int64_t undoToken);
+                       int64_t undoToken,
+                       const LoadTableCaller &caller);
 
         /**
          * Reset the result buffer (use the nextResultBuffer by default)
@@ -385,6 +386,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Non-transactional work methods
         // -------------------------------------------------
 
+        /** Track the table that needs to be flushed at the target time */
+        void setStreamFlushTarget(int64_t targetTime, StreamedTable* table);
+
         /** Perform once per second, non-transactional work. */
         void tick(int64_t timeInMillis, int64_t lastCommittedSpHandle);
 
@@ -434,7 +438,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
 
-                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
+                vassert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
@@ -458,6 +462,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 CatalogId tableId,
                 TableStreamType streamType,
+                HiddenColumnFilter::Type hiddenColumnFilterType,
                 int64_t undoToken,
                 ReferenceSerializeInputBE& serializeIn);
 
@@ -480,23 +485,35 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                          ReferenceSerializeInputBE& serializeIn,
                                          std::vector<int>& retPositions);
 
-        /*
-         * Apply the updates in a recovery message.
-         */
-        void processRecoveryMessage(RecoveryProtoMsg* message);
-
         /**
          * Perform an action on behalf of Export.
          *
-         * @param if syncAction is true, the stream offset being set for a table
-         * @param the catalog version qualified id of the table to which this action applies
+         * @param syncAction if syncAction is true, the stream offset being set for a table
+         * @param ackOffset the reference to the USO of the next row inserted in the stream
+         * @param seqNo the reference to the sequenceNumber of the next inserted row
+         * @param generationIdCreated the reference to the initial creation generation ID of the export stream
+         * @param streamName the name of the stream we want to update the state for
          * @return the universal offset for any poll results
          * (results returned separately via QueryResults buffer)
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                             std::string tableSignature);
+                             int64_t generationIdCreated, std::string streamName);
 
-        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string tableSignature);
+        /**
+         * Complete the deletion of the Migrated Table rows.
+         *
+         * @param txnId The transactionId of the currently executing stored procedure
+         * @param spHandle The spHandle of the currently executing stored procedure
+         * @param uniqueId The uniqueId of the currently executing stored procedure
+         * @param mTableName The name of the table that the deletes should be applied to
+         * @param deletableTxnId The transactionId of the last row that can be deleted
+         * @param undoToken Commit/Rollback token for this delete call
+         * @return true if more rows to be deleted
+         */
+        bool deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+                std::string tableName, int64_t deletableTxnId, int64_t undoToken);
+
+        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, int64_t &genId, std::string streamName);
 
         /**
          * Retrieve a hash code for the specified table
@@ -539,6 +556,18 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t getPartitionId() const { return m_partitionId; }
 
         void setViewsEnabled(const std::string& viewNames, bool value);
+
+        virtual ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
+            return &m_newestExportStreamWithPendingRows;
+        }
+
+        virtual ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
+            return &m_oldestExportStreamWithPendingRows;
+        }
+
+        void disableExternalStreams();
+
+        bool externalStreamsEnabled();
 
     protected:
         void setHashinator(TheHashinator* hashinator);
@@ -592,6 +621,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool checkTempTableCleanup(ExecutorVector* execsForFrag);
 
         void loadBuiltInJavaFunctions();
+
+        void attachTupleStream(StreamedTable* streamedTable,
+                               const std::string& streamName,
+                               std::map<std::string, ExportTupleStream*> & purgedStreams,
+                               int64_t timestamp);
 
         // -------------------------------------------------
         // Data Members
@@ -656,14 +690,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Map of table signatures to exporting tables.
          */
         std::map<std::string, StreamedTable*> m_exportingTables;
+
         /*
-         * Map of table signatures to exporting stream wrappers.
+         * Pointer to begin/end export streams that need to be flushed ordered by first row create time
          */
-        std::map<std::string, ExportTupleStream*> m_exportingStreams;
-        /*
-         * Map of table signatures to exporting stream wrappers which are deleted.
-         */
-        std::map<std::string, ExportTupleStream*> m_exportingDeletedStreams;
+        ExportTupleStream* m_oldestExportStreamWithPendingRows;
+        ExportTupleStream* m_newestExportStreamWithPendingRows;
 
         /*
          * Only includes non-materialized tables
@@ -806,6 +838,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
+
+        static int s_drHiddenColumnSize;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {

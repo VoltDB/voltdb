@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,20 +48,20 @@ public:
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
-        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
-        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
+        vassert(m_latitude >= -90.0 && m_latitude <= 90.0);
+        vassert(m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
     GeographyPointValue(const S2Point &s2Point)
         : m_latitude(nullCoord())
         , m_longitude(nullCoord())
     {
-        assert(!s2Point.IsNaN());
+        vassert(!s2Point.IsNaN());
         S2LatLng latLong(s2Point);
         m_latitude = latLong.lat().degrees();
         m_longitude = latLong.lng().degrees();
-        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
-        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
+        vassert(m_latitude >= -90.0 && m_latitude <= 90.0);
+        vassert(m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
     // Use the number 360.0 for the null coordinate.
@@ -106,8 +106,8 @@ public:
     int compareWith(const GeographyPointValue& rhs) const {
 
         // Caller guarantees that neither side is null
-        assert(! isNull());
-        assert(! rhs.isNull());
+        vassert(! isNull());
+        vassert(! rhs.isNull());
 
         const GeographyPointValue canonThis = canonicalize();
         const GeographyPointValue canonRhs = rhs.canonicalize();

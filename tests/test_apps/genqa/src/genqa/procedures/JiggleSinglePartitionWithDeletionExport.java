@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,6 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -40,11 +39,10 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
 
     public VoltTable[] run(long rowid, long ignore)
     {
-        @SuppressWarnings("deprecation")
-        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+        long txid = getUniqueId();
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = new Random(txid);
+        Random rand = getSeededRandomNumberGenerator();
 
         // Check if the record exists first
         voltQueueSQL(check, rowid);
@@ -90,7 +88,7 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
             }
             else
             {
-                SampleRecord record = new SampleRecord(rowid, rand);
+                SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               update
                             , record.type_null_tinyint
@@ -120,7 +118,7 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
         else
         {
                 // Insert a new record
-                SampleRecord record = new SampleRecord(rowid, rand);
+                SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               insert
                             , rowid

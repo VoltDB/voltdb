@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import java.util.Queue;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Rejoin message used to drive the whole rejoin process. It is only sent between
@@ -54,7 +53,7 @@ public class RejoinMessage extends VoltMessage {
     private Queue<BBContainer> m_compressedDataBufferPool = null;
     // number of sources sending to this site
     private long m_snapshotSinkHSId = -1;
-    private boolean m_schemaHasNoTables = false;
+    private boolean m_schemaHasPersistentTables = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -79,13 +78,13 @@ public class RejoinMessage extends VoltMessage {
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
                          Queue<BBContainer> dataBufferPool,
                          Queue<BBContainer> compressedDataBufferPool,
-                         boolean schemaHasNoTables) {
+                         boolean schemaHasPersistentTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
         m_dataBufferPool = dataBufferPool;
         m_compressedDataBufferPool = compressedDataBufferPool;
-        m_schemaHasNoTables = schemaHasNoTables;
+        m_schemaHasPersistentTables = schemaHasPersistentTables;
     }
 
     /**
@@ -125,8 +124,8 @@ public class RejoinMessage extends VoltMessage {
         return m_compressedDataBufferPool;
     }
 
-    public boolean schemaHasNoTables() {
-        return m_schemaHasNoTables;
+    public boolean schemaHasPersistentTables() {
+        return m_schemaHasPersistentTables;
     }
 
     /**

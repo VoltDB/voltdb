@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,27 +23,22 @@
 
 package org.voltdb.regressionsuites.statistics;
 
-import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.Test;
+import org.junit.Test;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
 
-import org.voltdb.join.BalancePartitionsStatistics;
-import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
+import org.voltdb.elastic.BalancePartitionsStatistics;
 
-public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {
-
-    public TestStatisticsSuiteRebalanceStats(String name) {
-        super(name);
-    }
+public class TestStatisticsSuiteRebalanceStats {
 
     class RebalanceStatsChecker
     {
         final double fuzzFactor;
         final int rangesToMove;
 
-        long tStartMS;
         long rangesMoved = 0;
         long bytesMoved = 0;
         long rowsMoved = 0;
@@ -54,7 +49,6 @@ public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {
         {
             this.fuzzFactor = fuzzFactor;
             this.rangesToMove = rangesToMove;
-            this.tStartMS = System.currentTimeMillis();
         }
 
         void update(int ranges, int bytes, int rows)
@@ -65,36 +59,29 @@ public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {
             invocations++;
         }
 
-        void checkFuzz(double expected, double actual)
-        {
-            double delta = Math.abs((expected - actual) / expected);
-            if (delta > fuzzFactor) {
-                assertFalse(Math.abs((expected - actual) / expected) > fuzzFactor);
-            }
-        }
-
         void check(BalancePartitionsStatistics.StatsPoint stats)
         {
-            double totalTimeS = (System.currentTimeMillis() - tStartMS) / 1000.0;
+            double totalTimeS = (stats.getEndTimeMillis() - stats.getStartTimeMillis()) / 1000.0;
             double statsRangesMoved1 = (stats.getPercentageMoved() / 100.0) * rangesToMove;
-            checkFuzz(rangesMoved, statsRangesMoved1);
+            assertEquals(rangesMoved, statsRangesMoved1, rangesMoved*fuzzFactor);
             double statsRangesMoved2 = stats.getRangesPerSecond() * totalTimeS;
-            checkFuzz(rangesMoved, statsRangesMoved2);
+            assertEquals(rangesMoved, statsRangesMoved2, rangesMoved*fuzzFactor);
             double statsBytesMoved = stats.getMegabytesPerSecond() * 1000000.0 * totalTimeS;
-            checkFuzz(bytesMoved, statsBytesMoved);
+            assertEquals(bytesMoved, statsBytesMoved, bytesMoved*fuzzFactor);
             double statsRowsMoved = stats.getRowsPerSecond() * totalTimeS;
-            checkFuzz(rowsMoved, statsRowsMoved);
+            assertEquals(rowsMoved, statsRowsMoved, rowsMoved*fuzzFactor);
             double statsInvocations = stats.getInvocationsPerSecond() * totalTimeS;
-            checkFuzz(invocations, statsInvocations);
+            assertEquals(invocations, statsInvocations, invocations*fuzzFactor);
             double statsInvTimeMS = stats.getAverageInvocationTime() * invocations;
             assertTrue(Math.abs((totalInvTimeMS - statsInvTimeMS) / totalInvTimeMS) <= fuzzFactor);
-            checkFuzz(totalInvTimeMS, statsInvTimeMS);
+            assertEquals(totalInvTimeMS, statsInvTimeMS, totalInvTimeMS*fuzzFactor);
             double estTimeRemainingS = totalTimeS * (rangesToMove / (double)rangesMoved - 1.0);
             double statsEstTimeRemainingS = stats.getEstimatedRemaining() / 1000.0;
-            checkFuzz(estTimeRemainingS, statsEstTimeRemainingS);
+            assertEquals(estTimeRemainingS, statsEstTimeRemainingS, estTimeRemainingS*fuzzFactor);
         }
     }
 
+    @Test
     public void testRebalanceStats() throws Exception {
         System.out.println("testRebalanceStats");
         // Test constants
@@ -128,14 +115,5 @@ public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {
         }
         // Check the results with fuzzing to avoid rounding errors.
         checker.check(bps.getOverallStats());
-    }
-
-    //
-    // Build a list of the tests to be run. Use the regression suite
-    // helpers to allow multiple backends.
-    // JUnit magic that uses the regression suite helper classes.
-    //
-    static public Test suite() throws IOException {
-        return StatisticsTestSuiteBase.suite(TestStatisticsSuiteRebalanceStats.class, false);
     }
 }

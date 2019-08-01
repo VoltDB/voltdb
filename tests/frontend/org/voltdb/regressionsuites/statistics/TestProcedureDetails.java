@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,8 +28,10 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
@@ -186,10 +188,6 @@ public class TestProcedureDetails extends RegressionSuite {
         for (long i = 0; i < 4; i++) {
             assertTrue(procedureDetail.advanceRow());
             trivialVerification(procedureDetail);
-            long hostId = procedureDetail.getLong("HOST_ID");
-            long siteId = procedureDetail.getLong("SITE_ID");
-            long partitionId = procedureDetail.getLong("PARTITION_ID");
-            assertEquals(hostId * 2 + siteId, partitionId);
             assertEquals(expectedInvocationCount, procedureDetail.getLong("INVOCATIONS"));
             assertEquals(expectedInvocationCount, procedureDetail.getLong("TIMED_INVOCATIONS"));
             assertEquals(0, procedureDetail.getLong("ABORTS"));
@@ -201,6 +199,7 @@ public class TestProcedureDetails extends RegressionSuite {
             }
 
             if (testConfig.isSinglePartition()) {
+                long partitionId = procedureDetail.getLong("PARTITION_ID");
                 assertEquals(partitionId, testConfig.getWorkingPartition());
                 assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
                         procedureDetail.getString("PROCEDURE"));
@@ -211,7 +210,8 @@ public class TestProcedureDetails extends RegressionSuite {
         }
     }
 
-    private void verifyProcedureDetailResult(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
+    private void verifyProcedureDetailResult(Client client, ProcedureDetailTestConfig testConfig,
+            VoltTable procedureDetail) throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(procedureDetail);
         procedureDetail.resetRowPosition();
 
@@ -224,14 +224,14 @@ public class TestProcedureDetails extends RegressionSuite {
         if (testConfig.isSinglePartition()) {
             assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
                     procedureDetail.getString("PROCEDURE"));
-            assertEquals(hostId * 2 + siteId, partitionId);
             // See which partition this query went to.
             testConfig.setWorkingPartition(partitionId);
         }
         else {
             assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP",
                     procedureDetail.getString("PROCEDURE"));
-            assertEquals(0, hostId);
+
+            assertEquals(getHostIdForMpI(client), hostId);
             assertEquals(2, siteId);
             assertEquals(16383, partitionId);
         }
@@ -283,7 +283,7 @@ public class TestProcedureDetails extends RegressionSuite {
                 // Note that pass 1 as the second parameter to get incremental statistics.
                 VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 1).getResults()[0];
                 System.out.println(procedureDetail.toFormattedString());
-                verifyProcedureDetailResult(testConfig, procedureDetail);
+                verifyProcedureDetailResult(client, testConfig, procedureDetail);
             }
             // The test configuration says an exception is expected, but we did not get it.
             if (testConfig.expectsException() && ! caughtException) {
@@ -292,6 +292,18 @@ public class TestProcedureDetails extends RegressionSuite {
                         configValue, testConfig.getArgumentString()));
             }
         }
+    }
+
+    private int getHostIdForMpI(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable topo = client.callProcedure("@Statistics", "TOPO", 0).getResults()[0];
+        while (topo.advanceRow()) {
+            if (topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
+                String leader = topo.getString("Leader");
+                return Integer.parseInt(leader.substring(0, leader.indexOf(':')));
+            }
+        }
+        fail("No leader for MP");
+        return -1;
     }
 
     /**

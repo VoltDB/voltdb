@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -85,6 +85,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/LargeTempTableSortTest
   storage/DRBinaryLog_test
   catalog/catalog_test
+  catalog/ExportTupleStreamTest
   common/debuglog_test
   common/elastic_hashinator_test
   common/nvalue_test

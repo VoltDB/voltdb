@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,12 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -46,7 +44,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
-    void callWithExpectedCount(Client client,int count, String procName, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+    void callWithExpectedCount(Client client,int count, String procName, Object... params) throws IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);

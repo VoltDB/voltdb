@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,15 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef THREADLOCALPOOL_H_
-#define THREADLOCALPOOL_H_
+#pragma once
 
 #include "structures/CompactingPool.h"
+#ifdef VOLT_POOL_CHECKING
+#include "common/StackTrace.h"
+#endif
 
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
 #include <boost/unordered_map.hpp>
-#include "common/debuglog.h"
 
 namespace voltdb {
 
@@ -219,4 +220,3 @@ private:
 };
 }
 
-#endif /* THREADLOCALPOOL_H_ */

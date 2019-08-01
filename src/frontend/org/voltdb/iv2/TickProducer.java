@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.rejoin.TaskLog;
@@ -36,14 +37,15 @@ public class TickProducer extends SiteTasker implements Runnable
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
     private int m_partitionId;
+    private final long m_siteId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
 
     private static String TICK_MESSAGE = " A process (procedure, fragment, or operational task) is taking a long time "
-            + "-- over %d seconds -- and blocking the queue for site %d. "
+            + "-- over %d seconds -- and blocking the queue for site %d (%s) "
             + "No other jobs will be executed until that process completes.";
 
-    public TickProducer(SiteTaskerQueue taskQueue)
+    public TickProducer(SiteTaskerQueue taskQueue, long siteId)
     {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
@@ -56,6 +58,7 @@ public class TickProducer extends SiteTasker implements Runnable
                                 .getSystemsettings()
                                 .getProcedure()
                                 .getLoginfo();
+        m_siteId = siteId;
     }
 
     // start schedules a 1 second tick.
@@ -89,9 +92,10 @@ public class TickProducer extends SiteTasker implements Runnable
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
             if (m_logger.isDebugEnabled()) {
                 String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId);
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, "Site:" + CoreUtils.hsIdToString(m_siteId) + " " + m_taskQueue.toString());
             } else {
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId);
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
             }
         }
     }

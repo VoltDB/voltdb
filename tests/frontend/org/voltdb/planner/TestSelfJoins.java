@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -104,6 +104,10 @@ public class TestSelfJoins  extends PlannerTestCase {
             TupleValueExpression tve = (TupleValueExpression) e;
             assertNotSame(-1, tve.getColumnIndex());
         }
+
+        // if no alias is used, self join should fail
+        failToCompile("select * from R1 JOIN R1 USING(A)",
+                      "Use fully qualified names including the table name or alias to avoid ambiguous references");
     }
 
     public void testOuterSelfJoin() {

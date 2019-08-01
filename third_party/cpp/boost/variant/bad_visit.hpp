@@ -23,12 +23,12 @@ namespace boost {
 // Exception thrown when a visitation attempt via apply_visitor fails due
 // to invalid visited subtype or contents.
 //
-struct bad_visit
+struct BOOST_SYMBOL_VISIBLE bad_visit
     : std::exception
 {
 public: // std::exception interface
 
-    virtual const char * what() const throw()
+    virtual const char * what() const BOOST_NOEXCEPT_OR_NOTHROW
     {
         return "boost::bad_visit: "
                "failed visitation using boost::apply_visitor";

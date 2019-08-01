@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SQLStmt;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNonTransactionalProcedure;
@@ -63,11 +64,12 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.utils.CreateTableUtils;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.calciteutils.CreateTableUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -282,14 +284,18 @@ public class VoltCompiler {
 
         public String getStandardFeedbackLine() {
             String retval = "";
-            if (severityLevel == Severity.INFORMATIONAL)
+            if (severityLevel == Severity.INFORMATIONAL) {
                 retval = "INFO";
-            if (severityLevel == Severity.WARNING)
+            }
+            if (severityLevel == Severity.WARNING) {
                 retval = "WARNING";
-            if (severityLevel == Severity.ERROR)
+            }
+            if (severityLevel == Severity.ERROR) {
                 retval = "ERROR";
-            if (severityLevel == Severity.UNEXPECTED)
+            }
+            if (severityLevel == Severity.UNEXPECTED) {
                 retval = "UNEXPECTED ERROR";
+            }
 
             return retval + " " + getLogString();
         }
@@ -298,8 +304,9 @@ public class VoltCompiler {
             String retval = new String();
             if (! fileName.equals(NO_FILENAME)) {
                 retval += "[" + fileName;
-                if (lineNo != NO_LINE_NUMBER)
+                if (lineNo != NO_LINE_NUMBER) {
                     retval += ":" + lineNo;
+                }
                 retval += "]: ";
             }
             retval += message;
@@ -516,39 +523,43 @@ public class VoltCompiler {
 
     /** Compiles a catalog from a user provided schema and (optional) jar file. */
     public boolean compileFromSchemaAndClasses(
-            final File schemaPath,
-            final File classesJarPath,
+            final List<File> schemaPaths,
+            final List<File> classesJarPaths,
             final File catalogOutputPath)
     {
-        if (schemaPath != null && !schemaPath.exists()) {
+        if (schemaPaths != null && !schemaPaths.stream().allMatch(File::exists)) {
             compilerLog.error("Cannot compile nonexistent or missing schema.");
             return false;
         }
 
         List<VoltCompilerReader> ddlReaderList;
         try {
-            if (schemaPath == null) {
+            if (schemaPaths == null || schemaPaths.isEmpty()) {
                 ddlReaderList = new ArrayList<>(1);
                 ddlReaderList.add(new VoltCompilerStringReader(AUTOGEN_DDL_FILE_NAME, m_emptyDDLComment));
             } else {
-                ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+                ddlReaderList = DDLPathsToReaderList(
+                        schemaPaths.stream().map(File::getAbsolutePath).toArray(String[]::new));
             }
         }
         catch (VoltCompilerException e) {
-            compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
+            compilerLog.error("Unable to open schema file \"" + schemaPaths + "\"", e);
             return false;
         }
 
-        InMemoryJarfile inMemoryUserJar = null;
+        InMemoryJarfile inMemoryUserJar = new InMemoryJarfile();
         ClassLoader originalClassLoader = m_classLoader;
         try {
-            if (classesJarPath != null && classesJarPath.exists()) {
+            m_classLoader = inMemoryUserJar.getLoader();
+            if (classesJarPaths != null) {
                 // Make user's classes available to the compiler and add all VoltDB artifacts to theirs (overwriting any existing VoltDB artifacts).
                 // This keeps all their resources because stored procedures may depend on them.
-                inMemoryUserJar = new InMemoryJarfile(classesJarPath);
-                m_classLoader = inMemoryUserJar.getLoader();
-            } else {
-                inMemoryUserJar = new InMemoryJarfile();
+                for (File classesJarPath: classesJarPaths) {
+                    if (classesJarPath.exists()) {
+                        InMemoryJarfile jarFile = new InMemoryJarfile(classesJarPath);
+                        inMemoryUserJar.putAll(jarFile);
+                    }
+                }
             }
             // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
             if (compileInternal(null, null, ddlReaderList, Collections.emptyList(), inMemoryUserJar) == null) {
@@ -1112,8 +1123,9 @@ public class VoltCompiler {
             for (final VoltCompilerReader schemaReader : schemaReaders) {
                 String origFilename = m_currentFilename;
                 try {
-                    if (m_currentFilename.equals(NO_FILENAME))
+                    if (m_currentFilename.equals(NO_FILENAME)) {
                         m_currentFilename = schemaReader.getName();
+                    }
 
                     // add the file object's path to the list of files for the jar
                     m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
@@ -1156,6 +1168,10 @@ public class VoltCompiler {
                 for (String tableName : e.getValue()) {
                     addExportTableToConnector(targetName, tableName, db);
                 }
+            }
+            Map<String, String> persistentExportTables = voltDdlTracker.getPersistentTableTargetMap();
+            for (Entry<String, String> e : persistentExportTables.entrySet()) {
+                addExportTableToConnector(e.getValue(), e.getKey(), db);
             }
             ddlcompiler.processMaterializedViewWarnings(db);
 
@@ -1371,28 +1387,35 @@ public class VoltCompiler {
             "the catalog.");
         }
 
-        // streams cannot have tuple limits
-        if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
-            throw new VoltCompilerException("Streams cannot have row limits configured");
-        }
-        Column pc = tableref.getPartitioncolumn();
-        //Get views
-        List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
-        if (pc == null && tlist.size() != 0) {
-            compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
-                    "for a materialized view. Streams support views as long as partitioned column is part of the view.");
-            throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
-        }
-        if (pc != null && pc.getName() != null && tlist.size() != 0) {
-            for (Table t : tlist) {
-                if (t.getColumns().get(pc.getName()) == null) {
-                    compilerLog.error("While configuring export, table " + t + " is a source table " +
-                            "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-                    throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
-                } else {
-                    //Set partition column of view table to partition column of stream
-                    t.setPartitioncolumn(t.getColumns().get(pc.getName()));
+        if (TableType.isStream(tableref.getTabletype())) {
+            // streams cannot have tuple limits
+            if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
+                throw new VoltCompilerException("Streams cannot have row limits configured");
+            }
+            Column pc = tableref.getPartitioncolumn();
+            //Get views
+            List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
+            if (pc == null && tlist.size() != 0) {
+                compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
+                        "for a materialized view. Streams support views as long as partitioned column is part of the view.");
+                throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
+            }
+            if (pc != null && pc.getName() != null && tlist.size() != 0) {
+                for (Table t : tlist) {
+                    if (t.getColumns().get(pc.getName()) == null) {
+                        compilerLog.error("While configuring export, table " + t + " is a source table " +
+                                "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+                        throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
+                    } else {
+                        //Set partition column of view table to partition column of stream
+                        t.setPartitioncolumn(t.getColumns().get(pc.getName()));
+                    }
                 }
+            }
+            // This is used to enforce default connectors assigned to streams through the Java Property
+            // for streams that don't have the Export To Target clause
+            if (TableType.isConnectorLessStream(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
+                tableref.setTabletype(TableType.STREAM.get());
             }
         }
         if (tableref.getMaterializer() != null)
@@ -1401,12 +1424,12 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-        if (tableref.getIndexes().size() > 0) {
+        if (tableref.getIndexes().size() > 0 && TableType.isStream(tableref.getTabletype())) {
             compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
-        if (tableref.getIsreplicated()) {
+        if (tableref.getIsreplicated() && !TableType.needsShadowStream(tableref.getTabletype())) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)
             tableref.setIsreplicated(false);
@@ -1769,7 +1792,9 @@ public class VoltCompiler {
                     throw new VoltCompilerException(msg);
                 }
                 finally {
-                    if ( jar != null) try {jar.close();} catch (Exception ignoreIt) {};
+                    if (jar != null) {
+                        try {jar.close();} catch (Exception ignoreIt) {}
+                    }
                 }
             }
             // load directly from a classfile
@@ -1867,7 +1892,9 @@ public class VoltCompiler {
                     org.xml.sax.SAXParseException.class.cast(jxbex.getLinkedException());
             for( DeprecatedProjectElement dpe: DeprecatedProjectElement.values()) {
                 Matcher mtc = dpe.messagePattern.matcher(saxex.getMessage());
-                if( mtc.find()) return dpe;
+                if (mtc.find()) {
+                    return dpe;
+                }
             }
 
             return null;

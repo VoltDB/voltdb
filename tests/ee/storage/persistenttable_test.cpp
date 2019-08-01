@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,8 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-//#define STUPIDUNIT_ASSERT_BREAKPOINT 1
 
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
@@ -44,8 +42,7 @@
 #include "storage/tableutil.h"
 
 #include "boost/scoped_ptr.hpp"
-
-#include "common/FixUnusedAssertHack.h"
+#include "common/debuglog.h"
 
 using namespace voltdb;
 
@@ -228,7 +225,7 @@ protected:
         ASSERT_EQ(nTuples > 0, iterator.hasNext());
         ASSERT_EQ(nTuples, table->activeTupleCount());
         ASSERT_EQ(nIndexes, table->indexCount());
-        BOOST_FOREACH (auto index, table->allIndexes()) {
+        for (auto index : table->allIndexes()) {
             ASSERT_EQ(nTuples, index->getSize());
         }
     }
@@ -393,7 +390,6 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
 }
 
 TEST_F(PersistentTableTest, SwapTablesTest) {
-    bool added;
     PersistentTable* namedTable;
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
@@ -447,8 +443,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert, 0);
@@ -484,8 +479,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     ASSERT_NE(NULL, dupTable);
 
     // Populate the empty table currently swapped to table
-    added = tableutil::addRandomTuples(table, tuplesToInsert*3);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*3));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*3, tuplesToInsert);
@@ -705,8 +699,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     // Test writes and swaps in the same aborted transaction.
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*2));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
@@ -722,8 +715,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*4));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);
@@ -743,8 +735,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*2));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
@@ -760,8 +751,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*4));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);

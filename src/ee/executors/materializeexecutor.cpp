@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -55,12 +55,12 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     VOLT_TRACE("init Materialize Executor");
 
     m_node = dynamic_cast<MaterializePlanNode*>(abstractNode);
-    assert(m_node);
+    vassert(m_node);
     m_batched = m_node->isBatched();
 
     // Construct the output table
     m_columnCount = static_cast<int>(m_node->getOutputSchema().size());
-    assert(m_columnCount >= 0);
+    vassert(m_columnCount >= 0);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -77,7 +77,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     m_expressionArray = m_expressionArrayPtr.get();
 
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (m_node->getOutputColumnExpressions()[ctr] != NULL);
+        vassert(m_node->getOutputColumnExpressions()[ctr] != NULL);
         m_expressionArrayPtr[ctr] = m_node->getOutputColumnExpressions()[ctr];
         m_needsSubstitutePtr[ctr] = m_node->getOutputColumnExpressions()[ctr]->hasParameter();
     }
@@ -89,12 +89,12 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (m_node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert (!m_node->isInline()); // inline projection's execute() should not be called
-    assert (m_outputTable == dynamic_cast<AbstractTempTable*>(m_node->getOutputTable()));
-    assert (m_outputTable);
-    assert (m_columnCount == (int)m_node->getOutputColumnNames().size());
+    vassert(m_node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    vassert(m_node);
+    vassert(!m_node->isInline()); // inline projection's execute() should not be called
+    vassert(m_outputTable == dynamic_cast<AbstractTempTable*>(m_node->getOutputTable()));
+    vassert(m_outputTable);
+    vassert(m_columnCount == (int)m_node->getOutputColumnNames().size());
 
     // batched insertion
     if (m_batched) {
@@ -114,7 +114,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
 
     if (m_allParamArray == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            assert(m_expressionArray[ctr]);
+            vassert(m_expressionArray[ctr]);
             VOLT_TRACE("predicate[%d]: %s", ctr, m_expressionArray[ctr]->debug(true).c_str());
         }
     }

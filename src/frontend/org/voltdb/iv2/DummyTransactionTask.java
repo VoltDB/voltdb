@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,12 +42,6 @@ public class DummyTransactionTask extends TransactionTask {
         doCommonSPICompleteActions();
         DummyTransactionResponseMessage response = new DummyTransactionResponseMessage(this);
         response.m_sourceHSId = m_initiator.getHSId();
-        if (m_txnState instanceof SpTransactionState) {
-            SpTransactionState st = (SpTransactionState)m_txnState;
-            if (st.m_initiationMsg != null && !(st.m_initiationMsg.isForReplica())) {
-                response.setForOldLeader(true);
-            }
-        }
         m_initiator.deliver(response);
     }
 

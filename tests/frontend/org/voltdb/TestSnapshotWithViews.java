@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
@@ -296,6 +297,8 @@ public class TestSnapshotWithViews extends TestExportBase {
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
         response = client.callProcedure("@AdHoc", "select count(*) from v_ex_np");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
+        System.out.println("Snapshot Restore for the second time...........");
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
     }
 
     public TestSnapshotWithViews(final String name) {
@@ -317,13 +320,13 @@ public class TestSnapshotWithViews extends TestExportBase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         Properties props = new Properties();
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
 
         /*
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         ((LocalCluster) config).setHasLocalServer(false);
         //TODO: Snapshot test to use old CLI
         ((LocalCluster)config).setNewCli(false);

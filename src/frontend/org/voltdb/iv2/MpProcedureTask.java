@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,7 +63,7 @@ public class MpProcedureTask extends ProcedureTask
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
-                  long buddyHSId, boolean isRestart, int leaderNodeId, boolean nPartTxn)
+                  long buddyHSId, boolean isRestart, int leaderId, boolean nPartTxn)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
@@ -74,7 +74,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId, true);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderId, true);
     }
 
     /**
@@ -182,6 +182,11 @@ public class MpProcedureTask extends ProcedureTask
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("[MpProcedureTask] STARTING: " + this);
         }
+
+        final long truncationHandle = Math.max(((MpTransactionTaskQueue)m_queue).getRepairLogTruncationHandle(),
+                m_msg.getTruncationHandle());
+        txn.m_initiationMsg.setTruncationHandle(truncationHandle);
+        m_msg.setTruncationHandle(truncationHandle);
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
         // 1) We're not writing the Iv2InitiateTaskMessage to the first

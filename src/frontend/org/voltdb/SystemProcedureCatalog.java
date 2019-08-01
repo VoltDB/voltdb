@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,15 @@
 
 package org.voltdb;
 
+import java.util.List;
+
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.messaging.FragmentTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 /**
@@ -55,8 +59,6 @@ public class SystemProcedureCatalog {
         public final boolean commercial;
         // whether this procedure will terminate replication
         public final boolean terminatesReplication;
-        // whether this procedure should be skipped in replication
-        public final boolean skipReplication;
         // whether normal clients can call this sysproc in secondary
         public final boolean allowedInReplica;
         //Durable?
@@ -68,21 +70,10 @@ public class SystemProcedureCatalog {
         // whether restartable
         public final boolean restartable;
 
-        public Config(String className,
-                      boolean singlePartition,
-                      boolean readOnly,
-                      boolean everySite,
-                      int partitionParam,
-                      VoltType partitionParamType,
-                      boolean commercial,
-                      boolean terminatesReplication,
-                      boolean skipReplication,
-                      boolean allowedInReplica,
-                      boolean durable,
-                      boolean allowedInShutdown,
-                      boolean transactional,
-                      boolean restartable)
-        {
+        public Config(
+                String className, boolean singlePartition, boolean readOnly, boolean everySite, int partitionParam,
+                VoltType partitionParamType, boolean commercial, boolean terminatesReplication, boolean allowedInReplica,
+                boolean durable, boolean allowedInShutdown, boolean transactional, boolean restartable) {
             this.className = className;
             this.singlePartition = singlePartition;
             this.readOnly = readOnly;
@@ -91,7 +82,6 @@ public class SystemProcedureCatalog {
             this.partitionParamType = partitionParamType;
             this.commercial = commercial;
             this.terminatesReplication = terminatesReplication;
-            this.skipReplication = skipReplication;
             this.allowedInReplica = allowedInReplica;
             this.durable = durable;
             this.allowedInShutdown = allowedInShutdown;
@@ -148,78 +138,428 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
-    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
+    // Cache the fragments of VoltSysemProcedure which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableSet<Long> s_allowableSysprocFragsInTaskLog;
+
+    // Cache VoltSysemProcedure by name which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableSet<String> s_allowableSysprocsInTaskLog;
+    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
-        ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
-        builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,   false,            true,         true  ));
-        builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,   false,            true,         true  ));
-        builder.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            true,         true  ));
-        builder.put("@MigratePartitionLeader",  new Config("org.voltdb.sysprocs.MigratePartitionLeader",   true,  true,  false, 0,    VoltType.BIGINT,    false, true,  true,  false,     false,  false,            true,         false  ));
-        builder.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, 0,    VoltType.VARBINARY, false, false, false, true,      false,  false,            true,         true  ));
-        builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
-        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
-        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, 0,    VoltType.INVALID,   false, true,  true,  false,     false,  false,            true,         false ));
-        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
-        builder.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
-        builder.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",            true,  true,  false, 0,    VoltType.STRING,    false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, 0,    VoltType.INVALID,   true,  false, true,  false,     true,   false,            true,         false ));
-        builder.put("@UpdateCore",              new Config("org.voltdb.sysprocs.UpdateCore",               false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            true,         true  ));
-        builder.put("@VerifyCatalogAndWriteJar",new Config("org.voltdb.sysprocs.VerifyCatalogAndWriteJar", false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            false,        false ));
-        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            false,        false ));
-        builder.put("@UpdateClasses",           new Config("org.voltdb.sysprocs.UpdateClasses",            false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            false,        false ));
-        builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,   false,            true,         true  ));
-        builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,   false,            true,         false ));
-        builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ValidatePartitioning",    new Config("org.voltdb.sysprocs.ValidatePartitioning",     false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true,  false, false, 0,    VoltType.VARBINARY, true,  false, false, true,      true,   false,            true,         false ));
-        builder.put("@ApplyBinaryLogMP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",         false, false, false, 0,    VoltType.INVALID,   true,  false, false, true,      true,   false,            true,         true  ));
-        builder.put("@LoadVoltTableSP",         new Config("org.voltdb.sysprocs.LoadVoltTableSP",          true,  false, false, 0,    VoltType.VARBINARY, true,  false, false, true,      true,   false,            true,         false ));
-        builder.put("@LoadVoltTableMP",         new Config("org.voltdb.sysprocs.LoadVoltTableMP",          false, false, false, 0,    VoltType.INVALID,   true,  false, false, true,      true,   false,            true,         false ));
-        builder.put("@ResetDR",                 new Config("org.voltdb.sysprocs.ResetDR",                  false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            true,         false ));
-        //------------------------------------------------------------------------------------------------ SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
+        final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
+        builder.put("@AdHoc_RW_MP",
+                new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        false, true, true));
+        builder.put("@AdHoc_RW_SP",
+                new Config("org.voltdb.sysprocs.AdHoc_RW_SP",
+                        true,  false, false, 0, VoltType.VARBINARY,
+                        false, false, false,true,
+                        false, true, true));
+        builder.put("@AdHoc_RO_MP",
+                new Config("org.voltdb.sysprocs.AdHoc_RO_MP",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, true));
+        builder.put("@MigratePartitionLeader",
+                new Config("org.voltdb.sysprocs.MigratePartitionLeader",
+                        true, true, false, 0, VoltType.BIGINT,
+                        false, true,  false,false,
+                        false, true, false));
+        builder.put("@AdHoc_RO_SP",
+                new Config("org.voltdb.sysprocs.AdHoc_RO_SP",
+                        true,  true,  false, 0, VoltType.VARBINARY,
+                        false, false, true,false,
+                        false, true, true));
+        builder.put("@JStack",
+                new Config(null,
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@Pause",
+                new Config("org.voltdb.sysprocs.Pause",
+                        false, false, true,  0, VoltType.INVALID,
+                        false, false, true,false,
+                        false, true, false));
+        builder.put("@Resume",
+                new Config("org.voltdb.sysprocs.Resume",
+                        false, false, true,  0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@Quiesce",
+                new Config("org.voltdb.sysprocs.Quiesce",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@SnapshotSave",
+                new Config("org.voltdb.sysprocs.SnapshotSave",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@SnapshotRestore",
+                new Config("org.voltdb.sysprocs.SnapshotRestore",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, true,false, false,
+                        false, true, false ));
+        builder.put("@SnapshotStatus",
+                new Config("org.voltdb.sysprocs.SnapshotStatus",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@SnapshotScan",
+                new Config("org.voltdb.sysprocs.SnapshotScan",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@SnapshotDelete",
+                new Config("org.voltdb.sysprocs.SnapshotDelete",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@Shutdown",
+                new Config("org.voltdb.sysprocs.Shutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@ProfCtl",
+                new Config("org.voltdb.sysprocs.ProfCtl",
+                        false, false, true, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@Statistics",
+                new Config("org.voltdb.sysprocs.Statistics",
+                        false, true, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@SystemCatalog",
+                new Config("org.voltdb.sysprocs.SystemCatalog",
+                        true, true, false, 0, VoltType.STRING,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@SystemInformation",
+                new Config("org.voltdb.sysprocs.SystemInformation",
+                        false, true, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@UpdateLogging",
+                new Config("org.voltdb.sysprocs.UpdateLogging",
+                        false, false, true, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@BalancePartitions",
+                new Config("org.voltdb.sysprocs.BalancePartitions",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, false, true,
+                        false, true, false));
+        builder.put("@UpdateCore",
+                new Config("org.voltdb.sysprocs.UpdateCore",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, true));
+        builder.put("@VerifyCatalogAndWriteJar",
+                new Config("org.voltdb.sysprocs.VerifyCatalogAndWriteJar",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, false, false));
+        builder.put("@UpdateApplicationCatalog",
+                new Config("org.voltdb.sysprocs.UpdateApplicationCatalog",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, false, false));
+        builder.put("@UpdateClasses",
+                new Config("org.voltdb.sysprocs.UpdateClasses",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, false, false));
+        builder.put("@LoadMultipartitionTable",
+                new Config("org.voltdb.sysprocs.LoadMultipartitionTable",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        false, true, true));
+        builder.put("@LoadSinglepartitionTable",
+                new Config("org.voltdb.sysprocs.LoadSinglepartitionTable",
+                        true,  false, false, 0, VoltType.VARBINARY,
+                        false, false, false, true,
+                        false, true, false ));
+        builder.put("@Promote",
+                new Config("org.voltdb.sysprocs.Promote",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@ValidatePartitioning",
+                new Config("org.voltdb.sysprocs.ValidatePartitioning",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@GetHashinatorConfig",
+                new Config("org.voltdb.sysprocs.GetHashinatorConfig",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@ApplyBinaryLogSP",
+                new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",
+                        true,  false, false, 0, VoltType.VARBINARY,
+                        true, false, true, true,
+                        false, true, false));
+        builder.put("@ApplyBinaryLogMP",
+                new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, true,
+                        false, true, true));
+        builder.put("@LoadVoltTableSP",
+                new Config("org.voltdb.sysprocs.LoadVoltTableSP",
+                        true,  false, false, 0, VoltType.VARBINARY,
+                        true, false, true, true,
+                        false, true, false));
+        builder.put("@LoadVoltTableMP",
+                new Config("org.voltdb.sysprocs.LoadVoltTableMP",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, true,
+                        false, true, false));
+        builder.put("@ResetDR",
+                new Config("org.voltdb.sysprocs.ResetDR",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, true, false));
         /* @ExecuteTask is a all-in-one system store procedure and should be ONLY used for internal purpose */
-        builder.put("@ExecuteTask",             new Config("org.voltdb.sysprocs.ExecuteTask",              false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            true,         true  ));
-        builder.put("@ExecuteTask_SP",          new Config("org.voltdb.sysprocs.ExecuteTask_SP",           true,  false, false, 0,    VoltType.VARBINARY, false, false, true,  true,      true,   false,            true,         false ));
-        builder.put("@UpdateSettings",          new Config("org.voltdb.sysprocs.UpdateSettings",           false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,   false,            true,         false ));
-        builder.put("@Ping",                    new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true,             true,         false ));
-        builder.put("@PingPartitions",          new Config("org.voltdb.sysprocs.PingPartitions",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         true  ));
-        builder.put("@GetPartitionKeys",        new Config(null,                                           false, true,  true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Subscribe",               new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@GC",                      new Config("org.voltdb.sysprocs.GC",                       false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHoc",                    false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        true  ));
-        builder.put("@AdHocSpForTest",          new Config("org.voltdb.sysprocs.AdHocSpForTest",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        true  ));
-        builder.put("@AdHocLarge",              new Config("org.voltdb.sysprocs.AdHocLarge",               false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        true  ));
-        builder.put("@StopNode",                new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@Explain",                 new Config("org.voltdb.sysprocs.Explain",                  false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ExplainProc",             new Config("org.voltdb.sysprocs.ExplainProc",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ExplainView",             new Config("org.voltdb.sysprocs.ExplainView",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ExplainJSON",             new Config("org.voltdb.sysprocs.ExplainJSON",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ExplainCatalog",          new Config("org.voltdb.sysprocs.ExplainCatalog",           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
-        builder.put("@SendSentinel",            new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   true,  false, false, true,      false,  false,            true,         false ));
-        builder.put("@PrepareShutdown",         new Config("org.voltdb.sysprocs.PrepareShutdown",          false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
-        builder.put("@SwapTables",              new Config("org.voltdb.sysprocs.SwapTables",               false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            false,        false ));
-        builder.put("@SwapTablesCore",          new Config("org.voltdb.sysprocs.SwapTablesCore",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         false ));
-        builder.put("@Trace",                   new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@CheckUpgradePlanNT",      new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",       true,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
-        builder.put("@PrerequisitesCheckNT",    new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
-                                                                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
-        builder.put("@RestartDRConsumerNT",     new Config("org.voltdb.sysprocs.RestartDRConsumerNT",      false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
-        builder.put("@ShutdownNodeDRConsumerNT", new Config("org.voltdb.sysprocs.RestartDRConsumerNT$ShutdownNodeDRConsumerNT",
-                                                                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
-        builder.put("@StartNodeDRConsumerNT",   new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
-                                                                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
-        builder.put("@NibbleDeleteSP",          new Config("org.voltdb.sysprocs.NibbleDeleteSP",           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
-        builder.put("@NibbleDeleteMP",          new Config("org.voltdb.sysprocs.NibbleDeleteMP",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
-        builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true, false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
+        builder.put("@ExecuteTask",
+                new Config("org.voltdb.sysprocs.ExecuteTask",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, true));
+        builder.put("@ExecuteTask_SP",
+                new Config("org.voltdb.sysprocs.ExecuteTask_SP",
+                        true, false, false, 0, VoltType.VARBINARY,
+                        false, false, true, true,
+                        false, true, false));
+        builder.put("@UpdateSettings",
+                new Config("org.voltdb.sysprocs.UpdateSettings",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, false));
+        builder.put("@Ping",
+                new Config(null,
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@PingPartitions",
+                new Config("org.voltdb.sysprocs.PingPartitions",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, true));
+        builder.put("@GetPartitionKeys",
+                new Config(null,
+                        false, true,  true,  0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@Subscribe",
+                new Config(null,
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@GC",
+                new Config("org.voltdb.sysprocs.GC",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@AdHoc",
+                new Config("org.voltdb.sysprocs.AdHoc",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, true));
+        builder.put("@AdHocSpForTest",
+                new Config("org.voltdb.sysprocs.AdHocSpForTest",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, true));
+        builder.put("@AdHocLarge",
+                new Config("org.voltdb.sysprocs.AdHocLarge",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, true));
+        builder.put("@StopNode",
+                new Config(null,
+                        true,  false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@PrepareStopNode",
+                new Config(null,
+                        true,  false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@Explain",
+                new Config("org.voltdb.sysprocs.Explain",
+                        false, true, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@ExplainProc",
+                new Config("org.voltdb.sysprocs.ExplainProc",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@ExplainView",
+                new Config("org.voltdb.sysprocs.ExplainView",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@ExplainJSON",
+                new Config("org.voltdb.sysprocs.ExplainJSON",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@ExplainCatalog",
+                new Config("org.voltdb.sysprocs.ExplainCatalog",
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
+        builder.put("@SendSentinel",
+                new Config(null,
+                        true,  false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, true, false));
+        builder.put("@PrepareShutdown",
+                new Config("org.voltdb.sysprocs.PrepareShutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@CancelShutdown",
+                new Config("org.voltdb.sysprocs.CancelShutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
+        builder.put("@SwapTables",
+                new Config("org.voltdb.sysprocs.SwapTables",
+                        false, false, false, 0,    VoltType.INVALID,
+                        false, false, true, true,
+                        false, false, false));
+        builder.put("@SwapTablesCore",
+                new Config("org.voltdb.sysprocs.SwapTablesCore",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, false));
+        builder.put("@Trace",
+                new Config(null,
+                        false, true,  false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@CheckUpgradePlanNT",
+                new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",
+                        true,  false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false));
+        builder.put("@PrerequisitesCheckNT",
+                new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false));
+        builder.put("@RestartDRConsumerNT",
+                new Config("org.voltdb.sysprocs.RestartDRConsumerNT",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false));
+        builder.put("@ShutdownNodeDRConsumerNT",
+                new Config("org.voltdb.sysprocs.RestartDRConsumerNT$ShutdownNodeDRConsumerNT",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false));
+        builder.put("@StartNodeDRConsumerNT",
+                new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false));
+        builder.put("@NibbleDeleteSP",
+                new Config("org.voltdb.sysprocs.NibbleDeleteSP",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, true));
+        builder.put("@NibbleDeleteMP",
+                new Config("org.voltdb.sysprocs.NibbleDeleteMP",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, true,
+                        false, true, true));
+        builder.put("@LowImpactDeleteNT",
+                new Config("org.voltdb.sysprocs.LowImpactDeleteNT",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, false, false,
+                        false, false, false));
+        builder.put("@ExportControl",
+                new Config("org.voltdb.sysprocs.ExportControl",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
+        builder.put("@MigrateRowsAcked_SP",
+                new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        true, true, true));
+        builder.put("@MigrateRowsAcked_MP",
+                new Config("org.voltdb.sysprocs.MigrateRowsAcked_MP",
+                        false, false, false, 0, VoltType.VARBINARY,
+                        false, false, false, true,
+                        true, true, false));
+        builder.put("@MigrateRowsSP",
+                new Config("org.voltdb.sysprocs.MigrateRowsSP",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        false, true, true));
+        builder.put("@MigrateRowsMP",
+                new Config("org.voltdb.sysprocs.MigrateRowsMP",
+                        false, false, false, 0, VoltType.VARBINARY,
+                        false, false, false, true,
+                        false, true,false));
+        builder.put("@MigrateRowsNT",
+                new Config("org.voltdb.sysprocs.MigrateRowsNT",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        false, false, false));
+        builder.put("@MigrateRowsDeleterNT",
+                new Config("org.voltdb.sysprocs.MigrateRowsDeleterNT",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, false, true,
+                        true, false, false));
+        builder.put("@ElasticRemoveNT",
+                new Config("org.voltdb.sysprocs.ElasticRemoveNT",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, false,
+                        false, false, false ));
+        builder.put("@ElasticRemove",
+                new Config("org.voltdb.sysprocs.ElasticRemove",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, false, true,
+                        false, true, true));
         listing = builder.build();
+    }
+
+    // Set up the cache when system procedures are loaded on execution sites.
+    public static void setupAllowableSysprocFragsInTaskLog(List<Long> fragments, List<String> procs) {
+        if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null){
+            synchronized(SystemProcedureCatalog.class) {
+                if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null) {
+                    s_allowableSysprocFragsInTaskLog = ImmutableSet.<Long>builder().addAll(fragments).build();
+                    s_allowableSysprocsInTaskLog = ImmutableSet.<String>builder().addAll(procs).build();
+                }
+            }
+        }
+    }
+
+    // return true if the fragment or the system procedure is allowed to be replayed in TaskLog
+    public static boolean isAllowableInTaskLog(Long fragId, FragmentTaskMessage msg) {
+        if(s_allowableSysprocFragsInTaskLog == null || s_allowableSysprocsInTaskLog == null) {
+            return true;
+        }
+
+        // Check specified fragment IDs
+        if (s_allowableSysprocFragsInTaskLog.contains(fragId)) {
+            return true;
+        }
+
+        // If fragId is not in the allowed list, check proc name.
+        String procName = msg.getProcedureName();
+        if (procName != null) {
+            return s_allowableSysprocsInTaskLog.contains(procName);
+        }
+        return false;
     }
 }

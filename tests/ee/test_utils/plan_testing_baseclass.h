@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -255,7 +255,7 @@ public:
         assert(pTable != NULL);
         int dummyExceptionTracker;
         voltdb::ConditionalSynchronizedExecuteWithMpMemory setMpMemoryIfNeeded
-                (pTable->isCatalogTableReplicated(), true, &dummyExceptionTracker, -1);
+                (pTable->isReplicatedTable(), true, &dummyExceptionTracker, -1);
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {
                 std::cout << '.';

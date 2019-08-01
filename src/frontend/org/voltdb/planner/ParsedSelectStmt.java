@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -1472,14 +1473,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 whereList.add(selectStmt.m_joinTree.getWhereExpression());
             }
             selectStmt.m_joinTree.setWhereExpression(
-                    ExpressionUtil.combinePredicates(whereList));
+                    ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, whereList));
         }
         // Add new HAVING expressions
         if (!havingList.isEmpty()) {
             if (selectStmt.m_having != null) {
                 havingList.add(selectStmt.m_having);
             }
-            selectStmt.m_having = ExpressionUtil.combinePredicates(havingList);
+            selectStmt.m_having = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, havingList);
             // reprocess HAVING expressions
             ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
         }

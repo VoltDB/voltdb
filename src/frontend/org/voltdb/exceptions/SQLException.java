@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,8 @@ package org.voltdb.exceptions;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+
+import org.voltdb.client.ClientResponse;
 
 /**
  * Exceptions that are intended to be caught by the user in a stored procedure are SQLExceptions
@@ -99,5 +101,15 @@ public class SQLException extends SerializableException {
     @Override
     protected SerializableExceptions getExceptionType() {
         return SerializableExceptions.SQLException;
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.GRACEFUL_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "SQL ERROR";
     }
 }

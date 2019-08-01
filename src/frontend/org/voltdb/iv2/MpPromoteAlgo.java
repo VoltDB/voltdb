@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,7 +58,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
-
+    private long m_repairTruncationHandle = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
     long getRequestId()
     {
         return m_requestId;
@@ -188,6 +188,8 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
+            m_repairTruncationHandle = Math.max(m_repairTruncationHandle, response.getRepairTruncationHandle());
+
             // Step 2: track hashinator versions
 
             if (response.hasHashinatorConfig()) {
@@ -229,7 +231,7 @@ public class MpPromoteAlgo implements RepairAlgo
                     //no real transaction repair when triggered with MigratePartitionLeader. Theoretically it should not be here.
                     //MigratePartitionLeader should not trigger MP promotion.
                     if (m_isMigratePartitionLeader) {
-                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_repairTruncationHandle));
                     } else {
                         repairSurvivors();
                     }
@@ -285,7 +287,7 @@ public class MpPromoteAlgo implements RepairAlgo
             }
         }
 
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_repairTruncationHandle));
     }
 
     //

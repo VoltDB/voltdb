@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.Random;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
@@ -35,6 +36,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -141,9 +143,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long spHandle, final long lastCommittedTxnId, long uniqueId,
-        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
+            final long lastCommittedTxnId, long uniqueId, long undoToken, LoadTableCaller caller)
     throws EEException
     {
         return null;
@@ -186,7 +187,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
+    public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+            long undoQuantumToken, byte[] predicates) {
         return false;
     }
 
@@ -197,17 +199,19 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String mStreamName) {
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
+        return false;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String streamName) {
         return null;
-    }
-
-    @Override
-    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
     }
 
     @Override
@@ -257,5 +261,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public void setViewsEnabled(String viewNames, boolean enabled) {
         return;
+    }
+
+    @Override
+    public void disableExternalStreams() {
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return true;
     }
 }

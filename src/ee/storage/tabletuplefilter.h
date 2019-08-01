@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -120,8 +120,8 @@ class TableTupleFilter {
     uint64_t updateTuple(const TableTuple& tuple, char marker)
     {
         uint64_t tupleIdx = getTupleIndex(tuple);
-        assert(tupleIdx <= m_lastActiveTupleIndex && m_lastActiveTupleIndex != INVALID_INDEX);
-        assert(m_tuples[tupleIdx] != INACTIVE_TUPLE);
+        vassert(tupleIdx <= m_lastActiveTupleIndex && m_lastActiveTupleIndex != INVALID_INDEX);
+        vassert(m_tuples[tupleIdx] != INACTIVE_TUPLE);
         m_tuples[tupleIdx] = marker;
         return tupleIdx;
     }
@@ -131,7 +131,7 @@ class TableTupleFilter {
      */
     char getTupleValue(size_t tupleIdx) const
     {
-        assert(tupleIdx < m_tuples.size());
+        vassert(tupleIdx < m_tuples.size());
         return m_tuples[tupleIdx];
     }
 
@@ -140,11 +140,11 @@ class TableTupleFilter {
      */
     uint64_t getTupleAddress(size_t tupleIdx)
     {
-        assert(tupleIdx < m_tuples.size());
+        vassert(tupleIdx < m_tuples.size());
         size_t blockIdx = tupleIdx / m_tuplesPerBlock;
-        assert(blockIdx < m_blocks.size());
+        vassert(blockIdx < m_blocks.size());
         if (m_prevBlockIndex > tupleIdx || (tupleIdx - m_prevBlockIndex) >= m_tuplesPerBlock) {
-            assert(m_blockIndexes.find(m_blocks[blockIdx]) != m_blockIndexes.end());
+            vassert(m_blockIndexes.find(m_blocks[blockIdx]) != m_blockIndexes.end());
             m_prevBlockIndex = m_blockIndexes.find(m_blocks[blockIdx])->second;
         }
         return m_blocks[blockIdx] + (tupleIdx - m_prevBlockIndex) * m_tupleLength;
@@ -190,7 +190,7 @@ class TableTupleFilter {
     void initActiveTuple(const TableTuple& tuple)
     {
         uint64_t tupleIdx = getTupleIndex(tuple);
-        assert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
+        vassert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
         m_tuples[tupleIdx] = ACTIVE_TUPLE;
         // Advance last active tuple index if necessary
         if (m_lastActiveTupleIndex == INVALID_INDEX || m_lastActiveTupleIndex < tupleIdx)
@@ -286,7 +286,7 @@ class TableTupleFilter_iter
     bool equal(TableTupleFilter_iter const& other) const
     {
         // Shouldn't compare iterators from different tables
-        assert(m_tableFilter == other.m_tableFilter);
+        vassert(m_tableFilter == other.m_tableFilter);
         return m_tupleIdx == other.m_tupleIdx;
     }
 
@@ -373,7 +373,7 @@ class TableTupleFilter_const_iter
     bool equal(TableTupleFilter_const_iter const& other) const
     {
         // Shouldn't compare iterators from different tables
-        assert(m_tableFilter == other.m_tableFilter);
+        vassert(m_tableFilter == other.m_tableFilter);
         return m_tupleIdx == other.m_tupleIdx;
     }
 

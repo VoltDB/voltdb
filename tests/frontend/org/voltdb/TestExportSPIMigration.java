@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,7 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
@@ -49,7 +48,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
@@ -61,19 +62,13 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
     private ServerListener m_serverSocket;
     private final List<ClientConnectionHandler> clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
     private final ConcurrentMap<Long, AtomicLong> seenIds = new ConcurrentHashMap<Long, AtomicLong>();
-    private static final String SCHEMA = "CREATE STREAM t partition on column a (a integer not null, b integer not null);";
+    private static final String SCHEMA = "CREATE STREAM t partition on column a export to target utopia (a integer not null, b integer not null);";
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
 
-    static void resetDir() throws IOException {
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-         VoltFile.recursivelyDelete(f);
-         f.mkdirs();
-    }
-
     @Test
     public void testFlushEEBufferWhenRejoin() throws Exception {
-        resetDir();
+        ExportLocalClusterBase.resetDir();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
         VoltFile.resetSubrootForThisProcess();
@@ -95,9 +90,9 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
 
             //enable export
             Properties props = new Properties();
-            props.put("replicated", "true");
+            //props.put("replicated", "true");
             props.put("skipinternals", "true");
-            builder.addExport(true, "custom", props);
+            builder.addExport(true, ServerExportEnum.CUSTOM, props, "utopia");
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");
@@ -138,11 +133,12 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                 client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
             }
 
-            cluster.rejoinOne(1);
+            // Don't clear voltdbroot before rejoin
+            cluster.rejoinOne(1, false);
             long tss = System.currentTimeMillis();
             while (true) {
                 Thread.sleep(100);
-                assertTrue("Rejoin time has reached 20s limit, test failed", System.currentTimeMillis() - tss < 20000);
+                assertTrue("Rejoin time has reached 20s limit, test failed", System.currentTimeMillis() - tss < 20_000);
                 // rejoin has finished and partition leader balanced after migration
                 vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
                 if (!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0])) {
@@ -164,8 +160,8 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             client.callProcedure("@Quiesce");
             while (true) {
                 Thread.sleep(100);
-                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10000);
-                // making sure all export message
+                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10_000);
+                // make sure see all export message
                 if (exportMessageSet.size() == 10) {
                     break;
                 }

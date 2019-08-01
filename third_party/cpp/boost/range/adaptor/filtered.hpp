@@ -12,7 +12,9 @@
 #define BOOST_RANGE_ADAPTOR_FILTERED_HPP
 
 #include <boost/range/adaptor/argument_fwd.hpp>
+#include <boost/range/detail/default_constructible_unary_fn.hpp>
 #include <boost/range/iterator_range.hpp>
+#include <boost/range/concepts.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
 namespace boost
@@ -22,21 +24,28 @@ namespace boost
         template< class P, class R >
         struct filtered_range :
             boost::iterator_range<
-                boost::filter_iterator< P,
-                    BOOST_DEDUCED_TYPENAME range_iterator<R>::type
+                boost::filter_iterator<
+                    typename default_constructible_unary_fn_gen<P, bool>::type,
+                    typename range_iterator<R>::type
                 >
             >
         {
         private:
             typedef boost::iterator_range<
-                        boost::filter_iterator< P,
-                            BOOST_DEDUCED_TYPENAME range_iterator<R>::type
-                        >
-                    > base;
+                boost::filter_iterator<
+                    typename default_constructible_unary_fn_gen<P, bool>::type,
+                    typename range_iterator<R>::type
+                >
+            > base;
         public:
-            filtered_range( P p, R& r )
-            : base( make_filter_iterator( p, boost::begin(r), boost::end(r) ),
-                    make_filter_iterator( p, boost::end(r), boost::end(r) ) )
+            typedef typename default_constructible_unary_fn_gen<P, bool>::type
+                pred_t;
+
+            filtered_range(P p, R& r)
+            : base(make_filter_iterator(pred_t(p),
+                                        boost::begin(r), boost::end(r)),
+                   make_filter_iterator(pred_t(p),
+                                        boost::end(r), boost::end(r)))
             { }
         };
 
@@ -47,20 +56,23 @@ namespace boost
             { }
         };
 
-        template< class InputRng, class Predicate >
-        inline filtered_range<Predicate, InputRng>
-        operator|( InputRng& r,
-                   const filter_holder<Predicate>& f )
+        template< class SinglePassRange, class Predicate >
+        inline filtered_range<Predicate, SinglePassRange>
+        operator|(SinglePassRange& r,
+                  const filter_holder<Predicate>& f)
         {
-            return filtered_range<Predicate, InputRng>( f.val, r );
+            BOOST_RANGE_CONCEPT_ASSERT((SinglePassRangeConcept<SinglePassRange>));
+            return filtered_range<Predicate, SinglePassRange>( f.val, r );
         }
 
-        template< class InputRng, class Predicate >
-        inline filtered_range<Predicate, const InputRng>
-        operator|( const InputRng& r,
-                   const filter_holder<Predicate>& f )
+        template< class SinglePassRange, class Predicate >
+        inline filtered_range<Predicate, const SinglePassRange>
+        operator|(const SinglePassRange& r,
+                  const filter_holder<Predicate>& f )
         {
-            return filtered_range<Predicate, const InputRng>( f.val, r );
+            BOOST_RANGE_CONCEPT_ASSERT((
+                SinglePassRangeConcept<const SinglePassRange>));
+            return filtered_range<Predicate, const SinglePassRange>( f.val, r );
         }
 
     } // 'range_detail'
@@ -81,18 +93,26 @@ namespace boost
                        range_detail::forwarder<range_detail::filter_holder>();
         }
 
-        template<class InputRange, class Predicate>
-        inline filtered_range<Predicate, InputRange>
-        filter(InputRange& rng, Predicate filter_pred)
+        template<class SinglePassRange, class Predicate>
+        inline filtered_range<Predicate, SinglePassRange>
+        filter(SinglePassRange& rng, Predicate filter_pred)
         {
-            return range_detail::filtered_range<Predicate, InputRange>( filter_pred, rng );
+            BOOST_RANGE_CONCEPT_ASSERT((
+                SinglePassRangeConcept<SinglePassRange>));
+
+            return range_detail::filtered_range<
+                Predicate, SinglePassRange>( filter_pred, rng );
         }
 
-        template<class InputRange, class Predicate>
-        inline filtered_range<Predicate, const InputRange>
-        filter(const InputRange& rng, Predicate filter_pred)
+        template<class SinglePassRange, class Predicate>
+        inline filtered_range<Predicate, const SinglePassRange>
+        filter(const SinglePassRange& rng, Predicate filter_pred)
         {
-            return range_detail::filtered_range<Predicate, const InputRange>( filter_pred, rng );
+            BOOST_RANGE_CONCEPT_ASSERT((
+                SinglePassRangeConcept<const SinglePassRange>));
+
+            return range_detail::filtered_range<
+                Predicate, const SinglePassRange>( filter_pred, rng );
         }
     } // 'adaptors'
 

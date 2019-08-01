@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,10 +19,12 @@
 #include "common/SynchronizedThreadLock.h"
 
 #include "executors/abstractexecutor.h"
+#include "executors/insertexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
 #include "plannodes/insertnode.h"
+#include "debuglog.h"
 
 #ifdef LINUX
 #include <malloc.h>
@@ -121,10 +123,10 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_txnId(0),
     m_spHandle(0),
     m_uniqueId(0),
-    m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
     m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024, siteId), // engine may be null in unit tests
     m_traceOn(false),
+    m_externalStreamsEnabled(true),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -187,9 +189,8 @@ UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
     return executeExecutors(executorList, subqueryId);
 }
 
-UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                         int subqueryId)
-{
+UniqueTempTableResult ExecutorContext::executeExecutors(
+      const std::vector<AbstractExecutor*>& executorList, int subqueryId) {
     // Walk through the list and execute each plannode.
     // The query planner guarantees that for a given plannode,
     // all of its children are positioned before it in this list,
@@ -197,7 +198,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     int ctr = 0;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert(executor);
+            vassert(executor);
 
             if (isTraceOn()) {
                 char name[32];
@@ -211,8 +212,14 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 if (isTraceOn()) {
                     getPhysicalTopend()->traceLog(false, NULL, NULL);
                 }
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
+                InsertExecutor* insertExecutor = dynamic_cast<InsertExecutor*>(executor);
+                if (insertExecutor != nullptr && insertExecutor->exceptionMessage() != nullptr) {
+                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                         insertExecutor->exceptionMessage());
+                } else {
+                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                         "Unspecified execution error detected");
+                }
             }
 
             if (isTraceOn()) {
@@ -241,7 +248,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         // (potential) inline children could also be smart enough to clean up
         // after its inline children, and this post-processing would not be needed.
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert (executor);
+            vassert(executor);
             AbstractPlanNode * node = executor->getPlanNode();
             std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
             std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
@@ -250,7 +257,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 inlineNode->getExecutor()->cleanupMemoryPool();
             }
         }
-
         if (subqueryId == 0) {
             VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
         } else {
@@ -266,7 +272,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
-    assert(!executorList.empty());
+    vassert(!executorList.empty());
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
@@ -291,7 +297,7 @@ void ExecutorContext::cleanupAllExecutors()
     // If something failed before we could even instantiate the plan,
     // there won't even be an executors map.
     if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        typedef std::map<int, std::vector<AbstractExecutor*>>::value_type MapEntry;
         BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
             int subqueryId = entry.first;
             cleanupExecutorsForSubquery(subqueryId);
@@ -305,7 +311,7 @@ void ExecutorContext::cleanupAllExecutors()
 
 void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-        assert(executor);
+        vassert(executor);
         executor->cleanupTempOutputTable();
     }
 }
@@ -321,7 +327,7 @@ void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
     }
-    assert (m_tuplesModifiedStack.size() == 0);
+    vassert(m_tuplesModifiedStack.size() == 0);
 
     executorVector->resetLimitStats();
 }
@@ -353,10 +359,9 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
-    if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-        BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
-            BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+    if (m_executorsMap != nullptr) {
+        for(auto& entry : *m_executorsMap) {
+            for(auto const* executor : entry.second) {
                 if (! executor->outputTempTableIsEmpty()) {
                     return false;
                 }
@@ -368,9 +373,9 @@ bool ExecutorContext::allOutputTempTablesAreEmpty() const {
 }
 
 void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
-    assert (m_drStream != NULL);
-    assert (drStream != NULL);
-    assert (m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
+    vassert(m_drStream != NULL);
+    vassert(drStream != NULL);
+    vassert(m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openSpHandle);
     m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
@@ -383,7 +388,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
         m_drReplicatedStream = drReplicatedStream;
         return;
     }
-    assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
+    vassert(m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
@@ -402,9 +407,8 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
 bool ExecutorContext::checkTransactionForDR() {
     bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream && m_drStream->drStreamStarted()) {
-            if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+        if (m_externalStreamsEnabled && m_drStream && m_drStream->drStreamStarted()) {
+            if (m_drStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                                 m_drStream->m_committedUso, 0));
@@ -412,8 +416,7 @@ bool ExecutorContext::checkTransactionForDR() {
             result = true;
         }
         if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
-            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drReplicatedStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,

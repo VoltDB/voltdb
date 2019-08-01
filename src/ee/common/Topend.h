@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,8 @@
 namespace voltdb {
 class Table;
 class Pool;
-class StreamBlock;
+class ExportStreamBlock;
+class DrStreamBlock;
 class LargeTempTableBlock;
 
 /*
@@ -63,19 +64,19 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
     virtual void pushExportBuffer(
             int32_t partitionId,
-            std::string signature,
-            StreamBlock *block,
-            bool sync) = 0;
+            std::string tableName,
+            ExportStreamBlock *block) = 0;
+    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
+    // are managed (they really don't belong in row buffers).
     virtual void pushEndOfStream(
             int32_t partitionId,
-            std::string signature) = 0;
+            std::string tableName) = 0;
 
-    virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+    virtual int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block) = 0;
 
-    virtual void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) = 0;
+    virtual void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) = 0;
 
     virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -133,14 +134,13 @@ public:
 
     void crashVoltDB(voltdb::FatalException e);
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-
-    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
+    int64_t getFlushedExportBytes(int32_t partitionId);
+    virtual void pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -163,7 +163,8 @@ public:
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
-    std::deque<boost::shared_ptr<StreamBlock> > blocks;
+    std::deque<boost::shared_ptr<DrStreamBlock> > drBlocks;
+    std::deque<boost::shared_ptr<ExportStreamBlock> > exportBlocks;
     std::deque<boost::shared_array<char> > data;
     bool receivedDRBuffer;
     bool receivedExportBuffer;

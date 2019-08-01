@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -73,8 +73,6 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  */
 public class ReplaySequencer
 {
-    static final VoltLogger hostLog = new VoltLogger("HOST");
-
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
     private class ReplayEntry {
@@ -364,17 +362,17 @@ public class ReplaySequencer
         return true;
     }
 
-    public void dump(long hsId)
+    public void dump(long hsId, StringBuilder sb)
     {
         final String who = CoreUtils.hsIdToString(hsId);
-        hostLog.warn(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
+        sb.append(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
                                  who,
                                  m_lastPolledFragmentUniqueId, TxnEgo.txnIdToString(m_lastPolledFragmentUniqueId),
                                  m_lastSeenUniqueId, TxnEgo.txnIdToString(m_lastSeenUniqueId),
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {
-            hostLog.warn(String.format("%s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
+            sb.append(String.format("\n    %s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
         }
     }
 }

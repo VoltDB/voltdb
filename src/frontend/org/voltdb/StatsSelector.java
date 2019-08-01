@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ public enum StatsSelector {
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
     QUEUE,
+    IDLETIME,         // synonym for STARVATION
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
     LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY
@@ -61,5 +62,7 @@ public enum StatsSelector {
     GC,             // return GC Stats
 
     COMMANDLOG,     // return number of outstanding bytes and txns on this node
-    IMPORTER
+    IMPORTER,       // synonym as IMPORT for backward compatibility
+    IMPORT,
+    EXPORT
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,9 @@
 package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
+
+import org.voltdb.TheHashinator;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Exceptions thrown by native Execution Engine
@@ -40,11 +43,26 @@ public class MispartitionedException extends SerializableException {
     }
 
     @Override
+    public void setClientResponseResults(org.voltdb.ClientResponseImpl cr) {
+        cr.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+    }
+
+    @Override
     protected int p_getSerializedSize() {
         return 0;
     }
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.TXN_MISPARTITIONED;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "TRANSACTION MISPARTITIONED";
     }
 }

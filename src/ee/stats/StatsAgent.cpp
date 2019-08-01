@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ StatsAgent::StatsAgent() {}
 void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
-    assert(statsSource != NULL);
+    vassert(statsSource != NULL);
     m_statsCategoryByStatsSelector[sst].insert(make_pair(catalogId, statsSource));
     VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
                ThreadLocalPool::getEnginePartitionId(),
@@ -119,7 +119,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
              iter++) {
 
             StatsSource *ss = iter->second;
-            assert (ss != NULL);
+            vassert(ss != NULL);
             if (ss == NULL) {
                 continue;
             }

@@ -225,6 +225,9 @@ public class Tokens {
     static final String        T_MEMBER            = "MEMBER";
     static final String        T_MERGE             = "MERGE";
     static final String        T_METHOD            = "METHOD";
+    // A VoltDB extension NIBBLE EXPORT
+    static final String        T_MIGRATE           = "MIGRATE";
+    // End of VoltDB extension
     static final String        T_MIN               = "MIN";
     public static final String T_MINUTE            = "MINUTE";
     static final String        T_MOD               = "MOD";
@@ -335,10 +338,16 @@ public class Tokens {
     static final String        T_SYSTEM            = "SYSTEM";
     static final String        T_SYSTEM_USER       = "SYSTEM_USER";
     // A VoltDB extension STREAM
-    static final String        T_STREAM = "STREAM";
+    static final String        T_STREAM            = "STREAM";
     // End of VoltDB extension
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
+    // A VoltDB extension NIBBLE EXPORT
+    static final String        T_EXPORT            = "EXPORT";
+    static final String        T_TARGET            = "TARGET";
+    static final String        T_UPDATEOLD         = "UPDATE_OLD";
+    static final String        T_UPDATENEW         = "UPDATE_NEW";
+    // End of VoltDB extension
     static final String        T_THEN              = "THEN";
     public static final String T_TIME              = "TIME";
     public static final String T_TIMESTAMP         = "TIMESTAMP";
@@ -358,7 +367,9 @@ public class Tokens {
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
     // A VoltDB extension to support the assume unique index attribute
-    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
+    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";
+    // A VoltDB extension to support the migrating index attribute
+    static final String        T_MIGRATING         = "MIGRATING";
     // End of VoltDB extension
     public static final String T_UNIQUE            = "UNIQUE";
     static final String        T_UNKNOWN           = "UNKNOWN";
@@ -1113,6 +1124,11 @@ public class Tokens {
     public static final int SYSTEM_USER                      = 275;
     // A VoltDB extension STREAM
     public static final int STREAM                           = 1305;
+    public static final int MIGRATE                          = 1400;
+    public static final int TARGET                           = 1401;
+    public static final int EXPORT                           = 1402;
+    public static final int UPDATEOLD                        = 1403;
+    public static final int UPDATENEW                        = 1404;
     // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
@@ -1137,7 +1153,9 @@ public class Tokens {
     public static final int UNION                            = 296;
     public static final int UNIQUE                           = 297;
     // A VoltDB extension to support the assume unique index attribute
-    public static final int ASSUMEUNIQUE                     = 1303;    // For VoltDB
+    public static final int ASSUMEUNIQUE                     = 1303;
+    // A VoltDB extension to support the MIGRATING index attribute
+    public static final int MIGRATING                        = 1306;
     // End of VoltDB extension
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
@@ -1802,6 +1820,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_LEFT, LEFT);
         reservedKeys.put(Tokens.T_LIKE, LIKE);
         reservedKeys.put(Tokens.T_LIKE_REGX, LIKE_REGEX);
+        reservedKeys.put(Tokens.T_LIMIT, LIMIT);
         reservedKeys.put(Tokens.T_LN, LN);
         reservedKeys.put(Tokens.T_LOCAL, LOCAL);
         reservedKeys.put(Tokens.T_LOCALTIME, LOCALTIME);
@@ -1928,6 +1947,11 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SYSTEM_USER, SYSTEM_USER);
         // A VoltDB extension STREAM
         reservedKeys.put(Tokens.T_STREAM, STREAM);
+        reservedKeys.put(Tokens.T_MIGRATE, MIGRATE);
+        reservedKeys.put(Tokens.T_TARGET, TARGET);
+        reservedKeys.put(Tokens.T_EXPORT, EXPORT);
+        reservedKeys.put(Tokens.T_UPDATEOLD, UPDATEOLD);
+        reservedKeys.put(Tokens.T_UPDATENEW, UPDATENEW);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);
@@ -1952,7 +1976,11 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
         // A VoltDB extension to support the assume unique index attribute
-        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
+        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);
+        // A VoltDB extension to support the migrating index attribute
+        // TODO: by making MIGRATING not reserved key word, we allow HSQL to parse MIGRATING as a SQL function name.
+        // In future (ENG-15699), we shall remove code introduced for CREATE MIGRATING INDEX syntax.
+        //reservedKeys.put(Tokens.T_MIGRATING, MIGRATING);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
@@ -2316,12 +2344,14 @@ public class Tokens {
             CAST, CORRESPONDING, CONVERT, COUNT, COALESCE, CREATE, CROSS,
             DISTINCT, DROP, ELSE, END, EVERY, EXISTS, EXCEPT, FOR, FROM, FULL,
             GRANT, GROUP, HAVING, INTO, IS, IN, INTERSECT, JOIN, INNER, LEFT,
-            LEADING, LIKE, MAX, MIN, NATURAL, NULLIF, NOT, ON, ORDER, OR,
-            OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME, STDDEV_POP,
-            STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
-            UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
+            LEADING, LIKE, LIMIT, MAX, MIN, NATURAL, NULLIF, NOT, OFFSET, ON,
+            ORDER, OR, OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME,
+            STDDEV_POP, STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER,
+            UNION, UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
-            ASSUMEUNIQUE, // For VoltDB
+            ASSUMEUNIQUE,
+            // A VoltDB extension to support the MIGRATING index attribute.
+            // MIGRATING,
             // End of VoltDB extension
             // A VoltDB extension APPROX_COUNT_DISTINCT
             APPROX_COUNT_DISTINCT,

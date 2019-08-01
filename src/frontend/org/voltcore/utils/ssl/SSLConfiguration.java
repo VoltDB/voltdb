@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,11 +21,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.Set;
@@ -37,6 +35,9 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
@@ -96,26 +97,25 @@ public class SSLConfiguration {
             .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
             .build();
 
-    public static SSLContext createSslContext(SslConfig sslConfig) {
+    public static SslContext createClientSslContext(SslConfig sslConfig) {
         if (sslConfig == null) {
             throw new IllegalArgumentException("sslConfig is null");
         }
 
-        KeyManager[] keyManagers = null;
-        TrustManager[] trustManagers = null;
         try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
+            SslContextBuilder builder = SslContextBuilder.forClient();
 
             if (sslConfig.keyStorePath != null && sslConfig.keyStorePassword != null) {
-                keyManagers = createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword);
+                builder.keyManager(createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword,
+                        sslConfig.keyStorePassword));
             }
             if (sslConfig.trustStorePath != null && sslConfig.trustStorePassword != null) {
-                trustManagers = createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+                builder.trustManager(createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword));
             }
-            sslContext.init(keyManagers,trustManagers, new SecureRandom());
 
-            return sslContext;
-        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
+            return builder.build();
+        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException
+                | UnrecoverableKeyException ex) {
             throw new IllegalArgumentException("Failed to initialize SSL using " + sslConfig, ex);
         }
     }
@@ -129,7 +129,7 @@ public class SSLConfiguration {
      * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
      * @throws Exception
      */
-    private static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword)
+    private static KeyManagerFactory createKeyManagers(String filepath, String keystorePassword, String keyPassword)
             throws FileNotFoundException, KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException {
         KeyStore keyStore = KeyStore.getInstance("JKS");
         try (InputStream keyStoreIS = new FileInputStream(filepath)) {
@@ -137,7 +137,7 @@ public class SSLConfiguration {
         }
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(keyStore, keyPassword.toCharArray());
-        return kmf.getKeyManagers();
+        return kmf;
     }
 
     /**
@@ -148,7 +148,7 @@ public class SSLConfiguration {
      * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
      * @throws Exception
      */
-    private static TrustManager[] createTrustManagers(String filepath, String keystorePassword)
+    private static TrustManagerFactory createTrustManagers(String filepath, String keystorePassword)
             throws KeyStoreException, FileNotFoundException,
             IOException, NoSuchAlgorithmException, CertificateException {
         KeyStore trustStore = KeyStore.getInstance("JKS");
@@ -157,7 +157,7 @@ public class SSLConfiguration {
         }
         TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustFactory.init(trustStore);
-        return trustFactory.getTrustManagers();
+        return trustFactory;
     }
 
     public static class SslConfig {

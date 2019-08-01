@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -602,8 +602,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
      */
     public static AggregatePlanNode convertToPartialAggregatePlanNode(HashAggregatePlanNode hashAggregateNode,
             List<Integer> aggrColumnIdxs) {
-        AggregatePlanNode partialAggr = new PartialAggregatePlanNode();
-        partialAggr = setAggregatePlanNode(hashAggregateNode, partialAggr);
+        final AggregatePlanNode partialAggr = setAggregatePlanNode(hashAggregateNode, new PartialAggregatePlanNode());
         partialAggr.m_partialGroupByColumns = aggrColumnIdxs;
         return partialAggr;
     }
@@ -622,7 +621,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
         for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
             destination.addAggregate(aggregateTypes.get(i),
-                    aggregateDistinct.get(i) == 1 ? true : false,
+                    aggregateDistinct.get(i) == 1,
                     aggregateOutputColumns.get(i),
                     aggregateExpressions.get(i));
         }

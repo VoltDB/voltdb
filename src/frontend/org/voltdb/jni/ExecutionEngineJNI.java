@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -38,14 +39,14 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
-
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -282,15 +283,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
+        throw getExceptionFromError(errorCode);
+    }
+
+    private SerializableException getExceptionFromError(final int errorCode) {
         m_exceptionBuffer.clear();
         final int exceptionLength = m_exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
-            throw new EEException(errorCode);
+            return new EEException(errorCode);
         } else {
             m_exceptionBuffer.position(0);
             m_exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(m_exceptionBuffer);
+            return SerializableException.deserializeFromBuffer(m_exceptionBuffer);
         }
     }
 
@@ -384,21 +389,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public FastDeserializer coreExecutePlanFragments(
-            final int batchIndex,
-            final int numFragmentIds,
-            final long[] planFragmentIds,
-            final long[] inputDepIds,
-            final Object[] parameterSets,
-            DeterminismHash determinismHash,
-            boolean[] isWriteFrags,
-            int[] sqlCRCs,
-            final long txnId,
-            final long spHandle,
-            final long lastCommittedSpHandle,
-            long uniqueId,
-            final long undoToken,
-            final boolean traceOn) throws EEException
-    {
+            final int batchIndex, final int numFragmentIds, final long[] planFragmentIds, final long[] inputDepIds,
+            final Object[] parameterSets, DeterminismHash determinismHash, boolean[] isWriteFrags, int[] sqlCRCs,
+            final long txnId, final long spHandle, final long lastCommittedSpHandle, long uniqueId,
+            final long undoToken, final boolean traceOn) throws EEException {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
@@ -430,13 +424,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             if (param instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) param;
                 m_psetBuffer.put(buf);
-            }
-            else {
+            } else {
                 ParameterSet pset = (ParameterSet) param;
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
-                }
-                catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
+                } catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +
@@ -456,20 +448,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         FastDeserializer targetDeserializer = (batchIndex == 0) ? m_firstDeserializer : m_nextDeserializer;
         targetDeserializer.clear();
 
-        final int errorCode =
-            nativeExecutePlanFragments(
-                    pointer,
-                    batchIndex,
-                    numFragmentIds,
-                    planFragmentIds,
-                    inputDepIds,
-                    txnId,
-                    spHandle,
-                    lastCommittedSpHandle,
-                    uniqueId,
-                    undoToken,
-                    traceOn);
-
+        final int errorCode = nativeExecutePlanFragments(
+                pointer, batchIndex, numFragmentIds, planFragmentIds, inputDepIds, txnId, spHandle,
+                lastCommittedSpHandle, uniqueId, undoToken, traceOn);
         try {
             checkErrorCode(errorCode);
             m_usingFallbackBuffer = m_fallbackBuffer != null;
@@ -508,9 +489,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long spHandle,
         final long lastCommittedSpHandle,
         final long uniqueId,
-        boolean returnUniqueViolations,
-        boolean shouldDRStream,
-        long undoToken) throws EEException
+        long undoToken,
+        LoadTableCaller caller) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -524,7 +504,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken);
+                                              undoToken, caller.getId());
         checkErrorCode(errorCode);
 
         try {
@@ -591,7 +571,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 int len = m_nextDeserializer.readInt();
                 byte[] bufCopy = new byte[len];
                 m_nextDeserializer.readFully(bufCopy, 0, len);
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
+                // This Table should be readonly (true), but table stats need to be updated
+                // Stream stats until Stream stats are deprecated from Table stats
+                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), false);
             }
             return results;
         } catch (final IOException ex) {
@@ -628,9 +610,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
+                                       HiddenColumnFilter hiddenColumnFilter,
                                        long undoQuantumToken,
                                        byte[] predicates) {
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), hiddenColumnFilter.getId(),
                                          undoQuantumToken, predicates);
     }
 
@@ -672,28 +655,42 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String tableSignature)
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String streamName)
     {
+        if (EXPORT_LOG.isDebugEnabled()) {
+            EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", streamName: " + streamName);
+        }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, uso, seqNo, getStringBytes(tableSignature));
+                                         syncAction,
+                                         sequences.getAckOffset(),
+                                         sequences.getSequenceNumber(),
+                                         sequences.getGenerationId(),
+                                         getStringBytes(streamName));
         if (retval < 0) {
             LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
-                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
-                    ", tableSignature: " + tableSignature);
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", partitionId: " + partitionId +
+                    ", streamName: " + streamName);
         }
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
+        m_nextDeserializer.clear();
+        boolean txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+                getStringBytes(tableName), deletableTxnId, undoToken);
+        return txnFullyDeleted;
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
+    public long[] getUSOForExportTable(String streamName) {
+        return nativeGetUSOForExportTable(pointer, getStringBytes(streamName));
     }
 
     @Override
@@ -743,7 +740,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
                 undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int) rowCount);
+            throw getExceptionFromError((int) rowCount);
         }
         return rowCount;
     }
@@ -895,9 +892,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             checkErrorCode(errorCode);
             return (byte[])m_nextDeserializer.readArray(byte.class);
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     @Override
@@ -919,5 +915,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
         }
         nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        nativeDisableExternalStreams(pointer);
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return nativeExternalStreamsEnabled(pointer);
     }
 }

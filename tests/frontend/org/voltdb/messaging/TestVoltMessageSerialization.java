@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,7 +74,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 100045, spi);
         InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltMessage(itask);
 
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
@@ -83,7 +83,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
-        assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
     }
 
     public void testIv2InitiateTask() throws IOException {
@@ -119,7 +118,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
 
-        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 100045, spi);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("foobar", VoltType.STRING)
@@ -456,7 +455,7 @@ public class TestVoltMessageSerialization extends TestCase {
         // simulate the first message in the sequence, sequence must be 0
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
-                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3})
+                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3}), Long.MIN_VALUE
                 );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());

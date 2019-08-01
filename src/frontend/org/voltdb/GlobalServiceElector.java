@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -98,13 +98,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
         }
     }
 
-    @Override
-    public void noticedTopologyChange(boolean added, boolean removed) {
-    }
-
-    int getLeaderElectorNode() {
-        String path = m_leaderElector.getNode();
-        // last ten characters are numeric
-        return Integer.valueOf(path.substring(path.length() - 10));
+    public int getLeaderId() {
+        return m_leaderElector.getLeaderId();
     }
 }

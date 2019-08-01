@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,11 +32,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.utils.VoltFile;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -55,9 +54,7 @@ public class TestExportConstraintsSuite extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();
@@ -69,7 +66,7 @@ public class TestExportConstraintsSuite extends TestExportBaseSocketExport {
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
     public void testExportConstraints() throws Exception {
@@ -151,7 +148,7 @@ public class TestExportConstraintsSuite extends TestExportBaseSocketExport {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-constraints.jar", 4, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);

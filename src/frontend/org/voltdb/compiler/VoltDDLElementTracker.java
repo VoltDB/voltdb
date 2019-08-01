@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,8 @@ public class VoltDDLElementTracker {
             new HashMap<>();
     // map from export group name to a sorted set of table names in that group
     final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
+    final Map<String, String> m_persistentTableTargetMap = new HashMap<>();
+
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
     final Map<String, String> m_drTables = new LinkedHashMap<>();
@@ -190,25 +192,32 @@ public class VoltDDLElementTracker {
      * @param targetName
      * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable(String tableName, String targetName)
-    {
+    void addExportedTable(String tableName, String targetName, boolean isStream) {
         assert tableName != null && ! tableName.trim().isEmpty();
         assert targetName != null && ! targetName.trim().isEmpty();
 
         // store uppercase in the catalog as typename
         targetName = targetName.toUpperCase();
 
-        // insert the table's name into the export group
-        NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
-        if (tableGroup == null) {
-            tableGroup = new TreeSet<>();
-            m_exportsByTargetName.put(targetName, tableGroup);
+        if (isStream) {
+            // insert the table's name into the export group
+            NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
+            if (tableGroup == null) {
+                tableGroup = new TreeSet<>();
+                m_exportsByTargetName.put(targetName, tableGroup);
+            }
+            tableGroup.add(tableName);
+            return;
         }
-        tableGroup.add(tableName);
+        m_persistentTableTargetMap.put(tableName, targetName);
+
     }
 
-    void removeExportedTable(String tableName)
-    {
+    void removeExportedTable(String tableName, boolean isStream) {
+        if (!isStream) {
+            m_persistentTableTargetMap.remove(tableName);
+            return;
+        }
         for (Entry<String, NavigableSet<String>> groupTables : m_exportsByTargetName.entrySet()) {
             if(groupTables.getValue().remove(tableName)) {
                 break;
@@ -222,6 +231,10 @@ public class VoltDDLElementTracker {
      */
     NavigableMap<String, NavigableSet<String>> getExportedTables() {
         return m_exportsByTargetName;
+    }
+
+    Map<String, String> getPersistentTableTargetMap() {
+        return m_persistentTableTargetMap;
     }
 
     void addDRedTable(String tableName, String action)

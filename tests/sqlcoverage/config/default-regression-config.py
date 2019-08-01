@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -133,4 +133,12 @@
                           "ddl": "matview-DDL.sql",
                           "template": "matview-query-opt.sql",
                           "normalizer": "nulls-lowest-normalizer.py"},
+
+    # This logically belongs in default-advanced-mv-subq-config.py, but is
+    # placed here to balance execution time.
+    # "ncs" is No Count Star, i.e., Materialized Views without an explicit COUNT(*)
+    "advanced-matview-ncs-nonjoin": {"schema": "matview-advanced-ncs-nonjoin-schema.py",
+                                     "ddl": "matview-DDL.sql",
+                                     "template": "advanced-matview-nonjoin.sql",
+                                     "normalizer": "nulls-lowest-normalizer.py"},
 }

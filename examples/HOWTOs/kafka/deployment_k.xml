@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <export>
+        <configuration enabled="true" target="test" type="kafka">
+            <property name="bootstrap.servers">localhost:9092</property>
+            <property name="topic.key">Customer_final.test</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+    </export>
+    <import>
+        <configuration enabled="true" type="kafka">
+            <property name="brokers">localhost:9092</property>
+            <property name="topics">test</property>
+            <property name="procedure">add_customer</property>
+        </configuration>
+    </import>
+    <cluster sitesperhost="4" kfactor="0"/>
+    <partition-detection/>
+    <heartbeat/>
+    <ssl/>
+    <httpd enabled="true">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot frequency="2m" enabled="false"/>
+    <commandlog enabled="true">
+        <frequency/>
+    </commandlog>
+    <systemsettings>
+        <temptables maxsize="200"/>
+        <snapshot/>
+        <elastic/>
+        <query/>
+        <procedure/>
+        <resourcemonitor>
+            <memorylimit/>
+        </resourcemonitor>
+    </systemsettings>
+    <security enabled="false"/>
+</deployment>

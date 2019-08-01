@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETABLEFACTORY_H
-#define HSTORETABLEFACTORY_H
+#pragma once
 
 #include "persistenttable.h"
 
@@ -78,29 +77,16 @@ public:
     * instance is made. TableColumn is immutable.
     */
     static Table* getPersistentTable(
-        voltdb::CatalogId databaseId,
-        const std::string &name,
-        TupleSchema* schema,
-        const std::vector<std::string> &columnNames,
-        char *signature,
-        bool tableIsMaterialized = false,
+        voltdb::CatalogId databaseId, char const* name, TupleSchema* schema,
+        const std::vector<std::string> &columnNames, char *signature, bool tableIsMaterialized = false,
         int partitionColumn = 0, // defaults provided for ease of testing.
-        bool exportEnabled = false,
-        bool exportOnly = false,
-        int tableAllocationTargetSize = 0,
-        int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95,
-        bool drEnabled = false,
-        bool isReplicated = false);
+        TableType tableType = PERSISTENT, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX,
+        int32_t compactionThreshold = 95, bool drEnabled = false, bool isReplicated = false);
 
     static StreamedTable* getStreamedTableForTest(
-                voltdb::CatalogId databaseId,
-                const std::string &name,
-                TupleSchema* schema,
-                const std::vector<std::string> &columnNames,
-                ExportTupleStream* mockWrapper = NULL,
-                bool exportEnabled = false,
-                int32_t compactionThreshold = 95);
+            voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,
+            const std::vector<std::string> &columnNames, ExportTupleStream* mockWrapper = NULL,
+            bool exportEnabled = false, int32_t compactionThreshold = 95);
 
     /**
      * Creates an empty temp table with given name and columns.
@@ -109,55 +95,37 @@ public:
      * of tuples doesn't involve Undolog.
      */
     static TempTable* buildTempTable(
-        const std::string &name,
-        TupleSchema* schema,
-        const std::vector<std::string> &columnNames,
-        TempTableLimits* limits);
+        const std::string &name, TupleSchema* schema, const std::vector<std::string> &columnNames,
+        TempTableLimits const* limits);
 
-    static LargeTempTable* buildLargeTempTable(
-        const std::string &name,
-        TupleSchema* schema,
-        const std::vector<std::string> &columnNames);
+    static LargeTempTable* buildLargeTempTable(const std::string &name, TupleSchema* schema,
+            const std::vector<std::string> &columnNames);
 
     /**
      * Creates an empty temp table from the given template table.
      */
-    static AbstractTempTable* buildCopiedTempTable(
-        const std::string &name,
-        const Table* templateTable,
-        const ExecutorVector& executorVector);
+    static AbstractTempTable* buildCopiedTempTable(const std::string &name,
+            const Table* templateTable, const ExecutorVector& executorVector);
 
     /**
      * Creates an empty (normal, non-large) temp table from the given
      * template table.
      */
-    static TempTable* buildCopiedTempTable(
-        const std::string &name,
-        const Table* templateTable);
+    static TempTable* buildCopiedTempTable(const std::string &name, const Table* templateTable);
 
     /**
      * Creates an empty large temp table from the given
      * template table.
      */
-    static LargeTempTable* buildCopiedLargeTempTable(
-        const std::string &name,
-        const Table* templateTable);
+    static LargeTempTable* buildCopiedLargeTempTable(const std::string &name, const Table* templateTable);
 
 private:
-    static void initCommon(
-        voltdb::CatalogId databaseId,
-        Table *table,
-        const std::string &name,
-        TupleSchema *schema,
-        const std::vector<std::string> &columnNames,
-        const bool ownsTupleSchema,
-        const int32_t compactionThreshold = 95);
+    static void initCommon(voltdb::CatalogId databaseId, Table *table, const std::string &name,
+            TupleSchema *schema, const std::vector<std::string> &columnNames, const bool ownsTupleSchema,
+            const int32_t compactionThreshold = 95);
 
-    static void configureStats(
-        std::string name,
-        TableStats *tableStats);
+    static void configureStats(char const* name, TableStats *tableStats);
 };
 
 }// namespace voltdb
 
-#endif

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,7 +91,7 @@ class LargeTempTableBlockCache {
         not fetch or pin the block. */
     int64_t getBlockTupleCount(LargeTempTableBlockId blockId) {
         auto it = m_idToBlockMap.find(blockId);
-        assert(it != m_idToBlockMap.end());
+        vassert(it != m_idToBlockMap.end());
         return it->second->get()->activeTupleCount();
     }
 

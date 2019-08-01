@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,8 +37,8 @@ class ScopedDeltaTableContext {
 public:
     ScopedDeltaTableContext(PersistentTable *table)
         : m_table(table) {
-        assert(m_table->m_deltaTable);
-        assert(! m_table->m_deltaTableActive);
+        vassert(m_table->m_deltaTable);
+        vassert(! m_table->m_deltaTableActive);
         m_table->m_deltaTableActive = true;
     }
 
@@ -87,6 +87,7 @@ public:
     virtual void pollute() { m_dirty = true; }
     virtual void setEnabled(bool enabled);
     virtual bool isEnabled() { return m_enabled; }
+    virtual bool snapshotable() { return m_supportSnapshot; }
 
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
@@ -193,6 +194,7 @@ public:
     virtual void pollute() { m_partitionedHandler->pollute(); }
     virtual void setEnabled(bool enabled) { m_partitionedHandler->setEnabled(enabled); }
     virtual bool isEnabled() { return m_partitionedHandler->isEnabled(); }
+    virtual bool snapshotable() { return m_partitionedHandler->snapshotable(); }
 
     virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
     virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);

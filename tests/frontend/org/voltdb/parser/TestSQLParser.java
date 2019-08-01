@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,8 +23,7 @@
 
 package org.voltdb.parser;
 
-import static org.junit.Assert.assertEquals;
-
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,16 +32,25 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
+import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.SplitStmtResults;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
+
+import junit.framework.TestCase;
 
 public class TestSQLParser extends TestCase {
 
@@ -737,5 +745,100 @@ public class TestSQLParser extends TestCase {
                 "Too many hexadecimal digits for BIGINT value",
                 "exec myProc_bi x'ffffffffffffffff0'");
 
+    }
+
+    public final String PATTERN_1 = "\"line: 10, column: 1\"";
+    public final String PATTERN_2 = "\"line: 1, column: 15\"";
+    public final String PATTERN_3 = "\"line: 2, column: 1\"";
+
+    // Test multi-line sql statements with errors
+    @Test
+    public void testErrorPositionForMultiLineStatement() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+        LocalCluster cluster = null;
+        Client m_client = null;
+
+        try {
+            cluster = createLocalCluster("TestErrorPosition");
+
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("", cluster.port(0));
+
+            // Check basic create query
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table f1 (\n" +
+                        "ID int not null\n" +
+                        ");\n" +
+                        "create table f2 (\n" +
+                        "ID int not null\n" +
+                        ");\n" +
+                        "create table t1 (\n" +
+                        "ID int not null\n" +
+                        ")\n" +                         // missing semicolon
+                        "create table t2 (\n" +
+                        "ID int not null\n" +
+                        ");"
+                        );
+            } catch (ProcCallException pce) {
+                cluster.verifyLogMessage(0, PATTERN_1);
+            }
+
+            // check basic select query
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "select * from table f1;"       // wrong token, no need for table
+                        );
+            } catch (ProcCallException pce) {
+
+                cluster.verifyLogMessage(0, PATTERN_2);
+            }
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "drop table f1\n" +               // missing semicolon
+                        "drop table f2;"
+                        );
+            } catch (ProcCallException pce) {
+                cluster.verifyLogMessage(0, PATTERN_3);
+            }
+        }
+        finally {
+            if (cluster != null) {
+                cluster.shutDown();
+            }
+            if (m_client != null) {
+                m_client.close();
+                m_client = null;
+            }
+        }
+    }
+
+    private LocalCluster createLocalCluster(String testMethod) throws IOException {
+        VoltFile.resetSubrootForThisProcess();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+
+        // Add the patterns to be searched for in advance
+        List<String> patterns = new ArrayList<>();
+        patterns.add(PATTERN_1);
+        patterns.add(PATTERN_2);
+        patterns.add(PATTERN_3);
+
+        LocalCluster cluster = new LocalCluster("TestSQLParser.jar",
+                4, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster.setHasLocalServer(false);
+        cluster.setLogSearchPatterns(patterns);
+        boolean success = cluster.compile(builder);
+        cluster.setCallingMethodName(testMethod);
+        assert (success);
+        cluster.startUp(true);
+        return cluster;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,17 +17,12 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableSet;
-import java.util.Set;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -36,6 +31,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -52,34 +48,7 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.AbstractJoinPlanNode;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.CommonTablePlanNode;
-import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.IndexSortablePlanNode;
-import org.voltdb.plannodes.IndexUseForOrderBy;
-import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.SwapTablesPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
-import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -128,6 +97,8 @@ public class PlanAssembler {
     private ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for a union */
     private ParsedUnionStmt m_parsedUnion = null;
+    /** parsed statement for a migrate */
+    private ParsedMigrateStmt m_parsedMigrate = null;
 
     /** plan selector */
     private final PlanSelector m_planSelector;
@@ -193,9 +164,8 @@ public class PlanAssembler {
      * Return true if tableList includes at least one matview.
      */
     private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
+            if (table.getMaterializer() != null && !TableType.isStream(table.getMaterializer().getTabletype())) {
                 return true;
             }
         }
@@ -213,7 +183,7 @@ public class PlanAssembler {
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (exportTables.contains(table.getTypeName())) {
+            if (exportTables.contains(table.getTypeName()) && TableType.isStream(table.getTabletype())) {
                 return true;
             }
         }
@@ -311,7 +281,7 @@ public class PlanAssembler {
                 // Convert RIGHT joins to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
             }
-            m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+            m_subAssembler = new SelectSubPlanAssembler(m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             if (isPartitionColumnInGroupbyList(m_parsedSelect.groupByColumns())) {
@@ -369,21 +339,19 @@ public class PlanAssembler {
             m_parsedInsert = (ParsedInsertStmt) parsedStmt;
             // The currently handled inserts are too simple to even require a subplan assembler. So, done.
             return;
-        }
-
-        if (parsedStmt instanceof ParsedUpdateStmt) {
+        } else if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException("Illegal to update a stream.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-        }
-        else if (parsedStmt instanceof ParsedDeleteStmt) {
+        } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException("Illegal to delete from a stream.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-        }
-        else {
+        } else if (parsedStmt instanceof ParsedMigrateStmt) {
+            m_parsedMigrate = (ParsedMigrateStmt) parsedStmt;
+        } else {
             throw new RuntimeException("Unknown subclass of AbstractParsedStmt.");
         }
 
@@ -400,7 +368,7 @@ public class PlanAssembler {
             Collection<StmtTableScan> scans = parsedStmt.allScans();
             m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
         }
-        m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        m_subAssembler = new WriterSubPlanAssembler(parsedStmt, m_partitioning);
     }
 
     private boolean isPartitionColumnInWindowedAggregatePartitionByList() {
@@ -678,10 +646,6 @@ public class PlanAssembler {
 
         for (AbstractExpression expr : subqueryExprs) {
             assert(expr instanceof SelectSubqueryExpression);
-            if (!(expr instanceof SelectSubqueryExpression)) {
-                continue; // DEAD CODE?
-            }
-
             SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
@@ -720,30 +684,27 @@ public class PlanAssembler {
         if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
             retval = getNextSelectPlan();
-        }
-        else if (m_parsedInsert != null) {
+        } else if (m_parsedInsert != null) {
             nextStmt = m_parsedInsert;
             retval = getNextInsertPlan();
-        }
-        else if (m_parsedDelete != null) {
+        } else if (m_parsedDelete != null) {
             nextStmt = m_parsedDelete;
             retval = getNextDeletePlan();
             // note that for replicated tables, multi-fragment plans
             // need to divide the result by the number of partitions
-        }
-        else if (m_parsedUpdate != null) {
+        } else if (m_parsedUpdate != null) {
             nextStmt = m_parsedUpdate;
             retval = getNextUpdatePlan();
-        }
-        else if (m_parsedUnion != null) {
+        } else if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
             retval = getNextUnionPlan();
-        }
-        else if (m_parsedSwap != null) {
+        } else if (m_parsedSwap != null) {
             nextStmt = m_parsedSwap;
             retval = getNextSwapPlan();
-        }
-        else {
+        } else if (m_parsedMigrate != null) {
+            nextStmt = m_parsedMigrate;
+            retval = getNextMigratePlan();
+        } else {
             throw new RuntimeException(
                     "setupForNewPlans encountered unsupported statement type.");
         }
@@ -1174,8 +1135,7 @@ public class PlanAssembler {
                         root = handleMVBasedMultiPartQuery(reAggNode, root, mvFixInfoEdgeCaseOuterJoin);
                     }
                 }
-            }
-            else {
+            } else {
                 if (receivers.size() > 0) {
                     throw new PlanningErrorException(
                             "This special case join between an outer replicated table and " +
@@ -1207,8 +1167,7 @@ public class PlanAssembler {
                     mvFixNeedsProjection = true;
                 }
             }
-        }
-        else {
+        } else {
             /*
              * There is no receive node and root is a single partition plan.
              */
@@ -1603,6 +1562,40 @@ public class PlanAssembler {
         return retval;
     }
 
+    private CompiledPlan getNextMigratePlan() {
+        assert (m_subAssembler != null);
+        final AbstractOperationPlanNode migrateNode = new MigratePlanNode();
+        assert (m_parsedMigrate.m_tableList.size() == 1);
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
+        if (subSelectRoot == null) {
+            return null;
+        } else {
+            assert(subSelectRoot instanceof AbstractScanPlanNode);
+            final NodeSchema proj_schema = new NodeSchema();
+            // This planner-created column is magic.
+            proj_schema.addColumn(
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    "tuple_address", "tuple_address",
+                    new TupleAddressExpression());
+            subSelectRoot.addInlinePlanNode(new ProjectionPlanNode(proj_schema));
+            migrateNode.addAndLinkChild(subSelectRoot);
+        }
+        final Table targetTable = m_parsedMigrate.m_tableList.get(0);
+        migrateNode.setTargetTableName(targetTable.getTypeName());
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
+        plan.setReadOnly(false);
+        final boolean isSinglePartitionPlan = m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle();
+        plan.replicatedTableDML = targetTable.getIsreplicated();
+        // The delete statement cannot be inherently content non-deterministic.
+        // So, the last parameter is always null.
+        plan.statementGuaranteesDeterminism(
+                false, migrateNode.isOrderDeterministic(), null);
+        plan.rootPlanGraph = isSinglePartitionPlan ? migrateNode :
+                addCoordinatorToDMLNode(migrateNode, plan.replicatedTableDML);
+        return plan;
+    }
+
     static private AbstractExpression castExprIfNeeded(
             AbstractExpression expr, Column column) {
         if (expr.getValueType().getValue() != column.getType() ||
@@ -1656,13 +1649,11 @@ public class PlanAssembler {
                 // in getBestCostPlan, above.
                 throw new PlanningErrorException("INSERT INTO ... SELECT subquery could not be planned: "
                         + m_recentErrorMsg);
-
             }
 
             boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
-                            targetIsExportTable);
+                    new InsertSubPlanAssembler(m_parsedInsert, m_partitioning, targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -2025,85 +2016,77 @@ public class PlanAssembler {
             // scan or join node at all.  This seems unlikely
             // to be right.  Maybe this should be an assert?
             return true;
-        }
-
-        //
-        //   o If the SLOB cannot use the index, then we
-        //     need an order by node always.
-        //   o If there are zero window functions, then
-        //     - If the SLOB cannot use the index than we
-        //       need an order by node.
-        //     - If the SLOB can use the index, then
-        //       = If the statement is a single fragment
-        //         statement then we don't need an order by
-        //         node.
-        //       = If the statement is a two fragment
-        //         statement then we need an order by node.
-        //         This is because we will convert the RECEIVE
-        //         node into a MERGERECEIVE node in the
-        //         microoptimizer, and the MERGERECEIVE
-        //         node needs an inline order by node to do
-        //         the merge.
-        //   o If there is only one window function, then
-        //     - If the window function does not use the index
-        //       then we always need an order by node.
-        //     - If the window function can use the index but
-        //       the SLOB can't use the index, then we need an
-        //       order by node.
-        //     - If both the SLOB and the window function can
-        //       use the index, then we don't need an order
-        //       by, no matter how many fragments this statement
-        //       has.  This is because any RECEIVE node will be
-        //       a descendent of the window function node.  So
-        //       the RECEIVE to MERGERECEIVE conversion happens
-        //       in the window function and not the order by.
-        //   o If there is more than one window function then
-        //     we always need an order by node.  The second
-        //     window function will invalidate the ordering of
-        //     the first one.  (Actually, if the SLOB order is
-        //     compatible with the last window function then
-        //     the situation is like the one-window function
-        //     below.)
-        //
-        if ( ! (probe instanceof IndexSortablePlanNode)) {
+        } else if ( ! (probe instanceof IndexSortablePlanNode)) {
+            //
+            //   o If the SLOB cannot use the index, then we
+            //     need an order by node always.
+            //   o If there are zero window functions, then
+            //     - If the SLOB cannot use the index than we
+            //       need an order by node.
+            //     - If the SLOB can use the index, then
+            //       = If the statement is a single fragment
+            //         statement then we don't need an order by
+            //         node.
+            //       = If the statement is a two fragment
+            //         statement then we need an order by node.
+            //         This is because we will convert the RECEIVE
+            //         node into a MERGERECEIVE node in the
+            //         microoptimizer, and the MERGERECEIVE
+            //         node needs an inline order by node to do
+            //         the merge.
+            //   o If there is only one window function, then
+            //     - If the window function does not use the index
+            //       then we always need an order by node.
+            //     - If the window function can use the index but
+            //       the SLOB can't use the index, then we need an
+            //       order by node.
+            //     - If both the SLOB and the window function can
+            //       use the index, then we don't need an order
+            //       by, no matter how many fragments this statement
+            //       has.  This is because any RECEIVE node will be
+            //       a descendent of the window function node.  So
+            //       the RECEIVE to MERGERECEIVE conversion happens
+            //       in the window function and not the order by.
+            //   o If there is more than one window function then
+            //     we always need an order by node.  The second
+            //     window function will invalidate the ordering of
+            //     the first one.  (Actually, if the SLOB order is
+            //     compatible with the last window function then
+            //     the situation is like the one-window function
+            //     below.)
+            //
             return true;
-        }
-
-        IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)probe).indexUse();
-
-        if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
-            return true;
-        }
-        // Hash aggregates and partial aggregates
-        // invalidate the index ordering.  So, we will need
-        // an ORDERBY node.
-        if (numberHashAggregates > 0) {
-            return true;
-        }
-        if ( numberWindowFunctions == 0 ) {
-            if ( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+        } else {
+            final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode) probe).indexUse();
+            if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+                return true;
+            } else if (numberHashAggregates > 0) {
+                // Hash aggregates and partial aggregates
+                // invalidate the index ordering.  So, we will need
+                // an ORDERBY node.
+                return true;
+            } else if (numberWindowFunctions == 0) {
+                if (indexUse.getWindowFunctionUsesIndex() == WindowFunctionScoreboard.NO_INDEX_USE) {
+                    return true;
+                } else {
+                    assert (indexUse.getWindowFunctionUsesIndex() == WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX);
+                    // Return true for MP (numberReceiveNodes > 0) and
+                    // false for SP (numberReceiveNodes == 0);
+                    return numberReceiveNodes > 0;
+                }
+            } else if (numberWindowFunctions == 1) {
+                // If the WF uses the index then getWindowFunctionUsesIndex()
+                // will return 0.
+                return ! (indexUse.getWindowFunctionUsesIndex() == 0 && indexUse.isWindowFunctionCompatibleWithOrderBy());
+                // Both the WF and the SLOB can use the index.  Since the
+                // window function will have the order by node, the SLOB
+                // does not need one.  So this is a false.
+            } else {
+                // This can actually never happen now,
+                // because we only support one window function.
                 return true;
             }
-            assert( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
-            // Return true for MP (numberReceiveNodes > 0) and
-            // false for SP (numberReceiveNodes == 0);
-            return numberReceiveNodes > 0;
         }
-        if (numberWindowFunctions == 1) {
-            // If the WF uses the index then getWindowFunctionUsesIndex()
-            // will return 0.
-            if ( ( indexUse.getWindowFunctionUsesIndex() != 0 )
-                    || ( ! indexUse.isWindowFunctionCompatibleWithOrderBy() ) ) {
-                return true;
-            }
-            // Both the WF and the SLOB can use the index.  Since the
-            // window function will have the order by node, the SLOB
-            // does not need one.  So this is a false.
-            return false;
-        }
-        // This can actually never happen now,
-        // because we only support one window function.
-        return true;
     }
 
     /**
@@ -2494,15 +2477,15 @@ public class PlanAssembler {
         // into an inline order by in a MergeReceivePlanNode.
         IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
         AbstractPlanNode cnode = null;
-        int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
+        int winfunc = (scanNode == null) ? WindowFunctionScoreboard.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
         // If we have an index which is compatible with the statement
         // level order by, and we have a window function which can't
         // use the index we have to ignore the statement level order by
         // index use.  We will need to order the input according to the
         // window function first, and that will in general invalidate the
         // statement level order by ordering.
-        if ((SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
-                || (SubPlanAssembler.NO_INDEX_USE == winfunc)) {
+        if ((WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
+                || (WindowFunctionScoreboard.NO_INDEX_USE == winfunc)) {
             // No index.  Calculate the expression order here and stuff it into
             // the order by node.  Note that if we support more than one window
             // function this would be the case when scanNode.getWindowFunctionUsesIndex()
@@ -2591,15 +2574,45 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Check if the index for the scan node is a partial index, and if so, make sure that the
+     * scan contains index predicate, and update index reason as needed for @Explain.
+     * @param scan index scan plan node
+     */
+    private static void updatePartialIndex(IndexScanPlanNode scan) {
+        if (scan.getPredicate() == null && scan.getPartialIndexPredicate() != null) {
+            if (scan.isForSortOrderOnly()) {
+                scan.setPredicate(Collections.singletonList(scan.getPartialIndexPredicate()));
+            }
+            scan.setForPartialIndexOnly();
+        }
+    }
+
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
+        // ENG-15719: with partial index scan, add top node
+        if (root instanceof IndexScanPlanNode) {
+            updatePartialIndex((IndexScanPlanNode) root);
+        } else if (root instanceof ReceivePlanNode) {
+            assert root.getChildCount() > 0;
+            for(int c1 = 0; c1 < root.getChildCount(); ++c1) {
+                assert root.getChild(c1) instanceof SendPlanNode;
+                final SendPlanNode child1 = (SendPlanNode) root.getChild(c1);
+                for (int c2 = 0; c2 < child1.getChildCount(); ++c2) {
+                    final AbstractPlanNode child2 = child1.getChild(c2);
+                    if (child2 instanceof IndexScanPlanNode) {
+                        updatePartialIndex((IndexScanPlanNode) child2);
+                    }
+                }
+            }
+        }
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
-            AggregatePlanNode aggNode = null;
+            AggregatePlanNode aggNode;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
@@ -2612,8 +2625,7 @@ public class PlanAssembler {
                     gbInfo.m_multiPartition = true;
                     switchToIndexScanForGroupBy(candidate, gbInfo);
                 }
-            }
-            else if (switchToIndexScanForGroupBy(root, gbInfo)) {
+            } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
@@ -2623,34 +2635,26 @@ public class PlanAssembler {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
                     aggNode = new HashAggregatePlanNode();
-                }
-                else {
+                } else {
                     if (gbInfo.isChangedToSerialAggregate()) {
                         assert(root instanceof ReceivePlanNode);
                         aggNode = new AggregatePlanNode();
-                    }
-                    else if (gbInfo.isChangedToPartialAggregate()) {
+                    } else if (gbInfo.isChangedToPartialAggregate()) {
                         aggNode = new PartialAggregatePlanNode(gbInfo.m_coveredGroupByColumns);
-                    }
-                    else {
+                    } else {
                         aggNode = new HashAggregatePlanNode();
                     }
-
                     topAggNode = new HashAggregatePlanNode();
                 }
-            }
-            else {
+            } else {
                 aggNode = new AggregatePlanNode();
-
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                if (! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
 
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
-
-
             for ( int outputColumnIndex = 0;
                     outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                     outputColumnIndex += 1) {
@@ -2690,7 +2694,6 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.m_alias,
                             tve, outputColumnIndex);
-
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
                      * push them down to each partition. It will do the
@@ -2722,8 +2725,7 @@ public class PlanAssembler {
                                     ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
                                             canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
                                 topAggNode = null;
-                            }
-                            else {
+                            } else {
                                 // for aggregate distinct when group by
                                 // partition column, the top aggregate node
                                 // will be dropped later, thus there is no
@@ -2762,8 +2764,7 @@ public class PlanAssembler {
                                     topDistinctFalse, outputColumnIndex, tve);
                         }
                     }// end if we have a top agg node
-                }
-                else {
+                } else {
                     // All complex aggregations have been simplified,
                     // cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
                     // has already been broken down.
@@ -2783,8 +2784,7 @@ public class PlanAssembler {
                     AbstractExpression topExpr = null;
                     if (col.m_groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
-                    }
-                    else {
+                    } else {
                         topExpr = col.m_expression;
                     }
                     top_schema_col = new SchemaColumn(
@@ -2808,8 +2808,7 @@ public class PlanAssembler {
             if (topAggNode != null) {
                 if (m_parsedSelect.hasComplexGroupby()) {
                     topAggNode.setOutputSchema(top_agg_schema);
-                }
-                else {
+                } else {
                     topAggNode.setOutputSchema(agg_schema);
                 }
             }

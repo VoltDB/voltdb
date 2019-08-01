@@ -1,0 +1,13 @@
+################################################################################
+#
+# This file is used, together with sql-grammar.txt, to redefine (overwrite)
+# certain symbol definitions in that file, to their 'pro' alternative values,
+# for use with the 'pro' version of VoltDB, because it allows an unlimited
+# number of streams, including MIGRATE TO TARGET tables, unlike the 'community'
+# version, which allows only two.
+#
+################################################################################
+#
+stream-name             ::= {pro-stream-name}
+table-name-w-migrate    ::= {pro-table-name-w-migrate}
+table-name-ttl-or-migr  ::= {pro-tbl-name-ttl-or-migr}

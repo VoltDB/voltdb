@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,13 +30,15 @@ public:
                                     std::vector<char*> const & oldObjects,
                                     std::vector<char*> const & newObjects,
                                     PersistentTableSurgeon *tableSurgeon,
-                                    bool revertIndexes)
+                                    bool revertIndexes,
+                                    bool updateMigrate)
         : m_oldTuple(oldTuple)
         , m_newTuple(newTuple)
         , m_tableSurgeon(tableSurgeon)
         , m_revertIndexes(revertIndexes)
         , m_oldUninlineableColumns(oldObjects)
         , m_newUninlineableColumns(newObjects)
+        , m_updateMigrate(updateMigrate)
     { }
 
     /*
@@ -45,7 +47,7 @@ public:
      * the tuple must be overwritten with the old one.
      */
     virtual void undo() {
-        m_tableSurgeon->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
+        m_tableSurgeon->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes, m_updateMigrate);
         NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
     }
 
@@ -65,6 +67,7 @@ private:
     bool const m_revertIndexes;
     std::vector<char*> const m_oldUninlineableColumns;
     std::vector<char*> const m_newUninlineableColumns;
+    bool const m_updateMigrate;
 };
 
 }

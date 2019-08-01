@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -61,6 +61,8 @@ public abstract class VoltServerConfig {
      * @param builder The VoltProjectBuilder instance describing the project to build.
      */
     public abstract boolean compile(VoltProjectBuilder builder);
+
+    public abstract boolean isUsingCalcite();
 
     /**
      * Start the instance of VoltDB.
@@ -139,8 +141,7 @@ public abstract class VoltServerConfig {
     public abstract boolean isDebug();
 
     abstract boolean compileWithPartitionDetection(VoltProjectBuilder builder,
-            String snapshotPath,
-            String ppdPrefix);
+            String snapshotPath, String ppdPrefix);
 
     abstract boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup);
 
@@ -186,34 +187,25 @@ public abstract class VoltServerConfig {
     }
 
     protected static void addInstance(VoltServerConfig config) {
-        if (! config.isValgrind()) {
-            return;
+        if (config.isValgrind()) {
+            org.junit.Assert.assertTrue("JUnit tests that instantiate instances of LocalCluster must either a) inherit from RegressionSuite, "
+                            + "or b) be a JUnit 4-style unit test that inherits from JUnit4LocalClusterTest.  "
+                            + "These super classes ensure unconditional deterministic shutdown of clusters "
+                            + "so that memory errors will be detected and cause JUnit tests to fail.  "
+                            + "Your cooperation is appreciated to ensure product quality!",
+                    s_instanceSet != null);
+            s_instanceSet.add(config);
         }
-
-        org.junit.Assert.assertTrue("JUnit tests that instantiate instances of LocalCluster must either a) inherit from RegressionSuite, "
-                + "or b) be a JUnit 4-style unit test that inherits from JUnit4LocalClusterTest.  "
-                + "These super classes ensure unconditional deterministic shutdown of clusters "
-                + "so that memory errors will be detected and cause JUnit tests to fail.  "
-                + "Your cooperation is appreciated to ensure product quality!",
-                s_instanceSet != null);
-        s_instanceSet.add(config);
     }
 
     protected static void removeInstance(VoltServerConfig config) {
-        if (! config.isValgrind()) {
-            return;
+        if (config.isValgrind()) {
+            s_instanceSet.remove(config);
         }
-
-        s_instanceSet.remove(config);
     }
 
     protected static void shutDownClusters() throws InterruptedException {
-        List<VoltServerConfig> instancesCopy = new ArrayList<>();
-        for (VoltServerConfig config : s_instanceSet) {
-            instancesCopy.add(config);
-        }
-
-        for (VoltServerConfig config : instancesCopy) {
+        for (VoltServerConfig config : new ArrayList<VoltServerConfig>() {{ addAll(s_instanceSet); }}) {
             config.shutDown();
         }
     }

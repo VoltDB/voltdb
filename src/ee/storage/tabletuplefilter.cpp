@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -82,7 +82,7 @@ void TableTupleFilter::init(const std::vector<uint64_t>& blocks, uint32_t tuples
 
 void TableTupleFilter::init(Table* table)
 {
-    assert(table != NULL);
+    vassert(table != NULL);
 
     init(table->getBlockAddresses(), table->getTuplesPerBlock(), table->getTupleLength());
 
@@ -97,16 +97,16 @@ uint64_t TableTupleFilter::findBlockIndex(uint64_t tupleAddress)
 {
     if (m_prevBlockAddress > tupleAddress || (tupleAddress - m_prevBlockAddress)/ m_tupleLength >= m_tuplesPerBlock) {
         // This tuple belongs to a different block that the last tuple did
-        assert(!m_blocks.empty());
+        vassert(!m_blocks.empty());
         std::vector<uint64_t>::iterator blockIter = std::lower_bound(m_blocks.begin(), m_blocks.end(), tupleAddress);
         if (blockIter == m_blocks.end() || tupleAddress != *blockIter)
         {
             // move back a block
-            assert(blockIter != m_blocks.begin());
+            vassert(blockIter != m_blocks.begin());
             --blockIter;
         }
         m_prevBlockAddress = *blockIter;
-        assert(m_blockIndexes.find(m_prevBlockAddress) != m_blockIndexes.end());
+        vassert(m_blockIndexes.find(m_prevBlockAddress) != m_blockIndexes.end());
         m_prevBlockIndex = m_blockIndexes.find(m_prevBlockAddress)->second;
     }
     return m_prevBlockIndex;

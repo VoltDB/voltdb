@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -98,6 +98,11 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
                                    "which should never happen");
+    }
+
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("Unexpected Borrow task");
     }
 
     @Override

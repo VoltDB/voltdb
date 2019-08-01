@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@
 #include "catalog/statement.h"
 #include "execution/ExecutorVector.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/CoveringCellIndex.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexscannode.h"
 
@@ -152,7 +153,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
 #ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             const string& hexString = stmt->explainplan();
-            assert(hexString.length() % 2 == 0);
+            vassert(hexString.length() % 2 == 0);
             int bufferLength = (int)hexString.size() / 2 + 1;
             char* explanation = new char[bufferLength];
             boost::shared_array<char> memoryGuard(explanation);
@@ -227,6 +228,10 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
     if (minMaxIndexIncludesAggCol(selectedIndex, m_groupByColumnCount)) {
         // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
+        // we can not use CoveringCellIndex for value comparison.
+        vassert(selectedIndex->getKeySchema()->getColumnInfo(
+                static_cast<int>(m_groupByColumnCount))->getVoltType() !=
+               VALUE_TYPE_POINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
@@ -368,7 +373,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     // executing the stored plan.
     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
     UniqueTempTableResult tbl = context->executeExecutors(executorList, 0);
-    assert(tbl);
+    vassert(tbl);
     // get the fallback value from the returned table.
     TableIterator iterator = tbl->iterator();
     TableTuple tuple(tbl->schema());
@@ -410,7 +415,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
     // obtain the current count of the number of tuples in the group
     NValue count;
     if ((int) m_countStarColumnIndex == -1) {
-        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        vassert(destTbl->schema()->hiddenColumnCount() == 1);
         count = m_existingTuple.getHiddenNValue(0).op_decrement();
     } else {
         count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
@@ -486,7 +491,11 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                             newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx, numCountStar);
                         }
                         // indexscan if an index is available, otherwise tablescan
-                        else if (m_indexForMinMax[minMaxAggIdx]) {
+                        else if (m_indexForMinMax[minMaxAggIdx] &&
+                                 // CoveringCellIndex is to accelerate queries that use the
+                                 // CONTAINS function which tests to see if a point is contained by a polygon.
+                                 // But NOT for value comparison, so we can't use it here.
+                                 dynamic_cast<CoveringCellIndex *>(m_indexForMinMax[minMaxAggIdx]) == NULL) {
                             newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
                                                                       reversedForMin, aggIndex, minMaxAggIdx, numCountStar);
                         }
@@ -499,7 +508,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                     }
                     break;
                 default:
-                    assert(false); // Should have been caught when the matview was loaded.
+                    vassert(false); // Should have been caught when the matview was loaded.
                     // no break
             }
         }
@@ -511,7 +520,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
     if (numCountStar == 0) {
-        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        vassert(destTbl->schema()->hiddenColumnCount() == 1);
         m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_decrement());
     }
     // update the row

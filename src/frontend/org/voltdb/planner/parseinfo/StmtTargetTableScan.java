@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.List;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -147,7 +148,12 @@ public class StmtTargetTableScan extends StmtTableScan {
         // from the original column (T.C)
         Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
                 tve.getDifferentiator());
-        assert(columnIndex != null);
+        if (columnIndex == null) {
+            throw new PlanningErrorException("Column <"
+                                                + columnName
+                                                + "> not found. Please update your query.",
+                                             1);
+        }
         SchemaColumn originalSchemaColumn = m_origSubqueryScan.getSchemaColumn(columnIndex);
         assert(originalSchemaColumn != null);
         String origColumnName = originalSchemaColumn.getColumnName();

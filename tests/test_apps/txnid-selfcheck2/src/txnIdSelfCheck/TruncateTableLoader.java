@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -239,13 +239,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             String message = swapProcName+" on "+tableName+", "+swapTableName
                     + " failed to swap row counts correctly: went from " + tableRowCount
                     + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1];
-            if ("TRUPSwapTablesSP".equals(swapProcName)) {
-                // TRUPSwapTablesSP, being SP, does not swap the two tables
-                // entirely, so this situation is expected, and not fatal
-                log.warn(message);
-            } else {
-                hardStop("TruncateTableLoader: " + message);
-            }
+            hardStop("TruncateTableLoader: " + message);
         }
         return rowCounts;
     }

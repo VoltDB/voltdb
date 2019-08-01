@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,7 +68,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
     VOLT_TRACE("init NLJ Executor");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     // Init parent first
     if (!AbstractJoinExecutor::p_init(abstractNode, executorVector)) {
@@ -85,17 +85,17 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getInputTableCount() == 2);
+    vassert(node);
+    vassert(node->getInputTableCount() == 2);
 
     // output table must be a temp table
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
 
     Table* outer_table = node->getInputTable();
-    assert(outer_table);
+    vassert(outer_table);
 
     Table* inner_table = node->getInputTable(1);
-    assert(inner_table);
+    vassert(inner_table);
 
     VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
     VOLT_TRACE ("input table right:\n %s", inner_table->debug().c_str());
@@ -225,7 +225,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
-            assert(inner_tuple.isActive());
+            vassert(inner_tuple.isActive());
             if (postfilter.eval(&null_outer_tuple, &inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);

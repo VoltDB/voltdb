@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.SortedSet;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -50,6 +51,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compilereport.ProcedureAnnotation;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.types.ConstraintType;
 
 import junit.framework.TestCase;
@@ -943,6 +945,8 @@ public class TestCatalogUtil extends TestCase {
                 + "    </import>"
                 + "</deployment>";
 
+        RealVoltDB realVoltDB = (RealVoltDB) VoltDB.instance();
+        realVoltDB.setClusterSettingsForTest(ClusterSettings.create());
         final String ddl =
                 "CREATE TABLE data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n";
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);

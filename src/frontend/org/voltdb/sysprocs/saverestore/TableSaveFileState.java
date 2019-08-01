@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,6 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
@@ -42,7 +40,6 @@ public abstract class TableSaveFileState
         m_tableName = tableName;
         m_txnId = txnId;
         m_consistencyResult = "Table: " + m_tableName + " not yet processed";
-        m_planDependencyIds = new HashSet<Integer>();
     }
 
     abstract public SynthesizedPlanFragment[]
@@ -67,23 +64,6 @@ public abstract class TableSaveFileState
 
     public abstract boolean isConsistent();
 
-    void addPlanDependencyId(int dependencyId)
-    {
-        m_planDependencyIds.add(dependencyId);
-    }
-
-    int[] getPlanDependencyIds()
-    {
-        int[] unboxed_ids = new int[m_planDependencyIds.size()];
-        int id_index = 0;
-        for (int id : m_planDependencyIds)
-        {
-            unboxed_ids[id_index] = id;
-            id_index++;
-        }
-        return unboxed_ids;
-    }
-
     void setRootDependencyId(int dependencyId)
     {
         m_rootDependencyId = dependencyId;
@@ -102,10 +82,11 @@ public abstract class TableSaveFileState
         return m_isRecover ? "true" : "false";
     }
 
+    public abstract String debug();
+
     int m_rootDependencyId;
     protected String m_consistencyResult;
     private final String m_tableName;
     private final long m_txnId;
-    private final Set<Integer> m_planDependencyIds;
     private boolean m_isRecover;
 }

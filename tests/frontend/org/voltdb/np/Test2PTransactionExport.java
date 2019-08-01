@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,6 +53,7 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.LocalCluster;
 
@@ -128,11 +129,11 @@ public class Test2PTransactionExport {
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-        builder.addExport(true, "custom", props);
+        builder.addExport(true, ServerExportEnum.CUSTOM, props);
 
         cluster = new LocalCluster("test2pexport.jar", 4, 2, KFACTOR,
                                    BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING,
-                                   true, false, additionalEnv);
+                                   true, additionalEnv);
         cluster.setNewCli(true);
         cluster.setHasLocalServer(false);
         cluster.setCallingMethodName(method);

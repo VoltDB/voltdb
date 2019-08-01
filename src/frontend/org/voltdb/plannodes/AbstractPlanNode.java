@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,11 +40,12 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannerv2.utils.AbstractPlanNodeVisitor;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -492,7 +493,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      *
      * @param childSchema
      */
-    private void setOutputSchema(NodeSchema childSchema) {
+    public void setOutputSchema(NodeSchema childSchema) {
         assert( ! m_hasSignificantOutputSchema);
         m_outputSchema = childSchema;
     }
@@ -942,7 +943,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param aeClass AbstractExpression class to search for
      * @param collection set to populate with expressions that this node has
      */
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
             Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
@@ -950,7 +951,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
-        // and the output column expressions if there were no projection
+        // add the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
             schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
@@ -1446,5 +1447,16 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         assert (m_children.size() == 1);
         m_children.get(0).adjustDifferentiatorField(tve);
+    }
+
+    public void setHaveSignificantOutputSchema(boolean hasSignificantOutputSchema) {
+        m_hasSignificantOutputSchema = hasSignificantOutputSchema;
+    }
+
+    /**
+     * Traverse the plan node tree to allow a visitor interact with each node.
+     */
+    public void acceptVisitor(AbstractPlanNodeVisitor visitor) {
+        visitor.visitNode(this);
     }
 }

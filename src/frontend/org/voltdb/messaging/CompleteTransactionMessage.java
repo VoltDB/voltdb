@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -172,43 +173,79 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         assert(buf.capacity() == buf.position());
     }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-
+    public void indentedString(StringBuilder sb, int indentCnt) {
+        char[] array = new char[indentCnt];
+        Arrays.fill(array, ' ');
+        String indent = new String("\n" + new String(array));
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + ")");
-        sb.append("\n SP HANDLE: ");
+        sb.append(indent).append("SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
-        sb.append("\n  FLAGS: ").append(m_flags);
+        sb.append(indent).append("FLAGS: ").append(m_flags);
 
         if (isNPartTxn())
-            sb.append("\n  ").append(" N Partition TXN");
+            sb.append(indent).append("  N Partition TXN");
 
-        sb.append("\n  TIMESTAMP: ");
+        sb.append(indent).append("TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
-        sb.append("\n  TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));
-        sb.append("\n  HASH: " + String.valueOf(m_hash));
+        sb.append(indent).append("TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));
+        sb.append(indent).append("HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
-            sb.append("\n  THIS IS AN ROLLBACK REQUEST");
+            sb.append(indent).append("THIS IS AN ROLLBACK REQUEST");
 
         if (requiresAck())
-            sb.append("\n  THIS MESSAGE REQUIRES AN ACK");
+            sb.append(indent).append("THIS MESSAGE REQUIRES AN ACK");
 
         if (isRestart()) {
-            sb.append("\n  THIS IS A TRANSACTION RESTART");
+            sb.append(indent).append("THIS IS A TRANSACTION RESTART");
         }
 
         if (!isForReplica()) {
-            sb.append("\n  SEND TO LEADER");
+            sb.append(indent).append("SEND TO LEADER");
         }
 
         if(isAbortDuringRepair()) {
-            sb.append("\n  THIS IS NOT RESTARTABLE (ABORT) REPAIR");
+            sb.append(indent).append("THIS IS NOT RESTARTABLE (ABORT) REPAIR");
         }
+    }
+
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("COMPLETION: ");
+        if (isRestart()) {
+            assert(!isAbortDuringRepair());
+            assert(isRollback());
+            sb.append("RESTARTABLE Rollback ");
+            if (m_timestamp != INITIAL_TIMESTAMP) {
+                MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
+            }
+        }
+        else
+        if (isAbortDuringRepair()) {
+            assert(!isRestart());
+            assert(isRollback());
+            sb.append("ABORT Rollback ");
+            if (m_timestamp != INITIAL_TIMESTAMP) {
+                MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
+            }
+        }
+        else
+        if (isRollback()) {
+            sb.append("ROLLBACK");
+        }
+        else {
+            sb.append("COMMIT");
+        }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        indentedString(sb, 5);
         return sb.toString();
     }
 }

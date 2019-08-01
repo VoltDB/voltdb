@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,7 +44,7 @@ public class ExportRabbitMQVerifier {
     private final ConnectionFactory m_connFactory;
     private volatile long m_verifiedRows = 0;
     private String m_exchangeName;
-
+    private boolean success = true;
     public ExportRabbitMQVerifier(String host, String username, String password, String vhost, String exchangename)
             throws IOException, InterruptedException
     {
@@ -83,17 +83,21 @@ public class ExportRabbitMQVerifier {
 
             // Wait until the done message arrives, then verify count
             final QueueingConsumer.Delivery doneMsg = doneConsumer.nextDelivery();
-            final long expectedRows = Long.parseLong(ExportOnServerVerifier.RoughCSVTokenizer
+            final long expectedRows = Long.parseLong(RoughCSVTokenizer
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
 
             while (expectedRows > m_verifiedRows) {
                 Thread.sleep(1000);
                 System.err.println("Expected " + expectedRows + " " + m_verifiedRows);
+                success = false;
             }
         } finally {
             tearDown(channel);
             channel.close();
             connection.close();
+        }
+        if ( ! success ) {
+            System.exit(1);
         }
     }
 
@@ -109,18 +113,19 @@ public class ExportRabbitMQVerifier {
             {
                 long deliveryTag = envelope.getDeliveryTag();
 
-                String row[] = ExportOnServerVerifier.RoughCSVTokenizer.tokenize(new String(body, Charsets.UTF_8));
+                String row[] = RoughCSVTokenizer.tokenize(new String(body, Charsets.UTF_8));
                 if (row.length != 29) {
                     return;
                 }
-                ExportOnServerVerifier.ValidationErr err = null;
+                ValidationErr err = null;
                 try {
                     err = ExportOnServerVerifier.verifyRow(row);
-                } catch (ExportOnServerVerifier.ValidationErr validationErr) {
+                } catch (ValidationErr validationErr) {
                     validationErr.printStackTrace();
                 }
                 if (err != null) {
                     System.out.println("ERROR in validation: " + err.toString());
+                    success = false;
                 }
 
                 if (++m_verifiedRows % VALIDATION_REPORT_INTERVAL == 0) {
@@ -146,7 +151,7 @@ public class ExportRabbitMQVerifier {
     {
         if (args.length != 5) {
             usage();
-            System.exit(-1);
+            System.exit(1);
         }
 
         final ExportRabbitMQVerifier verifier =

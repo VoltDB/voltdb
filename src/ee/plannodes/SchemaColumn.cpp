@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 #include <stdexcept>
 
 #include "SchemaColumn.h"
+#include "common/debuglog.h"
 
 using namespace std;
 using namespace voltdb;
@@ -57,7 +58,7 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
         PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
 
         m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
-        assert(m_expression);
+        vassert(m_expression);
     }
 }
 

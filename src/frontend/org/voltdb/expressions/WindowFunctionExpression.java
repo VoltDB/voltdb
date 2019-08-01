@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,8 +43,6 @@ public class WindowFunctionExpression extends AbstractExpression {
         PARTITION_BY_EXPRESSIONS
     }
 
-    public static SortDirectionType DEFAULT_ORDER_BY_DIRECTION = SortDirectionType.ASC;
-
     private List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     private List<AbstractExpression> m_orderByExpressions     = new ArrayList<>();
     private List<SortDirectionType>  m_orderByDirections      = new ArrayList<>();
@@ -71,8 +69,7 @@ public class WindowFunctionExpression extends AbstractExpression {
             List<AbstractExpression> orderbyExprs,
             List<SortDirectionType>  orderByDirections,
             List<AbstractExpression> aggArguments,
-            int                      id)
-    {
+            int                      id) {
         super(operationType);
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -267,7 +267,8 @@ public class CompleteTransactionTask extends TransactionTask
             sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
             sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
         }
-        sb.append("  MSG: ").append(m_completeMsg.toString());
+        sb.append("  MSG:\n    ");
+        m_completeMsg.indentedString(sb, 8);
         return sb.toString();
     }
 

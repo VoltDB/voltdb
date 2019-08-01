@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.DependencyPair;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotFormat;
@@ -45,7 +44,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
@@ -59,11 +57,6 @@ import com.google_voltpatches.common.primitives.Longs;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
-
-    private static final int DEP_createSnapshotTargets = (int)
-        SysProcFragmentId.PF_createSnapshotTargets | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_createSnapshotTargetsResults = (int)
-        SysProcFragmentId.PF_createSnapshotTargetsResults;
 
     @Override
     public long[] getPlanFragmentIds()
@@ -93,30 +86,32 @@ public class SnapshotSave extends VoltSystemProcedure
                 // progress.
                 SNAP_LOG.error("@SnapshotSave is called while another snapshot is still in progress");
                 result.addRow(context.getHostId(), hostname, null, "FAILURE", "SNAPSHOT IN PROGRESS");
-                return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargets, result);
             }
 
             // Tell each site to quiesce - bring the Export and DR system to a steady state with
-            // no pending committed data.
+            // no pending committed data. It's asynchronous, SnapshotSave sysproc doesn't wait
+            // for Export and DR system to have *seen* the pending committed data.
+            // NativeSnapshotWritePlan.createDeferredSetup() will force the wait then do the fsync
             context.getSiteProcedureConnection().quiesce();
 
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
-            assert(params.toArray()[2] != null);
-            assert(params.toArray()[3] != null);
-            assert(params.toArray()[4] != null);
-            assert(params.toArray()[5] != null);
-            assert(params.toArray()[6] != null);
-            assert(params.toArray()[9] != null);
-            assert(params.toArray()[10] != null);
-            final String file_path = (String) params.toArray()[0];
-            final String pathType = (String) params.toArray()[10];
-            final String file_nonce = (String) params.toArray()[1];
-            final long txnId = (Long)params.toArray()[2];
-            long perPartitionTxnIds[] = (long[])params.toArray()[3];
-            byte block = (Byte)params.toArray()[4];
+            Object[] paramsArray = params.toArray();
+            assert paramsArray.length == 10;
+            assert (paramsArray[0] != null);
+            assert (paramsArray[1] != null);
+            assert (paramsArray[2] != null);
+            assert (paramsArray[3] != null);
+            assert (paramsArray[4] != null);
+            assert (paramsArray[5] != null);
+            assert (paramsArray[8] != null);
+            assert (paramsArray[9] != null);
+            final String file_path = (String) paramsArray[0];
+            final String pathType = (String) paramsArray[9];
+            final String file_nonce = (String) paramsArray[1];
+            long perPartitionTxnIds[] = (long[]) paramsArray[2];
+            byte block = (Byte) paramsArray[3];
             SnapshotFormat format =
-                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[5]);
+                    SnapshotFormat.getEnumIgnoreCase((String) paramsArray[4]);
 
             /*
              * Filter out the partitions that are active in the cluster
@@ -132,16 +127,17 @@ public class SnapshotSave extends VoltSystemProcedure
                 }
             }
 
-            String data = (String) params.toArray()[6];
-            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
+            String data = (String) paramsArray[5];
+            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) paramsArray[6],
+                    (Long) paramsArray[7]);
 
-            final long timestamp = (Long)params.toArray()[9];
+            final long timestamp = (Long) paramsArray[8];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             result = saveAPI.startSnapshotting(file_path, pathType, file_nonce,
-                                                         format, block, txnId,
-                                                         context.getSpHandleForSnapshotDigest(),
-                                                         Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname, hashinatorData, timestamp);
+                                               format, block, m_runner.getTxnState().txnId,
+                                               context.getSpHandleForSnapshotDigest(),
+                                               Longs.toArray(perPartitionTransactionIdsToKeep),
+                                               data, context, hostname, hashinatorData, timestamp);
 
             // The MPI uses the result table to figure out which nodes are participating in the snapshot.
             // If this node is not doing useful work for the stream snapshot, return a single line
@@ -154,15 +150,15 @@ public class SnapshotSave extends VoltSystemProcedure
                 result.advanceRow();
                 String success = result.getString("RESULT");
                 if (success.equals("SUCCESS")) {
-                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), txnId);
+                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), m_runner.getTxnState());
                 }
             }
-            return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_createSnapshotTargets));
-            return new DependencyPair.TableDependencyPair(DEP_createSnapshotTargetsResults, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_createSnapshotTargets));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargetsResults, result);
         }
         assert (false);
         return null;
@@ -172,8 +168,7 @@ public class SnapshotSave extends VoltSystemProcedure
     {
         // TRAIL [SnapSave:1] 1 [MPI] Check parameters and perform SnapshotCreationWork.
         final long startTime = System.currentTimeMillis();
-        @SuppressWarnings("deprecation")
-        final long txnId = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+        final long txnId = m_runner.getTxnState().txnId;
 
         JSONObject jsObj = new JSONObject(command);
         final boolean block = jsObj.optBoolean(SnapshotUtil.JSON_BLOCK, false);
@@ -263,7 +258,7 @@ public class SnapshotSave extends VoltSystemProcedure
                         isTruncation, truncReqId);
 
         // For snapshot targets creation, see executePlanFragment() in this file.
-        VoltTable[] results = performSnapshotCreationWork(path, stype.toString(), nonce, txnId, perPartitionTxnIds,
+        VoltTable[] results = performSnapshotCreationWork(path, stype.toString(), nonce, perPartitionTxnIds,
                                               (byte)(block ? 1 : 0), format, data,
                                               serializationData);
 
@@ -319,39 +314,19 @@ public class SnapshotSave extends VoltSystemProcedure
 
     private final VoltTable[] performSnapshotCreationWork(String filePath, String pathType,
             String fileNonce,
-            long txnId,
             long perPartitionTxnIds[],
             byte block,
             SnapshotFormat format,
             String data,
             HashinatorSnapshotData hashinatorData)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
         // TRAIL [SnapSave:2] 2 [MPI] Build & send create snapshot targets requests to all SP sites.
         // This fragment causes each execution node to create the files
         // that will be written to during the snapshot
         byte[] hashinatorBytes = (hashinatorData != null ? hashinatorData.m_serData : null);
         long hashinatorVersion = (hashinatorData != null ? hashinatorData.m_version : 0);
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
-        pfs[0].outputDepId = DEP_createSnapshotTargets;
-        pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data,
-                hashinatorBytes, hashinatorVersion,
-                System.currentTimeMillis(), pathType);
-
-        // This fragment aggregates the results of creating those files
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_createSnapshotTargetsResults;
-        pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
-        pfs[1].inputDepIds = new int[] { DEP_createSnapshotTargets };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_createSnapshotTargets,  SysProcFragmentId.PF_createSnapshotTargetsResults,
+                filePath, fileNonce, perPartitionTxnIds, block, format.name(), data,
+                hashinatorBytes, hashinatorVersion, System.currentTimeMillis(), pathType);
     }
 }

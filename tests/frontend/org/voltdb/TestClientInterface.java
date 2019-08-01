@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,12 +27,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -187,7 +185,7 @@ public class TestClientInterface {
                 Object args[] = invocation.getArguments();
                 return ses.scheduleAtFixedRate((Runnable) args[0], (long) args[1], (long) args[2], (TimeUnit) args[3]);
             }
-        }).when(m_volt).scheduleWork(any(Runnable.class), anyLong(), anyLong(), (TimeUnit)anyObject());
+        }).when(m_volt).scheduleWork(any(Runnable.class), anyLong(), anyLong(), any());
 
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
                 m_context, m_messenger, ReplicationRole.NONE,
@@ -337,7 +335,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@SystemInformation");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_sysinfoAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
+        verify(m_sysinfoAgent).performOpsAction(any(Connection.class), anyLong(), eq(OpsSelector.SYSTEMINFORMATION),
                 any(ParameterSet.class));
     }
 

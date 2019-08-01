@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,9 @@ import java.nio.ByteBuffer;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltProcedure;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Base class for runtime exceptions that can be serialized to ByteBuffers without involving Java's
@@ -115,6 +117,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
             protected SerializableException deserializeException(ByteBuffer b) {
                 return new ReplicatedTableException(b);
             }
+        },
+        DrTableNotFoundException() {
+            @Override
+            protected SerializableException deserializeException(ByteBuffer b) {
+                return new DRTableNotFoundException(b);
+            }
         };
 
         abstract protected SerializableException deserializeException(ByteBuffer b);
@@ -152,6 +160,16 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
      */
     @Override
     public String getMessage() { return m_message; }
+
+    /**
+     * Override this method if the ClientResponse sent back must contain
+     * result rows with additional information.
+     *
+     * @param cr
+     */
+    public void setClientResponseResults(ClientResponseImpl cr) {
+        // Does nothing by default
+    }
 
     /**
      * Number of bytes necessary to store the serialized representation of this exception
@@ -223,6 +241,11 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
         final int ordinal = b.get();
         assert (ordinal != SerializableExceptions.None.ordinal());
         return SerializableExceptions.values()[ordinal].deserializeException(b);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.UNEXPECTED_FAILURE;
     }
 
     @Override

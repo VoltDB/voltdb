@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -44,6 +45,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -65,6 +67,7 @@ import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -74,6 +77,7 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -120,11 +124,9 @@ public final class InvocationDispatcher {
     private final NTProcedureService m_NTProcedureService;
 
     // Next partition to service adhoc replicated table reads
-    private static int m_nextPartition = -1;
-    // Number of partitions, will NOT change when new node joins cluster
-    private static int m_partitionCount;
+    private static final AtomicInteger m_nextPartition = new AtomicInteger();
     // the partition id list, which does not assume starting from 0
-    private static ArrayList<Integer> m_partitionIds;
+    private static volatile List<Integer> m_partitionIds;
 
     public final static class Builder {
 
@@ -239,25 +241,12 @@ public final class InvocationDispatcher {
         m_NTProcedureService.update(m_catalogContext.get());
     }
 
-    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+    public LightweightNTClientResponseAdapter getInternelAdapterNT () {
         return m_NTProcedureService.m_internalNTClientAdapter;
     }
 
-    static void updatePartitionInformation() {
-        m_partitionIds = new ArrayList<>();
-
-        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
-        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
-        partitionKeys.flattenToBuffer(buf);
-        buf.flip();
-        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
-        keyCopy.resetRowPosition();
-        while (keyCopy.advanceRow()) {
-            if (MpInitiator.MP_INIT_PID != keyCopy.getLong("PARTITION_ID")) {
-                m_partitionIds.add((int)(keyCopy.getLong("PARTITION_ID")));
-            }
-        }
-        m_partitionCount = m_partitionIds.size();
+    public static void updatePartitionInformation() {
+        m_partitionIds = ImmutableList.copyOf(TheHashinator.getCurrentHashinator().getPartitions());
     }
 
     /*
@@ -419,6 +408,10 @@ public final class InvocationDispatcher {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
+            else if ("@PrepareStopNode".equals(procName)) {
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
+                return dispatchPrepareStopNode(task);
+            }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
@@ -458,6 +451,9 @@ public final class InvocationDispatcher {
             else if ("@UpdateLogging".equals(procName)) {
                 task = appendAuditParams(task, ccxn, user);
             }
+            else if ("@JStack".equals(procName)) {
+                return dispatchJstack(task);
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -475,7 +471,8 @@ public final class InvocationDispatcher {
             // admin port, otherwise return a failure
             if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
-                 || "@PrepareShutdown".equals(procName))
+                 || "@PrepareShutdown".equals(procName)
+                 || "@CancelShutdown".equals(procName))
             {
                 if (handler.isAdmin() == false) {
                     return unexpectedFailureResponse(
@@ -490,38 +487,42 @@ public final class InvocationDispatcher {
         // up above.  -rtb.
 
         int[] partitions = null;
-        try {
-            partitions = getPartitionsForProcedure(catProc, task);
-        } catch (Exception e) {
-            // unable to hash to a site, return an error
-            return getMispartitionedErrorResponse(task, catProc, e);
-        }
-        boolean success = createTransaction(handler.connectionId(),
-                        task,
-                        catProc.getReadonly(),
-                        catProc.getSinglepartition(),
-                        catProc.getEverysite(),
-                        partitions,
-                        task.getSerializedSize(),
-                        nowNanos);
-        if (!success) {
-            // when VoltDB.crash... is called, we close off the client interface
-            // and it might not be possible to create new transactions.
-            // Return an error.
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
-                    "VoltDB failed to create the transaction internally.  It is possible this "
-                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
-                    + "it should be safe to resend the work, as the work was never started.",
-                    task.clientHandle);
-        }
-
-        return null;
+        do {
+            try {
+                partitions = getPartitionsForProcedure(catProc, task);
+            } catch (Exception e) {
+                // unable to hash to a site, return an error
+                return getMispartitionedErrorResponse(task, catProc, e);
+            }
+            CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
+                    catProc.getSinglepartition(), catProc.getEverysite(), partitions, task.getSerializedSize(),
+                    nowNanos);
+            switch (result) {
+            case SUCCESS:
+                return null;
+            case NO_CLIENT_HANDLER:
+                /*
+                 * when VoltDB.crash... is called, we close off the client interface and it might not be possible to
+                 * create new transactions. Return an error. Another case is when elastic shrink, the target partition
+                 * may be removed in between the transaction is created
+                 */
+                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                        "VoltDB failed to create the transaction internally.  It is possible this "
+                                + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                                + "it should be safe to resend the work, as the work was never started.",
+                        task.clientHandle);
+            case PARTITION_REMOVED:
+                // Loop back around and try to figure out the partitions again
+                Thread.yield();
+            }
+        } while (true);
     }
 
     private final boolean shouldLoadSchemaFromSnapshot() {
         CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-        if(tables.size() == 0) return true;
+        if(tables.size() == 0) {
+            return true;
+        }
         for(Table t : tables) {
             if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR")) {
                 return false;
@@ -561,7 +562,9 @@ public final class InvocationDispatcher {
         }
 
         if (voltdb.isPreparingShuttingdown()) {
-            if (procedure.getAllowedinshutdown()) return null;
+            if (procedure.getAllowedinshutdown()) {
+                return null;
+            }
 
             return serverUnavailableResponse(
                     SHUTDOWN_MSG,
@@ -621,6 +624,51 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
+    }
+
+    private static ClientResponseImpl dispatchJstack(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return gracefulFailureResponse(
+                    "@JStack must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return gracefulFailureResponse(
+                    "@JStack must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (ihid >=0 && !liveHids.contains(ihid)) {
+            return gracefulFailureResponse(
+                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
+                    task.clientHandle);
+        }
+
+        boolean success = true;
+        if (ihid < 0) { // all hosts
+            //collect thread dumps
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
+            liveHids.remove(hostMessenger.getHostId());
+            hostMessenger.sendPoisonPill(liveHids, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        } else if (ihid == hostMessenger.getHostId()) { // only local
+            //collect thread dumps
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
+        } else { // only remote
+            hostMessenger.sendPoisonPill(ihid, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        }
+        if (success) {
+            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+        }
+        return gracefulFailureResponse(
+                "Failed to create the thread dump of " + ((ihid < 0) ? "all hosts." : "Host Id " + ihid + "."),
+                task.clientHandle);
     }
 
     private final ClientResponseImpl dispatchSubscribe(InvocationClientHandler handler, StoredProcedureInvocation task) {
@@ -705,6 +753,51 @@ public final class InvocationDispatcher {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
+    private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return gracefulFailureResponse(
+                    "@PrepareStopNode must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return gracefulFailureResponse(
+                    "@PrepareStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (!liveHids.contains(ihid)) {
+            return gracefulFailureResponse("@PrepareStopNode: " + ihid + " is not valid.", task.clientHandle);
+        }
+
+       String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
+       if (reason != null) {
+           return gracefulFailureResponse(
+                   "@PrepareStopNode:" + reason, task.clientHandle);
+       }
+
+       // The host has partition masters, go ahead to move them
+       if (m_cartographer.getMasterCount(ihid) > 0) {
+
+           // shutdown partition leader migration
+           MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
+           for (Integer integer : liveHids) {
+               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer,
+                           HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+           }
+
+           // start leader migration on this node
+           message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
+           message.setStartTask();
+           message.setStopNodeService();
+           m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+       }
+
+       return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
     public final ClientResponseImpl dispatchNTProcedure(InvocationClientHandler handler,
                                                         StoredProcedureInvocation task,
                                                         AuthUser user,
@@ -783,8 +876,12 @@ public final class InvocationDispatcher {
      * @param partitionId
      */
     public final void sendSentinel(long txnId, int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
-        sendSentinel(txnId, initiatorHSId, -1, -1, true);
+        final Long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
+        if (initiatorHSId == null) {
+            log.error("InvocationDispatcher.sendSentinel: Master does not exist for partition: " + partitionId);
+        } else {
+            sendSentinel(txnId, initiatorHSId, -1, -1, true);
+        }
     }
 
     private final void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
@@ -1074,10 +1171,15 @@ public final class InvocationDispatcher {
             try {
                 catalog = MiscUtils.fileToBytes(catalogFH);
             } catch (IOException e) {
-                log.warn("Unable to access file " + catalogFH, e);
+                HostMessenger hm = VoltDB.instance().getHostMessenger();
+                log.warn("Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
+                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
+                        " may has redundant copies elsewhere.");
+                log.info("Stacktrace: ", e);
                 return unexpectedFailureResponse(
-                        "Unable to access file " + catalogFH,
-                        task.clientHandle);
+                        "Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
+                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
+                        " may has redundant copies elsewhere.", task.clientHandle);
             }
             final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
 
@@ -1165,7 +1267,7 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
@@ -1190,7 +1292,7 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public  boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final long txnId,
             final long uniqueId,
@@ -1210,7 +1312,7 @@ public final class InvocationDispatcher {
                     "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
-            return false;
+            return CreateTransactionResult.NO_CLIENT_HANDLER;
         }
 
         Long initiatorHSId = null;
@@ -1230,6 +1332,17 @@ public final class InvocationDispatcher {
             if (isReadOnly) {
                 isShortCircuitRead = true;
             }
+        }
+
+        if (initiatorHSId == null) {
+            hostLog.rateLimitedLog(60, Level.INFO, null,
+                    String.format(
+                            "InvocationDispatcher.createTransaction request rejected for partition %d invocation %s."
+                                    + " isReadOnly=%s isSinglePartition=%s, isEveryPartition=%s isForReplay=%s."
+                                    + " This is likely due to partition leader being removed during elastic shrink.",
+                            (isSinglePartition && !isEveryPartition) ? partitions[0] : 16383, invocation, isReadOnly,
+                            isSinglePartition, isEveryPartition, isForReplay));
+            return CreateTransactionResult.PARTITION_REMOVED;
         }
 
         long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
@@ -1262,7 +1375,7 @@ public final class InvocationDispatcher {
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);
-        return true;
+        return CreateTransactionResult.SUCCESS;
     }
 
     final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
@@ -1278,8 +1391,9 @@ public final class InvocationDispatcher {
                 // partitions to spread the traffic.
                 assert (task.getProcName().equals("@AdHoc_RO_SP")): task.getProcName();
 
-                int partitionIdIndex = (Math.abs(++m_nextPartition)) % m_partitionCount;
-                int partitionId = m_partitionIds.get(partitionIdIndex);
+                List<Integer> partitionIds = m_partitionIds;
+                int partitionIdIndex = Math.abs(m_nextPartition.getAndIncrement()) % partitionIds.size();
+                int partitionId = partitionIds.get(partitionIdIndex);
                 return new int[] {partitionId};
             }
             return new int[] { TheHashinator.getPartitionForParameter(ppi.type, invocationParameter) };

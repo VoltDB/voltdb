@@ -97,7 +97,7 @@ CREATE TABLE adhocr
 , jmp        bigint             NOT NULL
 , CONSTRAINT PK_id_ar PRIMARY KEY (id)
 );
-CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+CREATE INDEX R_TSINDEX ON adhocr (ts);
 
 -- partitioned table
 CREATE TABLE adhocp
@@ -109,7 +109,7 @@ CREATE TABLE adhocp
 , CONSTRAINT PK_id_ap PRIMARY KEY (id)
 );
 PARTITION TABLE adhocp ON COLUMN id;
-CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
+CREATE INDEX P_TSINDEX ON adhocp (ts);
 
 -- replicated table
 CREATE TABLE bigr
@@ -422,6 +422,29 @@ CREATE TABLE importbr
 , UNIQUE ( cid, seq )
 );
 
+-- TTL with migrate to stream -- partitioned
+CREATE TABLE ttlmigratep MIGRATE TO TARGET abc1
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts;
+PARTITION TABLE ttlmigratep ON COLUMN p;
+CREATE INDEX ttlmigrateidxp ON ttlmigratep(ts) WHERE NOT MIGRATING;
+
+-- TTL with migrate to stream -- replicated
+CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts;
+CREATE INDEX ttlmigrateidxr ON ttlmigrater(ts) WHERE NOT MIGRATING;
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
@@ -449,6 +472,9 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATEPTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATERTableInsert;
+PARTITION PROCEDURE TTLMIGRATEPTableInsert ON TABLE ttlmigratep COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
@@ -467,12 +493,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
 PARTITION PROCEDURE TRUPTableInsert ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
-PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesSP;
-PARTITION PROCEDURE TRUPSwapTablesSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURSwapTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;

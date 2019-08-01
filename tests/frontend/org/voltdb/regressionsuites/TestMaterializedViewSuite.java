@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1389,7 +1389,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
          *    Senior,Lexington,2
          */
         results = client.callProcedure("@AdHoc",
-                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
+                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge'").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());

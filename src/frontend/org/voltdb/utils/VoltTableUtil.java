@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -175,10 +175,10 @@ public class VoltTableUtil {
             writer = new CSVWriter(sw,
                     fullDelimiters[0], fullDelimiters[1], fullDelimiters[2], String.valueOf(fullDelimiters[3]));
         }
-        else if (delimiter == ',')
+        else if (delimiter == ',') {
             // CSV
             writer = new CSVWriter(sw, delimiter);
-        else {
+        } else {
             // TSV
             writer = CSVWriter.getStrictTSVWriter(sw);
         }
@@ -197,27 +197,14 @@ public class VoltTableUtil {
         // Locate the first non-null table to get the schema
         for (VoltTable vt : operands) {
             if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                            vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
+                result = new VoltTable(vt.getTableSchema());
                 result.setStatusCode(vt.getStatusCode());
                 break;
             }
         }
 
         if (result != null) {
-            for (VoltTable vt : operands) {
-                if (vt != null) {
-                    vt.resetRowPosition();
-                    while (vt.advanceRow()) {
-                        result.add(vt);
-                    }
-                }
-            }
-
+            result.addTables(operands);
             result.resetRowPosition();
         }
 
@@ -225,25 +212,12 @@ public class VoltTableUtil {
     }
 
     /**
-     * Extract a table's schema.
-     * @param vt  input table with source schema
-     * @return  schema as column info array
-     */
-    public static VoltTable.ColumnInfo[] extractTableSchema(VoltTable vt)
-    {
-        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-            columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                    vt.getColumnType(ii));
-        }
-        return columns;
-    }
-
-    /**
      * Return true if any string field in the table contains param s.
      */
     public static boolean tableContainsString(VoltTable t, String s, boolean caseSenstive) {
-        if (t.getRowCount() == 0) return false;
+        if (t.getRowCount() == 0) {
+            return false;
+        }
         if (!caseSenstive) {
             s = s.toLowerCase();
         }
@@ -253,7 +227,9 @@ public class VoltTableUtil {
             for (int i = 0; i < t.getColumnCount(); i++) {
                 if (t.getColumnType(i) == VoltType.STRING) {
                     String value = row.getString(i);
-                    if (value == null) continue;
+                    if (value == null) {
+                        continue;
+                    }
                     if (!caseSenstive) {
                         value = value.toLowerCase();
                     }
@@ -319,8 +295,11 @@ public class VoltTableUtil {
 
         @Override
         public long estimateSize() {
-            if (m_row == null) return 0;
-            else return m_fence - m_row.getActiveRowIndex();
+            if (m_row == null) {
+                return 0;
+            } else {
+                return m_fence - m_row.getActiveRowIndex();
+            }
         }
 
         @Override

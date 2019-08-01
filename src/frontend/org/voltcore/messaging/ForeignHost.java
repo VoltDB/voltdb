@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltcore.messaging;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
@@ -77,6 +78,7 @@ public class ForeignHost {
     public static final int CRASH_ALL = 0;
     public static final int CRASH_ME = 1;
     public static final int CRASH_SPECIFIED = 2;
+    public static final int PRINT_STACKTRACE = 3;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -376,6 +378,11 @@ public class ForeignHost {
                 VoltDB.instance().halt();
             } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            } else if (cause == ForeignHost.PRINT_STACKTRACE) {
+                //collect thread dumps
+                String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+                String fileName =  m_hostMessenger.getHostname() + "_host-" + m_hostId + "_" + System.currentTimeMillis()+".jstack";
+                VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
             } else {
                 //Should never come here.
                 hostLog.error("Invalid Cause in poison pill: " + cause);

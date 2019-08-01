@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
@@ -160,7 +161,10 @@ public class TestMVOptimizationSuite extends RegressionSuite {
         assertTablesAreEqual("Exact match with view",
                 client.callProcedure("@AdHoc", "SELECT COUNT(b1) cb FROM t1 WHERE b >= 2 OR b1 in (3, 30, 300) GROUP BY a1 order by cb").getResults()[0],
                 client.callProcedure("@AdHoc", "SELECT count_b1 cb FROM v5_1 order by cb").getResults()[0]);
-        assertTrue(getQueryPlan('\n', client, "SELECT COUNT(b1) cb FROM t1 WHERE b >= 2 OR b1 in (3, 30, 300) GROUP BY a1").toLowerCase().contains("sequential scan of \"v5_3\"".toLowerCase()));
+        final String plan = getQueryPlan('\n', client, "SELECT COUNT(b1) cb FROM t1 WHERE b >= 2 OR b1 in (3, 30, 300) GROUP BY a1");
+        assertTrue("Plan should have used V5_1 or V5_3: \n" + plan,
+              plan.toLowerCase().contains("sequential scan of \"v5_3\"".toLowerCase()) ||
+              plan.toLowerCase().contains("sequential scan of \"v5_1\"".toLowerCase()));
         cleanTableAndViews(client, "V5_1", "V5_2", "V5_3", "V5_4");
     }
 

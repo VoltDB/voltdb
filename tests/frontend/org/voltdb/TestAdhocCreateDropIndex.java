@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,10 +28,14 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import java.io.IOException;
+import java.util.stream.Stream;
 
 public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
@@ -310,7 +314,8 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
     public static String unsafeIndexExprErrorMsg = "The index definition uses operations that cannot be applied";
 
-    public void ENG12024TestHelper(String ddlTemplate, String testExpression, boolean isSafeForDDL) throws Exception {
+
+    private void ENG12024TestHelper(String ddlTemplate, String testExpression, boolean isSafeForDDL) throws Exception {
         String ddl = String.format(ddlTemplate, testExpression);
 
         // Create index on empty table first.
@@ -376,6 +381,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForColumnExpression, "a / b", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "c || c", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "repeat(c, 100)", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "LOG(a), b", false);
 
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "NOT a > b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NULL", true);
@@ -390,25 +396,224 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NOT DISTINCT FROM b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b AND b > 0", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b OR b > 0", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "LOG10(b) < 1", false);
         }
         finally {
             teardownSystem();
         }
     }
 
-    private void createSchema(VoltDB.Configuration config,
-                              String ddl,
-                              final int sitesPerHost,
-                              final int hostCount,
-                              final int replication) throws Exception
-    {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(ddl);
-        builder.setUseDDLSchema(true);
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        boolean success = builder.compile(config.m_pathToCatalog, sitesPerHost, hostCount, replication);
-        assertTrue("Schema compilation failed", success);
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-        MiscUtils.copyFile(builder.getPathToDeployment(), config.m_pathToDeployment);
+    @Test
+    public void testENG15047() {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                        "INT     INTEGER  DEFAULT 0 PRIMARY KEY, -- also crashes on UNIQUE\n" +
+                        "VCHAR_JSON        VARCHAR(100) DEFAULT 'foo' NOT NULL," +
+                        "BIG     BIGINT   DEFAULT 0,\n" +
+                        ");\n" +
+                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(BIG) values(1);",                   // passes
+                    "INSERT INTO P4(VCHAR_JSON) VALUES('0');",          // fails: constraint violation
+                    "UPSERT INTO P4(INT, VCHAR_JSON) VALUES(1, '0');",  // fails: constraint violation
+                    "UPDATE P4 SET BIG = 0 WHERE BIG = 1;",             // fails: constraint violation
+                    "SELECT DISTINCT * FROM P4;")                       // passes
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) { } // ignore query execution exceptions
+                    });
+        } catch (Exception e) {
+            // ignore exceptions
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
+        }
+    }
+
+    @Test
+    public void testENG15213() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P5 (i INTEGER, j FLOAT);";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    Pair.of("CREATE INDEX PI1 ON P5(i, j);", true),                         // normal index on columns only: passes
+                    Pair.of("CREATE INDEX PI2 ON P5(i, LOG10(j));", true),                  // normal index with unsafe expression on empty table: passes
+                    Pair.of("CREATE INDEX PI3 ON P5(i) WHERE j > 0;", true),                // partial index with columns and safe predicate on empty table: passes
+                    Pair.of("CREATE INDEX PI4 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with columns and unsafe predicate on empty table: passes
+                    Pair.of("CREATE INDEX PI5 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with unsafe expression and unsafe predicate on empty table: passes
+                    Pair.of("DROP INDEX PI2; DROP INDEX PI4; DROP INDEX PI5", true),        // clean up indexes with unsafe operations
+                    Pair.of("INSERT INTO P5 values(0, 0);", true),                          // Table has rows: passes
+                    Pair.of("CREATE INDEX PI11 ON P5(i, j);", true),                        // normal index on columns only: passes
+                    Pair.of("CREATE INDEX PI31 ON P5(i) WHERE j > 0;", true),               // partial index with columns and safe predicate on non-empty table: passes
+                    Pair.of("CREATE INDEX PI21 ON P5(i, LOG10(j));", false),                 // normal index with unsafe expression on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI41 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", false),// partial index with columns and unsafe predicate on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI51 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", false))  // partial index with unsafe expression and unsafe predicate on non-empty table: rejected
+                    .forEachOrdered(stmtAndShouldPass -> {
+                        final String stmt = stmtAndShouldPass.getFirst();
+                        final boolean shouldPass = stmtAndShouldPass.getSecond();
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            assertTrue("Query \"" + stmt + "\" should pass", shouldPass);
+                        } catch (IOException | ProcCallException e) {
+                            assertFalse("Query \"" + stmt + "\" should fail", shouldPass);
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
+        }
+
+    }
+
+    @Test
+    public void testENG15220() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R1 (ID INTEGER NOT NULL PRIMARY KEY, TINY TINYINT);";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "CREATE VIEW VR6 (TINY, ID) AS SELECT TINY, MIN(ID) FROM R1 GROUP BY TINY;",
+                    "INSERT INTO R1(ID, TINY) VALUES(1, 11);",
+                    "CREATE ASSUMEUNIQUE INDEX DIDX2 ON R1 (ID);",
+                    "CREATE UNIQUE INDEX DIDX20 ON R1 (ID);")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+            Stream.of(
+                    Pair.of("DROP VIEW VR6;", true),
+                    Pair.of("TRUNCATE TABLE R1;", true),                            // roll back
+                    Pair.of("PARTITION TABLE R1 ON COLUMN ID;", true),              // paritioned table
+                    Pair.of("CREATE VIEW VR6 (TINY, ID) AS SELECT TINY, MIN(ID) FROM R1 GROUP BY TINY;", true),
+                    Pair.of("INSERT INTO R1(ID, TINY) VALUES(1, 11);", true),
+                    Pair.of("CREATE ASSUMEUNIQUE INDEX DIDX2 ON R1 (ID);", false))  // "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. Please use UNIQUE instead"
+                    .forEachOrdered(stmtAndShouldPass -> {
+                        final String stmt = stmtAndShouldPass.getFirst();
+                        final boolean shouldPass = stmtAndShouldPass.getSecond();
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            assertTrue("Query \"" + stmt + "\" should have passed", shouldPass);
+                        } catch (IOException | ProcCallException e) {
+                            assertFalse("Query \"" + stmt + "\" should have failed", shouldPass);
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
+        }
+
+    }
+
+    @Test
+    public void testENG15273() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "ID INTEGER NOT NULL,\n" +
+                "POLYGON GEOGRAPHY,\n" +
+                "PRIMARY KEY (ID)\n" +
+                ");\n" +
+                "CREATE INDEX IDX_R21_POLY ON R21 (POLYGON);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "insert into R21 (ID) values -9355;",
+                    "CREATE VIEW DV1 (POLYGON) AS SELECT MIN(POLYGON) FROM R21;",
+                    "insert into R21 (ID, POLYGON) values 84, PolygonFromText('POLYGON((0.0 0.0, 0.0 -64.0, 51.0 0.0, 0.0 0.0))');",
+                    "UPDATE R21 SET POLYGON = POLYGON;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
+    public void testENG15742() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "VB VARBINARY NOT NULL\n" +
+                ");\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            // we don't allow using VARBINARY type in LIKE/STARTS WITH expression
+            Stream.of(
+                    "CREATE INDEX testIdx ON R21(VB) WHERE x'03' like VB;",
+                    "CREATE INDEX testIdx ON R21(VB) WHERE VB starts with x'03';")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            fail("We should not allow allow using VARBINARY type in LIKE/STARTS WITH expression");
+                        } catch (ProcCallException pce) {
+                            pce.printStackTrace();
+                            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+                            try {
+                                assertFalse(findIndexInSystemCatalogResults("testIdx"));
+                            } catch (Exception e) {
+                                fail(e.getMessage());
+                            }
+                        } catch (IOException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
+    public void testENG15734() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                "ID INTEGER,\n" +
+                "FL FLOAT,\n" +
+                "V1 VARCHAR(63),\n" +
+                "V2 VARCHAR(64) DEFAULT '0'" +
+                ");\n" +
+                "CREATE INDEX DIDX4 ON P4(ID) WHERE V2 LIKE UPPER(V1);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(FL) VALUES(6.2);",
+                    "UPDATE P4 SET V1 = V2;",
+                    "TRUNCATE TABLE P4;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) { }
+        }
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,11 +23,6 @@
 
 package org.voltdb.export;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -41,9 +36,16 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.VoltFile;
 
-public class TestStreamBlockQueue {
+import junit.framework.TestCase;
+
+public class TestStreamBlockQueue extends TestCase {
 
     private final static String TEST_DIR = "/tmp/" + System.getProperty("user.name");
 
@@ -53,10 +55,12 @@ public class TestStreamBlockQueue {
 
     private StreamBlockQueue m_sbq;
 
-    private static long g_uso = 0;
+    private static long g_seqNo = 0;
+    private MockVoltDB m_mockVoltDB;
     private static ByteBuffer getFilledBuffer(byte fillValue) {
         //8 bytes is magic prefix space
-        ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2 + 8);
+        ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2 + StreamBlock.HEADER_SIZE);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
         while (buf.hasRemaining()) {
             buf.put(fillValue);
         }
@@ -65,31 +69,97 @@ public class TestStreamBlockQueue {
     }
 
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
-        g_uso += 1024 * 1024 * 2;
-        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), g_uso, false);
+        g_seqNo += 100;
+        BBContainer cont = DBBPool.wrapBB(getFilledBuffer(fillValue));
+        BinaryDequeReader.Entry<ExportRowSchema> entry = new BinaryDequeReader.Entry<ExportRowSchema>() {
+
+            @Override
+            public ExportRowSchema getExtraHeader() {
+                return null;
+            }
+
+            @Override
+            public ByteBuffer getData() {
+                return cont.b();
+            }
+
+            @Override
+            public void release() {
+                cont.discard();
+            }
+        };
+        return new StreamBlock(entry, g_seqNo, g_seqNo, 1, 0L, false);
     }
 
-    @Test
-    public void testOfferCloseReopen() throws Exception {
-        assertTrue(m_sbq.isEmpty());
-        StreamBlock sb = getStreamBlockWithFill((byte)1);
-        m_sbq.offer(sb);
-        StreamBlock fromPeek = m_sbq.peek();
-        assertEquals(sb.uso(), fromPeek.uso());
-        assertEquals(sb.totalSize(), fromPeek.totalSize());
-        assertFalse(m_sbq.isEmpty());
-        assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
-        m_sbq.close();
+    @Override
+    @Before
+    public void setUp() throws Exception {
+        m_mockVoltDB = new MockVoltDB();
+        m_mockVoltDB.addTable("TableName", false);
+        m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        g_seqNo = 0;
+        File testDir = new File(TEST_DIR);
+        if (testDir.exists()) {
+            for (File f : testDir.listFiles()) {
+                VoltFile.recursivelyDelete(f);
+            }
+            testDir.delete();
+        }
+        testDir.mkdir();
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, m_mockVoltDB.getCatalogContext().m_genId);
+        defaultBuffer.clear();
+    }
+
+    @Override
+    @After
+    public void tearDown() throws Exception {
+        try {
+            m_mockVoltDB.shutdown(null);
+            m_sbq.close();
+        } finally {
+            try {
+                File testDir = new File(TEST_DIR);
+                if (testDir.exists()) {
+                    for (File f : testDir.listFiles()) {
+                        f.delete();
+                    }
+                    testDir.delete();
+                }
+            } finally {
+                m_sbq = null;
+            }
+        }
         System.gc();
         System.gc();
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
+    }
+
+    @Test
+    public void testOfferCloseReopen() throws Exception {
+        StreamBlock sb = null;
+        assertTrue(m_sbq.isEmpty());
+        sb = getStreamBlockWithFill((byte)1);
+        m_sbq.offer(sb);
+        StreamBlock fromPeek = m_sbq.peek();
+        assertEquals(sb.startSequenceNumber(), fromPeek.startSequenceNumber());
+        assertEquals(sb.totalSize(), fromPeek.totalSize());
+        assertFalse(m_sbq.isEmpty());
+        assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
+        m_sbq.close(); // sb is also discarded here
+        System.gc();
+        System.gc();
+        System.gc();
+        System.runFinalization();
+
+        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE, "TableName", 1, m_sbq.getGenerationIdCreated());
         sb = m_sbq.peek();
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
         assertEquals(sb, m_sbq.poll());
-        assertTrue(sb.uso() == g_uso);
+        assertTrue(sb.startSequenceNumber() == g_seqNo);
         assertEquals(sb.totalSize(), 1024 * 1024 * 2);
         assertTrue(m_sbq.isEmpty());
         assertNull(m_sbq.peek());
@@ -127,11 +197,11 @@ public class TestStreamBlockQueue {
                 case 5:
                 case 0:
                     System.out.println("Iteration " + iteration + " Action offer");
-                    m_sbq.offer(getStreamBlockWithFill(zero));
+                m_sbq.offer(getStreamBlockWithFill(zero));
                     break;
                 case 1:
                     System.out.println("Iteration " + iteration + " Action sync");
-                    m_sbq.sync(r.nextBoolean());
+                    m_sbq.sync();
                     break;
                 case 2:
                     System.out.println("Iteration " + iteration + " Action peek");
@@ -176,13 +246,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 4;
+        long seqnum = 200; // first block was discarded
         for (int ii = 1; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -238,13 +308,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300; // first two block were discarded
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -299,18 +369,18 @@ public class TestStreamBlockQueue {
         long weirdSizeValue = 1024 * 1024 * 2 * 30;
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
 
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300; // first two blocks were discarded
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -364,23 +434,24 @@ public class TestStreamBlockQueue {
         long weirdSizeValue = ((1024 * 1024 * 2) * 30);
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
+        long genId = m_sbq.getGenerationIdCreated();
 
         m_sbq.close();
         m_sbq = null;
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, genId);
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;
-        long uso = 1024 * 1024 * 2;
+        long seqnum = 100; // SBQ was reopened.
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
         int ii = 0;
         while (ii < 32 && (sb = m_sbq.pop()) != null) {
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -432,13 +503,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300;
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -492,12 +563,12 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 2;
+        long seqnum = 100;
         for (int ii = 0; ii < 32; ii++) {
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -533,43 +604,4 @@ public class TestStreamBlockQueue {
         assertTrue(m_sbq.isEmpty());
 
     }
-
-    @Before
-    public void setUp() throws Exception {
-        g_uso = 0;
-        File testDir = new File(TEST_DIR);
-        if (testDir.exists()) {
-            for (File f : testDir.listFiles()) {
-                VoltFile.recursivelyDelete(f);
-            }
-            testDir.delete();
-        }
-        testDir.mkdir();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
-        defaultBuffer.clear();
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        try {
-            m_sbq.close();
-        } finally {
-            try {
-                File testDir = new File(TEST_DIR);
-                if (testDir.exists()) {
-                    for (File f : testDir.listFiles()) {
-                        f.delete();
-                    }
-                    testDir.delete();
-                }
-            } finally {
-                m_sbq = null;
-            }
-        }
-        System.gc();
-        System.gc();
-        System.gc();
-        System.runFinalization();
-    }
-
 }

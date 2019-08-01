@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
@@ -74,10 +74,12 @@ public class TableSaveFile
         @Override
         public void discard() {
             checkDoubleFree();
-            if (m_hasMoreChunks.get() == false) {
-                m_origin.discard();
-            } else {
-                m_buffers.add(m_origin);
+            synchronized (TableSaveFile.this) {
+                if (m_hasMoreChunks.get() == false) {
+                    m_origin.discard();
+                } else {
+                    m_buffers.add(m_origin);
+                }
             }
         }
 
@@ -107,7 +109,7 @@ public class TableSaveFile
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
-            EELibraryLoader.loadExecutionEngineLibrary(true);
+            NativeLibraryLoader.loadVoltDB();
             if (relevantPartitionIds == null) {
                 m_relevantPartitionIds = null;
             } else {

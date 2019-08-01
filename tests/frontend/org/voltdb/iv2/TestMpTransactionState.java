@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -170,7 +170,7 @@ public class TestMpTransactionState extends TestCase
 
         for (int i = 0; i < depsForLocalTask.size(); i++) {
             if (depsForLocalTask.get(i) < 0) continue;
-            plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
+            plan.localWork.setInputDepId(i, depsForLocalTask.get(i));
         }
         // create the FragmentResponse for the BorrowTask
         FragmentResponseMessage resp =

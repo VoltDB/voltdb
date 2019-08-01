@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -51,9 +53,10 @@ public class TTLManager extends StatsSource{
     //DRTupleStream.cpp
     public static final String DR_LIMIT_MSG = "bytes exceeds max DR Buffer size";
     static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0) * 1000;
-    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1) * 1000;
+    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1000);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
+    public static final int NT_PROC_TIMEOUT = Integer.getInteger("NT_PROC_TIMEOUT", 1000 * 120);
     static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
     public static class TTLStats {
         final String tableName;
@@ -85,10 +88,12 @@ public class TTLManager extends StatsSource{
         final String tableName;
         final TTLStats stats;
         AtomicReference<TimeToLive> ttlRef;
+        AtomicReference<Table> tableRef;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        public TTLTask(String table, TimeToLive timeToLive, TTLStats ttlStats) {
-            tableName = table;
+        public TTLTask(String tableName, TimeToLive timeToLive, Table table, TTLStats ttlStats) {
+            this.tableName = tableName;
             ttlRef = new AtomicReference<>(timeToLive);
+            tableRef = new AtomicReference<>(table);
             stats = ttlStats;
         }
 
@@ -102,7 +107,12 @@ public class TTLManager extends StatsSource{
             }
             ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
-                performDelete(cl, this);
+                String stream = tableRef.get().getMigrationtarget();
+                if (!StringUtil.isEmpty(stream)) {
+                    migrate(cl, this);
+                } else {
+                    delete(cl, this);
+                }
             }
         }
 
@@ -115,8 +125,9 @@ public class TTLManager extends StatsSource{
             }
         }
 
-        public void updateTask(TimeToLive updatedTTL) {
+        public void updateTask(TimeToLive updatedTTL, Table updatedTable) {
             ttlRef.compareAndSet(ttlRef.get(), updatedTTL);
+            tableRef.compareAndSet(tableRef.get(), updatedTable);
         }
 
         long getValue() {
@@ -151,6 +162,10 @@ public class TTLManager extends StatsSource{
         }
         String getColumnName() {
             return ttlRef.get().getTtlcolumn().getName();
+        }
+
+        String getStream() {
+            return tableRef.get().getMigrationtarget();
         }
     }
 
@@ -247,16 +262,19 @@ public class TTLManager extends StatsSource{
             TTLTask task = m_tasks.get(t.getTypeName());
             if (task == null) {
                 TTLStats stats = m_stats.get(t.getTypeName());
-                if (stats == null) {
+                if (!TableType.isPersistentMigrate(t.getTabletype()) && stats == null) {
                     stats = new TTLStats(t.getTypeName());
                     m_stats.put(t.getTypeName(), stats);
                 }
-                task = new TTLTask(t.getTypeName(), ttl, stats);
+                task = new TTLTask(t.getTypeName(), ttl, t, stats);
                 m_tasks.put(t.getTypeName(), task);
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt(INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
+                m_futures.put(t.getTypeName(),
+                              m_timeToLiveExecutor.scheduleAtFixedRate(task,
+                                      DELAY + random.nextInt(INTERVAL),
+                                      INTERVAL, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
-                task.updateTask(ttl);
+                task.updateTask(ttl, t);
                 hostLog.info(String.format(info + " has been updated.", t.getTypeName()));
             }
         }
@@ -309,7 +327,29 @@ public class TTLManager extends StatsSource{
         }
     }
 
-    protected void performDelete(ClientInterface cl, TTLTask task) {
+    protected void migrate(ClientInterface cl, TTLTask task) {
+        CountDownLatch latch = new CountDownLatch(1);
+        final ProcedureCallback cb = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse resp) throws Exception {
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.warn(String.format("Fail to execute nibble export on table: %s, column: %s, status: %s",
+                            task.tableName, task.getColumnName(), resp.getStatusString()));
+                }
+                latch.countDown();
+            }
+        };
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
+                "@MigrateRowsNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
+                        TIMEOUT, task.getMaxFrequency(), INTERVAL});
+        try {
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            hostLog.warn("Nibble export waiting interrupted" + e.getMessage());
+        }
+    }
+
+    protected void delete(ClientInterface cl, TTLTask task) {
         CountDownLatch latch = new CountDownLatch(1);
         final ProcedureCallback cb = new ProcedureCallback() {
             @Override
@@ -329,8 +369,8 @@ public class TTLManager extends StatsSource{
                             // the transaction will be aborted. The same is true for nibble delete transaction.
                             // If hit this error, no more data can be deleted in this TTL table.
                             drLimitError = "The transaction exceeds DR Buffer Limit of "
-                                        + MpTransactionState.DR_MAX_AGGREGATE_BUFFERSIZE
-                                        + " TTL is disabled for the table. Please change BATCH_SIZE to a smaller value.";
+                                    + MpTransactionState.DR_MAX_AGGREGATE_BUFFERSIZE
+                                    + " TTL is disabled for the table. Please change BATCH_SIZE to a smaller value.";
                             task.cancel();
                             ScheduledFuture<?> fut = m_futures.get(task.tableName);
                             if (fut != null) {
@@ -347,11 +387,11 @@ public class TTLManager extends StatsSource{
                 latch.countDown();
             }
         };
-        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
                 "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
-            latch.await(1, TimeUnit.MINUTES);
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             hostLog.warn("TTL waiting interrupted" + e.getMessage());
         }

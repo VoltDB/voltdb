@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.voltdb.client.ClientResponse;
 
 /**
  * This exception is used in IV2 MPI repair to terminate the currently running
@@ -96,5 +98,23 @@ public class TransactionRestartException extends SerializableException {
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_txnId);
         b.put(m_misrouted ? (byte) 1 : (byte) 0);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        if (isMisrouted()) {
+            return ClientResponse.TXN_MISROUTED;
+        } else {
+            return ClientResponse.TXN_RESTART;
+        }
+    }
+
+    @Override
+    public String getShortStatusString() {
+        if (isMisrouted()) {
+            return "TRANSACTION MISROUTED";
+        } else {
+            return "TRANSACTION RESTART";
+        }
     }
 }

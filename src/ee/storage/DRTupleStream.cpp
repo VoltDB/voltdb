@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,7 @@
 #include <cstdio>
 #include <limits>
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 #include <ctime>
 #include <utility>
 #include <math.h>
@@ -48,16 +48,14 @@ DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t 
       m_hashFlag(m_initialHashFlag),
       m_firstParHash(LONG_MAX),
       m_lastParHash(LONG_MAX),
-      m_hasReplicatedStream(drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION),
-      m_wasFirstChangeReplicatedTable(false),
-      m_wasLastChangeReplicatedTable(false),
       m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
-{}
+{
+    extendBufferChain(m_defaultCapacity);
+}
 
-size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
-                                    char *tableHandle,
+size_t DRTupleStream::truncateTable(char *tableHandle,
                                     std::string tableName,
                                     int partitionColumn,
                                     int64_t spHandle,
@@ -67,7 +65,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     size_t startingUso = m_uso;
 
-    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+    transactionChecks(spHandle, uniqueId);
 
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
@@ -100,11 +98,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                              m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        if (m_wasLastChangeReplicatedTable) {
-            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        } else {
-            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        }
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
         io.writeInt(-1);  // hash delimiter for TRUNCATE_TABLE records is always -1
     }
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
@@ -136,22 +130,8 @@ int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn
 bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
-        // For replicated table changes, the hash flag should stay the same as
-        // the initial value, which is TXN_PAR_HASH_REPLICATED, if it's older
-        // versions.
-        assert(!m_hasReplicatedStream || m_hashFlag == m_initialHashFlag);
-        if (m_hasReplicatedStream) {
-            return false;
-        }
-        if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {
-            m_wasFirstChangeReplicatedTable = true;
-            m_wasLastChangeReplicatedTable = true;
-            return false;
-        }
-        else if (!m_wasLastChangeReplicatedTable) {
-            m_wasLastChangeReplicatedTable = true;
-            return true;
-        }
+        // the initial value, which is TXN_PAR_HASH_REPLICATED
+        vassert(m_hashFlag == m_initialHashFlag);
         return false;
     }
 
@@ -162,11 +142,6 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
         m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
         // no delimiter needed for first record
         return false;
-    }
-    else if (m_wasLastChangeReplicatedTable) {
-        m_lastParHash = parHash;
-        m_wasLastChangeReplicatedTable = false;
-        return true;
     }
     else if (parHash != m_lastParHash) {
         m_lastParHash = parHash;
@@ -192,8 +167,7 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
-                                  char *tableHandle,
+size_t DRTupleStream::appendTuple(char *tableHandle,
                                   int partitionColumn,
                                   int64_t spHandle,
                                   int64_t uniqueId,
@@ -208,7 +182,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
 
-    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+    transactionChecks(spHandle, uniqueId);
 
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
@@ -248,11 +222,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                              m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        if (m_wasLastChangeReplicatedTable) {
-            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        } else {
-            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        }
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
@@ -274,8 +244,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
-                                         char *tableHandle,
+size_t DRTupleStream::appendUpdateRecord(char *tableHandle,
                                          int partitionColumn,
                                          int64_t spHandle,
                                          int64_t uniqueId,
@@ -292,7 +261,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     size_t newRowMetadataSz = 0;
     size_t maxLength = TXN_RECORD_HEADER_SIZE;
 
-    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+    transactionChecks(spHandle, uniqueId);
 
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
@@ -330,11 +299,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                  m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        if (m_wasLastChangeReplicatedTable) {
-            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        } else {
-            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        }
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
@@ -357,7 +322,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
+bool DRTupleStream::transactionChecks(int64_t spHandle, int64_t uniqueId)
 {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -388,7 +353,7 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
                     UniqueId::toString(UniqueId(m_openUniqueId)).c_str(), UniqueId::toString(UniqueId(uniqueId)).c_str());
         }
     }
-    assert(m_opened);
+    vassert(m_opened);
     return switchedToOpen;
 }
 
@@ -439,7 +404,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
 {
-    assert(!m_opened);
+    vassert(!m_opened);
 
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -568,7 +533,9 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     }
     else {
         m_lastCommittedSpUniqueId = uniqueId;
-        m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        m_currBlock->recordCompletedSpTxn(uniqueId);
+        // for sp, update the last Committed SpHandle
+        m_currBlock->recordLastCommittedSpHandle(m_openSpHandle);
     }
     m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 
@@ -586,11 +553,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
                                   txnLength);
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
-    if (m_wasFirstChangeReplicatedTable) {
-        extraio.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(m_hashFlag));
-    } else {
-        extraio.writeByte(static_cast<int8_t>(m_hashFlag));
-    }
+    extraio.writeByte(static_cast<int8_t>(m_hashFlag));
     extraio.writeInt(txnLength);
     // if it is the replicated stream or first record is TRUNCATE_TABLE
     // m_firstParHash will be LONG_MAX, and will be written as -1 after casting
@@ -616,7 +579,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
+bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
 {
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
@@ -638,15 +601,30 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         }
         return true;
     }
-    assert(!m_opened);
+    vassert(!m_opened);
     return false;
 }
 
-void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+void DRTupleStream::extendBufferChain(size_t minLength) {
+    DrStreamBlock *oldBlock = m_currBlock;
+    size_t uso = m_uso;
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
+    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
+
+    TupleStreamBase::commonExtendBufferChain(blockSize, uso);
+
+    if (openTransaction) {
+        handleOpenTransaction(oldBlock);
+    }
+
+    pushPendingBlocks();
+}
+
+void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
-        assert(!m_opened);
+        vassert(!m_opened);
         ++m_openSequenceNumber;
     }
 
@@ -674,7 +652,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -704,7 +682,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -724,7 +702,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         break;
     }
     default:
-        assert(false);
+        vassert(false);
     }
 }
 
@@ -748,9 +726,6 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
                                        char *outBytes)
 {
     int tupleStreamPartitionId = partitionId;
-    if (partitionId == 16383 && drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
-        tupleStreamPartitionId = 0;
-    }
     DRTupleStream stream(tupleStreamPartitionId,
                          2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING, // 2MB
                          drProtocolVersion);
@@ -773,7 +748,6 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
     // Override start sequence number
     stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
@@ -784,26 +758,25 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
         tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
 
         if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
+            stream.truncateTable(tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
         }
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
+            stream.appendTuple(tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
         }
 
         if (flagList[ii] == TXN_PAR_HASH_MULTI) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii] + 1));
             for (int zz = 0; zz < 5; zz++) {
-                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
+                stream.appendTuple(tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
             }
         }
         else if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
+            stream.truncateTable(tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
+            stream.truncateTable(tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
         }
 
         stream.endTransaction(uid);
-        lastUID = uid;
     }
 
     TupleSchema::freeTupleSchema(schema);
@@ -812,4 +785,8 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
+}
+
+int DRTupleStream::getDRLogHeaderSize() {
+    return DR_LOG_HEADER_SIZE + ExecutorContext::getEngine()->getDRHiddenColumnSize();
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,9 +41,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.AssertionFailedError;
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -60,6 +57,9 @@ import org.voltdb.sysprocs.AdHoc_RO_MP;
 import org.voltdb.sysprocs.GC;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
+
+import junit.framework.AssertionFailedError;
+import junit.framework.TestCase;
 
 public class TestNTProcs extends TestCase {
 
@@ -420,6 +420,9 @@ public class TestNTProcs extends TestCase {
         }
     }
 
+    private ServerThread m_serverThread;
+    private LocalCluster m_cluster;
+
     // get the first stats table for any selector
     final VoltTable getStats(Client client, String selector) {
         ClientResponse response = null;
@@ -497,17 +500,38 @@ public class TestNTProcs extends TestCase {
         MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("compileNT.xml"));
     }
 
-    private ServerThread start() throws Exception {
+    private void start() throws Exception {
         compile();
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("compileNT.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("compileNT.xml");
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
+        start(Configuration.getPathToCatalogForTest("compileNT.jar"),
+                Configuration.getPathToCatalogForTest("compileNT.xml"));
+    }
 
-        return localServer;
+    private void start(String pathToCatalog, String pathToDeployment) throws Exception {
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        m_serverThread = new ServerThread(config);
+        m_serverThread.start();
+        m_serverThread.waitForInitialization();
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        if (m_serverThread != null) {
+            System.out.println("Stopping server thread");
+            m_serverThread.shutdown();
+            m_serverThread.join();
+            m_serverThread = null;
+        }
+
+        if (m_cluster != null) {
+            System.out.println("Stopping local cluster");
+            m_cluster.shutDown();
+            m_cluster = null;
+        }
     }
 
     public void testNTCompile() throws Exception {
@@ -515,7 +539,7 @@ public class TestNTProcs extends TestCase {
     }
 
     public void testTrivialNTRoundTrip() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -532,13 +556,10 @@ public class TestNTProcs extends TestCase {
         assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
         Map<String, Long> stats = aggregateProcRow(client, TrivialNTProc.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testNestedNTRoundTrip() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -560,13 +581,10 @@ public class TestNTProcs extends TestCase {
         assertEquals(1, stats.get("INVOCATIONS").longValue());
         stats = aggregateProcRow(client, AdHoc_RO_MP.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testRunEverywhereNTRoundTripOneNode() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -586,24 +604,21 @@ public class TestNTProcs extends TestCase {
         assertEquals(1, stats.get("INVOCATIONS").longValue());
         stats = aggregateProcRow(client, TrivialNTProcPriority.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testRunEverywhereNTRoundTripCluster() throws Exception {
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(SCHEMA);
 
-        LocalCluster cluster = new LocalCluster("compileNT.jar", 4, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("compileNT.jar", 4, 3, 1, BackendTarget.NATIVE_EE_JNI);
 
-        boolean success = cluster.compile(pb);
+        boolean success = m_cluster.compile(pb);
         assertTrue(success);
 
-        cluster.startUp();
+        m_cluster.startUp();
 
         Client client = ClientFactory.createClient();
-        client.createConnection(cluster.getListenerAddress(0));
+        client.createConnection(m_cluster.getListenerAddress(0));
 
         ClientResponseImpl response;
 
@@ -622,14 +637,13 @@ public class TestNTProcs extends TestCase {
         assertEquals(3, stats.get("INVOCATIONS").longValue());
 
         client.close();
-        cluster.shutDown();
     }
 
     //
     // This should stress the callbacks, handles and futures for NT procs
     //
     public void testOverlappingNT() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -676,9 +690,6 @@ public class TestNTProcs extends TestCase {
             Thread.sleep(1000);
         }
 
-        localServer.shutdown();
-        localServer.join();
-
         if (!found) {
             fail();
         }
@@ -689,7 +700,7 @@ public class TestNTProcs extends TestCase {
     // (It's ok to run them from multiple calling procs)
     //
     public void testRunOnAllHostsSerialness() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -707,13 +718,10 @@ public class TestNTProcs extends TestCase {
 
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testRunOnAllHostsAPI() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -731,13 +739,10 @@ public class TestNTProcs extends TestCase {
 
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testBadFutureType() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -754,14 +759,11 @@ public class TestNTProcs extends TestCase {
         assertTrue(response.getStatusString().contains("was not an acceptible VoltDB return type"));
         System.out.println("Client got failure response");
         System.out.println(response.toJSONString());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     // @GC is the fist (to be coded) NT sysproc
     public void testGCSysproc() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -780,9 +782,6 @@ public class TestNTProcs extends TestCase {
 
         Map<String, Long> stats = aggregateProcRow(client, GC.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     public void testUAC() throws Exception {
@@ -796,14 +795,7 @@ public class TestNTProcs extends TestCase {
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
+        start(pathToCatalog, pathToDeployment);
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -815,9 +807,6 @@ public class TestNTProcs extends TestCase {
         VoltTable statsT = getStats(client, "PROCEDURE");
         System.out.println("STATS: " + statsT.toFormattedString());
         assertEquals(0, statsT.getRowCount());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     /*
@@ -863,7 +852,7 @@ public class TestNTProcs extends TestCase {
 
         final Set<Long> outstanding = Collections.synchronizedSet(new HashSet<Long>());
 
-        ServerThread localServer = start();
+        start();
 
         final AtomicLong called = new AtomicLong(0);
 
@@ -973,8 +962,6 @@ public class TestNTProcs extends TestCase {
 
         client.close();
         firehoseClient.close();
-        localServer.shutdown();
-        localServer.join();
     }
 
     class VerifySuccessCallback implements ProcedureCallback {
@@ -985,7 +972,7 @@ public class TestNTProcs extends TestCase {
     }
 
     public void testRunOnAllPartitionsProcedure() throws Exception {
-        ServerThread localServer = start();
+        start();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -1040,9 +1027,6 @@ public class TestNTProcs extends TestCase {
             System.out.println("Client got trivial response");
             System.out.println(response.toJSONString());
         }
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     class AvoidCatastropheCallback implements ProcedureCallback {
@@ -1061,10 +1045,13 @@ public class TestNTProcs extends TestCase {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             outstandingCallbacks.remove(index);
 
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS) return;
-            if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST) return;
-            if (clientResponse.getStatus() == ClientResponse.SERVER_UNAVAILABLE) return;
-            if (clientResponse.getStatus() == ClientResponse.RESPONSE_UNKNOWN) return;
+            switch (clientResponse.getStatus()) {
+            case ClientResponse.SUCCESS:
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.SERVER_UNAVAILABLE:
+            case ClientResponse.RESPONSE_UNKNOWN:
+                return;
+            }
 
             // now we fail!
             System.err.println(clientResponse.getStatusString());
@@ -1083,13 +1070,13 @@ public class TestNTProcs extends TestCase {
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(SCHEMA);
 
-        LocalCluster cluster = new LocalCluster("compileNT.jar", 6, 4, 2, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(true);
+        m_cluster = new LocalCluster("compileNT.jar", 6, 4, 2, BackendTarget.NATIVE_EE_JNI);
+        m_cluster.setHasLocalServer(true);
 
-        boolean success = cluster.compile(pb);
+        boolean success = m_cluster.compile(pb);
         assertTrue(success);
 
-        cluster.startUp();
+        m_cluster.startUp();
 
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setTopologyChangeAware(true);
@@ -1097,7 +1084,7 @@ public class TestNTProcs extends TestCase {
         clientConfig.setConnectionResponseTimeout(200);
         clientConfig.setMaxOutstandingTxns(500);
         final Client firehoseClient = ClientFactory.createClient();
-        firehoseClient.createConnection(cluster.getListenerAddress(0));
+        firehoseClient.createConnection(m_cluster.getListenerAddress(0));
 
         System.out.println("Client connected");
 
@@ -1183,10 +1170,10 @@ public class TestNTProcs extends TestCase {
             public void run() {
                 while (keepKilling.get()) {
                     try {
-                        int nodeCount = cluster.getNodeCount();
+                        int nodeCount = m_cluster.getNodeCount();
                         int killNode = rand.nextInt(nodeCount);
-                        cluster.killSingleHost(killNode);
-                        cluster.rejoinOne(killNode);
+                        m_cluster.killSingleHost(killNode);
+                        m_cluster.rejoinOne(killNode);
                     }
                     catch (Exception e) {
                         e.printStackTrace();
@@ -1219,8 +1206,5 @@ public class TestNTProcs extends TestCase {
         System.out.println("Stopping callback status thread");
         keepPrintingCallbacksOutstanding.set(false);
         callbackStatusThread.join(10000);
-
-        System.out.println("Stopping cluster");
-        cluster.shutDown();
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,7 +19,7 @@
 #define UNDOQUANTUM_H_
 
 #include <stdint.h>
-#include <cassert>
+#include <common/debuglog.h>
 #include <string.h>
 #include <list>
 
@@ -55,22 +55,32 @@ public:
     /**
      * Add a new UndoReleaseAction to the list of undo actions. interest is an optional UndoQuantumReleaseInterest which
      * will be added to the list of interested parties and invoked upon release of the undo quantum after all
-     * undoActions have been performed. removeInterest is an optional UndoQuantumReleaseInterest which will be removed
-     * from the list of interested parties if it had been previously added.
+     * undoActions have been performed.
      */
-    virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL,
-            UndoQuantumReleaseInterest *removeInterest = NULL) {
-        assert(undoAction);
+    inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+        vassert(undoAction);
+        m_undoActions.push_back(undoAction);
+
+        if (interest != NULL && interest->isNewReleaseInterest(m_undoToken)) {
+           m_interests.push_back(interest);
+        }
+    }
+
+    inline void registerSynchronizedUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+        vassert(undoAction);
         m_undoActions.push_back(undoAction);
 
         if (interest != NULL) {
            m_interests.push_back(interest);
         }
+    }
 
-        if (removeInterest != NULL) {
-            assert(removeInterest != interest);
-            m_interests.remove(removeInterest);
-        }
+    /**
+     * removeInterest is an UndoQuantumReleaseInterest which will be removed
+     * from the list of interested parties if it had been previously added.
+     */
+    inline void unregisterReleaseInterest(UndoQuantumReleaseInterest *removeInterest) {
+        m_interests.remove(removeInterest);
     }
 
     /*
@@ -121,8 +131,6 @@ public:
         return m_undoToken;
     }
 
-    virtual bool isDummy() {return false;}
-
     inline int64_t getAllocatedMemory() const
     {
         return m_dataPool->getAllocatedMemory();
@@ -130,6 +138,8 @@ public:
     Pool* getPool() const throw() {
        return m_dataPool;
     }
+
+    inline const UndoReleaseAction* getLastUndoActionForTest() { return m_undoActions.back(); }
 
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
 private:

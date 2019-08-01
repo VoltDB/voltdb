@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        String[] strs = {"SELECT COUNT(*) FROM T1 order by A_INT", "SELECT COUNT(*) FROM T1 order by A_INT"};
+        String[] strs = {"SELECT COUNT(*) FROM T1", "SELECT COUNT(*) FROM T1"};
 
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
         while (vt.advanceRow()) {

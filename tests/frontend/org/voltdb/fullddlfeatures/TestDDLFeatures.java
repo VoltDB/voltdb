@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,7 +92,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findTableInSystemCatalogResults("T1"));
         assertTrue(findIndexInSystemCatalogResults("area"));
         assertTrue(verifyIndexUniqueness("area", true));
-        assertEquals(indexedColumnCount("T1"), 2);
+        assertEquals(indexedColumnCount("T1"), 3);
     }
 
     @Test
@@ -142,6 +142,27 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
                 "@AdHoc", tooManyParmsProcBuilder.toString());
+
+        // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+        String ENG14487 = "CREATE PROCEDURE ENG14487 PARTITION ON TABLE T2 COLUMN area\n" +
+                "   AS BEGIN\n" +
+                "      select * from t2 where area=?;\n" +
+                "      truncate table t2;\n" +
+                "   END;";
+        RegressionSuite.verifyProcFails(m_client,
+                "Single partitioned procedure: ENG14487 has TRUNCATE statement: \"truncate table t2\"",
+                "@AdHoc", ENG14487);
+
+        ENG14487 = "CREATE PROCEDURE ENG14487\n" +
+                "   AS BEGIN\n" +
+                "      select * from t2 where area=?;\n" +
+                "      truncate table t2;\n" +
+                "   END;";
+        ClientResponse cr = m_client.callProcedure("@AdHoc", ENG14487);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        RegressionSuite.verifyProcFails(m_client,
+                "Single partitioned procedure: ENG14487 has TRUNCATE statement: \"truncate table t2\"",
+                "@AdHoc", "PARTITION PROCEDURE ENG14487 ON TABLE T2 COLUMN area;");
     }
 
     @Test
@@ -187,6 +208,19 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         // ENG-14210 more than 1025 parameters
         RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
                 "@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testJavaProcTooManyParams;");
+
+        // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+        RegressionSuite.verifyProcFails(m_client,
+                "Single partitioned procedure: org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc has TRUNCATE statement: \"truncate table t2;\".",
+                "@AdHoc",
+                "CREATE PROCEDURE PARTITION ON TABLE T2 COLUMN area FROM CLASS org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc;");
+
+        ClientResponse cr = m_client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        RegressionSuite.verifyProcFails(m_client,
+                ".*Single partitioned procedure: org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc has TRUNCATE statement: \"truncate table t2;\"",
+                "@AdHoc", "PARTITION PROCEDURE testSinglePartitionedTruncateProc ON TABLE T2 COLUMN area;");
     }
 
     @Test
@@ -409,21 +443,93 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     }
 
     @Test
-    public void testExportTable() throws Exception
+    public void testDropStream() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25"));
-        assertEquals(getTableType("T25"), "EXPORT");
-        //Export table created with STREAM syntax
-        assertTrue(findTableInSystemCatalogResults("T25S"));
-        assertEquals(getTableType("T25S"), "EXPORT");
+        assertFalse("Stream T25D1 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D1"));
+        assertFalse("Stream T25D2 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D2"));
+    }
+
+    @Test
+    public void testCreateStream() throws Exception
+    {
+        assertTrue  ("Stream T25S should exist",   findTableInSystemCatalogResults("T25S"));
+        assertEquals("Stream T25S has wrong type", "EXPORT", getTableType("T25S"));
     }
 
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25N"));
-        assertEquals(getTableType("T25N"), "EXPORT");
-        assertEquals(getTableType("VT25N"), "VIEW");
+        assertTrue  ("Stream T25N should exist",         findTableInSystemCatalogResults("T25N"));
+        assertEquals("Stream T25N has wrong type",       "EXPORT", getTableType("T25N"));
+        assertTrue  ("Stream View VT25N should exist",   findTableInSystemCatalogResults("VT25N"));
+        assertEquals("Stream View VT25N has wrong type", "VIEW", getTableType("VT25N"));
+    }
+
+    @Test
+    public void testCreateTableWithTTL() throws Exception
+    {
+        assertTrue  ("Table T63 should exist",    findTableInSystemCatalogResults("T63"));
+        assertEquals("Stream T63 has wrong type", "TABLE", getTableType("T63"));
+
+        // TODO: add more tests, once TTL info (e.g. TTL value, time-unit,
+        // batch size # rows, max frequency value) is available from
+        // '@SystemCatalog "COLUMNS"' (or in some other way): ENG-15701
+
+        // Table T64 also specifies BATCH_SIZE and MAX_FREQUENCY
+        assertTrue  ("Table T64 should exist",    findTableInSystemCatalogResults("T64"));
+        assertEquals("Stream T64 has wrong type", "TABLE", getTableType("T64"));
+    }
+
+    @Test
+    public void testAlterTableWithTTLDropColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnDoesNotExist("T63", "C1");
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnDoesNotExist("T64", "C2");
+    }
+
+    @Test
+    public void testAlterTableWithTTLAddColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnExists    ("T63", "A1");
+        assertColumnTypeEquals("T63", "A1", "VARCHAR");
+        assertColumnSizeEquals("T63", "A1", 15);
+        assertColumnIsNullable("T63", "A1");
+        assertColumnDefaultValueEquals   ("T63", "A1", "'abc'");
+        assertColumnOrdinalPositionEquals("T63", "A1", 3);
+        assertColumnOrdinalPositionEquals("T63", "C2", 1);
+        assertColumnOrdinalPositionEquals("T63", "C3", 2);
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnExists    ("T64", "A1");
+        assertColumnTypeEquals("T64", "A1", "VARCHAR");
+        assertColumnSizeEquals("T64", "A1", 2048);
+        assertColumnIsNotNullable("T64", "A1");
+        assertColumnDefaultValueEquals   ("T64", "A1", "'ghi'");
+        assertColumnOrdinalPositionEquals("T64", "A1", 1);
+        assertColumnOrdinalPositionEquals("T64", "C1", 2);
+        assertColumnOrdinalPositionEquals("T64", "C3", 3);
+    }
+
+    @Test
+    public void testAlterTableWithTTLAlterColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnExists    ("T63", "C2");
+        assertColumnTypeEquals("T63", "C2", "VARCHAR");
+        assertColumnSizeEquals("T63", "C2", 16);
+        assertColumnIsNotNullable("T63", "C2");
+        assertColumnDefaultValueEquals("T63", "C2", "'def'");
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnExists    ("T64", "C1");
+        assertColumnTypeEquals("T64", "C1", "VARCHAR");
+        assertColumnSizeEquals("T64", "C1", 15);
+        assertColumnIsNullable("T64", "C1");
+        assertColumnDefaultValueEquals("T64", "C1", "'jkl'");
     }
 
 //    @Test

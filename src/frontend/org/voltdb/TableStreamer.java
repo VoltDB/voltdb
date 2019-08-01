@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.rejoin.StreamSnapshotDataTarget.SnapshotSerializationException;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -50,12 +51,15 @@ public class TableStreamer {
 
     private final int m_tableId;
     private final TableStreamType m_type;
+    private final HiddenColumnFilter m_hiddenColumnFilter;
     private final ImmutableList<SnapshotTableTask> m_tableTasks;
 
-    public TableStreamer(int tableId, TableStreamType type, List<SnapshotTableTask> tableTasks)
+    public TableStreamer(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+            List<SnapshotTableTask> tableTasks)
     {
         m_tableId = tableId;
         m_type = type;
+        m_hiddenColumnFilter = hiddenColumnFilter;
         m_tableTasks = ImmutableList.copyOf(tableTasks);
     }
 
@@ -79,7 +83,7 @@ public class TableStreamer {
      */
     public boolean activate(SystemProcedureExecutionContext context, boolean undo, byte[] predicates)
     {
-        if (!context.activateTableStream(m_tableId, m_type, undo, predicates)) {
+        if (!context.activateTableStream(m_tableId, m_type, m_hiddenColumnFilter, undo, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
             log.debug("Attempted to activate a table stream of type " + m_type +
                       "for table " + tableName + " and failed");
@@ -140,7 +144,9 @@ public class TableStreamer {
      * @return the number of rows contained within the given list of {@link BBContainer}
      */
     private int getTupleDataRowCount(List<DBBPool.BBContainer> outputBuffers) {
-        if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) return 0;
+        if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) {
+            return 0;
+        }
         int accumulator = 0;
         for (int i = 0; i < outputBuffers.size(); ++i) {
             SnapshotDataTarget target = m_tableTasks.get(i).m_target;

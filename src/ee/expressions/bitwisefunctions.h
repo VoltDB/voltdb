@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@
 #include <string>
 #include <limits.h>
 #include "common/NValue.hpp"
+#include "common/StackTrace.h"
 
 namespace voltdb {
 
@@ -89,7 +90,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BIN>() const {
 }
 
 template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -114,7 +115,7 @@ template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& ar
 
 
 template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -139,7 +140,7 @@ template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arg
 
 
 template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -164,7 +165,7 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 
 
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     if (lval.getValueType() != VALUE_TYPE_BIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_LEFT function");
@@ -198,7 +199,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vecto
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     if (lval.getValueType() != VALUE_TYPE_BIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_RIGHT function");
@@ -264,9 +265,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
     char answer[INET_ADDRSTRLEN + 1];
     answer[sizeof(answer)-1] = 0;
     if (inet_ntop(AF_INET, &addr, answer, sizeof(answer)) == 0) {
-        throw SQLException(SQLException::dynamic_sql_error,
-                           errno,
-                           "INET_NTOA Conversion error");
+        throw SQLException(SQLException::dynamic_sql_error, errno, "INET_NTOA Conversion error");
     }
     return getTempStringValue(answer, strlen(answer));
 }
@@ -291,7 +290,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
 
     in_addr addr;
     int32_t addrlen;
-    const char *addr_str = getObject_withoutNull(&addrlen);
+    const char *addr_str = getObject_withoutNull(addrlen);
     if (INET_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
         sb << "Address string for INET_ATON is too long to be an IPv4 address: "
@@ -327,7 +326,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
         return getNullValue(VALUE_TYPE_VARCHAR);
     }
     int32_t addr_len;
-    const in6_addr *addr = (const in6_addr *)getObject_withoutNull(&addr_len);
+    const in6_addr *addr = (const in6_addr *)getObject_withoutNull(addr_len);
     if (addr_len != sizeof(in6_addr)) {
         std::stringstream sb;
         sb << "VARBINARY value is the wrong size to hold an IPv6 address: "
@@ -339,9 +338,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     char dest[INET6_ADDRSTRLEN + 1];
     dest[sizeof(dest) - 1] = 0;
     if (inet_ntop(AF_INET6, (const void *)addr, dest, sizeof(dest)) == 0) {
-        throw SQLException(SQLException::dynamic_sql_error,
-                           errno,
-                           "INET6_NTOA Conversion error");
+        throw SQLException(SQLException::dynamic_sql_error, errno, "INET6_NTOA Conversion error");
     }
     return getTempStringValue(dest, strlen(dest));
 }
@@ -355,18 +352,18 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
 template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET6_ATON function");
-    }
-    if (isNull()) {
+    } else if (isNull()) {
         return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
     int32_t addrlen;
-    const char *addr_str = getObject_withoutNull(&addrlen);
+    const char *addr_str = getObject_withoutNull(addrlen);
     if (INET6_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
-        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: "
-           << addrlen;
+        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: " << addrlen;
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    } else {
+       throwDataExceptionIfInfiniteOrNaN(0, "function LN");
     }
     // Copy the string out to cbuff so we can
     // null terminate it for inet_pton.
@@ -377,13 +374,10 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     // Let inet_pton do the validation.
     if (inet_pton(AF_INET6, cbuff, (void*)&addr) == 0) {
         std::stringstream sb;
-        sb << "Unrecognized format for IPv6 address string <"
-           << cbuff
-           << ">";
+        sb << "Unrecognized format for IPv6 address string <" << cbuff << ">";
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addr, sizeof(addr), getTempStringPool());
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());
 }
 
 }

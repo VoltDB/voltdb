@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,8 +56,8 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           const ExecutorVector&)
 {
     VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getInputTableCount() == 1);
+    vassert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    vassert(m_abstractNode->getInputTableCount() == 1);
     return true;
 }
 
@@ -65,7 +65,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
 
     Table* inputTable = m_abstractNode->getInputTable();
-    assert(inputTable);
+    vassert(inputTable);
     VOLT_TRACE("send input:\n%s\n", inputTable->debug().c_str());
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!

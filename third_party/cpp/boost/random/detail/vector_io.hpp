@@ -7,7 +7,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: vector_io.hpp 71018 2011-04-05 21:27:52Z steven_watanabe $
+ * $Id$
  */
 
 #ifndef BOOST_RANDOM_DETAIL_VECTOR_IO_HPP
@@ -16,6 +16,7 @@
 #include <vector>
 #include <iosfwd>
 #include <istream>
+#include <boost/io/ios_state.hpp>
 
 namespace boost {
 namespace random {
@@ -52,12 +53,14 @@ void read_vector(std::basic_istream<CharT, Traits>& is, std::vector<T>& vec)
         is.setstate(std::ios_base::failbit);
         return;
     }
+    boost::io::basic_ios_exception_saver<CharT, Traits> e(is, std::ios_base::goodbit);
     T val;
     while(is >> std::ws >> val) {
         vec.push_back(val);
     }
     if(is.fail()) {
         is.clear();
+        e.restore();
         if(!(is >> ch)) {
             return;
         }

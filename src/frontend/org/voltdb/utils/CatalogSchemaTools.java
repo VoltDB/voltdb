@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,9 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -111,17 +113,27 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
         }
         else {
-            if (isExportOnly) {
+            if (TableType.isStream(catalog_tbl.getTabletype())) {
                 table_sb.append("CREATE STREAM ").append(catalog_tbl.getTypeName());
                 if (streamPartitionColumn != null && viewQuery == null) {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
                 }
                 //Default target means no target.
-                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME) &&
+                        TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
+                if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
+                    table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
+                }
+                if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
+                    table_sb.append(" EXPORT TO TARGET ");
+                    table_sb.append(streamTarget);
+                    table_sb.append(" ON " + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
+                    table_sb.append(" ");
+                }
             }
             table_sb.append(" (");
         }
@@ -350,12 +362,10 @@ public abstract class CatalogSchemaTools {
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
                     sb.append("CREATE ASSUMEUNIQUE INDEX ");
-                }
-                else {
+                } else {
                     sb.append("CREATE UNIQUE INDEX ");
                 }
-            }
-            else {
+            } else {    // MITGRATE flag does not imply any changes on the "CREATE INDEX" syntax
                 sb.append("CREATE INDEX ");
             }
 
@@ -588,7 +598,7 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table),
+                        toSchema(sb, table, null, TableType.isStream(table.getTabletype()),
                                 (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL

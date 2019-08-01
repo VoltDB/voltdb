@@ -25,6 +25,10 @@ import multiprocessing
 #
 ########################################################################
 def makeParser():
+    class OnOffAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, self.dest, 'ON' if values == 'true' else 'OFF')
+
     parser = argparse.ArgumentParser(description='Build VoltDB EE Engine.')
     #
     # Build configuration.
@@ -80,11 +84,22 @@ def makeParser():
                         Set the log level.  The default is 500.
                         ''')
     parser.add_argument('--pool-checking',
-                        action='store',
-                        default='false',
+                        action=OnOffAction,
+                        default='OFF',
                         help='''
                         Turns on conditionally compiled code to verify usage of memory
                         pools in the EE.''')
+    parser.add_argument('--trace-pools',
+                        action=OnOffAction,
+                        default='OFF',
+                        help='''
+                        Turns on conditionally compiled code to save stack traces for memory
+                        pool allocations in the EE.''')
+    parser.add_argument('--timer-enabled',
+                        action=OnOffAction,
+                        default='OFF',
+                        help='''
+                        Turns on conditionally compiled code to enable timers in the EE.''')
 
     #
     # Build parameters.
@@ -272,13 +287,10 @@ def makeBuilderCall(config):
 def configureCommandString(config):
     profile = "OFF"
     coverage = "OFF"
-    pool_checking = "OFF"
     if config.coverage:
         coverage = "ON"
     if config.profile:
         profile = 'ON'
-    if config.pool_checking == 'true':
-        pool_checking = 'ON'
     if config.buildtype == 'debug' or config.buildtype == 'memcheck':
         cmakeBuildType="Debug"
     else:
@@ -294,6 +306,8 @@ def configureCommandString(config):
             '-DVOLTDB_USE_PROFILING=%s '  # profile
             '-DVOLT_LOG_LEVEL=%s '        # config.log_level
             '-DVOLT_POOL_CHECKING=%s '    # pool_checking
+            '-DVOLT_TRACE_ALLOCATIONS=%s '# trace_pools
+            '-DVOLT_TIMER_ENABLED=%s '    # timer_enabled
             '-DVOLTDB_CORE_COUNT=%d '     # number of processors
             '%s')                         # config.srcdir
               % (verbose,
@@ -303,7 +317,9 @@ def configureCommandString(config):
                 coverage,
                 profile,
                 config.log_level,
-                pool_checking,
+                config.pool_checking,
+                config.trace_pools,
+                config.timer_enabled,
                 getNumberProcessors(config),
                 config.srcdir))
 

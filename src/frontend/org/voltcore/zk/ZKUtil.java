@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -163,7 +163,9 @@ public class ZKUtil {
         int ii = 0;
         PureJavaCrc32 crc = getCRC ? new PureJavaCrc32() : null;
         for (String chunk : chunks) {
-            if (chunk.endsWith("_complete")) continue;
+            if (chunk.endsWith("_complete")) {
+                continue;
+            }
             resultBuffers[ii] = zk.getData(chunk, false, null);
             if (crc != null) {
                 crc.update(resultBuffers[ii]);
@@ -304,70 +306,71 @@ public class ZKUtil {
         }
     }
 
-    public static class VoidCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.VoidCallback {
+    private static abstract class BaseCallback<T> {
         private final CountDownLatch done = new CountDownLatch(1);
-        private Object results[];
+        private KeeperException.Code code;
+        private String path;
+        private Object context;
+        private T payload;
 
-
-        public Object[] get() throws InterruptedException, KeeperException {
-            done.await();
-            return getResult();
+        public T get() throws InterruptedException, KeeperException {
+            await();
+            return payload;
         }
 
-        public byte[] getData() throws InterruptedException, KeeperException {
-            done.await();
-            return (byte[])getResult()[3];
-        }
-
-        private Object[] getResult() throws KeeperException {
-            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
-            if (code == KeeperException.Code.OK) {
-                return results;
+        public T get(long timeout, TimeUnit unit) throws InterruptedException, KeeperException, TimeoutException {
+            if (done.await(timeout, unit)) {
+                checkCode();
+                return payload;
             } else {
-                throw KeeperException.create(code);
+                throw new TimeoutException();
             }
-        }
-
-        @Override
-        public void processResult(int rc, String path, Object ctx) {
-            results = new Object[] { rc, path, ctx };
-            done.countDown();
-        }
-
-    }
-    public static class ByteArrayCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback {
-        private final CountDownLatch done = new CountDownLatch(1);
-        private Object results[];
-
-        public Object[] get() throws InterruptedException, KeeperException {
-            done.await();
-            return getResult();
         }
 
         public String getPath() throws InterruptedException, KeeperException {
-            done.await();
-            return (String)getResult()[1];
+            await();
+            return path;
         }
 
-        public byte[] getData() throws InterruptedException, KeeperException {
-            done.await();
-            return (byte[])getResult()[3];
+        @SuppressWarnings("unchecked")
+        public <C> C getContext() throws InterruptedException, KeeperException {
+            await();
+            return (C) context;
         }
 
-        private Object[] getResult() throws KeeperException {
-            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
-            if (code == KeeperException.Code.OK) {
-                return results;
-            } else {
-                throw KeeperException.create(code);
+        void setResult(int rc, String path, Object context, T payload) {
+            code = KeeperException.Code.get(rc);
+            this.path = path;
+            this.context = context;
+            this.payload = payload;
+            done.countDown();
+        }
+
+        private void await() throws InterruptedException, KeeperException {
+            done.await();
+            checkCode();
+        }
+
+        private void checkCode() throws KeeperException {
+            if (code != KeeperException.Code.OK) {
+                throw KeeperException.create(code, path);
             }
         }
+    }
 
+    public static class VoidCallback extends BaseCallback<Void>
+            implements org.apache.zookeeper_voltpatches.AsyncCallback.VoidCallback {
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data,
-                Stat stat) {
-            results = new Object[] { rc, path, ctx, data, stat };
-            done.countDown();
+        public void processResult(int rc, String path, Object ctx) {
+            setResult(rc, path, ctx, null);
+        }
+    }
+
+    public static class ByteArrayCallback extends BaseCallback<byte[]>
+            implements org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback {
+        @Override
+        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+            setResult(rc, path, ctx, data);
         }
     }
 
@@ -393,81 +396,19 @@ public class ZKUtil {
         }
     }
 
-    public static class StringCallback implements
+    public static class StringCallback extends BaseCallback<String> implements
          org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback {
-        private final CountDownLatch done = new CountDownLatch(1);
-        private Object results[];
-
-        public Object[] get() throws InterruptedException, KeeperException {
-            done.await();
-            return getResult();
-        }
-
-        public Object[] get(long timeout, TimeUnit unit)
-                throws InterruptedException, KeeperException,
-                TimeoutException {
-            if (done.await(timeout, unit)) {
-                return getResult();
-            } else {
-                throw new TimeoutException();
-            }
-        }
-
-        private Object[] getResult() throws KeeperException {
-            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
-            if (code == KeeperException.Code.OK) {
-                return results;
-            } else {
-                throw KeeperException.create(code);
-            }
-        }
-
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
-            results = new Object[] { rc, path, ctx, name };
-            done.countDown();
+            setResult(rc, path, ctx, name);
         }
     }
 
-    public static class ChildrenCallback implements
-    org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback {
-        private final CountDownLatch done = new CountDownLatch(1);
-        private Object results[];
-
-        public Object[] get() throws InterruptedException, KeeperException {
-            done.await();
-            return getResult();
-        }
-
-        public Object[] get(long timeout, TimeUnit unit)
-                throws InterruptedException, KeeperException,
-                TimeoutException {
-            if (done.await(timeout, unit)) {
-                return getResult();
-            } else {
-                throw new TimeoutException();
-            }
-        }
-
-        private Object[] getResult() throws KeeperException {
-            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
-            if (code == KeeperException.Code.OK) {
-                return results;
-            } else {
-                throw KeeperException.create(code);
-            }
-        }
-
+    public static class ChildrenCallback extends BaseCallback<List<String>>
+            implements org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback {
         @Override
         public void processResult(int rc, String path, Object ctx, List<String> children) {
-            results = new Object[] {rc, path, ctx, children};
-            done.countDown();
-        }
-
-        @SuppressWarnings("unchecked")
-        public List<String> getChildren()  throws InterruptedException, KeeperException  {
-            done.await();
-            return (List<String>)getResult()[3];
+            setResult(rc, path, ctx, children);
         }
     }
 
@@ -492,7 +433,9 @@ public class ZKUtil {
            es.execute(new Runnable() {
                @Override
                public void run() {
-                   if (canceled) return;
+                   if (canceled) {
+                    return;
+                }
                    pProcess(event);
                }
            });
@@ -541,7 +484,7 @@ public class ZKUtil {
             while (itr.hasNext()) {
                 Pair<ChildrenCallback,ListingNode> callbackPair = itr.next();
                 try {
-                    List<String> children = callbackPair.getFirst().getChildren();
+                    List<String> children = callbackPair.getFirst().get();
                     callbackPair.getSecond().childCount = children.size();
                     for (String child: children) {
                         listing.add(new ListingNode(callbackPair.getSecond(), child));
@@ -603,20 +546,26 @@ public class ZKUtil {
 
         @Override
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             ListingNode other = (ListingNode) obj;
-            if (lvl != other.lvl)
+            if (lvl != other.lvl) {
                 return false;
+            }
             if (node == null) {
-                if (other.node != null)
+                if (other.node != null) {
                     return false;
-            } else if (!node.equals(other.node))
+                }
+            } else if (!node.equals(other.node)) {
                 return false;
+            }
             return true;
         }
 

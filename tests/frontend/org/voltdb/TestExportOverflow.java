@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -154,18 +155,17 @@ public class TestExportOverflow extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestExportOverflow.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        // configure export
-        project.addLiteralSchema(
-                "CREATE STREAM stream1 EXPORT TO TARGET rejecting1 (id integer NOT NULL, value varchar(25) NOT NULL);");
-        project.addExport(true, "custom", null, "rejecting1");
-
         // set up default export connector
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.RejectingExportClient");
         Map<String, String> additionalEnv = new HashMap<String, String>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.RejectingExportClient");
 
+        project.addLiteralSchema(
+                "CREATE STREAM stream1 EXPORT TO TARGET rejecting1 (id integer NOT NULL, value varchar(25) NOT NULL);");
+        project.addExport(true, ServerExportEnum.CUSTOM, null, "rejecting1");
+
         LocalCluster config = new LocalCluster("export-overflow-test.jar", 1, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         // This is only for testing create --force.
         config.setNewCli(false);

@@ -68,6 +68,18 @@ namespace boost {
             { return io::detail::feed<CharT, Tr, Alloc, T&>(*this,x); }
 #endif
 
+        template<class T>
+        basic_format& operator%(volatile const T& x)
+            { /* make a non-volatile copy */ const T v(x);
+              /* pass the copy along      */ return io::detail::feed<CharT, Tr, Alloc, const T&>(*this, v); }
+
+#ifndef BOOST_NO_OVERLOAD_FOR_NON_CONST
+        template<class T>
+        basic_format& operator%(volatile T& x)
+            { /* make a non-volatile copy */ T v(x);
+              /* pass the copy along      */ return io::detail::feed<CharT, Tr, Alloc, T&>(*this, v); }
+#endif
+
 #if defined(__GNUC__)
         // GCC can't handle anonymous enums without some help
         // ** arguments passing ** //
@@ -126,7 +138,7 @@ namespace boost {
 
         template<class Ch2, class Tr2, class Alloc2, class T>  
         friend basic_format<Ch2, Tr2, Alloc2>&  
-        io::detail::feed (basic_format<Ch2, Tr2, Alloc2>&, T);
+        io::detail::feed_impl (basic_format<Ch2, Tr2, Alloc2>&, T);
 
         template<class Ch2, class Tr2, class Alloc2, class T>  friend   
         void io::detail::distribute (basic_format<Ch2, Tr2, Alloc2>&, T);

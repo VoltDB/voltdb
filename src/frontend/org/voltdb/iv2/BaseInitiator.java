@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,9 +43,9 @@ import org.voltdb.rejoin.TaskLog;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public abstract class BaseInitiator implements Initiator
+public abstract class BaseInitiator<S extends Scheduler> implements Initiator
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger tmLog = new VoltLogger("TM");
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -54,7 +54,7 @@ public abstract class BaseInitiator implements Initiator
     protected final String m_whoami;
 
     // Encapsulated objects
-    protected final Scheduler m_scheduler;
+    protected final S m_scheduler;
     protected final InitiatorMailbox m_initiatorMailbox;
     protected Term m_term = null;
     protected Site m_executionSite = null;
@@ -63,8 +63,7 @@ public abstract class BaseInitiator implements Initiator
 
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
-            StartAction startAction)
+            S scheduler, String whoamiPrefix, StatsAgent agent, StartAction startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
@@ -81,21 +80,7 @@ public abstract class BaseInitiator implements Initiator
             joinProducer = null;
         }
 
-        if (m_partitionId == MpInitiator.MP_INIT_PID) {
-            m_initiatorMailbox = new MpInitiatorMailbox(
-                    m_partitionId,
-                    m_scheduler,
-                    m_messenger,
-                    m_repairLog,
-                    joinProducer);
-        } else {
-            m_initiatorMailbox = new InitiatorMailbox(
-                    m_partitionId,
-                    m_scheduler,
-                    m_messenger,
-                    m_repairLog,
-                    joinProducer);
-        }
+        m_initiatorMailbox = createInitiatorMailbox(joinProducer);
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
@@ -202,7 +187,7 @@ public abstract class BaseInitiator implements Initiator
         if (m_siteThread != null) {
             try {
                 if (m_executionSite != null) {
-                    m_executionSite.m_scheduler.offer(Scheduler.m_nullTask);
+                    m_executionSite.m_pendingSiteTasks.offer(Scheduler.m_nullTask);
                 }
                 m_siteThread.join();
             } catch (InterruptedException e) {
@@ -240,4 +225,6 @@ public abstract class BaseInitiator implements Initiator
             return null;
         }
     }
+
+    protected abstract InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer);
 }

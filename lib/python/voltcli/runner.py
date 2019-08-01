@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,19 +27,18 @@ from voltcli import environment
 from voltcli import utility
 from getpass import getpass
 
-
 #===============================================================================
 # Global data
 #===============================================================================
 
 # Standard CLI options.
 base_cli_spec = cli.CLISpec(
-    description = '''\
+    description='''\
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
-    options = (
+    usage='%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
+    options=(
         cli.BooleanOption(None, '--debug', 'debug', None),
         cli.BooleanOption('-v', '--verbose', 'verbose',
                           'display verbose messages and external commands'),
@@ -79,6 +78,7 @@ readme_template = '''
 %(warning)s
 '''
 
+
 #===============================================================================
 class JavaRunner(object):
 #===============================================================================
@@ -87,9 +87,9 @@ class JavaRunner(object):
     """
 
     def __init__(self, verb, config, **kwargs):
-        self.verb      = verb
-        self.config    = config
-        self.kwargs    = kwargs
+        self.verb = verb
+        self.config = config
+        self.kwargs = kwargs
         self.classpath = None
 
     def initialize(self):
@@ -151,6 +151,7 @@ class JavaRunner(object):
             os.makedirs(outdir)
         utility.run_cmd('javac', '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
+
 #===============================================================================
 class VerbRunner(object):
 #===============================================================================
@@ -160,13 +161,13 @@ class VerbRunner(object):
         VerbRunner constructor.
         """
         # Unpack the command object for use by command implementations.
-        self.verb   = command.verb
-        self.opts   = command.opts
-        self.args   = command.args
+        self.verb = command.verb
+        self.opts = command.opts
+        self.args = command.args
         self.parser = command.parser
         # The verbspace supports running nested commands.
-        self.verbspace    = verbspace
-        self.config       = config
+        self.verbspace = verbspace
+        self.config = config
         self.default_func = None
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
@@ -265,7 +266,7 @@ class VerbRunner(object):
         """
         # The only valid keyword argument is 'all' for now.
         context = '%s.help()' % self.__class__.__name__
-        all = utility.kwargs_get_boolean(kwargs, 'all', default = False)
+        all = utility.kwargs_get_boolean(kwargs, 'all', default=False)
         if all:
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
@@ -314,17 +315,17 @@ class VerbRunner(object):
             self._create_package(output_dir, self.verbspace.name, self.verbspace.version,
                                  self.verbspace.description, force)
         # Warn for Python version < 2.6.
-        compat_msg = compatibility_warning % dict(name = self.verbspace.name)
+        compat_msg = compatibility_warning % dict(name=self.verbspace.name)
         if sys.version_info[0] == 2 and sys.version_info[1] < 6:
             utility.warning(compat_msg)
         # Generate README.<tool> file.
         readme_path = os.path.join(output_dir, 'README.%s' % self.verbspace.name)
-        readme_file = utility.File(readme_path, mode = 'w')
+        readme_file = utility.File(readme_path, mode='w')
         readme_file.open()
         try:
-            readme_file.write(readme_template % dict(name    = self.verbspace.name,
-                                                     usage   = self.get_usage(),
-                                                     warning = compat_msg))
+            readme_file.write(readme_template % dict(name=self.verbspace.name,
+                                                     usage=self.get_usage(),
+                                                     warning=compat_msg))
         finally:
             readme_file.close()
 
@@ -503,8 +504,8 @@ class VerbRunner(object):
         # Internal method to create a runnable Python package.
         output_path = os.path.join(output_dir, name)
         utility.info('Creating compressed executable Python program: %s' % output_path)
-        zipper = utility.Zipper(excludes = ['[.]pyc$'])
-        zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')
+        zipper = utility.Zipper(excludes=['[.]pyc$'])
+        zipper.open(output_path, force=force, preamble='#!/usr/bin/env python\n')
         try:
             # Generate the __main__.py module for automatic execution from the zip file.
             standalone = str(environment.standalone)
@@ -523,7 +524,7 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
                 dst = os.path.join('voltcli', os.path.basename(command_d))
                 zipper.add_directory(command_d, dst)
         finally:
-            zipper.close(make_executable = True)
+            zipper.close(make_executable=True)
 
     def _run_command(self, verbspace, *args, **kwargs):
         # Internal method to run a command.
@@ -553,12 +554,14 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
         output = utility.kwargs_get_string(kwargs, 'daemon_output', default=environment.command_dir)
         return utility.Daemonizer(name, description, output=output)
 
+
 #===============================================================================
 class VOLT(object):
 #===============================================================================
     """
     The VOLT namespace provided to dynamically loaded verb scripts.
     """
+
     def __init__(self, verb_decorators):
         # Add all verb_decorators methods not starting with '_' as members.
         for name, function in inspect.getmembers(verb_decorators, inspect.ismethod):
@@ -570,22 +573,23 @@ class VOLT(object):
             if issubclass(cls, cli.BaseOption) or issubclass(cls, cli.BaseArgument):
                 setattr(self, name, cls)
         # Expose specific useful voltdbclient symbols for Volt client commands.
-        self.VoltProcedure  = voltdbclient.VoltProcedure
-        self.VoltResponse   = voltdbclient.VoltResponse
-        self.VoltException  = voltdbclient.VoltException
-        self.VoltTable      = voltdbclient.VoltTable
-        self.VoltColumn     = voltdbclient.VoltColumn
+        self.VoltProcedure = voltdbclient.VoltProcedure
+        self.VoltResponse = voltdbclient.VoltResponse
+        self.VoltException = voltdbclient.VoltException
+        self.VoltTable = voltdbclient.VoltTable
+        self.VoltColumn = voltdbclient.VoltColumn
         self.FastSerializer = voltdbclient.FastSerializer
         # For declaring multi-command verbs like "show".
         self.Modifier = Modifier
         # Bundles
         self.ConnectionBundle = ConnectionBundle
-        self.ClientBundle     = ClientBundle
-        self.AdminBundle      = AdminBundle
-        self.ServerBundle     = ServerBundle
+        self.ClientBundle = ClientBundle
+        self.AdminBundle = AdminBundle
+        self.ServerBundle = ServerBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility
+
 
 #===============================================================================
 def load_verbspace(command_name, command_dir, config, version, description, package, pro_version):
@@ -621,16 +625,18 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     # If running from a zip package add resource locations.
     if package:
         finder.add_resource('__main__', os.path.join('voltcli', verbs_subdir))
-    finder.search_and_execute(VOLT = namespace_VOLT)
+    finder.search_and_execute(VOLT=namespace_VOLT)
 
     # Add standard verbs if they aren't supplied.
     def default_func(runner):
         runner.go()
+
     for verb_name, verb_cls in (('help', HelpVerb), ('package', PackageVerb)):
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
     return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs, pro_version)
+
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -638,6 +644,7 @@ class VoltConfig(utility.PersistentConfig):
     """
     Volt-specific persistent configuration provides customized error messages.
     """
+
     def __init__(self, permanent_path, local_path):
         utility.PersistentConfig.__init__(self, 'INI', permanent_path, local_path)
 
@@ -649,8 +656,10 @@ class VoltConfig(utility.PersistentConfig):
                             ['%s config %s=VALUE' % (environment.command_name, key)])
         return value
 
+
 #===============================================================================
 class VoltCLIParser(cli.CLIParser):
+
 #===============================================================================
     def __init__(self, verbspace):
         """
@@ -665,6 +674,7 @@ class VoltCLIParser(cli.CLIParser):
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
                                      verstr)
+
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
@@ -689,21 +699,22 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
             content = ""
             for line in credentialsFile:
                 content += line
-            user,usr,password,pswd = content.replace(':', ' ').split()
+            user, usr, password, pswd = content.replace(':', ' ').split()
             command.opts.username = usr
             command.opts.password = pswd
             credentialsFile.close()
 
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)
-    utility.set_debug(  command.opts.debug)
+    utility.set_debug(command.opts.debug)
     if hasattr(command.opts, 'dryrun'):
-        utility.set_dryrun( command.opts.dryrun)
+        utility.set_dryrun(command.opts.dryrun)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".
     runner = VerbRunner(command, verbspace, internal_verbspaces, config, **kwargs)
     runner.execute()
+
 
 #===============================================================================
 def main(command_name, command_dir, version, description, *args, **kwargs):
@@ -727,7 +738,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Load the configuration and state
         permanent_path = os.path.join(os.getcwd(), environment.config_name)
-        local_path     = os.path.join(os.getcwd(), environment.config_name_local)
+        local_path = os.path.join(os.getcwd(), environment.config_name_local)
         config = VoltConfig(permanent_path, local_path)
 
         # Initialize the environment

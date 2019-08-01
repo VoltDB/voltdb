@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,8 +29,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -43,6 +41,8 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
+
+import junit.framework.Test;
 
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
@@ -165,18 +165,17 @@ public class TestUserDefinedFunctions extends RegressionSuite {
             if (exceptionCause != null) {
                 actualExcepCauseType = exceptionCause.getClass();
             }
-
-            assertEquals("Unexpected Exception type for: "+functionCall, expectedExceptionType, actualExceptionType);
-
+            assertEquals("Unexpected Exception type for: " + functionCall,
+                    expectedExceptionType, actualExceptionType);
             // TODO: delete, once UDFs throwing exceptions with causes works (ENG-12863):
-            if (exceptionCause == null) {
-                return;
+            if (exceptionCause != null) {
+                assertEquals("Unexpected Exception *cause* type for " + functionCall,
+                        expectedExcepCauseType, actualExcepCauseType);
             }
-
-            assertEquals("Unexpected Exception *cause* type for "+functionCall, expectedExcepCauseType, actualExcepCauseType);
             return;
         }
-        fail(functionCall+" did not throw expected exception: "+expectedExceptionType+" (with "+expectedExcepCauseType+" cause)");
+        fail(functionCall + " did not throw expected exception: " + expectedExceptionType +
+                " (with " + expectedExcepCauseType + " cause)");
     }
 
     /** Tests the specified <i>functionCall</i>, and confirms that an Exception
@@ -598,10 +597,11 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
     }
 
-
-
     // Test more UDF's with two arguments; these UDF's have no null checking, so odd
     // things can happen, such as null plus one equals a number ...
+    // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite. These tests now succeed
+    // even when running in Git branch name that contains "calcite-", because we catch CalciteContextException, and
+    // rerun the query using legacy parser/planner. Nevertheless, ENG-15490 need to be resolved.
 
     public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
         testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);

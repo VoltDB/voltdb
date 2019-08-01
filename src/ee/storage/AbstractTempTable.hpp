@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -76,7 +76,7 @@ public:
      * Swap the tuples in this table with the tuples in another table
      */
     virtual void swapContents(AbstractTempTable* otherTable) {
-        assert(schema()->isCompatibleForMemcpy(otherTable->schema()));
+        vassert(schema()->isCompatibleForMemcpy(otherTable->schema()));
         std::swap(m_tupleCount, otherTable->m_tupleCount);
         std::swap(m_tuplesPinnedByUndo, otherTable->m_tuplesPinnedByUndo);
         std::swap(m_nonInlinedMemorySize, otherTable->m_nonInlinedMemorySize);

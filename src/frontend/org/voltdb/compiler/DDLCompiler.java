@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,12 +20,7 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
@@ -33,17 +28,23 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.PersistentExport;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -75,16 +76,20 @@ import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.*;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.calciteutils.DropTableUtils;
+import org.voltdb.plannerv2.utils.DropTableUtils;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -93,8 +98,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
-
-
 
 /**
  * Compiles schema (SQL DDL) text files and stores the results in a given catalog.
@@ -111,6 +114,18 @@ public class DDLCompiler {
     private final HSQLInterface m_hsql;
     private final VoltCompiler m_compiler;
     private final MaterializedViewProcessor m_mvProcessor;
+    private static final AbstractExpression NOT_MIGRATING =
+            new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                    new FunctionExpression("migrating", null,   // MIGRATING() function
+                            FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING),
+                    null);
+
+    static {
+        final AbstractExpression migrating_node = NOT_MIGRATING.getLeft();
+        migrating_node.setValueType(VoltType.BOOLEAN);
+        migrating_node.setArgs(Collections.emptyList());
+        migrating_node.setValueSize(1);
+    }
 
     private String m_fullDDL = "";
 
@@ -154,6 +169,9 @@ public class DDLCompiler {
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
+    private static final String INVALID_CREATE_EXPORT = "Invalid CREATE TABLE statement: %s "
+            + "expected syntax: CREATE TABLE <table> [EXPORT TO TARGET <target> ON <OPERATIONS> (column datatype, ...);" +
+            " Only INSERT, DELETE, UPDATE (or one of UPDATE_NEW, UPDATE_OLD) are allowed for OPERATIONS.";
     static final String [][] DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS = {
         {DR_ROW_TYPE_COLUMN_NAME, "VARCHAR(3 BYTES) NOT NULL"},
         {DR_LOG_ACTION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
@@ -500,12 +518,17 @@ public class DDLCompiler {
         loadSchema(reader, db, previousDBIfAny, whichProcs);
     }
 
-    private void applyDiff(VoltXMLDiff stmtDiff)
+    private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
     {
         // record which tables changed
-        for (String tableName : stmtDiff.getChangedNodes().keySet()) {
+        for (Map.Entry<String, VoltXMLDiff> entry : stmtDiff.getChangedNodes().entrySet()) {
+            String tableName = entry.getKey();
             assert(tableName.startsWith("table"));
             tableName = tableName.substring("table".length());
+            if (!validatePersistentExport(entry.getValue())) {
+                throw m_compiler.new VoltCompilerException(String.format("The export target on table %s cann't be altered", tableName));
+            }
+
             m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
@@ -561,6 +584,24 @@ public class DDLCompiler {
             m_compiler.addWarn(String.format("Partition column %s was dropped from table %s.  Attempting to change table to replicated.", partitionCol, tableElement.attributes.get("name")));
             tableElement.attributes.remove("partitioncolumn");
         }
+    }
+
+    private boolean validatePersistentExport(VoltXMLDiff stmtdiff) {
+        String addedTarget = null;
+        for (VoltXMLElement persistentXML : stmtdiff.getAddedNodes()) {
+            if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
+                addedTarget = persistentXML.attributes.get("target");
+                break;
+            }
+        }
+        if (addedTarget != null) {
+            for (VoltXMLElement persistentXML : stmtdiff.getRemovedNodes()) {
+                if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
+                    return (addedTarget.equalsIgnoreCase(persistentXML.attributes.get("target")));
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -673,6 +714,99 @@ public class DDLCompiler {
         }
     }
 
+    /**
+     * Process a VoltDB-specific create table ... migrate to target ... DDL statement.
+     * @param stmt
+     * @throws VoltCompilerException
+     */
+    private void processCreateTableStatement(DDLStatement stmt) throws VoltCompilerException {
+        final String statement = stmt.statement;
+        Matcher statementMatcher = SQLParser.matchCreateTableMigrateTo(statement);
+        if (statementMatcher.matches()) {
+            // if we have migrate to target clause
+            if ((statementMatcher.groupCount() > 1) &&
+                    (statementMatcher.group(2) != null) &&
+                    (!statementMatcher.group(2).isEmpty())) {
+                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+                String targetName = checkIdentifierStart(statementMatcher.group(2), statement);
+
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML == null) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid DDL statement: table %s does not exist", tableName));
+                }
+
+                tableXML.attributes.put("migrateExport", targetName);
+            }
+            return;
+        }
+
+        // if we have export to target clause
+        statementMatcher = SQLParser.matchCreateTableExportTo(statement);
+        if (statementMatcher.matches()) {
+            int groups = statementMatcher.groupCount();
+            if (groups > 1 && statementMatcher.group(2) != null && !statementMatcher.group(2).isEmpty()) {
+                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+                String targetName = checkIdentifierStart(statementMatcher.group(2), statement);
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML == null) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid DDL statement: table %s does not exist", tableName));
+                }
+
+                List<String> triggers = new ArrayList<>();
+                if (groups > 2 && statementMatcher.group(3) != null && !statementMatcher.group(3).isEmpty()) {
+                    String exportTrigger = checkIdentifierStart(statementMatcher.group(3), statement);
+                    triggers = validateExportTriggers(exportTrigger);
+                }
+                if (triggers.isEmpty()) {
+                    triggers = Arrays.asList("INSERT");
+                }
+                targetName = targetName.toUpperCase();
+                tableName = tableName.toUpperCase();
+                VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
+                pe.attributes.put("target", targetName);
+                pe.attributes.put("triggers", String.join(",", triggers));
+                tableXML.children.add(pe);
+
+                // update export to target in the cached schema
+                VoltXMLElement lastSchema = m_hsql.getLastSchema(tableName.toLowerCase());
+                if (lastSchema != null) {
+                    VoltXMLElement lastXml = lastSchema.findChild("table", tableName);
+                    if (lastXml != null) {
+                        lastXml.children.add(pe.duplicate());
+                    }
+                }
+            }
+        } else {
+            throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\", "
+                            + "expected syntax: CREATE TABLE <table> [MIGRATE/EXPORT TO TARGET <target>] (column datatype, ...); ",
+                    statement.substring(0, statement.length() - 1)));
+        }
+    }
+
+    private List<String> validateExportTriggers(String triggers) throws VoltCompilerException {
+        triggers = triggers.toUpperCase();
+        List<String> exportTriggers = Arrays.asList(triggers.split(","));
+        Set<String> triggerSets = new HashSet<String>(exportTriggers);
+        if (exportTriggers.size() != triggerSets.size() || exportTriggers.size() > 3) {
+            throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
+        }
+
+        triggerSets.remove("INSERT");
+        triggerSets.remove("DELETE");
+        if (triggerSets.contains("UPDATE")) {
+            triggerSets.remove("UPDATE");
+            if (!triggerSets.isEmpty()) {
+                throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
+            }
+        }
+        if (triggerSets.contains("UPDATE_NEW") && triggerSets.contains("UPDATE_OLD")) {
+            throw m_compiler.new VoltCompilerException(String.format(INVALID_CREATE_EXPORT, triggers));
+        }
+        return exportTriggers;
+    }
+
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
@@ -746,6 +880,9 @@ public class DDLCompiler {
         final CatalogMap<Table> tables = db.getTables();
         for (Table table : tables) {
             String tableName = table.getTypeName();
+            // Here, we restore that the table is always replicated, and set it to be partitioned if
+            // the partition makes sense.
+            table.setIsreplicated(true);
 
             if (m_tracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
                 String colName = m_tracker.m_partitionMap.get(tableName.toLowerCase());
@@ -914,20 +1051,30 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 String drTable = e.attributes.get("drTable");
+                String migrateTarget = e.attributes.get("migrateExport");
+                export = StringUtil.isEmpty(export) ? migrateTarget : export;
+                final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
                 else {
                     m_tracker.removePartition(tableName);
                 }
-                if (export != null) {
-                    m_tracker.addExportedTable(tableName, export);
-                }
-                else {
-                    m_tracker.removeExportedTable(tableName);
+                if (!StringUtil.isEmpty(export)) {
+                    m_tracker.addExportedTable(tableName, export, isStream);
+                } else {
+                    m_tracker.removeExportedTable(tableName, isStream);
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
+                }
+
+                for (VoltXMLElement subNode : e.children) {
+                    if (subNode.name.equals(PersistentExport.PERSISTENT_EXPORT)) {
+                        String streamTarget = subNode.attributes.get("target");
+                        m_tracker.addExportedTable(tableName, streamTarget, false);
+                        break;
+                    }
                 }
             }
         }
@@ -1008,8 +1155,9 @@ public class DDLCompiler {
             // end of the statement
             retval.statement += nchar[0];
             // statement completed only if outside of begin..end
-            if(!inAsBegin)
+            if(!inAsBegin) {
                 return kStateCompleteStatement;
+            }
         }
         else if (nchar[0] == '\'') {
             retval.statement += nchar[0];
@@ -1259,22 +1407,16 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-        final AtomicBoolean hasCreated = new AtomicBoolean(false);
         // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
-        db.getTables().forEach(tbl -> {
-            if (tbl.getTypeName().equals(name)) {
-                System.err.println("Table " + name + " has already been created!");
-                hasCreated.set(true);
-            }
-        });
-        if (hasCreated.get()) {
+        if (StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
             return;
         }       // Code below this point is not executed any more.
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
-
+        table.setTabletype(TableType.PERSISTENT.get());
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
@@ -1285,14 +1427,25 @@ public class DDLCompiler {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-        final boolean isStream = (node.attributes.get("stream") != null);
-        final String streamTarget = node.attributes.get("export");
+        final boolean isStream = node.attributes.get("stream") != null
+                && node.attributes.get("stream").equalsIgnoreCase("true");
+        String streamTarget = node.attributes.get("export");
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
+
         // all tables start replicated
         // if a partition is found in the project file later,
-        //  then this is reversed
-        table.setIsreplicated(true);
-
+        //  then this is reversed;
+        // But the index creation needs to know if the table is replicated, and coerce
+        // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
+        // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
+        table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
+        if (isStream) {
+            if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
+                table.setTabletype(TableType.STREAM.get());
+            } else {
+                table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
+            }
+        }
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
 
@@ -1301,6 +1454,14 @@ public class DDLCompiler {
         VoltXMLElement ttlNode = null;
         for (VoltXMLElement subNode : node.children) {
 
+            if (subNode.name.equals(PersistentExport.PERSISTENT_EXPORT)) {
+                streamTarget = subNode.attributes.get("target");
+                List<String> items= Stream.of(subNode.attributes.get("triggers").split(","))
+                        .map(String::trim)
+                        .collect(Collectors.toList());
+                int tblType = TableType.getPeristentExportTrigger(items);
+                table.setTabletype(tblType);
+            }
             if (subNode.name.equals("columns")) {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {
@@ -1324,7 +1485,9 @@ public class DDLCompiler {
                 // drop them: there are constraint objects in the catalog
                 // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
@@ -1333,7 +1496,9 @@ public class DDLCompiler {
                 }
 
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
@@ -1354,6 +1519,23 @@ public class DDLCompiler {
             if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
                 ttlNode = subNode;
             }
+        }
+
+        final String migratingIndexName =
+                StreamSupport.stream(((Iterable<Index>) () -> table.getIndexes().iterator()).spliterator(), false)
+                        .filter(Index::getMigrating)
+                        .map(Index::getTypeName)
+                        .findAny()
+                        .orElse(null);
+
+        final String migrationTarget = node.attributes.get("migrateExport");
+        if (!StringUtil.isEmpty(migrationTarget)) {
+            table.setMigrationtarget(migrationTarget);
+            table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
+        } else if (migratingIndexName != null) {
+            throw m_compiler.new VoltCompilerException(
+                    String.format("Cannot create migrating index \"%s\" on non-migrating table \"%s\"",
+                            migratingIndexName, name));
         }
 
         if (ttlNode != null) {
@@ -1573,8 +1755,9 @@ public class DDLCompiler {
         column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
-        if (defaulttype != null)
+        if (defaulttype != null) {
             column.setDefaulttype(Integer.parseInt(defaulttype));
+        }
 
         columnMap.put(name, column);
     }
@@ -1652,13 +1835,13 @@ public class DDLCompiler {
             HashMap<String, Index> indexMap,
             HashMap<String, Column> columnMap,
             VoltCompiler compiler)
-            throws VoltCompilerException
-    {
+            throws VoltCompilerException {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
-        boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        final boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+        boolean isMigrating = Boolean.parseBoolean(node.getStringAttribute("migrating", "false"));
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, null, db);
         dummy.setDDLIndexedTable(table);
@@ -1672,6 +1855,7 @@ public class DDLCompiler {
         // can't be indexed like boolean, geo ... We gather rest of expression into
         // checkExpressions list.  We will check on them all at once.
         List<AbstractExpression> checkExpressions = new ArrayList<>();
+        final UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<>();
@@ -1692,7 +1876,6 @@ public class DDLCompiler {
                         throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
                     }
-
                     // rest of the validity guards will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
@@ -1704,6 +1887,7 @@ public class DDLCompiler {
                 assert(predicateXML != null);
                 predicate = buildPartialIndexPredicate(dummy, name,
                         predicateXML, table, compiler);
+                predicate.findUnsafeOperatorsForDDL(unsafeOps);
             }
         }
 
@@ -1721,41 +1905,41 @@ public class DDLCompiler {
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
-            if (columns[i] == null) {
+            //  Allow creation of empty migrating index which has no explicit columns.
+            if (!isMigrating && columns[i] == null) {
                 return;
             }
         }
 
-        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
-        if (exprs == null) {
+        // Empty columns of migrating index ==> colNames = {""}
+        if (exprs == null && (!isMigrating || colNames.length > 1)) {
             for (int i = 0; i < colNames.length; i++) {
-                VoltType colType = VoltType.get((byte)columns[i].getType());
+                VoltType colType = VoltType.get((byte) columns[i].getType());
 
-                if (! colType.isIndexable()) {
-                    String emsg = "Cannot create index \""+ name + "\" because " +
+                if (!colType.isIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
-                if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
-                    String emsg = "Cannot create index \""+ name + "\" because " +
+                if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
-                if (! colType.isBackendIntegerType()) {
+                if (!colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
                     has_geo_col = colType.equals(VoltType.GEOGRAPHY);
                     if (has_geo_col && colNames.length > 1) {
-                        String emsg = "Cannot create index \""+ name + "\" because " +
+                        String emsg = "Cannot create index \"" + name + "\" because " +
                                 colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
                         throw compiler.new VoltCompilerException(emsg);
                     }
                 }
             }
-        }
-        else {
+        } else if (exprs != null) {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
 
@@ -1789,6 +1973,9 @@ public class DDLCompiler {
                 }
                 expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
+        } else {
+            assert isMigrating && colNames.length == 1 :
+                    "Encountered with an index that does not include columns or expressions";
         }
 
         Index index = table.getIndexes().add(name);
@@ -1831,10 +2018,12 @@ public class DDLCompiler {
         // need to set other index data here (column, etc)
         // For expression indexes, the columns listed in the catalog do not correspond to the values in the index,
         // but they still represent the columns that will trigger an index update when their values change.
-        for (int i = 0; i < columns.length; i++) {
-            ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
-            cref.setColumn(columns[i]);
-            cref.setIndex(i);
+        if (columns.length > 1 || columns[0] != null) {
+            for (int i = 0; i < columns.length; i++) {
+                ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
+                cref.setColumn(columns[i]);
+                cref.setIndex(i);
+            }
         }
 
         if (exprs != null) {
@@ -1846,11 +2035,27 @@ public class DDLCompiler {
             }
         }
 
+        // For non-migrating index, we need to check whether the predicate contains a 'NOT MIGRATING' piece, and
+        // set the isMigrating flag in the catalog if it does. We only check the leaf node for simplicity, meaning that
+        // there could possibly be misses/false alarms for complex predicate like `WHERE NOT (MIGRATING AND a > 0)`,
+        // `WHERE NOT MIGRATING OR a > 0`, or `WHERE NOT NOT MIGRATING`, etc.
+        isMigrating |= ExpressionUtil.reduce(predicate, NOT_MIGRATING::equals);
         index.setUnique(unique);
-        if (assumeUnique) {
+        if (! index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) && table.getIsreplicated() && assumeUnique) {
+            // Warn and convert AssumeUnique -> Unique index only on
+            // non-auto-generated index (i.e. from "CREATE ASSUMEUNIQUE INDEX ..." statement rather than "CREATE TABLE(...)" statement),
+            // because "PARTITION TABLE ..." statement cannot be specified together with "CREATE TABLE" statement!
+            final String warn = String.format(
+                    "Converting ASSUMEUNIQUE index %s to UNIQUE because table %s is a replicated table.",
+                    index.getTypeName(), table.getTypeName());
+            compiler.addWarn(warn);
+            System.err.println(warn);
+            assumeUnique = false;
+        } else if (assumeUnique) {
             index.setUnique(true);
         }
         index.setAssumeunique(assumeUnique);
+        index.setMigrating(isMigrating);
 
         if (predicate != null) {
             try {
@@ -2115,8 +2320,7 @@ public class DDLCompiler {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
             // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
-        }
-        catch (VoltCompilerException e) {
+        } catch (VoltCompilerException e) {
             // Reformat the message thrown by VoltDB DDL processing to have a line number.
             String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
             throw m_compiler.new VoltCompilerException(msg);
@@ -2143,6 +2347,12 @@ public class DDLCompiler {
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {
                     processCreateStreamStatement(stmt, db, whichProcs);
+                }
+
+                boolean createTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                if (createTable) {
+                    processCreateTableStatement(stmt);
                 }
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;

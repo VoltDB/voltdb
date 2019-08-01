@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,12 +19,18 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Non-transactional procedure that turns around and creates a SQL statement
@@ -33,21 +39,36 @@ import org.voltdb.client.ClientResponse;
  */
 public class SwapTables extends AdHocNTBase {
 
-    public CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
-        String sql = "@SwapTables " + theTable + " " + otherTable;
-        Object[] userParams = null;
+    @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
 
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        List<String> sqlStatements = new ArrayList<>(1);
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        return runUsingLegacy(params);
+    }
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
+        assert params.size() == 2;
+        assert params.getParam(0) instanceof String &&
+                params.getParam(1) instanceof String;
+        return run((String) params.getParam(0), (String) params.getParam(1));
+    }
+
+    private CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
+        final String sql = "@SwapTables " + theTable + " " + otherTable;
+        final Object[] userParams = null;
+        final CatalogContext context = VoltDB.instance().getCatalogContext();
+        final List<String> sqlStatements = new ArrayList<>(1);
         sqlStatements.add(sql);
-
-        return runNonDDLAdHoc(context,
-                sqlStatements,
-                true, // infer partitioning...?
-                null, // no partition key
-                ExplainMode.NONE,
-                false, // not a large query
-                true,  // IS swap tables
-                userParams);
+        final Table ttlTable = CatalogUtil.getTimeToLiveTables(context.database).get(theTable.toUpperCase());
+        if (ttlTable != null && !StringUtil.isEmpty(ttlTable.getMigrationtarget())) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    String.format("Table %s cannot be swapped since it uses TTL.",theTable));
+        } else {
+            return runNonDDLAdHoc(context, sqlStatements, true, null, ExplainMode.NONE,
+                    false, true, userParams);
+        }
     }
 }

@@ -1,0 +1,15 @@
+DDL:
+migration/ddl.sql
+
+SQL:
+MIGRATE FROM with_ttl WHERE not migrating and j < 0;
+MIGRATE FROM without_ttl WHERE not migrating and j < 0;
+MIGRATE FROM with_ttl_replicated WHERE not migrating and j < 0;
+MIGRATE FROM without_ttl_replicated WHERE not migrating and j < 0;
+MIGRATE FROM with_ttl_no_index WHERE not migrating and j < 0;
+MIGRATE FROM without_ttl_no_index WHERE not migrating and j < 0;
+MIGRATE FROM with_ttl_replicated_no_index WHERE not migrating and j < 0;
+MIGRATE FROM without_ttl_replicated_no_index WHERE not migrating and j < 0;
+SELECT * FROM without_ttl WHERE not migrating;
+
+Partition Columns:

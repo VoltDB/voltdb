@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ public class HSQLLexer extends SQLPatternFactory
     private static final Pattern HSQL_DDL_PREPROCESSOR =
         SPF.statementLeader(
             SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
+            SPF.optional(SPF.capture("migrating", SPF.tokenAlternatives("migrating"))), // MIGRATING index
             SPF.optional(SPF.capture("unique", SPF.tokenAlternatives("unique", "assumeunique"))),
             SPF.capture("object", SPF.tokenAlternatives("table", "view", "index" , "stream")),
             SPF.capture("name", SPF.databaseObjectName()),  // table/view/index name

@@ -2,9 +2,6 @@
 
 APPNAME="genqa"
 APPNAME2="genqa2"
-APPNAME3="eggenqa"
-APPNAME4="eggenqa2"
-APPNAME_EXPORT="genqa_nocat"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -30,14 +27,15 @@ fi
 CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-    \ls -1 /home/opt/kafka/libs/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar;
 } 2> /dev/null | paste -sd ':' - )
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
-ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar"
+MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
+VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
+POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
+CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -48,14 +46,25 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar $APPNAME_EXPORT.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
+    # this will create a sp.jar file
     ant -f build.xml
+
+    # these are deprecated and necessary for legacy test coverage in older apps.
+    cp sp.jar genqa.jar
+    cp sp.jar genqa2.jar
+    cp sp.jar eggenqa.jar
+    cp sp.jar eggenqa2.jar
+    cp sp.jar genqa_nocat.jar
+
+    # this is needed for the customexporter
     mkdir -p obj
+
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
@@ -69,26 +78,15 @@ function srccompile() {
 }
 
 # build an application catalog
-function catalog() {
+function jars() {
     srccompile
-    #cmd="$VOLTDB compile --classpath obj -o $APPNAME_EXPORT.jar ddl-nocat.sql"
-    #echo $cmd; $cmd
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo $cmd; $cmd
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME2.jar ddl2.sql"
-    echo $cmd; $cmd
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME3.jar ddl3.sql"
-    echo $cmd; $cmd
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME4.jar ddl4.sql"
-    echo $cmd; $cmd
-    #jar cvf sp.jar obj/*
 
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
     rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit -1; fi
 }
 
 function wait-for-create() {
@@ -101,43 +99,39 @@ function wait-for-create() {
 }
 
 # run the voltdb server locally
+function startvolt() {
+    $VOLTDB init -C $1 -s $2 -j $3 --force
+    $VOLTDB start  -l $LICENSE &
+    wait-for-create
+}
+
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment.xml ddl-all-nocat.sql sp.jar
+
 }
 
 # run the voltdb server locally with kafka connector
 function server-kafka() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment-kafka.xml ddl-all-nocat.sql sp.jar
 }
 
 function server-rabbitmq() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $RBMQ/rabbitmq.jar $VOLTDB_LIB/extension/
+    cp ../../../../export-rabbitmq/voltdb-rabbitmq.jar $VOLTDB_LIB/extension/
+    startvolt deployment-rabbitmq.xml ddl-all-nocat.sql sp.jar
 }
 
 # run the voltdb server locally with mysql connector
 function server-mysql() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $MYSQLLIB $VOLTDB_LIB/extension/
+    startvolt deployment_mysql.xml ddl-all-nocat.sql sp.jar
 }
 
 
 # run the voltdb server locally with vertica connector
 function server-vertica() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_vertica.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $VERTICALIB $VOLTDB_LIB/extension/
+    startvolt deployment_vertica.xml ddl-all-nocat.sql sp.jar
 }
 
 # run the voltdb server locally with postgresql connector
@@ -151,16 +145,8 @@ function server-vertica() {
 # ./run.sh stop-postgres;
 
 function server-pg() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-
-    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
-
-    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
-    sleep 5
-    wait-for-create
-    $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
+    cp $POSTGRESLIB $VOLTDB_LIB/extension/
+    startvolt deployment_pg_nocat.xml ddl-all-nocat.sql sp.jar
 }
 
 # to run the postgres jdbc geo export test manually:
@@ -173,61 +159,22 @@ function server-pg() {
 # ./run.sh stop-postgres;
 
 function server-pg-geo() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
+    cp $POSTGRESLIB $VOLTDB_LIB/extension/
+    startvolt deployment_pg_nocat.xml ddl-all-nocat-geo.sql sp.jar
 
-    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
-
-    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
-    sleep 5
-    wait-for-create
-    $VOLTDB_BIN/sqlcmd < ddl-nocat-geo.sql
-
-}
-
-# run the voltdb server locally
-function server-legacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_legacy.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function server-custom() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    if [ ! -f $APPNAME.jar ]; then jars; fi
     # Get custom class in jar
     cd obj
     jar cvf ../customexport.jar customexport/*
     cd ..
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
-    $VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
+    #$VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment_custom.xml ddl-all-nocat.sql sp.jar
 }
-
-# run the voltdb server locally
-function server1() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport=3024 $APPNAME.jar
-}
-
-function server2() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:21216 --adminport=21215 --internalport=3022 --zkport=2182 $APPNAME.jar
-}
-
-function server3() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport==3023 --adminport=21213 --port=21214 --zkport=2183 $APPNAME.jar
-}
-
 
 # run the client that drives the example
 function client() {
@@ -243,7 +190,7 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     # srccompile
-    echo java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -257,7 +204,7 @@ function async-benchmark() {
 }
 
 function clean-vertica() {
-    echo "drop table export_partitioned_table" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
+    echo "drop stream export_partitioned_stream" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
 }
 
 function async-export() {
@@ -273,7 +220,6 @@ function async-export() {
         --procedure=JiggleExportSinglePartition \
         --poolsize=100000 \
         --autotune=false \
-        --catalogswap=false \
         --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
@@ -292,7 +238,6 @@ function async-export-geo() {
         --procedure=JiggleExportGeoSinglePartition \
         --poolsize=100000 \
         --autotune=false \
-        --catalogswap=false \
         --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
@@ -327,7 +272,7 @@ function jdbc-benchmark-help() {
 
 function jdbc-benchmark() {
     # srccompile
-    echo jdbc-benchmark: java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
+    java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
         --threads=40 \
         --displayinterval=5 \
         --duration=120 \
@@ -447,13 +392,8 @@ function stop-postgres() {
     fi
 }
 
-# compile the source code for procedures and the client into jarfiles
-function jars() {
-    ant all
-}
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|async-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|jars|server|async-benchmark|async-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

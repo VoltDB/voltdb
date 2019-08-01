@@ -25,15 +25,15 @@ read_link() {    # Emulates GNU `readlink -f' behavior on Linux and MacOS.
     if [ -d $path ] ; then
         local abspath=$(cd $path; pwd)
     else
-        local dirnam=$(cd $(dirname -- $path) ; pwd)
+        local dirname=$(cd $(dirname -- $path) ; pwd)
         local basename=$(basename $path)
-        local abspath=$prefix/$suffix
+        local abspath=$dirname/$basename
     fi
     echo $abspath
 }
 
 voltdb_dir=$(read_link $(dirname $0)/../)
-calcite_dir=$voltdb_dir/../calcite/
+calcite_dir=$(read_link $voltdb_dir/../calcite/)
 if [ ! -d "$calcite_dir" ]; then       # Check location of calcite/ directory
    echo "Cannot find calcite repo in $calcite_dir"
    exit 1
@@ -44,14 +44,13 @@ if [ $(git status | egrep -c 'modified|deleted') -ne 0 ]; then    # Check Git cl
    git status
    exit 2
 fi
-base_date="2018-07-16"
+base_date="2018-07-16"     # Calcite 1.17 release date
 commits=$(git log --after=$base_date --pretty=format:%h | wc -w)
 if [ $commits -eq 0 ]; then         # Check that there are actually things to patch
    echo "No commit(s) found in current branch since 07/16/2018. Abort."
    exit 3
 fi
-base_author='Volodymyr Vysotskyi'
-base_commit=$(git log -1 --author="$base_author" --pretty=format:%h)
+base_commit=$(git log -1 --author='Volodymyr Vysotskyi' --pretty=format:%h)
 last_author_date=$(git log -1 --pretty=format:%ai $base_commit | cut -d' ' -f1)
 if [ "$last_author_date" != "$base_date" ]; then                    # Check that current branch is based on/in branch-1.17
    echo "Expect the last commit by $author should be on $base_date, found $last_author_date. "
@@ -59,7 +58,9 @@ if [ "$last_author_date" != "$base_date" ]; then                    # Check that
    exit 4
 fi
 git format-patch --stdout $base_commit..HEAD > $voltdb_dir/third_party/java/tar/commits.patch     # Generate single patch file
-echo "Patch regenerated on $commits commits. Running \`ant refresh_calcite'..."
+cp $voltdb_dir/third_party/java/tar/commits.patch /tmp
+echo "Patch regenerated on $commits commits. The patch file can now be found in /tmp/commits.patch\n Running \`ant refresh_calcite'..."
 # Run VoltDB Ant target
-cd $voltdb_dir && ant refresh_calcite && echo "Now develop/build VoltDB with the latest Calcite version!"
+cd $voltdb_dir
+ant refresh_calcite && echo "Now develop/build VoltDB with the latest Calcite version!"
 

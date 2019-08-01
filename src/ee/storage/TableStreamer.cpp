@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSur
     TableStreamer* the_clone = new TableStreamer(m_partitionId, surgeon.getTable(), m_tableId);
     surgeon.initTableStreamer(the_clone);
     BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-        assert(streamPtr != NULL);
+        vassert(streamPtr != NULL);
         boost::shared_ptr<TableStreamerContext> cloned_context;
         cloned_context.reset(streamPtr->m_context->cloneForTruncatedTable(surgeon));
         if (cloned_context != NULL) {
@@ -72,12 +72,13 @@ TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSur
  */
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TableStreamType streamType,
+                                   const HiddenColumnFilter &filter,
                                    const std::vector<std::string> &predicateStrings)
 {
     bool failed = false;
     bool found = false;
     BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-        assert(streamPtr != NULL);
+        vassert(streamPtr != NULL);
         switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
                 streamPtr->m_context->updatePredicates(predicateStrings);
@@ -99,13 +100,8 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
                     context.reset(
-                        new CopyOnWriteContext(m_table, surgeon, m_partitionId,
+                        new CopyOnWriteContext(m_table, surgeon, m_partitionId, filter,
                                                predicateStrings, m_table.activeTupleCount()));
-                    break;
-
-                case TABLE_STREAM_RECOVERY:
-                    context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
-                                                      m_tableId));
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX:
@@ -124,7 +120,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     break;
 
                 default:
-                    assert(false);
+                    vassert(false);
             }
             if (context) {
                 TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType);
@@ -172,10 +168,10 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
     m_streams.clear();
     for (StreamList::iterator iter = savedStreams.begin(); iter != savedStreams.end(); ++iter) {
         StreamPtr streamPtr = *iter;
-        assert(streamPtr->m_context != NULL);
+        vassert(streamPtr->m_context != NULL);
         if (streamPtr->m_streamType == streamType) {
             // Assert that we didn't find the stream type twice.
-            assert(remaining == TABLE_STREAM_SERIALIZATION_ERROR);
+            vassert(remaining == TABLE_STREAM_SERIALIZATION_ERROR);
             remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
             if (remaining <= 0) {
                 // Drop the stream if it doesn't need to hang around (e.g. elastic).

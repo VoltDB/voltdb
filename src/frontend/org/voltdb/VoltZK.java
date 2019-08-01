@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,9 +52,8 @@ public class VoltZK {
 
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
-    public static final String catalogbytesPrevious = "/db/catalogbytes_previous";
     //This node doesn't mean as much as it used to, it is accurate at startup
-    //but isn't updated after elastic join. We use the cartographer for most things
+    //but isn't updated after elastic operation. We use the cartographer for most things
     //now
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
@@ -62,9 +61,14 @@ public class VoltZK {
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
+    public static final String exportCoordination = "/db/export_coordination";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
+
+    // localMetadata json property names
+    public static final String drPublicHostProp = "drPublicHost";
+    public static final String drPublicPortProp = "drPublicPort";
 
     /*
      * mailboxes
@@ -169,18 +173,18 @@ public class VoltZK {
     public static final String migrate_partition_leader = "migrate_partition_leader_blocker";
     public static final String migratePartitionLeaderBlocker = actionBlockers + "/" + migrate_partition_leader;
 
-    // three elastic join blockers
-    // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
-    // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
-    //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
+    // three elastic blockers
+    // elasticOperationInProgress blocks the rejoin (create in init state, release before data migration start)
+    // banElasticOperation blocks elastic operation (currently created by DRProducer if the agreed protocol version
+    //                                     for the mesh does not support elastic operation during DR (i.e. version <= 7).
     //                                     It is now only released after a DR global reset.)
-    // elasticJoinMigration only blockers SPI Migration
-    public static final String leafNodeElasticJoinInProgress = "join_blocker";
-    public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
-    public static final String leafNodeBanElasticJoin = "no_join_blocker";
-    public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticJoin;
-    public static final String leafNodeElasticJoinMigration = "join_migration_blocker";
-    public static final String elasticJoinMigration = actionBlockers + "/" + leafNodeElasticJoinMigration;
+    // elasticMigration only blocks SPI Migration
+    public static final String leafNodeElasticOperationInProgress = "elastic_blocker";
+    public static final String elasticOperationInProgress = actionBlockers + "/" + leafNodeElasticOperationInProgress;
+    public static final String leafNodeBanElasticOperation = "no_elastic_blocker";
+    public static final String banElasticOperation = actionBlockers + "/" + leafNodeBanElasticOperation;
+    public static final String leafNodeElasticMigration = "elastic_migration_blocker";
+    public static final String elasticMigration = actionBlockers + "/" + leafNodeElasticMigration;
 
     public static final String leafNodeRejoinInProgress = "rejoin_blocker";
     public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
@@ -310,25 +314,35 @@ public class VoltZK {
             Integer hostId = p.getFirst();
             ZKUtil.ByteArrayCallback cb = p.getSecond();
             try {
-               clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
+               clusterMetadata.put( hostId, new String(cb.get(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
         }
     }
 
-    public static Pair<String, Integer> getDRInterfaceAndPortFromMetadata(String metadata)
+    public static Pair<String, Integer> getDRPublicInterfaceAndPortFromMetadata(String metadata)
     throws IllegalArgumentException {
         try {
             JSONObject obj = new JSONObject(metadata);
-            //Pick drInterface if specified...it will be empty if none specified.
-            //we should pick then from the "interfaces" array and use 0th element.
-            String hostName = obj.getString("drInterface");
+            // Precedence order for host:port on which consumers should connect:
+            // - drPublic
+            // - drInterface
+            // - 0th element in interfaces
+            String hostName = obj.getString(drPublicHostProp);
+            if (hostName == null || hostName.isEmpty()) {
+                hostName = obj.getString("drInterface");
+            }
             if (hostName == null || hostName.length() <= 0) {
                 hostName = obj.getJSONArray("interfaces").getString(0);
             }
             assert(hostName != null);
             assert(hostName.length() > 0);
 
-            return Pair.of(hostName, obj.getInt("drPort"));
+            int port = obj.getInt(drPublicPortProp);
+            if (port == VoltDB.DISABLED_PORT) {
+                port = obj.getInt("drPort");
+            }
+
+            return Pair.of(hostName, port);
         } catch (JSONException e) {
             throw new IllegalArgumentException("Error parsing host metadata", e);
         }
@@ -382,14 +396,14 @@ public class VoltZK {
     }
 
     /**
-     * Create a ZK node under action blocker directory.
-     * Exclusive execution of elastic join, rejoin or catalog update is checked.
+     * Create a ZK node under action blocker directory. Exclusive execution of elastic operation, rejoin or catalog
+     * update is checked.
      * </p>
      * Catalog update can not happen during node rejoin.
      * </p>
-     * Node rejoin can not happen during catalog update or elastic join.
+     * Node rejoin can not happen during catalog update or elastic operation.
      * </p>
-     * Elastic join can not happen during node rejoin or catalog update.
+     * Elastic operation can not happen during node rejoin or catalog update.
      *
      * @param zk
      * @param node
@@ -434,11 +448,11 @@ public class VoltZK {
         }
 
         /*
-         * Validate exclusive access of elastic join, rejoin, MigratePartitionLeader and catalog update.
+         * Validate exclusive access of elastic operation, rejoin, MigratePartitionLeader and catalog update.
          */
 
         // UAC can not happen during node rejoin
-        // some UAC can happen with elastic join
+        // some UAC can happen with elastic operation
         // UAC NT and TXN are exclusive
         String errorMsg = null;
         try {
@@ -454,11 +468,11 @@ public class VoltZK {
                 }
                 break;
             case rejoinInProgress:
-                // node rejoin can not happen during UAC or elastic join
+                // node rejoin can not happen during UAC or elastic operation
                 if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
                     errorMsg = "while a catalog update is active. Please retry node rejoin later.";
-                } else if (blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "while an elastic join is active. Please retry node rejoin later.";
+                } else if (blockers.contains(leafNodeElasticOperationInProgress)) {
+                    errorMsg = "while an elastic operation is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
                 } else if (blockers.contains(mpRepairBlocker)){
@@ -468,36 +482,36 @@ public class VoltZK {
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
                 }
                 break;
-            case elasticJoinInProgress:
-                // elastic join can not happen during node rejoin
+            case elasticOperationInProgress:
+                // elastic operation can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry elastic join later.";
+                    errorMsg = "while a node rejoin is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retyr elastic join later.";
-                } else if (blockers.contains(leafNodeBanElasticJoin)) {
-                    errorMsg = "while elastic join is blocked by DR established with a cluster that " +
-                            "does not support remote elastic join during DR. " +
-                            "DR needs to be reset before elastic join is allowed again.";
+                    errorMsg = "while a catalog update is active. Please retyr elastic operation later.";
+                } else if (blockers.contains(leafNodeBanElasticOperation)) {
+                    errorMsg = "while elastic operation is blocked by DR established with a cluster that "
+                            + "does not support remote elastic operation during DR. "
+                            + "DR needs to be reset before elastic operation is allowed again.";
                 } else if ( blockers.contains(migrate_partition_leader)) {
-                    errorMsg = "while leader migration is active. Please retry elastic join later.";
+                    errorMsg = "while leader migration is active. Please retry elastic operation later.";
                 }
                 break;
             case migratePartitionLeaderBlocker:
                 //MigratePartitionLeader can not happen when join (before data fully migrated), rejoin, catalog update, or repair is in progress.
-                blockers.remove(leafNodeBanElasticJoin);
+                blockers.remove(leafNodeBanElasticOperation);
                 if (blockers.size() > 1) {
-                    errorMsg = "while elastic join, rejoin or catalog update is active";
+                    errorMsg = "while elastic operation, rejoin or catalog update is active";
                 }
                 break;
-            case elasticJoinMigration:
-                // elastic join balancePartition currently cannot coexist with partition leader migration
+            case elasticMigration:
+                // elastic operation balancePartition currently cannot coexist with partition leader migration
                if (blockers.contains(migrate_partition_leader)) {
                    errorMsg = "while leader migration is active.";
                }
                break;
-            case banElasticJoin:
-                if (blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "while an elastic join is active";
+            case banElasticOperation:
+                if (blockers.contains(leafNodeElasticOperationInProgress)) {
+                    errorMsg = "while an elastic operation is active";
                 }
                 break;
             case mpRepairInProgress:
@@ -598,5 +612,19 @@ public class VoltZK {
             zk.delete(migrate_partition_leader_info, -1);
         } catch (KeeperException | InterruptedException e) {
         }
+    }
+
+    /**
+     * @param zk ZooKeeper
+     * @return true if any hosts work on snapshot
+     */
+    public static boolean hasHostsSnapshotting(ZooKeeper zk) {
+        try {
+            List<String> nodesSnapshotting = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
+            return (!nodesSnapshotting.isEmpty());
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to read snapshotting hosts.", true, e);
+        }
+        return false;
     }
 }

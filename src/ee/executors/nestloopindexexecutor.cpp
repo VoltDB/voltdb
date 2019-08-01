@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,10 +78,10 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
     m_indexNode =
         dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
-    assert(m_indexNode);
+    vassert(m_indexNode);
     VOLT_TRACE("<NestLoopIndexPlanNode> %s, <IndexScanPlanNode> %s",
                m_abstractNode->debug().c_str(), m_indexNode->debug().c_str());
 
@@ -91,7 +91,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     //
     // We need exactly one input table and a target table
     //
-    assert(node->getInputTableCount() == 1);
+    vassert(node->getInputTableCount() == 1);
 
     node->getOutputColumnExpressions(m_outputExpressions);
 
@@ -111,10 +111,10 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
         }
     }
 
-    assert(node->getInputTable());
+    vassert(node->getInputTable());
 
     PersistentTable* inner_table = dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable());
-    assert(inner_table);
+    vassert(inner_table);
 
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
@@ -136,23 +136,23 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
-    assert(dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    vassert(dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
     NestLoopIndexPlanNode* node = static_cast<NestLoopIndexPlanNode*>(m_abstractNode);
 
     // output table must be a temp table
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
     // target table is a persistent table
-    assert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
+    vassert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
     PersistentTable* inner_table = static_cast<PersistentTable*>(m_indexNode->getTargetTable());
 
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
-    assert(index);
+    vassert(index);
     IndexCursor indexCursor(index->getTupleSchema());
 
     //outer_table is the input table that have tuples to be iterated
-    assert(node->getInputTableCount() == 1);
+    vassert(node->getInputTableCount() == 1);
     Table* outer_table = node->getInputTable();
-    assert(outer_table);
+    vassert(outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug("").c_str(), inner_table->debug("").c_str());
 
@@ -219,8 +219,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple inner_tuple(inner_table->schema());
     TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
-    assert (outer_tuple.columnCount() == outer_table->columnCount());
-    assert (inner_tuple.columnCount() == inner_table->columnCount());
+    vassert(outer_tuple.columnCount() == outer_table->columnCount());
+    vassert(inner_tuple.columnCount() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
@@ -369,7 +369,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                     localLookupType = INDEX_LOOKUP_TYPE_GT;
                                     break;
                                 default:
-                                    assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                                    vassert(!"IndexScanExecutor::p_execute - can't index on not equals");
                                     return false;
                             }
                         }
@@ -423,26 +423,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         index->moveToLessThanKey(&index_values, indexCursor);
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-                        // find the entry whose key is greater than search key,
-                        // do a forward scan using initialExpr to find the correct
-                        // start point to do reverse scan
-                        bool isEnd = index->moveToGreaterThanKey(&index_values, indexCursor);
-                        if (isEnd) {
-                            index->moveToEnd(false, indexCursor);
-                        }
-                        else {
-                            while (!(inner_tuple = index->nextValue(indexCursor)).isNullTuple()) {
-                                pmp.countdownProgress();
-                                if (initial_expression != NULL && !initial_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
-                                    // just passed the first failed entry, so move 2 backward
-                                    index->moveToBeforePriorEntry(indexCursor);
-                                    break;
-                                }
-                            }
-                            if (inner_tuple.isNullTuple()) {
-                                index->moveToEnd(false, indexCursor);
-                            }
-                        }
+                        // find the entry whose key is less than or equal to search key
+                        // as the start point to do a reverse scan
+                        index->moveToKeyOrLess(&index_values, indexCursor);
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
                         index->moveToCoveringCell(&index_values, indexCursor);
@@ -558,7 +541,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
-            assert(inner_tuple.isActive());
+            vassert(inner_tuple.isActive());
             if (postfilter.eval(&null_outer_tuple, &inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 for (int col_ctr = num_of_outer_cols;

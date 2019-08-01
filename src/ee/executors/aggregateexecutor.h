@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -351,15 +351,15 @@ inline AggregateExecutorBase* getInlineAggregateExecutor(const AbstractPlanNode*
     if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_PARTIALAGGREGATE)) ) {
         VOLT_TRACE("init inline partial aggregation stuff...");
         aggExec = dynamic_cast<AggregatePartialExecutor*>(aggNode->getExecutor());
-        assert(aggExec != NULL);
+        vassert(aggExec != NULL);
     } else if ( NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE)) ) {
         VOLT_TRACE("init inline serial aggregation stuff...");
         aggExec = dynamic_cast<AggregateSerialExecutor*>(aggNode->getExecutor());
-        assert(aggExec != NULL);
+        vassert(aggExec != NULL);
     } else if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE)) ) {
         VOLT_TRACE("init inline hash aggregation stuff...");
         aggExec = dynamic_cast<AggregateHashExecutor*>(aggNode->getExecutor());
-        assert(aggExec != NULL);
+        vassert(aggExec != NULL);
     }
     return aggExec;
 }

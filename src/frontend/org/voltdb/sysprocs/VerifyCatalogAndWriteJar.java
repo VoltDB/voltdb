@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,6 +45,9 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
         SupportedJavaVersionMap.put(50, "Java 6");
         SupportedJavaVersionMap.put(51, "Java 7");
         SupportedJavaVersionMap.put(52, "Java 8");
+        SupportedJavaVersionMap.put(53, "Java 9");
+        SupportedJavaVersionMap.put(54, "Java 10");
+        SupportedJavaVersionMap.put(55, "Java 11");
     }
 
     private static VoltLogger log = new VoltLogger("HOST");

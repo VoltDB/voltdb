@@ -125,10 +125,15 @@ function jars() {
     echo -e "\n$0 performing: jars"
 
     # Build the jar file for the GEB tests of the VMC
-    jar cvf fullddlfeatures.jar \
-        -C $VOLTDB_COM_DIR/obj/release/testprocs org/voltdb_testprocs/fullddlfeatures/testCreateProcFromClassProc.class \
-        -C $VOLTDB_COM_DIR/obj/release/testfuncs org/voltdb_testfuncs/BasicTestUDFSuite.class
+    JARS_HOME_DIR=$(pwd)
+    cd ${VOLTDB_COM_DIR}/obj/release/testprocs/
+    ls org/voltdb_testprocs/fullddlfeatures/*.class > classes.list
+    jar cvf ${JARS_HOME_DIR}/fullddlfeatures.jar \
+        -C ${VOLTDB_COM_DIR}/obj/release/testfuncs org/voltdb_testfuncs/BasicTestUDFSuite.class \
+        @classes.list
     code[2]=$?
+    rm -f classes.list
+    cd -
 }
 
 # Create the Jar file, only if not created already

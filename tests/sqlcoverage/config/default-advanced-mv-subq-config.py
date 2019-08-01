@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -28,22 +28,21 @@
 # which are a subset of those run by the main, or "default", sqlcoverage
 # Jenkins job.
 {
-# To test advanced scalar subqueries
+    # To test advanced scalar subqueries
     "advanced-scalar-subquery": {"schema": "schema.py",
                                  "ddl": "DDL.sql",
                                  "template": "advanced-scalar-subquery.sql",
                                  "normalizer": "normalizer.py"},
-# To test advanced scalar subqueries containing set operators
+    # To test advanced scalar subqueries containing set operators
     "advanced-scalar-set-subquery": {"schema": "schema.py",
                                      "ddl": "DDL.sql",
                                      "template": "advanced-scalar-set-subquery.sql",
                                      "normalizer": "normalizer.py"},
-# ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
+    # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
                                  "ddl": "matview-DDL.sql",
                                  "template": "advanced-matview-nonjoin.sql",
                                  "normalizer": "nulls-lowest-normalizer.py"},
-
     "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
                               "ddl": "matview-DDL.sql",
                               "template": "advanced-matview-join.sql",

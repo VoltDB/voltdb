@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -73,23 +73,28 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         // that specifies those two column types treats them the same
     }
 
+    // Used below (twice), for an UPSERT INTO SELECT statement
+    private static final String COLUMN_DEFN = "(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w"
+            + "+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/|\\|\\|)"
+            + "\\s*(\\w|')+)*(\\s+(ASC|DESC))?";
+
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
     // those will be ignored (similar to
     // voltdb/tests/scripts/examples/sql_coverage/StandardNormalizer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?",
+            "ORDER BY\\s+(?<column1>"+COLUMN_DEFN+")"
+            + "((?<column2>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column3>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column4>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column5>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column6>\\s*,\\s*"+COLUMN_DEFN+"))?",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an ORDER BY clause, by adding (for each
     // order-by column) either NULLS FIRST or (after "DESC") NULL LAST, so
     // that PostgreSQL results will match VoltDB results
     private static final QueryTransformer orderByQueryTransformer
             = new QueryTransformer(orderByQuery)
-            .initialText("ORDER BY").suffix(" NULLS FIRST")
+            .initialText("ORDER BY ").suffix(" NULLS FIRST")
             .alternateSuffix("DESC", " NULLS LAST")
             .groups("column1", "column2", "column3", "column4", "column5", "column6");
 

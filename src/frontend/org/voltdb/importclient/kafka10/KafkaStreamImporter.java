@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,12 +25,14 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.RoundRobinAssignor;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.serialization.ByteBufferDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.AbstractImporter;
@@ -44,7 +46,8 @@ public class KafkaStreamImporter extends AbstractImporter {
 
     private ExecutorService m_executorService = null;
     private List<KafkaInternalConsumerRunner> m_consumers;
-
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    private final Object m_lock = new Object();
     public KafkaStreamImporter(KafkaStreamImporterConfig config) {
         super();
         m_config = config;
@@ -97,7 +100,16 @@ public class KafkaStreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, m_config.getHeartBeatInterval());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RoundRobinAssignor.class.getName());
+        if (m_config.getSaslKerberosServiceName() != null) {
+            props.put(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, m_config.getSaslKerberosServiceName());
+        }
 
+        if (m_config.getSecurityProtocol() != null) {
+            props.put("security.protocol", m_config.getSecurityProtocol());
+        }
+
+        // Query the topics and partitions outside the lock in order to properly
+        // respond to a shutdown query in case we're querying a non-existent broker
         int kafkaPartitions = 0;
         KafkaInternalConsumerRunner theConsumer = null;
         try {
@@ -114,37 +126,49 @@ public class KafkaStreamImporter extends AbstractImporter {
             return;
         }
 
-        int totalConsumerCount = kafkaPartitions;
-        if (m_config.getConsumerCount() > 0) {
-            totalConsumerCount = m_config.getConsumerCount();
-        }
-        int consumerCount = (int)Math.ceil((double)totalConsumerCount/m_config.getDBHostCount());
-        m_executorService = Executors.newFixedThreadPool(consumerCount);
-        m_consumers = new ArrayList<>();
-        m_consumers.add(theConsumer);
-        if (consumerCount > 1) {
-            try {
-                for (int i = 1; i < consumerCount; i++) {
-                    m_consumers.add(createConsumerRunner(props));
+        // While importers could be restarted upon catalog update, a cluster could be paused, triggering
+        // stopping the importer @stop().
+        // Thus sync the block to avoid any concurrent update.
+        synchronized(m_lock) {
+            int totalConsumerCount = kafkaPartitions;
+            if (m_config.getConsumerCount() > 0) {
+                totalConsumerCount = m_config.getConsumerCount();
+            }
+            int consumerCount = (int)Math.ceil((double)totalConsumerCount/m_config.getDBHostCount());
+            m_executorService = Executors.newFixedThreadPool(consumerCount);
+            m_consumers = new ArrayList<>();
+            m_consumers.add(theConsumer);
+            if (consumerCount > 1) {
+                try {
+                    for (int i = 1; i < consumerCount; i++) {
+                        if (m_shutdown.get()) {
+                            return;
+                        }
+                        m_consumers.add(createConsumerRunner(props));
+                    }
+                } catch (KafkaException ke) {
+                    LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
+                } catch (Throwable terminate) {
+                    LOGGER.error("Couldn't create Kafka consumer. ", terminate);
                 }
-            } catch (KafkaException ke) {
-                LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
-            } catch (Throwable terminate) {
-                LOGGER.error("Couldn't create Kafka consumer. ", terminate);
             }
+
+            if (m_consumers.size() != consumerCount) {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    consumer.shutdown();
+                }
+                m_consumers.clear();
+            } else {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    if (m_shutdown.get()) {
+                        return;
+                    }
+                    m_executorService.submit(consumer);
+                }
+            }
+            LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
         }
 
-        if (m_consumers.size() != consumerCount) {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                consumer.shutdown();
-            }
-        } else {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                m_executorService.submit(consumer);
-            }
-        }
-
-        LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
         // After the importer is initialized, insert records in @Statistics IMPORTER to make sure VMC can keep track of the import progress
         for (String topicName : m_config.getTopics().split("\\s*,\\s*")) {
             reportInitializedStat(m_config.getProcedure(topicName));
@@ -153,25 +177,29 @@ public class KafkaStreamImporter extends AbstractImporter {
 
     @Override
     public void stop() {
-        if (m_consumers != null) {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                if (consumer != null) {
-                    consumer.shutdown();
+        m_shutdown.set(true);
+        synchronized(m_lock) {
+            if (m_consumers != null) {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    if (consumer != null) {
+                        consumer.shutdown();
+                    }
                 }
+                m_consumers.clear();
             }
-        }
 
-        if (m_executorService == null) {
-            return;
-        }
+            if (m_executorService == null) {
+                return;
+            }
 
-        //graceful shutdown to allow importers to properly process post shutdown tasks.
-        m_executorService.shutdown();
-        try {
-            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException ignore) {
-        } finally {
-            m_executorService = null;
+            //graceful shutdown to allow importers to properly process post shutdown tasks.
+            m_executorService.shutdown();
+            try {
+                m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+            } catch (InterruptedException ignore) {
+            } finally {
+                m_executorService = null;
+            }
         }
     }
 }

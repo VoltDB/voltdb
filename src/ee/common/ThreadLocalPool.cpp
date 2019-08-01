@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -100,7 +100,7 @@ ThreadLocalPool::~ThreadLocalPool() {
     if (p == NULL) {
         VOLT_ERROR("Failed to find context");
         VOLT_ERROR_STACK();
-        assert(p != NULL);
+        vassert(p != NULL);
     }
     if (p != NULL) {
         if (p->first == 1) {
@@ -124,7 +124,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
-                assert(false);
+                vassert(false);
             }
             pthread_mutex_lock(&s_sharedMemoryMutex);
             SizeBucketMap_t& mapBySize = s_allocations[*enginePartitionIdPtr];
@@ -146,7 +146,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                         nextAlloc++;
                     } while (nextAlloc != allocMap.end());
                     allocMap.clear();
-                    assert(false);
+                    vassert(false);
                 }
                 mapBySize.erase(mapBySize.begin());
             }
@@ -169,7 +169,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from partition %d on thread %d:", getEnginePartitionId(), getThreadPartitionId());
                 VOLT_ERROR_STACK();
-                assert(false);
+                vassert(false);
             }
 #endif
         }
@@ -178,7 +178,7 @@ ThreadLocalPool::~ThreadLocalPool() {
 
 void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping)
 {
-    assert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
+    vassert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
 
     pthread_setspecific(m_allocatedKey, static_cast<const void *>(mapping.allocated));
     pthread_setspecific(m_key, static_cast<const void *>(mapping.poolData));
@@ -202,7 +202,7 @@ void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
 
 namespace {
 int32_t getAllocationSizeForObject(int length) {
-    static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
+    static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = sizeof(voltdb::ThreadLocalPool::Sized);
     static const int32_t MAX_ALLOCATION = ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
                                           NVALUE_LONG_OBJECT_LENGTHLENGTH +
                                           CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
@@ -302,8 +302,10 @@ ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, in
         // Compute num_elements to be the largest multiple of alloc_size
         // to fit in a 2MB buffer.
         int32_t num_elements = ((2 * 1024 * 1024 - 1) / alloc_size) + 1;
-        boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size, num_elements));
-        poolMap.insert(std::pair<int32_t, boost::shared_ptr<CompactingPool> >(alloc_size, pool));
+        // Compacting pool adds in its overhead so remove it since getAllocationSizeForObject also adds it
+        boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size - CompactingPool::FIXED_OVERHEAD_PER_ENTRY(),
+                num_elements));
+        poolMap[alloc_size] = pool;
         allocation = pool->malloc(referrer);
     }
     else {
@@ -334,18 +336,19 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         // allocation for any object of this size, so either the caller
         // passed a bogus data pointer that was never allocated here OR
         // the data pointer's size header has been corrupted.
-#ifdef VOLT_POOL_CHECKING
+
         // We will catch this when we see what compacting pool data is left
-        VOLT_ERROR("Deallocated relocatable pointer %p in wrong context thread (partition %d)",
-                sized, getEnginePartitionId());
+        VOLT_ERROR("Deallocated relocatable pointer %p in wrong context thread (partition %d). Requested size was %d",
+                sized, getEnginePartitionId(), alloc_size);
         VOLT_ERROR_STACK();
-#else
-        throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
-                            alloc_size);
-#endif
+        // TODO: ENG-14906: improve thread local pool
+        // implementation and tracking mechanism
+        // throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d", alloc_size);
+        vassert(false);
+    } else {
+       // Free the raw allocation from the found pool.
+       iter->second->free(sized);
     }
-    // Free the raw allocation from the found pool.
-    iter->second->free(sized);
 }
 
 #endif
@@ -373,7 +376,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
             mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
         }
         else {
-            assert(mapForAdd->second.size() == 0);
+            vassert(mapForAdd->second.size() == 0);
         }
 #endif
     }
@@ -381,7 +384,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         pool = iter->second.get();
 #ifdef VOLT_POOL_CHECKING
         mapForAdd = mapBySize.find(sz);
-        assert(mapForAdd != mapBySize.end());
+        vassert(mapForAdd != mapBySize.end());
 #endif
     }
     /**
@@ -429,7 +432,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         mapForAdd->second[newMem]->printLocalTrace();
         delete st;
 #endif
-        assert(false);
+        vassert(false);
     }
     VOLT_DEBUG("Allocated %p of size %lu on engine %d, thread %d", newMem, sz,
             getEnginePartitionId(), getThreadPartitionId());
@@ -576,7 +579,7 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
             SizeBucketMap_t& mapBySize = it->second;
             SizeBucketMap_t::iterator it2 = mapBySize.begin();
             while (it2 != mapBySize.end()) {
-                assert(it2->second.empty());
+                vassert(it2->second.empty());
                 it2++;
                 mapBySize.erase(mapBySize.begin());
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,8 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.Map.Entry;
@@ -46,6 +48,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.voltcore.utils.VoltUnsafe;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.catalog.Catalog;
@@ -59,6 +62,7 @@ import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.io.CharStreams;
 import com.google_voltpatches.common.reflect.ClassPath;
 import com.google_voltpatches.common.reflect.ClassPath.ClassInfo;
+import org.voltdb_testprocs.fakeusecase.greetings.GetGreetingBase;
 
 /** Tests starting the server with init + start without a schema,
  * and 'init --schema --classes'.
@@ -222,7 +226,9 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
-        if (!c1.m_isEnterprise) return;
+        if (!c1.m_isEnterprise) {
+            return;
+        }
 
         clearCrash();
 
@@ -276,25 +282,25 @@ final public class TestInitStartAction {
         } else {
             success = compiler.compileFromDDL(referenceFile.getAbsolutePath(), schemaFile.getPath());
         }
-        assertEquals(true, success);
+        assertTrue(success);
         InMemoryJarfile referenceCatalogJar = new InMemoryJarfile(referenceFile);
         Catalog referenceCatalog = new Catalog();
         referenceCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(referenceCatalogJar));
 
         // verify that the staged catalog is identical
         File stagedJarFile = new VoltFile(RealVoltDB.getStagedCatalogPath(rootDH.getPath() + File.separator + "voltdbroot"));
-        assertEquals(true, stagedJarFile.isFile());
+        assertTrue(stagedJarFile.isFile());
         InMemoryJarfile stagedCatalogJar = new InMemoryJarfile(stagedJarFile);
         Catalog stagedCatalog = new Catalog();
         stagedCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(stagedCatalogJar));
 
-        assertEquals(true, referenceCatalog.equals(stagedCatalog));
-        assertEquals(true, stagedCatalog.equals(referenceCatalog));
+        assertTrue(referenceCatalog.equals(stagedCatalog));
+        assertTrue(stagedCatalog.equals(referenceCatalog));
 
-        assertEquals(true, referenceFile.delete());
+        assertTrue(referenceFile.delete());
         // If schema is not null we have a real file else we have a dummy reader.
         if (schema != null) {
-            assertEquals(true, schemaFile.delete());
+            assertTrue(schemaFile.delete());
         }
 
         if (proceduresJar != null) {
@@ -341,7 +347,7 @@ final public class TestInitStartAction {
         server.join();
         expectSimulatedExit(0);
         validateStagedCatalog(schema, null);
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that a valid schema with procedures can be used to stage a matching catalog,
@@ -378,7 +384,7 @@ final public class TestInitStartAction {
         } catch (SimulatedExitException e){
             assertEquals(e.getStatus(), -1);
         }
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that a valid schema with no procedures can be used to stage a matching catalog.
@@ -396,7 +402,7 @@ final public class TestInitStartAction {
             assertEquals(e.getStatus(), -1);
         }
 
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that init accepts classes without a schema.
@@ -438,7 +444,7 @@ final public class TestInitStartAction {
         assertTrue(serverException.get().getMessage().equals("Faux crash of VoltDB successful."));
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Tests that when there are base classes and non-class files in the stored procedures,
@@ -457,13 +463,22 @@ final public class TestInitStartAction {
         System.out.println("Creating a .jar file using all of the classes associated with this test.");
         InMemoryJarfile originalInMemoryJar = new InMemoryJarfile();
         VoltCompiler compiler = new VoltCompiler(false, false);
-        ClassPath classpath = ClassPath.from(this.getClass().getClassLoader());
+        // Start with JAVA 9, the appClassLoader no longer an instance of java.net.URLClassLoader
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
         int classesFound = 0;
-        for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
-            compiler.addClassToJar(originalInMemoryJar, myclass.load());
-            classesFound++;
+        if (VoltUnsafe.IS_JAVA8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                compiler.addClassToJar(originalInMemoryJar, myclass.load());
+                classesFound++;
+            }
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                compiler.addClassToJar(originalInMemoryJar, Class.forName(packageName + "." + myclass.getName()));
+                classesFound++;
+            }
         }
+
         // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify this assert also.
         assertEquals(5, classesFound);
 
@@ -492,12 +507,19 @@ final public class TestInitStartAction {
         System.out.println("Creating a .jar file using all of the classes associated with this test.");
         InMemoryJarfile originalInMemoryJar = new InMemoryJarfile();
         VoltCompiler compiler = new VoltCompiler(false, false);
-        ClassPath classpath = ClassPath.from(this.getClass().getClassLoader());
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         int classesFound = 0;
-        for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
-            compiler.addClassToJar(originalInMemoryJar, myclass.load());
-            classesFound++;
+        if (VoltUnsafe.IS_JAVA8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                compiler.addClassToJar(originalInMemoryJar, myclass.load());
+                classesFound++;
+            }
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                compiler.addClassToJar(originalInMemoryJar, Class.forName(packageName + "." + myclass.getName()));
+                classesFound++;
+            }
         }
         // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify this assert also.
         assertEquals(5, classesFound);
@@ -516,6 +538,90 @@ final public class TestInitStartAction {
 
         //Only validate jar
         validateStagedCatalog(null, originalInMemoryJar);
+    }
+
+    @Test
+    public void testInitWithMultipleSchemaFiles() throws Exception {
+        String schema1 =
+                "CREATE TABLE unicorns" +
+                " (horn_size integer DEFAULT 12 NOT NULL," +
+                " name varchar(32) DEFAULT 'Pixie' NOT NULL," +
+                " PRIMARY KEY(name));" +
+                "PARTITION TABLE unicorns ON COLUMN name;";
+        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
+
+        String schema2 = "CREATE TABLE unicorns2" + " (horn_size integer DEFAULT 12 NOT NULL,"
+                + " name varchar(32) DEFAULT 'Pixie' NOT NULL," + " PRIMARY KEY(name));"
+                + "PARTITION TABLE unicorns2 ON COLUMN name;";
+
+        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
+
+        Configuration c1 = new Configuration(new String[] { "initialize", "voltdbroot", rootDH.getPath(), "force",
+                "schema", schemaFile1.getPath() + ',' + schemaFile2.getPath() });
+        ServerThread server = new ServerThread(c1);
+        server.setUncaughtExceptionHandler(handleUncaught);
+        server.start();
+        server.join();
+        expectSimulatedExit(0);
+        validateStagedCatalog(schema1 + schema2, null);
+        assertTrue(schemaFile1.delete());
+        assertTrue(schemaFile2.delete());
+    }
+
+    @Test
+    public void testInitWithMultipleJarFiles() throws Exception {
+        File resource = new File("tests/testprocs/org/voltdb_testprocs/fakeusecase/greetings/ddl.sql");
+        InputStream schemaReader = new FileInputStream(resource);
+        assertNotNull("Could not find " + resource, schemaReader);
+        String schema = CharStreams.toString(new InputStreamReader(schemaReader));
+
+        System.out.println("Creating a .jar file using all of the classes associated with this test.");
+        InMemoryJarfile inMemoryJar1 = new InMemoryJarfile();
+        InMemoryJarfile inMemoryJar2 = new InMemoryJarfile();
+        VoltCompiler compiler = new VoltCompiler(false, false);
+        String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
+        int classesFound = 0;
+        if (VoltUnsafe.IS_JAVA8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                if (myclass.getSimpleName().startsWith("Get")) {
+                    compiler.addClassToJar(inMemoryJar1, myclass.load());
+                } else {
+                    compiler.addClassToJar(inMemoryJar2, myclass.load());
+                }
+                classesFound++;
+            }
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                if (myclass.getSimpleName().startsWith("Get")) {
+                    compiler.addClassToJar(inMemoryJar1,  Class.forName(packageName + "." + myclass.getName()));
+                } else {
+                    compiler.addClassToJar(inMemoryJar2,  Class.forName(packageName + "." + myclass.getName()));
+                }
+                classesFound++;
+            }
+        }
+        // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify
+        // this assert also.
+        assertEquals(5, classesFound);
+
+        System.out.println("Writing " + classesFound + " classes to jar file");
+        File classesJarfile1 = File.createTempFile("testInitWIthMultipleJarFiles-procedures", ".jar");
+        classesJarfile1.deleteOnExit();
+        inMemoryJar1.writeToFile(classesJarfile1);
+        File classesJarfile2 = File.createTempFile("testInitWIthMultipleJarFiles-procedures", ".jar");
+        classesJarfile2.deleteOnExit();
+        inMemoryJar2.writeToFile(classesJarfile2);
+
+        Configuration c1 = new Configuration(new String[] { "initialize", "voltdbroot", rootDH.getPath(), "force",
+                "schema", resource.getPath(), "classes", classesJarfile1.getPath() + ',' + classesJarfile2.getPath() });
+        ServerThread server = new ServerThread(c1);
+        server.setUncaughtExceptionHandler(handleUncaught);
+        server.start();
+        server.join();
+
+        validateStagedCatalog(schema, inMemoryJar1);
+        validateStagedCatalog(schema, inMemoryJar2);
     }
 
     /* For 'voltdb start' test coverage see TestStartWithSchema and (in Pro) TestStartWithSchemaAndDurability.

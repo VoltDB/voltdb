@@ -55,6 +55,22 @@ CREATE TABLE R4 (
 -- of (coming soon) indexed IS NOT DISTINCT FROM joins.
 CREATE INDEX R4_NULLABLES ON R4 (G, A);
 
+CREATE TABLE R5 (
+    SI SMALLINT,
+    STR varchar(32),
+    BI BIGINT
+);
+
+CREATE INDEX R5_IND1 ON R5 (SI, BI);
+
+CREATE TABLE R6 (
+    A INTEGER,
+    STR varchar(32),
+    G INTEGER
+);
+
+CREATE INDEX R6_IND1 ON R6 (G, A);
+
 -- ENG-8692
 CREATE TABLE t1(i1 INTEGER);
 CREATE TABLE t2(i2 INTEGER);
@@ -71,3 +87,10 @@ CREATE TABLE T1_ENG_13603 (
 CREATE TABLE T2_ENG_13603 (
   ID INTEGER
 );
+
+-- ENG-15030
+create table rowkeys(dataset_id bigint, part int not null, value int, primary key (dataset_id, part, value));
+partition table rowkeys on column part;
+create table float_cells(attribute_id bigint, row_key int, value int, part int not null, primary key (attribute_id, part, row_key));
+partition table float_cells on column part;
+

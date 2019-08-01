@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,14 +45,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     boolean m_generatedPlans = false;
 
     /**
-     *
-     * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
-    {
-        super(db, parsedStmt, partitioning);
+    WriterSubPlanAssembler(AbstractParsedStmt parsedStmt, StatementPartitioning partitioning) {
+        super(parsedStmt, partitioning);
 
         assert(m_parsedStmt.m_tableList.size() == 1);
         m_targetTable = m_parsedStmt.m_tableList.get(0);

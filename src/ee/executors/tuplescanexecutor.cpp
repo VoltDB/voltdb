@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,7 +53,7 @@ bool TupleScanExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init TupleScan Executor");
     TupleScanPlanNode* node = dynamic_cast<TupleScanPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     setTempOutputTable(executorVector, node->getTargetTableName());
     return true;
@@ -61,15 +61,15 @@ bool TupleScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool TupleScanExecutor::p_execute(const NValueArray &params) {
     TupleScanPlanNode* node = static_cast<TupleScanPlanNode*>(m_abstractNode);
-    assert(node == dynamic_cast<TupleScanPlanNode*>(m_abstractNode));
+    vassert(node == dynamic_cast<TupleScanPlanNode*>(m_abstractNode));
     Table* output_table = node->getOutputTable();
-    assert(output_table);
+    vassert(output_table);
     AbstractTempTable* output_temp_table = dynamic_cast<AbstractTempTable*>(output_table);
-    assert(output_temp_table);
+    vassert(output_temp_table);
 
     TableTuple temp_tuple = output_temp_table->tempTuple();
     const std::vector<int>& paramIdxs = node->getParamIdxs();
-    assert(paramIdxs.size() == output_temp_table->schema()->columnCount());
+    vassert(paramIdxs.size() == output_temp_table->schema()->columnCount());
     for (int i = 0; i < paramIdxs.size(); ++i)
     {
         temp_tuple.setNValue(i, params[paramIdxs[i]]);

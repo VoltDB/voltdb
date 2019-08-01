@@ -23,7 +23,7 @@
 {@onefun = ""}
 {@optionalfn = ""}
 {@plus10 = ""} -- You cannot add to a varbinary
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "B"}

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -665,7 +665,6 @@ public abstract class StatementCompiler {
             ComparisonOperation comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
-//        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
         sb.append(" ORDER BY " + column.getName());
         if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
             sb.append(" ASC OFFSET ? LIMIT 1;");
@@ -808,5 +807,43 @@ public abstract class StatementCompiler {
         addStatement(catTable, newCatProc, valueAtQuery, "2");
 
         return newCatProc;
+    }
+
+    /**
+     * Generate migrate queries by using count - select - migrate pattern.
+     *
+     * 1) First query finds number of rows meet the migrate condition.
+     * 2) Second query finds the cut-off value if number of rows to be migrate is
+     *    higher than maximum migrate chunk size.
+     * 3) Third query migrates rows selected by above queries.
+     */
+    public static Procedure compileMigrateProcedure(Table table, String procName,
+            Column column, ComparisonOperation comparison) {
+        Procedure proc = addProcedure(table, procName);
+
+        // Select count(*)
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT COUNT(*) FROM " + table.getTypeName());
+        sb.append(" WHERE not migrating AND " + column.getName() + " " + comparison.toString() + " ?;");
+        addStatement(table, proc, sb.toString(), "0");
+
+         // Get cutoff value
+        sb.setLength(0);
+        sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
+        sb.append(" WHERE not migrating ORDER BY " + column.getName());
+        if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
+            sb.append(" ASC OFFSET ? LIMIT 1;");
+        } else {
+            sb.append(" DESC OFFSET ? LIMIT 1;");
+        }
+        addStatement(table, proc, sb.toString(), "1");
+
+        // Migrate
+        sb.setLength(0);
+        sb.append("MIGRATE FROM " + table.getTypeName());
+        sb.append(" WHERE not migrating AND " + column.getName() + " " + comparison.toString() + " ?;");
+        addStatement(table, proc, sb.toString(), "2");
+
+        return proc;
     }
 }

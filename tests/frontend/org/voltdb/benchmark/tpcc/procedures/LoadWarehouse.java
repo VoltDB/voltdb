@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -58,18 +58,22 @@ import org.voltdb.VoltTable;
  */
 public class LoadWarehouse extends VoltProcedure {
 
-    @SuppressWarnings("deprecation")
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "WAREHOUSE", warehouses, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "DISTRICT", districts, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER", customers, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "STOCK", stocks, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ORDERS", orders, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "NEW_ORDER", neworders, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ORDER_LINE", orderLines, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "HISTORY", histories, false, false);
+        callLoadTable("WAREHOUSE", warehouses);
+        callLoadTable("DISTRICT", districts);
+        callLoadTable("CUSTOMER", customers);
+        callLoadTable("STOCK", stocks);
+        callLoadTable("ORDERS", orders);
+        callLoadTable("NEW_ORDER", neworders);
+        callLoadTable("ORDER_LINE", orderLines);
+        callLoadTable("HISTORY", histories);
         return null;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void callLoadTable(String tableName, VoltTable table) {
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, tableName, table);
     }
 }

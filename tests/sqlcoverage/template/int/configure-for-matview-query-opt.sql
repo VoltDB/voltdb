@@ -16,7 +16,7 @@
 {@insertvals = "_id, _value[byte], _value[byte], _value[byte], _value[byte]"}
 {@numcol = "WAGE"}
 {@plus10 = " + 10"}
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "WAGE"}

@@ -25,49 +25,60 @@ namespace boost
 
     namespace ptr_container_detail
     {
-        template< class T, class CloneAllocator >
+        template< class Container >
         class scoped_deleter
         {
-            typedef std::size_t size_type;
+            typedef BOOST_DEDUCED_TYPENAME Container::size_type   size_type;
+            typedef BOOST_DEDUCED_TYPENAME Container::object_type T;
+            
+            Container&        cont_;
             scoped_array<T*>  ptrs_;
             size_type         stored_; 
             bool              released_;
             
         public:
-            scoped_deleter( T** a, size_type size ) 
-                : ptrs_( a ), stored_( size ), released_( false )
+            scoped_deleter( Container& cont, T** a, size_type size ) 
+                : cont_(cont), 
+                  ptrs_( a ), 
+                  stored_( size ), 
+                  released_( false )
             { 
                 BOOST_ASSERT( a );
             }
             
-            scoped_deleter( size_type size ) 
-                : ptrs_( new T*[size] ), stored_( 0 ), 
-                 released_( false )
+            scoped_deleter( Container& cont, size_type size ) 
+                : cont_(cont), 
+                  ptrs_( new T*[size] ), 
+                  stored_( 0 ), 
+                  released_( false )
             {
                 BOOST_ASSERT( size > 0 );
             }
 
 
             
-            scoped_deleter( size_type n, const T& x ) // strong
-                : ptrs_( new T*[n] ), stored_(0),
+            scoped_deleter( Container& cont, size_type n, const T& x ) // strong
+                : cont_(cont), 
+                  ptrs_( new T*[n] ), 
+                  stored_(0),
                   released_( false )
             {
                 for( size_type i = 0; i != n; i++ )
-                    add( CloneAllocator::allocate_clone( &x ) );
+                    add( cont_.null_policy_allocate_clone( &x ) );
                 BOOST_ASSERT( stored_ > 0 );
             }
 
 
             
             template< class InputIterator >
-            scoped_deleter ( InputIterator first, InputIterator last  ) // strong
-                : ptrs_( new T*[ std::distance(first,last) ] ),
+            scoped_deleter ( Container& cont, InputIterator first, InputIterator last  ) // strong
+                : cont_(cont),
+                  ptrs_( new T*[ std::distance(first,last) ] ),
                   stored_(0),
                   released_( false )
             {
                 for( ; first != last; ++first )
-                    add( CloneAllocator::allocate_clone_from_iterator( first ) );
+                    add( cont_.null_policy_allocate_clone_from_iterator( first ) );
                 BOOST_ASSERT( stored_ > 0 );
             }
 
@@ -78,7 +89,7 @@ namespace boost
                 if ( !released_ )
                 {
                     for( size_type i = 0u; i != stored_; ++i )
-                        CloneAllocator::deallocate_clone( ptrs_[i] ); 
+                        cont_.null_policy_deallocate_clone( ptrs_[i] ); 
                 }
             }
             

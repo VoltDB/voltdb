@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -91,6 +91,11 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
         java_opts.append('-Xms2048m')
         java_opts.append('-XX:+AlwaysPreTouch')
 
+# Find the temp directory which is going to be used by java
+tmpDir = '/tmp'
+for opt in filter(lambda o: o.startswith('-Djava.io.tmpdir='), java_opts):
+    tmpDir = opt.split('=', 1)[1]
+
 # Set common options now.
 java_opts.append('-server')
 java_opts.append('-Djava.awt.headless=true')
@@ -99,7 +104,6 @@ java_opts.append('-Dsun.net.inetaddr.ttl=300')
 java_opts.append('-Dsun.net.inetaddr.negative.ttl=3600')
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
-java_opts.append('-XX:+UseParNewGC')
 java_opts.append('-XX:+UseConcMarkSweepGC')
 java_opts.append('-XX:+CMSParallelRemarkEnabled')
 java_opts.append('-XX:+UseTLAB')
@@ -114,9 +118,37 @@ java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
 java_opts.append('-XX:+CMSClassUnloadingEnabled')
 
-# skip PermSize in Java 8
-if "1.8" not in java_version:
+# skip PermSize in Java 8 and above
+if "1.7" in java_version:
     java_opts.append('-XX:PermSize=64m')
+
+# Suppress Illegal reflective access warning
+if "11." in java_version:
+    java_opts.extend(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.net=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.nio=ALL-UNNAMED'])
+
+def _is_tmpfs(path):
+    '''
+    Test if path is on a tmpfs filesystem
+    '''
+    if not os.access('/proc/mounts', os.R_OK):
+        return False
+    while path and not os.path.ismount(path):
+        path = os.path.dirname(path)
+    if not path:
+        return False
+    is_tmpfs = False
+    with open('/proc/mounts') as f:
+        for line in f:
+            line = line.split()
+            if line[1] == path:
+                is_tmpfs = line[2] == 'tmpfs'
+    return is_tmpfs
+
+if not _is_tmpfs(tmpDir):
+    java_opts.append('-XX:+PerfDisableSharedMem')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """

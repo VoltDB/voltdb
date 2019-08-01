@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,10 +52,10 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message, PersistentTableSurgeon *surgeon =  NULL);
+    ConstraintFailureException(Table *table, TableTuple tuple, std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
 
-    virtual const std::string message() const;
-    virtual ~ConstraintFailureException();
+    virtual std::string message() const;
+    virtual ~ConstraintFailureException() throw();
 
     const TableTuple* getConflictTuple() const { return &m_tuple; }
     const TableTuple* getOriginalTuple() const { return &m_otherTuple; }

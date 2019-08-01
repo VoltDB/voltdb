@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,16 +34,13 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.dr2.DRIDTrackerHelper;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
 
 // ExecuteTask is now a restartable system procedure
 // make sure each sub task is either idempotent or can rollback (e.g. generateDREvent)
-public class ExecuteTask extends VoltSystemProcedure {
-
-    private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
+public class ExecuteTask extends VoltSystemProcedure
+{
 
     static final VoltLogger log = new VoltLogger("TM");
 
@@ -60,7 +57,12 @@ public class ExecuteTask extends VoltSystemProcedure {
 
     @Override
     public long[] getPlanFragmentIds() {
-        return new long[]{SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate};
+        return new long[] { SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate };
+    }
+
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[] { SysProcFragmentId.PF_executeTask};
     }
 
     @Override
@@ -69,7 +71,7 @@ public class ExecuteTask extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_executeTask) {
             assert(params.toArray()[0] != null);
-            byte[] payload = (byte [])params.toArray()[0];
+            byte[] payload = (byte[]) params.toArray()[0];
             ByteBuffer buffer = ByteBuffer.wrap(payload);
             int taskId = buffer.getInt();
             TaskType taskType = TaskType.values()[taskId];
@@ -80,13 +82,15 @@ public class ExecuteTask extends VoltSystemProcedure {
             {
                 TupleStreamStateInfo stateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
                 result = createDRTupleStreamStateResultTable();
-                result.addRow(context.getHostId(), context.getPartitionId(), 0,
-                        stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
-                        stateInfo.drVersion);
-                if (stateInfo.containsReplicatedStreamInfo) {
-                    result.addRow(context.getHostId(), context.getPartitionId(), 1,
-                            stateInfo.replicatedInfo.drId, stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                if (stateInfo != null) {
+                    result.addRow(context.getHostId(), context.getPartitionId(), 0, stateInfo.partitionInfo.drId,
+                            stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
                             stateInfo.drVersion);
+                    if (stateInfo.containsReplicatedStreamInfo) {
+                        result.addRow(context.getHostId(), context.getPartitionId(), 1, stateInfo.replicatedInfo.drId,
+                                stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                                stateInfo.drVersion);
+                    }
                 }
                 break;
             }
@@ -127,7 +131,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    result.addRow("FAILURE");
+                    result.addRow(STATUS_FAILURE);
                 }
                 break;
             }
@@ -135,17 +139,17 @@ public class ExecuteTask extends VoltSystemProcedure {
             {
                 result = new VoltTable(STATUS_SCHEMA);
                 try {
-                    boolean hasReplicatedStream = buffer.get() == (byte)1;
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
                     ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
                     ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
-                    context.initDRAppliedTracker(clusterIdToPartitionCountMap, hasReplicatedStream);
+                    @SuppressWarnings("unchecked")
+                    Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>) ois.readObject();
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    result.addRow("FAILURE");
+                    result.addRow(STATUS_FAILURE);
                 }
                 break;
             }
@@ -155,29 +159,33 @@ public class ExecuteTask extends VoltSystemProcedure {
                 int oldPartitionCnt = buffer.getInt();
                 int newPartitionCnt = buffer.getInt();
                 ProducerDRGateway producer = VoltDB.instance().getNodeDRGateway();
-                if (context.isLowestSiteId()) {
-                    // update the total partition count reported in query response by DRProducer.
-                    // Do this even if the Producer is disabled or there are no conversations.
-                    producer.elasticChangeUpdatesPartitionCount(newPartitionCnt);
+                if (producer==null) {
+                    result.addRow(STATUS_FAILURE);
+                }  else {
+                    if (context.isLowestSiteId()) {
+                        // update the total partition count reported in query response by DRProducer.
+                        // Do this even if the Producer is disabled or there are no conversations.
+                        producer.elasticChangeUpdatesPartitionCount(newPartitionCnt);
+                    }
+                    if (producer.isActive()) {
+                        // Only generate the event if we are generating binary log buffers
+                        long txnId = m_runner.getTxnState().txnId;
+                        long uniqueId = m_runner.getUniqueId();
+                        long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                        context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
+                                newPartitionCnt, txnId, spHandle, uniqueId);
+                    }
+                    result.addRow(STATUS_OK);
                 }
-                if (producer.isActive()) {
-                    // Only generate the event if we are generating binary log buffers
-                    long txnId = m_runner.getTxnState().txnId;
-                    long uniqueId = m_runner.getUniqueId();
-                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
-                            newPartitionCnt, txnId, spHandle, uniqueId);
-                }
-                result.addRow(STATUS_OK);
                 break;
             }
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
-            return new DependencyPair.TableDependencyPair(DEP_executeTask, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_executeTask, result);
         } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
-            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(DEP_executeTask));
-            return new DependencyPair.TableDependencyPair(DEP_executeTaskAggregate, unionTable);
+            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_executeTask));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_executeTaskAggregate, unionTable);
         }
         assert false;
         return null;
@@ -191,28 +199,11 @@ public class ExecuteTask extends VoltSystemProcedure {
             // This is a way for forcing the MPI to execute a runnable without doing anything
             VoltTable result = new VoltTable(STATUS_SCHEMA);
             result.addRow(STATUS_OK);
-            return new VoltTable[] {result};
+            return new VoltTable[] { result };
         }
 
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_executeTask;
-        pfs[0].inputDepIds = new int[]{};
-        pfs[0].outputDepId = DEP_executeTask;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[] { params });
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_executeTaskAggregate;
-        pfs[1].inputDepIds = new int[]{DEP_executeTask};
-        pfs[1].outputDepId = DEP_executeTaskAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results = executeSysProcPlanFragments(pfs, DEP_executeTaskAggregate);
-
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate,
+                params);
     }
 
 }

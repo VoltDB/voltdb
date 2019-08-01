@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,7 +45,9 @@
 
 #include <iostream>
 #include "indexes/tableindex.h"
+#include "common/StackTrace.h"
 #include "expressions/expressionutil.h"
+#include "expressions/conjunctionexpression.h"
 #include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
@@ -58,6 +60,7 @@ TableIndexScheme::TableIndexScheme(
     AbstractExpression* a_predicate,
     bool a_unique,
     bool a_countable,
+    bool migrating,
     const std::string& a_expressionsAsText,
     const std::string& a_predicateAsText,
     const TupleSchema *a_tupleSchema) :
@@ -69,16 +72,38 @@ TableIndexScheme::TableIndexScheme(
       allColumnIndices(a_columnIndices),
       unique(a_unique),
       countable(a_countable),
+      migrating(migrating),
       expressionsAsText(a_expressionsAsText),
       predicateAsText(a_predicateAsText),
-      tupleSchema(a_tupleSchema)
-    {
-        if (predicate != NULL)
-        {
+      tupleSchema(a_tupleSchema) {
+        if (predicate != NULL) {
             // Collect predicate column indicies
             ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
         }
+        // Deprecating "CREATE MIGRATING INDEX ..." syntax, but
+        // retain the catalog flag. Do not modify the index.
     }
+
+void TableIndexScheme::setMigrate() {
+   size_t const hiddenColumnIndex = tupleSchema->totalColumnCount() - 1;
+   auto* hiddenColumnExpr = ExpressionUtil::columnIsNull(0, hiddenColumnIndex);
+   if (predicate == nullptr) {
+      predicate = hiddenColumnExpr;
+   } else {
+      predicate = ExpressionUtil::conjunctionFactory(ExpressionType::EXPRESSION_TYPE_CONJUNCTION_AND,
+            hiddenColumnExpr, predicate);
+   }
+   // NOTE: we are not updating JSON expressions for the predicate, which
+   // involves work on rapidjson (that we may deprecate soon), and serialization
+   // of expression.
+   if (allColumnIndices.empty()) {
+      // if no explicit columns are used, index on the
+      // hidden column (i.e. the transaction id as of
+      // INTEGER type).
+      allColumnIndices.emplace_back(hiddenColumnIndex);
+   }
+
+}
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
     m_scheme(scheme),
@@ -108,6 +133,7 @@ std::string TableIndex::debug() const
     std::ostringstream buffer;
     buffer << getTypeName() << "(" << getName() << ")";
     buffer << (isUniqueIndex() ? " UNIQUE " : " NON-UNIQUE ");
+    buffer << (isMigratingIndex() ? " MIGRATING " : " NON-MIGRATING ");
     //
     // Columns
     //
@@ -157,17 +183,18 @@ void TableIndex::printReport()
     std::cout << m_updates << std::endl;
 }
 
-bool TableIndex::equals(const TableIndex *other) const
-{
+bool TableIndex::equals(const TableIndex *other) const {
     //TODO Do something useful here!
     return true;
 }
 
-void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
-{
+void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple) {
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Do not add it.
         return;
+    }
+    for(auto const* expr : getIndexedExpressions()) {
+       expr->eval(tuple, nullptr);
     }
     addEntryDo(tuple, conflictTuple);
 }
@@ -183,7 +210,7 @@ bool TableIndex::deleteEntry(const TableTuple *tuple)
 
 bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
 {
-    assert(originalTuple.address() != destinationTuple.address());
+    vassert(originalTuple.address() != destinationTuple.address());
 
     if (isPartialIndex()) {
         const AbstractExpression* predicate = getPredicate();
@@ -201,7 +228,7 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
             return deleteEntryDo(&originalTuple);
         } else {
             // both tuples pass the predicate.
-            assert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
+            vassert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
             return replaceEntryNoKeyChangeDo(destinationTuple, originalTuple);
         }
     } else {
@@ -209,10 +236,8 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
     }
 }
 
-bool TableIndex::exists(const TableTuple *persistentTuple) const
-{
-    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue())
-    {
+bool TableIndex::exists(const TableTuple *persistentTuple) const {
+    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue()) {
         // Tuple fails the predicate.
         return false;
     }
@@ -231,9 +256,10 @@ bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rh
             // either existing tuple needs to be deleted or the new one added from/to the index
             return true;
         } else {
-            assert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
+            vassert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
             return checkForIndexChangeDo(lhs, rhs);
         }
     }
     return checkForIndexChangeDo(lhs, rhs);
 }
+

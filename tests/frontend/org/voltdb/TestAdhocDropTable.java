@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -126,7 +126,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             m_client.callProcedure("@AdHoc", "drop table DROPME;");
         }
         catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("Table DROPME not found"));
+            assertTrue(pce.getMessage().contains("object not found: DROPME"));
             threw = true;
         }
         assertTrue("Dropping bad table should have failed", threw);
@@ -291,7 +291,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             fail("expected an exception!");
         }
         catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("Cannot drop table T_ENG12816"));
+            assertTrue(pce.getMessage().contains("object not found"));
         }
 
         cr = m_client.callProcedure("@SystemCatalog", "TABLES");

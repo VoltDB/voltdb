@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,8 +34,8 @@ class TupleSchema;
 class TableTuple;
 
 class ElasticIndexReadContext : public TableStreamerContext {
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
-                                              TableStreamType, const std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TableStreamType,
+            const HiddenColumnFilter&, const std::vector<std::string>&);
 
 public:
     /**
@@ -92,6 +92,8 @@ private:
 
     /// Set to true after index was completely materialized.
     bool m_materialized;
+
+    const HiddenColumnFilter m_filter;
 };
 
 }

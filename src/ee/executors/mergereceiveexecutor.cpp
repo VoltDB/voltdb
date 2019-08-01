@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -72,8 +72,8 @@ struct TupleRangeComparer : std::binary_function<tuple_range, tuple_range, bool>
     bool operator()(const tuple_range& ta, const tuple_range& tb) const
     {
         // Assert both ranges are not empty
-        assert(ta.first != ta.second);
-        assert(tb.first != tb.second);
+        vassert(ta.first != ta.second);
+        vassert(tb.first != tb.second);
         return m_comp(*ta.first, *tb.first);
     }
     AbstractExecutor::TupleComparer m_comp;
@@ -102,11 +102,11 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     tuple_iterator begin = tuples.begin();
     for (size_t i = 0; i < nonEmptyPartitions; ++i) {
         // Partitions are supposed to be non-empty
-        assert(partitionTupleCounts[i] > 0);
+        vassert(partitionTupleCounts[i] > 0);
         tuple_iterator end = begin + partitionTupleCounts[i];
         partitions.push_back(std::make_pair(begin, end));
         begin = end;
-        assert( i != nonEmptyPartitions -1 || end == tuples.end());
+        vassert( i != nonEmptyPartitions -1 || end == tuples.end());
     }
 
     // Make a heap out of partitions where the partition with a tuple with a minimal value is on top
@@ -117,7 +117,7 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     while (postfilter.isUnderLimit() && !partitions.empty()) {
         // Get the first partition from the heap that has the next tuple to be inserted
         range_iterator rangeIt = partitions.begin();
-        assert(rangeIt->first != rangeIt->second);
+        vassert(rangeIt->first != rangeIt->second);
         TableTuple tuple = *rangeIt->first;
         ++rangeIt->first;
 
@@ -163,10 +163,10 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                                   const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init MergeReceive Executor");
-    assert(!executorVector.isLargeQuery());
+    vassert(!executorVector.isLargeQuery());
 
     MergeReceivePlanNode* merge_receive_node = dynamic_cast<MergeReceivePlanNode*>(abstract_node);
-    assert(merge_receive_node != NULL);
+    vassert(merge_receive_node != NULL);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -174,7 +174,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     // inline OrderByPlanNode
     m_orderby_node = dynamic_cast<OrderByPlanNode*>(merge_receive_node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_ORDERBY));
-    assert(m_orderby_node != NULL);
+    vassert(m_orderby_node != NULL);
     #if defined(VOLT_LOG_LEVEL)
     #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
         const std::vector<AbstractExpression*>& sortExprs = m_orderby_node->getSortExpressions();
@@ -258,7 +258,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     while (iterator.next(input_tuple))
     {
         pmp.countdownProgress();
-        assert(input_tuple.isActive());
+        vassert(input_tuple.isActive());
         xs.push_back(input_tuple);
     }
 

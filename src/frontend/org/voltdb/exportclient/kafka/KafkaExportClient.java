@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,6 +70,8 @@ public class KafkaExportClient extends ExportClientBase {
 
     private final static Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
+
+    private final static int SHUTDOWN_TIMEOUT_MS = 10_000;
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
 
@@ -316,6 +318,9 @@ public class KafkaExportClient extends ExportClientBase {
             catch (ConfigException e) {
                 LOG.error("Unable to instantiate a Kafka producer", e);
                 throw new RestartBlockException("Unable to instantiate a Kafka producer", e, true);
+            } catch (KafkaException e) {
+                LOG.error("Unable to instantiate a Kafka producer", e);
+                throw new RestartBlockException("Unable to instantiate a Kafka producer", e, true);
             }
             m_primed = true;
         }
@@ -399,9 +404,26 @@ public class KafkaExportClient extends ExportClientBase {
             if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
             m_es.shutdown();
             try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
+                if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    // In case we were misconfigured to a non-existent Kafka broker,
+                    // a decoder thread may be stuck on 'send' and we need to force it out.
+                    // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+                    forceExecutorShutdown();
+                }
             } catch (InterruptedException e) {
-                throw new KafkaExportException("Interrupted while awaiting executor shutdown", e);
+                // We are in the UAC path and don't want to throw exception for this condition;
+                // just force the shutdown.
+                LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
+                forceExecutorShutdown();
+            }
+        }
+
+        private void forceExecutorShutdown() {
+            LOG.warn("Forcing executor shutdown on source: " + m_source);
+            try {
+                m_es.shutdownNow();
+            } catch (Exception e) {
+                LOG.error("Failed to force executor shutdown on source: " + m_source, e);
             }
         }
     }

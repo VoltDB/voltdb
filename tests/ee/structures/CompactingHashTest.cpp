@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,9 +29,9 @@
 #include <cstdio>
 #include <sys/time.h>
 #include <boost/unordered_map.hpp>
-#include "harness.h"
+#include "common/debuglog.h"
 #include "structures/CompactingHashTable.h"
-#include "common/FixUnusedAssertHack.h"
+#include "harness.h"
 
 using namespace voltdb;
 using namespace std;
@@ -97,20 +97,19 @@ void uniqueFuzzIteration() {
         int64_t value = rand();
         if (insert) {
             insertSTLIter = stl.insert(pair<int64_t,int64_t>(value,value));
-            bool didInsert = (volt.insert(value, value) == NULL);
-            assert (insertSTLIter.second == didInsert);
+            vassert(insertSTLIter.second == (volt.insert(value, value) == NULL));
         }
         else {
             stlIter = stl.find(value);
             voltIter = volt.find(value);
-            assert( (stlIter == stl.end()) == (voltIter.isEnd()) );
+            vassert((stlIter == stl.end()) == voltIter.isEnd());
             if (stlIter != stl.end()) {
                 stl.erase(stlIter);
                 volt.erase(voltIter);
             }
         }
 
-        assert( stl.size() == volt.size() );
+        vassert(stl.size() == volt.size());
     }
 
     volt.verify();
@@ -165,9 +164,8 @@ void multiFuzzIteration() {
             for (int j = 0; j < dups; j++) {
                 int64_t toInsert = randomValue(100);
                 stlIter = stl.insert(pair<int64_t,int64_t>(value, toInsert));
-                bool didInsert = (volt.insert(value, toInsert) == NULL);
+                vassert(volt.insert(value, toInsert) == NULL);
                 insertions++;
-                assert(didInsert);
             }
         }
         else {
@@ -179,7 +177,7 @@ void multiFuzzIteration() {
                 stlIter = stl.find(value);
                 if (stlIter == stl.end()) {
                     voltIter = volt.find(value);
-                    assert(voltIter.isEnd());
+                    vassert(voltIter.isEnd());
                     if (alwaysSucceed) j--;
                 }
                 else {
@@ -194,31 +192,31 @@ void multiFuzzIteration() {
                     }
 
                     voltIter = volt.find(value, stlValue);
-                    assert(voltIter.isEnd() == false);
+                    vassert(!voltIter.isEnd());
 
                     int64_t stlKey = stlIter->first;
                     int64_t voltKey = voltIter.key();
                     int64_t voltValue = voltIter.value();
 
-                    assert(stlKey == voltKey);
-                    assert(stlValue == voltValue);
+                    vassert(stlKey == voltKey);
+                    vassert(stlValue == voltValue);
 
                     // this should always succeed
                     stl.erase(stlIter);
 
                     // try to delete something that doesn't exist by value
                     bool erased = volt.erase(stlKey, 1000);
-                    assert(!erased);
+                    vassert(!erased);
 
                     // now delete the real thing
                     erased = volt.erase(stlKey, stlValue);
-                    assert(erased);
+                    vassert(erased);
                     deletions++;
                 }
             }
         }
 
-        assert( stl.size() == volt.size() );
+        vassert(stl.size() == volt.size());
     }
 
     volt.verify();
@@ -243,10 +241,9 @@ TEST_F(CompactingHashTest, MissingByKey) {
     volt.insert(1,1);
     voltIter = volt.find(1,1);
     bool erased = volt.erase(1,2);
-    assert(!erased);
+    vassert(!erased);
     voltIter.setValue(2);
-    erased = volt.erase(1,2);
-    assert(erased);
+    vassert(volt.erase(1,2));
 }
 
 TEST_F(CompactingHashTest, ShrinkAndGrowUnique) {
@@ -495,7 +492,7 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
         }
     }
 
-    assert(volt.verify());
+    ASSERT_TRUE(volt.verify());
 
     timeval tp;
     gettimeofday(&tp, NULL);
@@ -630,6 +627,6 @@ TEST_F(CompactingHashTest, Trivial) {
 }
 
 int main() {
-    assert(printf("Assertions are enabled\n"));
+    printf("Assertions are enabled\n");
     return TestSuite::globalInstance()->runAll();
 }

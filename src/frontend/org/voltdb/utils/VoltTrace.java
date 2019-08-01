@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,11 +33,6 @@ import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import com.google_voltpatches.common.collect.EvictingQueue;
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -46,6 +41,12 @@ import org.codehaus.jackson.map.SerializerProvider;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+
+import com.google_voltpatches.common.collect.EvictingQueue;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Utility class to log Chrome Trace Event format trace messages into files.
@@ -146,7 +147,9 @@ public class VoltTrace implements Runnable {
             }
 
             for (int i=0; i<m_argsArr.length; i+=2) {
-                if (i+1 == m_argsArr.length) break;
+                if (i+1 == m_argsArr.length) {
+                    break;
+                }
                 m_args.put(String.valueOf(m_argsArr[i]), String.valueOf(m_argsArr[i+1]));
             }
         }
@@ -368,7 +371,7 @@ public class VoltTrace implements Runnable {
         // If queue is full, drop oldest events
     }
 
-    private ListenableFuture dumpEvents(File path) {
+    private ListenableFuture<?> dumpEvents(File path) {
         if (m_emptyQueue == null || m_traceEvents.isEmpty()) {
             return null;
         }
@@ -377,7 +380,7 @@ public class VoltTrace implements Runnable {
         m_traceEvents = m_emptyQueue;
         m_emptyQueue = null;
 
-        final ListenableFuture future = m_writerThread.submit(new TraceFileWriter(path, writeQueue));
+        final ListenableFuture<?> future = m_writerThread.submit(new TraceFileWriter(path, writeQueue));
         future.addListener(() -> m_work.offer(() -> m_emptyQueue = writeQueue), CoreUtils.SAMETHREADEXECUTOR);
         return future;
     }
@@ -397,9 +400,9 @@ public class VoltTrace implements Runnable {
             throw new IOException("Trace file " + file.getAbsolutePath() + " is not writable");
         }
 
-        SettableFuture<Future> f = SettableFuture.create();
+        SettableFuture<Future<?>> f = SettableFuture.create();
         m_work.offer(() -> f.set(dumpEvents(file)));
-        final Future writeFuture = f.get();
+        final Future<?> writeFuture = f.get();
         if (writeFuture != null) {
             writeFuture.get(); // Wait for the write to finish without blocking new events
             return file.getAbsolutePath();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,17 +150,10 @@ static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeA
     voltdb::Table* tbl = NULL;
     if (tableType == PERSISTENT) {
         char signature[20];
-        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID,
-                                                       tableName,
-                                                       schema,
-                                                       names,
-                                                       signature);
+        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID, tableName.c_str(), schema, names, signature);
     }
     else {
-        tbl = voltdb::TableFactory::buildTempTable(tableName,
-                                                   schema,
-                                                   names,
-                                                   NULL);
+        tbl = voltdb::TableFactory::buildTempTable(tableName, schema, names, NULL);
     }
 
     return tbl;

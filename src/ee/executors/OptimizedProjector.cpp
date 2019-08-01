@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,10 +43,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 #include <algorithm>
 
-#include "boost/foreach.hpp"
+#include <boost/foreach.hpp>
 
 #include "common/tabletuple.h"
 #include "executors/OptimizedProjector.hpp"
@@ -68,7 +67,7 @@ public:
         : m_dstFieldIndex(dstFieldIndex)
         , m_action(EVAL_EXPR)
         , m_params(expr, dstFieldIndex) {
-        assert (dstFieldIndex >= 0);
+        vassert(dstFieldIndex >= 0);
     }
 
     // The memcpy constructor
@@ -78,7 +77,7 @@ public:
         , m_action(MEMCPY)
         , m_params(dstFieldIndex, srcFieldIndex,
                    dstOffset, srcOffset, numBytes) {
-        assert (dstFieldIndex >= 0);
+        vassert(dstFieldIndex >= 0);
     }
 
     // Perform this step on the destination tuple
@@ -97,7 +96,7 @@ public:
     // Return the expression for an expression eval step.
     // Asserts if this is not an expr eval step.
     AbstractExpression* expr() const {
-        assert (m_action == EVAL_EXPR);
+        vassert(m_action == EVAL_EXPR);
         return m_params.m_evalParams.m_expr;
     }
 
@@ -116,7 +115,7 @@ public:
     // (first argument to memcpy)
     // asserts if this is not a memcpy step
     size_t dstOffset() const {
-        assert (m_action == MEMCPY);
+        vassert(m_action == MEMCPY);
         return m_params.m_memcpyParams.m_dstOffset;
     }
 
@@ -124,7 +123,7 @@ public:
     // (second argument to memcpy)
     // asserts if this is not a memcpy step
     size_t srcOffset() const {
-        assert (m_action == MEMCPY);
+        vassert(m_action == MEMCPY);
         return m_params.m_memcpyParams.m_srcOffset;
     }
 
@@ -132,7 +131,7 @@ public:
     // (third argument to memcpy)
     // asserts if this is not a memcpy step
     size_t numBytes() const {
-        assert (m_action == MEMCPY);
+        vassert(m_action == MEMCPY);
         return m_params.m_memcpyParams.m_numBytes;
     }
 
@@ -187,7 +186,7 @@ private:
 // for ordering: fields in source tuple may be referenced more
 // than once, or projection expression may not be a TVE.
 struct StepComparator {
-    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs) {
+    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs) const {
         return lhs.dstFieldIndex() < rhs.dstFieldIndex();
     }
 };
@@ -210,7 +209,7 @@ void ProjectStep::exec(TableTuple& dstTuple, const TableTuple& srcTuple) const {
         break;
     }
     default:
-        assert(false);
+        vassert(false);
     }
 }
 
@@ -229,7 +228,7 @@ int ProjectStep::srcFieldIndex() const {
     case MEMCPY:
         return m_params.m_memcpyParams.m_srcFieldIndex;
     default:
-        assert(false);
+        vassert(false);
     }
 
     return -1;
@@ -251,7 +250,7 @@ std::string ProjectStep::debug() const {
             << ", " << expr()->debug();
         break;
     default:
-        assert(false);
+        vassert(false);
     }
 
     return oss.str();
@@ -280,7 +279,7 @@ static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
         if (colInfo->inlined && !colInfo->inBytes) {
             // For VARCHAR we need to consider multi-byte characters.
             uint32_t maxLength = colInfo->length * MAX_BYTES_PER_UTF8_CHARACTER;
-            assert (maxLength < UNINLINEABLE_OBJECT_LENGTH);
+            vassert(maxLength < UNINLINEABLE_OBJECT_LENGTH);
             return maxLength + 1;
         }
 
@@ -289,7 +288,7 @@ static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_GEOGRAPHY:
         if (colInfo->inlined) {
-            assert (colInfo->getVoltType() != VALUE_TYPE_GEOGRAPHY);
+            vassert(colInfo->getVoltType() != VALUE_TYPE_GEOGRAPHY);
             return colInfo->length + 1;
         }
         else {
@@ -321,7 +320,7 @@ static ProjectStepSet convertTVEsToMemcpy(const TupleSchema* dstSchema,
                 continue;
             }
 
-            assert (dstColInfo->length == srcColInfo->length);
+            vassert(dstColInfo->length == srcColInfo->length);
 
             size_t numBytes = getNumBytesForMemcpy(srcColInfo);
             ProjectStep memcpyStep(step.dstFieldIndex(), step.srcFieldIndex(),
@@ -341,7 +340,7 @@ static ProjectStepSet convertTVEsToMemcpy(const TupleSchema* dstSchema,
 // that does the same thing.
 static ProjectStep squishSteps(const ProjectStepSet& steps) {
 
-    assert (!steps.empty());
+    vassert(!steps.empty());
 
     if (steps.size() == 1) {
         return *(steps.begin());
@@ -351,7 +350,7 @@ static ProjectStep squishSteps(const ProjectStepSet& steps) {
     const ProjectStep &firstStep = *(steps.begin());
 
     size_t dstOffsetDiff = (lastStep.dstOffset() - firstStep.dstOffset());
-    assert (dstOffsetDiff == (lastStep.srcOffset() - firstStep.srcOffset()));
+    vassert(dstOffsetDiff == (lastStep.srcOffset() - firstStep.srcOffset()));
 
     size_t numBytes = dstOffsetDiff + lastStep.numBytes();
 
@@ -369,7 +368,7 @@ static ProjectStepSet coalesceMemcpys(const TupleSchema* dstSchema,
     ProjectStepSet inProgressGroup;
 
     BOOST_FOREACH(const ProjectStep& step, steps) {
-        assert (step.dstFieldIndex() != -1);
+        vassert(step.dstFieldIndex() != -1);
 
         if (! step.isMemcpy()) {
             outputSteps.insert(step);
@@ -378,7 +377,7 @@ static ProjectStepSet coalesceMemcpys(const TupleSchema* dstSchema,
 
         // At this point all mem copies correspond to an instance of TVE,
         // so the src field should be specified.
-        assert (step.srcFieldIndex() != -1);
+        vassert(step.srcFieldIndex() != -1);
 
         if (inProgressGroup.empty()) {
             inProgressGroup.insert(step);
@@ -460,7 +459,7 @@ void OptimizedProjector::exec(TableTuple& dstTuple, const TableTuple& srcTuple) 
 
 void OptimizedProjector::permuteOnIndexBitForTest(int numBits, int bitToFlip) {
 
-    assert (bitToFlip >= 0);
+    vassert(bitToFlip >= 0);
 
     if (bitToFlip >= numBits) {
         return;

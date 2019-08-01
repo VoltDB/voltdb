@@ -21,6 +21,16 @@
 
 #include <limits.h>
 
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
+
 namespace boost{ namespace math{ namespace lanczos{
 
 //
@@ -1068,7 +1078,7 @@ struct lanczos24m113 : public mpl::int_<113>
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 2.50662827463100050241576528481104515966515623051532908941425544355490413900497467936202516))
       };
       static const T denom[24] = {
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.112400072777760768e22)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.414847677933545472e22)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 6756146673770930688000.0)),
@@ -1087,11 +1097,11 @@ struct lanczos24m113 : public mpl::int_<113>
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 3256091103430.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 136717357942.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 4546047198.0)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 116896626)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 2240315)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 30107)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 253)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 1))
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 116896626.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 2240315.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 30107.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 253.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 1.0))
       };
       return boost::math::tools::evaluate_rational(num, denom, z);
    }
@@ -1127,7 +1137,7 @@ struct lanczos24m113 : public mpl::int_<113>
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.374799931707148855771381263542708435935402853962736029347951399323367765509988401336565436e-8))
       };
       static const T denom[24] = {
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.112400072777760768e22)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 0.414847677933545472e22)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 6756146673770930688000.0)),
@@ -1146,11 +1156,11 @@ struct lanczos24m113 : public mpl::int_<113>
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 3256091103430.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 136717357942.0)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 4546047198.0)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 116896626)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 2240315)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 30107)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 253)),
-         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 1))
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 116896626.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 2240315.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 30107.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 253.0)),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 113, 1.0))
       };
       return boost::math::tools::evaluate_rational(num, denom, z);
    }
@@ -1284,7 +1294,7 @@ struct lanczos
 } // namespace boost
 
 #if !defined(_CRAYC) && !defined(__CUDACC__) && (!defined(__GNUC__) || (__GNUC__ > 3) || ((__GNUC__ == 3) && (__GNUC_MINOR__ > 3)))
-#if (defined(_M_IX86_FP) && (_M_IX86_FP >= 2)) || defined(__SSE2__)
+#if ((defined(_M_IX86_FP) && (_M_IX86_FP >= 2)) || defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)) && !defined(_MANAGED)
 #include <boost/math/special_functions/detail/lanczos_sse2.hpp>
 #endif
 #endif

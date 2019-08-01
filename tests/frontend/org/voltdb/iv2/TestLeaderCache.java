@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -88,7 +88,7 @@ public class TestLeaderCache extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         configure("/cache01", zk);
 
-        LeaderCache dut = new  LeaderCache(zk, "/cache01");
+        LeaderCache dut = new  LeaderCache(zk, "", "/cache01");
         dut.start(true);
         Map<Integer, Long> cache = dut.pointInTimeCache();
 
@@ -108,7 +108,7 @@ public class TestLeaderCache extends ZKTestBase {
         configure("/cache01", zk);
 
         TestCallback cb = new TestCallback();
-        LeaderCache dut = new  LeaderCache(zk, "/cache01", cb);
+        LeaderCache dut = new  LeaderCache(zk, "", "/cache01", cb);
         dut.start(true);
 
         assertEquals("3 items cached.", 3, cb.m_cache.size());
@@ -126,7 +126,7 @@ public class TestLeaderCache extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         configure("/cache03", zk);
 
-        LeaderCache dut = new  LeaderCache(zk, "/cache03");
+        LeaderCache dut = new  LeaderCache(zk, "", "/cache03");
         dut.start(true);
         Map<Integer, Long> cache = dut.pointInTimeCache();
 
@@ -155,7 +155,7 @@ public class TestLeaderCache extends ZKTestBase {
         configure("/cache03", zk);
 
         TestCallback cb = new TestCallback();
-        LeaderCache dut = new  LeaderCache(zk, "/cache03", cb);
+        LeaderCache dut = new  LeaderCache(zk, "", "/cache03", cb);
         dut.start(true);
         Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
 
@@ -185,7 +185,7 @@ public class TestLeaderCache extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         configure("/cache02", zk);
 
-        LeaderCache dut = new LeaderCache(zk, "/cache02");
+        LeaderCache dut = new LeaderCache(zk, "", "/cache02");
         dut.start(true);
         Map<Integer, Long> cache = dut.pointInTimeCache();
         assertEquals("3 items cached.", 3, cache.size());
@@ -216,7 +216,7 @@ public class TestLeaderCache extends ZKTestBase {
         configure("/cache02", zk);
 
         TestCallback cb = new TestCallback();
-        LeaderCache dut = new LeaderCache(zk, "/cache02", cb);
+        LeaderCache dut = new LeaderCache(zk, "", "/cache02", cb);
         dut.start(true);
         Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
         assertEquals("3 items cached.", 3, cache.size());
@@ -246,7 +246,7 @@ public class TestLeaderCache extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         configure("/cache04", zk);
 
-        LeaderCache dut = new LeaderCache(zk, "/cache04");
+        LeaderCache dut = new LeaderCache(zk, "", "/cache04");
         dut.start(true);
         Map<Integer, Long> cache = dut.pointInTimeCache();
 
@@ -289,7 +289,7 @@ public class TestLeaderCache extends ZKTestBase {
         configure("/cache04", zk);
 
         TestCallback cb = new TestCallback();
-        LeaderCache dut = new LeaderCache(zk, "/cache04", cb);
+        LeaderCache dut = new LeaderCache(zk, "", "/cache04", cb);
         dut.start(true);
         Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
 

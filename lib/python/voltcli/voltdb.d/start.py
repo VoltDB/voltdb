@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,6 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None),
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster (deprecated, please use role="replica" in the deployment file)', default = False),
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
-        VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
         VOLT.IntegerOption('-m', '--missing', 'missing', 'specifying how many nodes are missing at K-safe cluster startup'),
     ),
     description = 'Starts a database, which has been initialized.'
@@ -53,8 +52,6 @@ def start(runner):
     runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
     if runner.opts.hostcount:
         runner.args.extend(['hostcount', runner.opts.hostcount])
-    if runner.opts.sitesperhost:
-        runner.args.extend(['sitesperhost', runner.opts.sitesperhost])
     if runner.opts.missing:
         runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:

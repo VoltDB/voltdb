@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,30 +32,31 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.export.AckingContainer;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.ExportRow;
+import org.voltdb.exportclient.ExportRowSchema;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class GuestProcessor implements ExportDataProcessor {
 
+    private static final VoltLogger EXPORTLOG = new VoltLogger("EXPORT");
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
-    // FIXME - replace with fixed list of ExportDataSource. That is all we need from m_generation.
     private ExportGeneration m_generation;
     private volatile boolean m_shutdown = false;
-    private VoltLogger m_logger;
 
     private Map<String, ExportClientBase> m_clientsByTarget = new HashMap<>();
     private Map<String, String> m_targetsByTableName = new HashMap<>();
@@ -64,14 +65,10 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private final long m_startTS = System.currentTimeMillis();
     private volatile boolean m_startPolling = false;
+    private long m_genId;
 
     // Instantiated at ExportManager
     public GuestProcessor() {
-    }
-
-    @Override
-    public void addLogger(VoltLogger logger) {
-        m_logger = logger;
     }
 
     @Override
@@ -106,48 +103,55 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
     @Override
+    public ExportClientBase getExportClient(final String tableName) {
+        ExportClientBase client = null;
+        synchronized (GuestProcessor.this) {
+            String groupName = m_targetsByTableName.get(tableName.toLowerCase());
+            // skip export tables that don't have an enabled connector and are still in catalog
+            if (groupName == null) {
+                EXPORTLOG.warn("Table " + tableName + " has no enabled export connector.");
+                return null;
+            }
+            //If we have a new client for the target use it or see if we have an older client which is set before
+            //If no client is found dont create the runner and log
+            client = m_clientsByTarget.get(groupName);
+            if (client == null) {
+                EXPORTLOG.warn("Table " + tableName + " has no configured connector.");
+                return null;
+            }
+        }
+        return client;
+    }
+
+    @Override
     public void readyForData() {
         for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {
                 synchronized(GuestProcessor.this) {
                     if (m_shutdown) {
-                        if (m_logger.isDebugEnabled()) {
-                            m_logger.info("Skipping mastership notification for export because processor has been shut down.");
+                        if (EXPORTLOG.isDebugEnabled()) {
+                            EXPORTLOG.debug("Skipping mastership notification for export because processor has been shut down.");
                         }
                         return;
                     }
                     String tableName = source.getTableName().toLowerCase();
                     String groupName = m_targetsByTableName.get(tableName);
-
-                    // skip export tables that don't have an enabled connector and are still in catalog
-                    if (groupName == null && source.getClient() == null) {
-                        m_logger.warn("Table " + tableName + " has no enabled export connector.");
-                        continue;
-                    }
-                    if (groupName == null && source.getClient() != null) {
-                        groupName = ((ExportClientBase )source.getClient()).getTargetName();
-                        m_targetsByTableName.put(tableName, groupName);
-                    }
-                    //If we have a new client for the target use it or see if we have an older client which is set before
-                    //If no client is found dont create the runner and log
-                    ExportClientBase client = (m_clientsByTarget.get(groupName) != null) ?
-                            m_clientsByTarget.get(groupName) : ( ExportClientBase)source.getClient();
-                    if (client == null) {
-                        m_logger.warn("Table " + tableName + " has no configured connector.");
+                    if (source.getClient() == null) {
+                        EXPORTLOG.warn("Table " + tableName + " has no configured connector.");
                         continue;
                     }
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
-                    m_clientsByTarget.putIfAbsent(groupName, client);
-                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), client, source);
+                    m_clientsByTarget.putIfAbsent(groupName, source.getClient());
+                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), source.getClient(), source);
                     // DataSource should start polling only after command log replay on a recover
                     source.setReadyForPolling(m_startPolling);
-                    source.setOnMastership(runner, client.isRunEverywhere());
+                    runner.run();
                 }
             }
         }
         //This will log any targets that are not there but draining datasources will keep them in list.
-        m_logger.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
+        EXPORTLOG.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
     }
 
     /**
@@ -185,9 +189,6 @@ public class GuestProcessor implements ExportDataProcessor {
             for (int type : m_source.m_columnTypes) {
                 m_types.add(VoltType.get((byte)type));
             }
-
-            m_source.setClient(client);
-            m_source.runEveryWhere(m_client.isRunEverywhere());
         }
 
         @Override
@@ -199,14 +200,14 @@ public class GuestProcessor implements ExportDataProcessor {
             try {
                 Method m = edb.getClass().getDeclaredMethod("processRow", int.class, byte[].class);
                 if (m != null) {
-                    if (m_logger.isDebugEnabled()) {
-                        m_logger.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
                     }
                     edb.setLegacy(true);
                 }
             } catch (Exception ex) {
-                if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Found Modern export client: " + client.getClass().getCanonicalName());
+                if (EXPORTLOG.isDebugEnabled()) {
+                    EXPORTLOG.debug("Found Modern export client: " + client.getClass().getCanonicalName());
                 }
             }
         }
@@ -219,16 +220,19 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            addBlockListener(m_source, m_source.poll(), edb);
+            final ListenableFuture<AckingContainer> fut = m_source.poll();
+            addBlockListener(m_source, fut, edb);
         }
 
+        // This runnable executes the starting sequence on the {@code ExportDataSource}
+        // executor, until the first polled buffer starts executing on the Export Decoder's
+        // executor.
         private void runDataSource() {
             synchronized (GuestProcessor.this) {
 
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
-                                m_source.getSignature(),
                                 m_source.getTableName(),
                                 m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),
@@ -238,19 +242,24 @@ public class GuestProcessor implements ExportDataProcessor {
                                 m_source.m_columnLengths,
                                 m_source.getExportFormat());
 
-                // in this case we cannot poll until the initial truncation is complete
+                // Ee cannot poll until the initial truncation is complete
                 final Runnable waitForBarrierRelease = new Runnable() {
                     @Override
                     public void run() {
                         try {
                             if (m_startPolling) { // Wait for command log replay to be done.
-                                if (m_logger.isDebugEnabled()) {
-                                    m_logger.debug("Beginning export processing for export source " + m_source.getTableName()
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Beginning export processing for export source " + m_source.getTableName()
                                     + " partition " + m_source.getPartitionId());
                                 }
                                 m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
-                                    if (m_shutdown) return;
+                                    if (m_shutdown) {
+                                        if (EXPORTLOG.isDebugEnabled()) {
+                                            EXPORTLOG.debug("Got shutdown before starting polling.");
+                                        }
+                                        return;
+                                    }
                                     buildListener(ads);
                                 }
                             } else {
@@ -266,28 +275,54 @@ public class GuestProcessor implements ExportDataProcessor {
 
                     private void resubmitSelf() {
                         synchronized (GuestProcessor.this) {
-                            if (m_shutdown) return;
-                            if (!m_source.getExecutorService().isShutdown()) try {
+                            if (m_shutdown) {
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Got shutdown while waiting for truncation.");
+                                }
+                                return;
+                            }
+                            if (m_source.getExecutorService().isShutdown()) {
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Data source shutdown while waiting for truncation.");
+                                }
+                                return;
+                            }
+                            try {
                                 m_source.getExecutorService().submit(this);
                             } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
                                 // it is truncated so we no longer need to wait
 
                                 // TODO: When truncation is finished, generation roll-over does not happen.
                                 // Log a message to and revisit the error handling for this case
-                                m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Got rejected execution exception while waiting for truncation to finish");
+                                }
                             }
                         }
                     }
                 };
-                if (m_shutdown) return;
-                if (!m_source.getExecutorService().isShutdown()) try {
+                if (m_shutdown) {
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Got shutdown while starting.");
+                    }
+                    return;
+                }
+                if (m_source.getExecutorService().isShutdown()) {
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Data source shutdown while starting.");
+                    }
+                    return;
+                }
+                try {
                     m_source.getExecutorService().submit(waitForBarrierRelease);
                 } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
                     // it is truncated so we no longer need to wait
 
                     // TODO: When truncation is finished, generation roll-over does not happen.
                     // Log a message to and revisit the error handling for this case
-                    m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Got rejected execution exception while trying to start");
+                    }
                 }
             }
         }
@@ -302,7 +337,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private void addBlockListener(
             final ExportDataSource source,
-            final ListenableFuture<BBContainer> fut,
+            final ListenableFuture<AckingContainer> fut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -310,23 +345,33 @@ public class GuestProcessor implements ExportDataProcessor {
          * For JDBC we want a dedicated thread to block on calls to the remote database
          * so the data source thread can overflow data to disk.
          */
+
         if (fut == null) {
             return;
         }
         fut.addListener(new Runnable() {
             @Override
             public void run() {
+                AckingContainer cont = null;
                 try {
-                    BBContainer cont = fut.get();
+                    cont = fut.get();
                     if (cont == null) {
+                        if (EXPORTLOG.isDebugEnabled()) {
+                            EXPORTLOG.debug("Received an end of stream event, exiting listener");
+                        }
                         return;
                     }
+                    // If export master accepts promotion in case of mastership migration or leader re-election,
+                    // we need an extra poll to get the schema of current buffer to setup the decoder
                     try {
                         //Position to restart at on error
                         final int startPosition = cont.b().position();
 
                         //Track the amount of backoff to use next time, will be updated on repeated failure
                         int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
+
+                        // Extract the sp handle of the last committed row in the block, if present
+                        long committedSpHandle = 0L;
 
                         /*
                          * If there is an error processing the block the decoder thinks is recoverable
@@ -338,35 +383,48 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                long generation = -1L;
                                 ExportRow row = null;
+                                boolean firstRowOfBlock = true;
                                 while (buf.hasRemaining() && !m_shutdown) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
-                                        edb.onBlockStart();
+                                        cont.updateStartTime(System.currentTimeMillis());
+                                        if (firstRowOfBlock) {
+                                            edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
+                                        }
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.
                                         try {
-                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                            edb.setPreviousRow(row);
+                                            cont.updateStartTime(System.currentTimeMillis());
+                                            ExportRow schema = edb.getExportRowSchema();
+                                            if (schema == null || schema.generation != cont.getSchema().generation) {
+                                                // Note {@code ExportRowSchema} is a special {@code ExportRow}
+                                                ExportRowSchema newSchema = cont.getSchema();
+                                                if (EXPORTLOG.isDebugEnabled()) {
+                                                    EXPORTLOG.debug("Set schema to: " + newSchema);
+                                                }
+                                                edb.setExportRowSchema(newSchema);
+                                            }
+                                            row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(), m_startTS, rowdata);
                                         } catch (IOException ioe) {
-                                            m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
+                                            EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
                                             cont = null;
                                             break;
                                         }
-                                        if (generation == -1L) {
+                                        if (firstRowOfBlock) {
                                             edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
                                         }
                                         edb.processRow(row);
-                                        if (generation != -1L && row.generation != generation) {
-                                            edb.onBlockCompletion(row);
-                                            edb.onBlockStart(row);
+                                        if (committedSpHandle == 0) {
+                                            committedSpHandle = extractCommittedSpHandle(row,
+                                                    cont.getCommittedSeqNo());
                                         }
-                                        generation = row.generation;
                                     }
                                 }
                                 if (edb.isLegacy()) {
@@ -381,15 +439,20 @@ public class GuestProcessor implements ExportDataProcessor {
                                 // that container isn't fully consumed. Discard the buffer prematurely
                                 // would cause missing rows in export stream.
                                 if (!m_shutdown && cont != null) {
+                                    if (committedSpHandle != 0) {
+                                        // We came across the last committed row in the buffer,
+                                        // record its sp handle
+                                        cont.setCommittedSpHandle(committedSpHandle);
+                                    }
                                     cont.discard();
                                     cont = null;
                                 }
                                 break;
                             } catch (RestartBlockException e) {
                                 if (m_shutdown) {
-                                    if (m_logger.isDebugEnabled()) {
+                                    if (EXPORTLOG.isDebugEnabled()) {
                                         // log message for debugging.
-                                        m_logger.debug("Shutdown detected, ignore restart exception. " + e);
+                                        EXPORTLOG.debug("Shutdown detected, ignore restart exception. " + e);
                                     }
                                     break;
                                 }
@@ -404,14 +467,11 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                             }
                         }
-                        // Don't discard the block also set the start position to the begining.
-                        // TODO: it would be nice to keep the last position in the buffer so that
-                        //       next time connector can pick up from where it left last time and
-                        //       continue. It helps to reduce exporting duplicated rows.
+                        //Don't discard the block also set the start position to the beginning.
                         if (m_shutdown && cont != null) {
-                            if (m_logger.isDebugEnabled()) {
+                            if (EXPORTLOG.isDebugEnabled()) {
                                 // log message for debugging.
-                                m_logger.debug("Shutdown detected, queue block to pending");
+                                EXPORTLOG.debug("Shutdown detected, queue block to pending");
                             }
                             cont.b().position(startPosition);
                             source.setPendingContainer(cont);
@@ -420,16 +480,52 @@ public class GuestProcessor implements ExportDataProcessor {
                     } finally {
                         if (cont != null) {
                             cont.discard();
+                            cont = null;
                         }
                     }
                 } catch (Exception e) {
-                    m_logger.error("Error processing export block", e);
+                    if (e.getCause() instanceof ReentrantPollException) {
+                        EXPORTLOG.info("Stopping processing export blocks: " + e.getMessage());
+                        return;
+
+                    } else {
+                        EXPORTLOG.error("Error processing export block, continuing processing: ", e);
+                    }
+                } finally {
+                    if (cont != null) {
+                        cont.discard();
+                        cont = null;
+                    }
                 }
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(), edb);
                 }
             }
         }, edb.getExecutor());
+    }
+
+    /**
+     * If the row is the last committed row, return the SpHandle, otherwise return 0
+     *
+     * @param row the export row
+     * @param committedSeqNo the sequence number of the last committed row
+     * @return
+     */
+    private long extractCommittedSpHandle(ExportRow row, long committedSeqNo) {
+        long ret = 0;
+        if (committedSeqNo == ExportDataSource.NULL_COMMITTED_SEQNO) {
+            return ret;
+        }
+
+        // Get the rows's sequence number (3rd column)
+        long seqNo = (long) row.values[2];
+        if (seqNo != committedSeqNo) {
+            return ret;
+        }
+
+        // Get the row's sp handle (1rst column)
+        ret = (long) row.values[0];
+        return ret;
     }
 
     @Override
@@ -439,16 +535,16 @@ public class GuestProcessor implements ExportDataProcessor {
             for (final Pair<ExportDecoderBase, AdvertisedDataSource> p : m_decoders) {
                 try {
                     if (p == null) {
-                        m_logger.warn("ExportDecoderBase pair was unexpectedly null");
+                        EXPORTLOG.warn("ExportDecoderBase pair was unexpectedly null");
                         continue;
                     }
                     ExportDecoderBase edb = p.getFirst();
                     if (edb == null) {
-                        m_logger.warn("ExportDecoderBase was unexpectedly null");
+                        EXPORTLOG.warn("ExportDecoderBase was unexpectedly null");
                         continue;
                     }
                     if (p.getSecond() == null) {
-                        m_logger.warn("AdvertisedDataSource was unexpectedly null");
+                        EXPORTLOG.warn("AdvertisedDataSource was unexpectedly null");
                         continue;
                     }
                     synchronized(p.getSecond()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,14 +42,14 @@ public class LoadWarehouseReplicated extends VoltProcedure {
             // check if we've already set up this partition
             voltQueueSQL(checkItemExists);
             VoltTable item = voltExecuteSQL()[0];
-            if (item.getRowCount() > 0)
+            if (item.getRowCount() > 0) {
                 return null;
+            }
 
             // now we know the partition is not loaded yet
-            DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ITEM", items, false, false);
+            DeprecatedProcedureAPIAccess.voltLoadTable(this, "ITEM", items);
         }
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "CUSTOMER_NAME", customerNames);
         return null;
     }
-
 }

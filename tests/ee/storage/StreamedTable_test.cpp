@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,29 +48,53 @@ using namespace std;
 using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine()
+    {
+        m_enginesOldest = NULL;
+        m_enginesNewest = NULL;
+    }
+
+    ~MockVoltDBEngine() { }
+
+
+    virtual ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
+        return &m_enginesNewest;
+    }
+
+    virtual ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
+        return &m_enginesOldest;
+    }
+
+
+private:
+    ExportTupleStream* m_enginesOldest;
+    ExportTupleStream* m_enginesNewest;
+};
 
 class StreamedTableTest : public Test {
 public:
     StreamedTableTest() {
         srand(0);
         m_topend = new DummyTopend();
+        m_engine = new MockVoltDBEngine();
         m_pool = new Pool();
         m_quantum = createInstanceFromPool<UndoQuantum>(*m_pool, 0, m_pool);
-        VoltDBEngine* noEngine = NULL;
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
-                                        noEngine, "", 0, NULL, NULL, 0);
+                                        m_engine, "", 0, NULL, NULL, 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
-        std::vector<std::string> columnNames;
         //Five columns
-        columnNames.push_back("one");
-        columnNames.push_back("two");
-        columnNames.push_back("three");
-        columnNames.push_back("four");
-        columnNames.push_back("five");
+        m_columnNames = new std::vector<std::string>();
+        m_columnNames->push_back("one");
+        m_columnNames->push_back("two");
+        m_columnNames->push_back("three");
+        m_columnNames->push_back("four");
+        m_columnNames->push_back("five");
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
@@ -93,7 +117,7 @@ public:
 
         // a simple helper around the constructor that sets the
         // wrapper buffer size to the specified value
-        m_table = StreamedTable::createForTest(1024, m_context, m_schema, columnNames);
+        m_table = StreamedTable::createForTest(1024, m_context, m_schema, "test", *m_columnNames);
     }
 
     void nextQuantum(int i, int64_t tokenOffset)
@@ -111,14 +135,16 @@ public:
             TupleSchema::freeTupleSchema(m_schema);
         delete m_table;
         delete m_context;
-        UndoQuantum::release(std::move(*m_quantum));
         delete m_pool;
+        delete m_engine;
         delete m_topend;
+        delete m_columnNames;
         voltdb::globalDestroyOncePerProcess();
     }
 
 protected:
     DummyTopend *m_topend;
+    MockVoltDBEngine *m_engine;
     Pool *m_pool;
     UndoQuantum *m_quantum;
     ExecutorContext *m_context;
@@ -127,7 +153,7 @@ protected:
     TupleSchema* m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
-
+    std::vector<std::string>* m_columnNames;
 };
 
 /**
@@ -151,24 +177,25 @@ TEST_F(StreamedTableTest, BaseCase) {
 
         m_table->insertTuple(*m_tuple);
     }
+    UndoQuantum::release(std::move(*m_quantum));
     // a negative flush implies "now". this helps valgrind heap block test
     m_table->flushOldTuples(-1);
 
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    deque<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    deque<boost::shared_ptr<ExportStreamBlock> >::iterator begin = m_topend->exportBlocks.begin();
     int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = (*begin)->offset();
     EXPECT_TRUE(offset != 0);
-    while (begin != m_topend->blocks.end()) {
+    while (begin != m_topend->exportBlocks.end()) {
         begin++;
-        if (begin == m_topend->blocks.end()) {
+        if (begin == m_topend->exportBlocks.end()) {
             break;
         }
 
-        boost::shared_ptr<StreamBlock> block = *begin;
+        boost::shared_ptr<ExportStreamBlock> block = *begin;
         uso = block->uso();
         EXPECT_EQ(uso, offset);
         offset += block->offset();

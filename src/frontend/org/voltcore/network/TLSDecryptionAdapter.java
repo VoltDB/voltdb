@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
@@ -36,10 +35,10 @@ import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.CompositeByteBuf;
-import io.netty_voltpatches.buffer.Unpooled;
-import io.netty_voltpatches.util.IllegalReferenceCountException;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.util.IllegalReferenceCountException;
 
 public class TLSDecryptionAdapter {
     public final static int TLS_HEADER_SIZE = 5;
@@ -49,7 +48,6 @@ public class TLSDecryptionAdapter {
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_decrypter;
 
     private final ConcurrentLinkedDeque<ExecutionException> m_exceptions = new ConcurrentLinkedDeque<>();
@@ -68,16 +66,8 @@ public class TLSDecryptionAdapter {
         m_connection = connection;
         m_inputHandler = handler;
         m_ce = cipherExecutor;
-        m_sslEngine = sslEngine;
         m_decrypter = new SSLBufferDecrypter(sslEngine);
         m_dcryptgw = new DecryptionGateway();
-    }
-
-    /**
-     * this values may change if a TLS session renegotiates its cipher suite
-     */
-    private int applicationBufferSize() {
-        return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
     void die() {
@@ -123,7 +113,9 @@ public class TLSDecryptionAdapter {
                     while (readStream.dataAvailable() >= TLS_HEADER_SIZE) {
                         readStream.peekBytes(frameHeader.array());
                         m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
-                        if (readStream.dataAvailable() < m_needed) break;
+                        if (readStream.dataAvailable() < m_needed) {
+                            break;
+                        }
                         m_dcryptgw.offer(readStream.getSlice(m_needed));
                         m_needed = NOT_AVAILABLE;
                     }
@@ -209,7 +201,9 @@ public class TLSDecryptionAdapter {
         }
         @Override
         public void run() {
-            if (isDead()) return;
+            if (isDead()) {
+                return;
+            }
             try {
                 m_fut.get();
             } catch (InterruptedException notPossible) {
@@ -267,24 +261,30 @@ public class TLSDecryptionAdapter {
         }
 
         void releaseDecryptedBuffer() {
-            if (m_msgbb.refCnt() > 0) try {
-                m_msgbb.release();
-            } catch (IllegalReferenceCountException ignoreIt) {
+            if (m_msgbb.refCnt() > 0) {
+                try {
+                    m_msgbb.release();
+                } catch (IllegalReferenceCountException ignoreIt) {
+                }
             }
         }
 
         @Override
         public void run() {
             final NIOReadStream.Slice slice = m_q.peek();
-            if (slice == null) return;
+            if (slice == null) {
+                return;
+            }
 
             ByteBuf src = slice.bb;
 
-            if (isDead()) synchronized(this) {
-                slice.markConsumed().discard();
-                m_q.poll();
-                releaseDecryptedBuffer();
-                return;
+            if (isDead()) {
+                synchronized(this) {
+                    slice.markConsumed().discard();
+                    m_q.poll();
+                    releaseDecryptedBuffer();
+                    return;
+                }
             }
 
             ByteBuffer [] slicebbarr = slice.bb.nioBuffers();
@@ -296,15 +296,12 @@ public class TLSDecryptionAdapter {
                 slicebbarr[0] = src.nioBuffer();
             }
 
-            final int appBuffSz = applicationBufferSize();
-            ByteBuf dest = m_ce.allocator().buffer(appBuffSz).writerIndex(appBuffSz);
-            ByteBuffer destjbb = dest.nioBuffer();
-            int decryptedBytes = 0;
+            ByteBuf dest ;
             int srcBBLength = slicebbarr[0].remaining();
             try {
-                decryptedBytes = m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
+                dest = m_decrypter.tlsunwrap(slicebbarr[0], m_ce.allocator());
             } catch (TLSException e) {
-                m_inFlight.release(); dest.release();
+                m_inFlight.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
                 networkLog.error("fragment decrypt task failed", e);
                 networkLog.error("isDead()=" + isDead() + ", Src buffer original length: " + srcBBLength +
@@ -316,8 +313,7 @@ public class TLSDecryptionAdapter {
 
             // src buffer is wholly consumed
             if (!isDead()) {
-                if (decryptedBytes > 0) {
-                    dest.writerIndex(destjbb.limit());
+                if (dest.isReadable()) {
                     m_msgbb.addComponent(true, dest);
                 } else {
                     // the TLS frame was consumed by the call to engines unwrap but it
@@ -331,7 +327,9 @@ public class TLSDecryptionAdapter {
                     try {
                         bb = m_inputHandler.retrieveNextMessage(m_msgbb);
                         // All of the message bytes are not available yet
-                        if (bb==null) continue;
+                        if (bb==null) {
+                            continue;
+                        }
                     } catch(IOException e) {
                         m_inFlight.release(); m_msgbb.release();
                         m_exceptions.offer(new ExecutionException("failed message length check", e));

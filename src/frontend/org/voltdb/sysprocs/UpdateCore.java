@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,12 +19,9 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -44,10 +41,8 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -65,15 +60,6 @@ import org.voltdb.utils.VoltTableUtil;
 public class UpdateCore extends VoltSystemProcedure {
     VoltLogger log = new VoltLogger("HOST");
 
-    private static final int DEP_updateCatalogSync = (int)
-            SysProcFragmentId.PF_updateCatalogPrecheckAndSync | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_updateCatalogSyncAggregate = (int)
-            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-    private static final int DEP_updateCatalog = (int)
-            SysProcFragmentId.PF_updateCatalog | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_updateCatalogAggregate = (int)
-            SysProcFragmentId.PF_updateCatalogAggregate;
-
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{
@@ -83,9 +69,11 @@ public class UpdateCore extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
-    private static Table getMaterializer(Cluster cluster, String tableName) {
-        return cluster.getDatabases().iterator().next()
-                .getTables().get(tableName).getMaterializer();
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalog};
     }
 
     /**
@@ -123,20 +111,6 @@ public class UpdateCore extends VoltSystemProcedure {
         CatalogMap<Table> tables = context.getDatabase().getTables();
         List<List<String>> allTableSets = decodeTables(tablesThatMustBeEmpty);
         Map<String, Boolean> allTables = collapseSets(allTableSets);
-        // Pull in matview dependencies
-        allTables.keySet().stream().flatMap(tableName -> {
-            final Table materialize = getMaterializer(m_cluster, tableName);
-            if (materialize != null) {
-                return Stream.of(materialize.getTypeName());
-            } else {
-                return Stream.empty();
-            }
-        }).collect(Collectors.toSet()).forEach(dep -> {
-            if (! allTables.containsKey(dep)) {
-                allTables.put(dep, false);
-            }
-        });
-
         int[] tableIds = new int[allTables.size()];
         int i = 0;
         for (String tableName : allTables.keySet()) {
@@ -164,27 +138,17 @@ public class UpdateCore extends VoltSystemProcedure {
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-        final Map<String, String> matViews = new HashMap<>();
+
         // find all empty tables and mark that they are empty.
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
             boolean isEmpty = true;
-            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
+            if (tupleCount > 0) {
                 isEmpty = false;
-                // Hang on, don't say so fast that it is non-empty. Check materializer for views.
-                final Table materializer = getMaterializer(m_cluster, tableName);
-                if (materializer != null) {  // whether a view is empty or not depends on all its materializers' emptiness
-                    matViews.put(tableName, materializer.getTypeName());
-                }
             }
             allTables.put(tableName.toUpperCase(), isEmpty);
         }
-        // Resolve emptiness of views by checking its materializer, since the materializer cannot be a view
-        matViews.forEach((view, materializer) -> {
-            assert allTables.containsKey(materializer.toUpperCase());
-            allTables.put(view.toUpperCase(), allTables.get(materializer.toUpperCase()));
-        });
 
         // Reexamine the sets of sets and see if any of them has
         // one empty element.  If not, then add the respective
@@ -256,18 +220,6 @@ public class UpdateCore extends VoltSystemProcedure {
         }
     }
 
-    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
-    static {
-        m_versionMap.put(45, "Java 1.1");
-        m_versionMap.put(46, "Java 1.2");
-        m_versionMap.put(47, "Java 1.3");
-        m_versionMap.put(48, "Java 1.4");
-        m_versionMap.put(49, "Java 5");
-        m_versionMap.put(50, "Java 6");
-        m_versionMap.put(51, "Java 7");
-        m_versionMap.put(52, "Java 8");
-    }
-
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -291,7 +243,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // the actual work on the second round-trip below
 
             // Don't actually care about the returned table, just need to send something back to the MPI
-            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
+            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
             if (log.isDebugEnabled()) {
@@ -305,7 +257,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // back to the MPI scoreboard
             log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                     " acknowledged data and catalog prechecks.");
-            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
@@ -323,6 +275,9 @@ public class UpdateCore extends VoltSystemProcedure {
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
+
+                // Bring the DR and Export buffer update to date.
+                context.getSiteProcedureConnection().quiesce();
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
@@ -364,11 +319,11 @@ public class UpdateCore extends VoltSystemProcedure {
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair.TableDependencyPair(DEP_updateCatalog, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalog, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
-            return new DependencyPair.TableDependencyPair(DEP_updateCatalogAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateCatalog));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogAggregate, result);
         }
         else {
             VoltDB.crashLocalVoltDB(
@@ -381,29 +336,14 @@ public class UpdateCore extends VoltSystemProcedure {
 
     private final void performCatalogVerifyWork(
             String[] tablesThatMustBeEmpty,
-            String[] reasonsForEmptyTables,
-            byte requiresSnapshotIsolation)
+            String[] reasonsForEmptyTables)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // Do a null round of work to sync up all the sites.  Avoids the possibility that
         // skew between nodes and/or partitions could result in cases where a catalog update
         // affects global state before transactions expecting the old catalog run
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
-        pfs[0].outputDepId = DEP_updateCatalogSync;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(tablesThatMustBeEmpty, reasonsForEmptyTables);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-        pfs[1].outputDepId = DEP_updateCatalogSyncAggregate;
-        pfs[1].inputDepIds  = new int[] { DEP_updateCatalogSync };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        executeSysProcPlanFragments(pfs, DEP_updateCatalogSyncAggregate);
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+                SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate, tablesThatMustBeEmpty,
+                reasonsForEmptyTables);
     }
 
     private final VoltTable[] performCatalogUpdateWork(
@@ -416,34 +356,10 @@ public class UpdateCore extends VoltSystemProcedure {
             long genId,
             byte hasSecurityUserChange)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        // Now do the real work
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalog;
-        pfs[0].outputDepId = DEP_updateCatalog;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                catalogDiffCommands,
-                expectedCatalogVersion,
-                requiresSnapshotIsolation,
-                requireCatalogDiffCmdsApplyToEE,
-                hasSchemaChange,
-                requiresNewExportGeneration,
-                genId,
-                hasSecurityUserChange);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
-        pfs[1].outputDepId = DEP_updateCatalogAggregate;
-        pfs[1].inputDepIds  = new int[] { DEP_updateCatalog };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, DEP_updateCatalogAggregate);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalog,
+                SysProcFragmentId.PF_updateCatalogAggregate, catalogDiffCommands, expectedCatalogVersion,
+                requiresSnapshotIsolation, requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
+                requiresNewExportGeneration, genId, hasSecurityUserChange);
     }
 
     /**
@@ -473,8 +389,11 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
-        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticJoinInProgress)) {
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticOperationInProgress)) {
             throw new VoltAbortException("Can't do a catalog update while an elastic join is active. Please retry catalog update later.");
+        }
+        if (requiresSnapshotIsolation == 1 && VoltZK.hasHostsSnapshotting(zk)) {
+            throw new VoltAbortException("Snapshot in progress. Please retry catalog update later.");
         }
         final CatalogContext context = VoltDB.instance().getCatalogContext();
         if (context.catalogVersion == expectedCatalogVersion) {
@@ -499,14 +418,6 @@ public class UpdateCore extends VoltSystemProcedure {
             }
         }
 
-        try {
-            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
-                    catalogBytes, catalogHash, deploymentBytes);
-        } catch (KeeperException | InterruptedException e) {
-            log.error("error writing catalog bytes on ZK during @UpdateCore");
-            throw e;
-        }
-
         // log the start of UpdateCore
         log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
         log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
@@ -517,23 +428,19 @@ public class UpdateCore extends VoltSystemProcedure {
         try {
             performCatalogVerifyWork(
                     tablesThatMustBeEmpty,
-                    reasonsForEmptyTables,
-                    requiresSnapshotIsolation);
+                    reasonsForEmptyTables);
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            // revert the catalog node on ZK
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
-                assert(data != null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytes, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
-                throw e;
-            }
             throw vae;
+        }
+
+        try {
+            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                    catalogBytes, catalogHash, deploymentBytes);
+        } catch (KeeperException | InterruptedException e) {
+            log.error("error writing catalog bytes on ZK during @UpdateCore");
+            throw e;
         }
 
         performCatalogUpdateWork(

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,8 @@ class Cluster(object):
         self.remoteclusters_by_id = dict()
         self.uptime = uptime
         self.liveclients = 0
+        self.elastic_status = ""
+        self.percentage_moved = 100.0
 
     def update_live_clients(self, liveclients):
         self.liveclients = liveclients
@@ -37,6 +39,10 @@ class Cluster(object):
 
     def get_remote_cluster(self, cluster_id):
         return self.remoteclusters_by_id[cluster_id]
+
+    def set_elastic_status(self, elastic_status, percentage_moved):
+        self.elastic_status = elastic_status
+        self.percentage_moved = percentage_moved
 
 class RemoteCluster(object):
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -174,6 +174,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         m_hasSignificantOutputSchema = true;
 
         generateRealOutputSchema(db);
+    }
+
+    public void setOutputSchemaPreInlineAgg(NodeSchema schema) {
+        m_outputSchemaPreInlineAgg = schema;
+    }
+
+    NodeSchema getOutputSchemaPreInlineAgg() {
+        return m_outputSchemaPreInlineAgg;
     }
 
     protected void generateRealOutputSchema(Database db) {

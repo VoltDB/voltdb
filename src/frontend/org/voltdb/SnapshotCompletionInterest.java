@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,8 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public interface SnapshotCompletionInterest {
@@ -36,7 +36,7 @@ public interface SnapshotCompletionInterest {
         public final boolean truncationSnapshot;
         public final boolean didSucceed;
         public final String requestId;
-        public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
+        public final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState;
         public final int drVersion;
@@ -51,7 +51,7 @@ public interface SnapshotCompletionInterest {
                 final boolean truncationSnapshot,
                 final boolean didSucceed,
                 final String requestId,
-                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
+                final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
                 final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState,
                 final int drVersion,

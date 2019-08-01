@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,26 +26,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.BackendTarget;
-import org.voltdb.CatalogContext;
+import org.voltdb.*;
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.newplanner.NonDdlBatch;
-import org.voltdb.newplanner.NonDdlBatchCompiler;
-import org.voltdb.newplanner.SqlBatch;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -74,19 +70,63 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     protected final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
+    /**
+     * There are two ways to set planning with calcite: either by setting the JAVA properties; or by setting the
+     * environment variable.
+     *
+     * The first way is used by build.xml to make Jenkins be Git branch aware, and only use Calcite planner when the
+     * branch it is in contains "calcite-" string (case sensitive). You don't need to do anything to make it work that
+     * way.
+     *
+     * The second way is needed for developer that run some quick test in sqlcmd, or need to run `startdb' locally.
+     * The first way does not work here, because this is the easiest way to by pass Python scripts for starting
+     * `bin/voltdb' without passing JVM variable down. To use it in `sqlcmd':
+     *
+     * $ export plan_with_calcite=true
+     * $ startdb ... # or use developer script `kvdb', `vdb'
+     * $ sqlcmd # the planner is using Calcite
+     *
+     * To use it within an IDE (IntelliJ for example), remember to add
+     * plan_with_calcite=true
+     * in Run -> Edit Configurations -> (VoltDB) -> Edit environment variables.
+     *
+     * Note that changes made to enviroment variable masks the mechanism how build.xml decides to pick planner based on
+     * the Git branch name.
+     */
+    private static final boolean USING_CALCITE =
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false")) ||
+            Boolean.parseBoolean(System.getenv("plan_with_calcite"));
+
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
-    boolean m_isConfiguredForNonVoltDBBackend = (m_backendTargetType == BackendTarget.HSQLDB_BACKEND ||
-                                                 m_backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
-                                                 m_backendTargetType == BackendTarget.POSTGIS_BACKEND);
+    private final boolean m_isConfiguredForNonVoltDBBackend =
+        m_backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+        m_backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
+        m_backendTargetType == BackendTarget.POSTGIS_BACKEND;
+
+    abstract protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException;
+    abstract protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params);
+    // NOTE!!! Because we use reflection to find the run method of each concrete AdHocNTBase class, each of those
+    // concrete methods must declare and implement the run() method. If instead we simply using run() from base class,
+    // the reflection would not find it. Each overriding run() method that matches this signature can safely just
+    // call runInternal() method.
+    abstract public CompletableFuture<ClientResponse> run(ParameterSet params);
+    protected CompletableFuture<ClientResponse> runInternal(ParameterSet params) {
+        if (USING_CALCITE) {
+            try {
+                return runUsingCalcite(params);
+            } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+                return runUsingLegacy(params);
+            }
+        } else {
+            return runUsingLegacy(params);
+        }
+    }
 
     /**
      * Log ad hoc batch info
      * @param batch planned statement batch
      */
-    private void logBatch(final CatalogContext context,
-                          final AdHocPlannedStmtBatch batch,
-                          final Object[] userParams)
-    {
+    void logBatch(final CatalogContext context, final AdHocPlannedStmtBatch batch, final Object[] userParams) {
         final int numStmts = batch.getPlannedStatementCount();
         final int numParams = userParams == null ? 0 : userParams.length;
         final String readOnly = batch.readOnly ? "yes" : "no";
@@ -118,7 +158,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         EMPTY,
         ALL_DML_OR_DQL,
         ALL_DDL,
-        MIXED;
+        MIXED
     }
 
     /**
@@ -146,9 +186,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             String ddlToken = SQLLexer.extractDDLToken(stmt);
 
             if (hasDDL == null) {
-                hasDDL = (ddlToken != null) ? true : false;
-            }
-            else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null)) {
+                hasDDL = ddlToken != null;
+            } else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null)) {
                 return AdHocSQLMix.MIXED;
             }
 
@@ -157,19 +196,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         if (validatedHomogeonousSQL.isEmpty()) {
             return AdHocSQLMix.EMPTY;
-        }
-        assert(hasDDL != null);
-        return hasDDL ? AdHocSQLMix.ALL_DDL : AdHocSQLMix.ALL_DML_OR_DQL;
-    }
-
-    public static class AdHocPlanningException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public AdHocPlanningException(String message) {
-            super(message);
-        }
-        public AdHocPlanningException(String message, Throwable cause) {
-            super(message, cause);
+        } else {
+            assert(hasDDL != null);
+            return hasDDL ? AdHocSQLMix.ALL_DDL : AdHocSQLMix.ALL_DML_OR_DQL;
         }
     }
 
@@ -177,16 +206,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Compile a batch of one or more SQL statements into a set of plans.
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
-    public static AdHocPlannedStatement compileAdHocSQL(PlannerTool plannerTool,
-                                                        String sqlStatement,
-                                                        boolean inferPartitioning,
-                                                        Object userPartitionKey,
-                                                        ExplainMode explainMode,
-                                                        boolean isLargeQuery,
-                                                        boolean isSwapTables,
-                                                        Object[] userParamSet)
-                                                                throws AdHocPlanningException
-    {
+    private static AdHocPlannedStatement compileAdHocSQL(
+            PlannerTool plannerTool, String sqlStatement, boolean inferPartitioning,
+            Object userPartitionKey, ExplainMode explainMode, boolean isLargeQuery,
+            boolean isSwapTables, Object[] userParamSet) throws PlanningErrorException {
         assert(plannerTool != null);
         assert(sqlStatement != null);
         final PlannerTool ptool = plannerTool;
@@ -197,26 +220,18 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         if (inferPartitioning) {
             partitioning = StatementPartitioning.inferPartitioning();
-        }
-        else if (userPartitionKey == null) {
+        } else if (userPartitionKey == null) {
             partitioning = StatementPartitioning.forceMP();
-        }
-        else {
+        } else {
             partitioning = StatementPartitioning.forceSP();
         }
 
         try {
-            return ptool.planSql(sqlStatement,
-                                 partitioning,
-                                 explainMode != ExplainMode.NONE,
-                                 userParamSet,
-                                 isSwapTables,
-                                 isLargeQuery);
-        }
-        catch (Exception e) {
-            throw new AdHocPlanningException(e.getMessage());
-        }
-        catch (StackOverflowError error) {
+            return ptool.planSql(sqlStatement, partitioning, explainMode != ExplainMode.NONE,
+                    userParamSet, isSwapTables, isLargeQuery);
+        } catch (Exception e) {
+            throw new PlanningErrorException(e.getMessage());
+        } catch (StackOverflowError error) {
             // Overly long predicate expressions can cause a
             // StackOverflowError in various code paths that may be
             // covered by different StackOverflowError/Error/Throwable
@@ -237,10 +252,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // explicit StackOverflowError catch blocks that re-throw
             // the error to bypass more generic catch blocks
             // for Error or Throwable on the same try block.
-            throw new AdHocPlanningException("Encountered stack overflow error. " +
+            throw new PlanningErrorException("Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.");
-        }
-        catch (AssertionError ae) {
+        } catch (AssertionError ae) {
             String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
                     + "Please contact VoltDB at support@voltdb.com with your log files.";
             StringWriter stringWriter = new StringWriter();
@@ -249,57 +263,17 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             String stackTrace = stringWriter.toString();
 
             adhocLog.error(msg + "\n" + stackTrace);
-            throw new AdHocPlanningException(msg);
-        }
-    }
-
-    /**
-     * Plan and execute a batch of DML/DQL SQL. Any DDL has been filtered out at this point.
-     * @param batchIn the batch to run.
-     * @return the response for the client.
-     * @since 8.4
-     * @author Yiqun Zhang
-     */
-    protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn) {
-        // TRAIL [Calcite:1] runNonDDLAdHocThroughCalcite
-        NonDdlBatch batch = new NonDdlBatch(batchIn);
-        NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(batch);
-        AdHocPlannedStmtBatch plannedStmtBatch;
-        try {
-            plannedStmtBatch = compiler.compile();
-        } catch (AdHocPlanningException ex) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
-        }
-
-        if (adhocLog.isDebugEnabled()) {
-            logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
-        }
-        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-        if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
-        }
-
-        // No explain mode and swap tables now.
-        try {
-            return createAdHocTransaction(plannedStmtBatch, false);
-        } catch (VoltTypeException vte) {
-            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
+            throw new PlanningErrorException(msg);
         }
     }
 
     /**
      * Plan and execute a batch of DML/DQL. Any DDL has been filtered out at this point.
      */
-    protected CompletableFuture<ClientResponse> runNonDDLAdHoc(CatalogContext context,
-                                                               List<String> sqlStatements,
-                                                               boolean inferPartitioning,
-                                                               Object userPartitionKey,
-                                                               ExplainMode explainMode,
-                                                               boolean isLargeQuery,
-                                                               boolean isSwapTables,
-                                                               Object[] userParamSet)
-    {
+    protected CompletableFuture<ClientResponse> runNonDDLAdHoc(
+            CatalogContext context, List<String> sqlStatements, boolean inferPartitioning,
+            Object userPartitionKey, ExplainMode explainMode, boolean isLargeQuery,
+            boolean isSwapTables, Object[] userParamSet) {
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
         if (context == null) {
@@ -324,14 +298,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         for (final String sqlStatement : sqlStatements) {
             try {
-                AdHocPlannedStatement result = compileAdHocSQL(context.m_ptool,
-                                                               sqlStatement,
-                                                               inferSP,
-                                                               userPartitionKey,
-                                                               explainMode,
-                                                               isLargeQuery,
-                                                               isSwapTables,
-                                                               userParamSet);
+                AdHocPlannedStatement result = compileAdHocSQL(
+                        context.m_ptool, sqlStatement, inferSP, userPartitionKey, explainMode, isLargeQuery,
+                        isSwapTables, userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -340,8 +309,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                     partitionParamValue = result.getPartitioningParameterValue();
                 }
                 stmts.add(result);
-            }
-            catch (AdHocPlanningException e) {
+            } catch (PlanningErrorException e) {
                 errorMsgs.add(e.getMessage());
             }
         }
@@ -352,12 +320,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch =
-                new AdHocPlannedStmtBatch(userParamSet,
-                                          stmts,
-                                          partitionParamIndex,
-                                          partitionParamType,
-                                          partitionParamValue,
-                                          userPartitionKey == null ? null : new Object[] { userPartitionKey });
+                new AdHocPlannedStmtBatch(userParamSet, stmts, partitionParamIndex, partitionParamType,
+                        partitionParamValue, userPartitionKey == null ? null : new Object[] { userPartitionKey });
 
         if (adhocLog.isDebugEnabled()) {
             logBatch(context, plannedStmtBatch, userParamSet);
@@ -370,18 +334,14 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
             return processExplainPlannedStmtBatch(plannedStmtBatch);
-        }
-        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+        } else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
             return processExplainDefaultProc(plannedStmtBatch);
-        }
-        else if (explainMode == ExplainMode.EXPLAIN_JSON) {
+        } else if (explainMode == ExplainMode.EXPLAIN_JSON) {
             return processExplainPlannedStmtBatchInJSON(plannedStmtBatch);
-        }
-        else {
+        } else {
             try {
                 return createAdHocTransaction(plannedStmtBatch, isSwapTables);
-            }
-            catch (VoltTypeException vte) {
+            } catch (VoltTypeException vte) {
                 String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
                 return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
             }
@@ -404,12 +364,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
+                new ClientResponseImpl(ClientResponseImpl.SUCCESS, ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null, vt, null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
@@ -432,12 +388,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
+                new ClientResponseImpl( ClientResponseImpl.SUCCESS, ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null, vt, null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
@@ -465,12 +417,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         vt.addRow("sql0", sql, explain);
 
         ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        new VoltTable[] { vt },
-                        null);
+                new ClientResponseImpl(ClientResponseImpl.SUCCESS, ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null, new VoltTable[] { vt }, null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
@@ -481,16 +429,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Take a set of adhoc plans and pass them off to the right transactional
      * adhoc variant.
      */
-    private final CompletableFuture<ClientResponse> createAdHocTransaction(
+    final CompletableFuture<ClientResponse> createAdHocTransaction(
             final AdHocPlannedStmtBatch plannedStmtBatch,
-            final boolean isSwapTables)
-                    throws VoltTypeException
-    {
+            final boolean isSwapTables) throws VoltTypeException {
         ByteBuffer buf = null;
         try {
             buf = plannedStmtBatch.flattenPlanArrayToBuffer();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         assert(buf.hasArray());
@@ -507,12 +452,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         if (isSwapTables) {
             procedureName = "@SwapTablesCore";
             params = new Object[] { buf.array() };
-        }
-        else if (isSinglePartition) {
+        } else if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
                 procedureName = "@AdHoc_RO_SP";
-            }
-            else {
+            } else {
                 procedureName = "@AdHoc_RW_SP";
             }
             int type = VoltType.NULL.getValue();
@@ -530,12 +473,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // Send the partitioning parameter and its type along so that the site can check if
             // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
             params = new Object[] { param, (byte)type, buf.array() };
-        }
-        else {
+        } else {
             if (plannedStmtBatch.isReadOnly()) {
                 procedureName = "@AdHoc_RO_MP";
-            }
-            else {
+            } else {
                 procedureName = "@AdHoc_RW_MP";
             }
             params = new Object[] { buf.array() };
@@ -545,23 +486,22 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     }
 
     public static AdHocPlannedStmtBatch plan(PlannerTool ptool, String sql, Object[] userParams, boolean singlePartition)
-            throws AdHocPlanningException
-    {
+            throws PlanningErrorException {
         List<String> sqlStatements = new ArrayList<>();
         AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
 
         switch (mix) {
         case EMPTY:
-            throw new AdHocPlanningException("No valid SQL found.");
+            throw new PlanningErrorException("No valid SQL found.");
         case ALL_DDL:
         case MIXED:
-            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+            throw new PlanningErrorException("DDL not supported in stored procedures.");
         default:
             break;
         }
 
         if (sqlStatements.size() != 1) {
-            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
+            throw new PlanningErrorException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
         }
 
         sql = sqlStatements.get(0);
@@ -570,25 +510,46 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         Object partitionKey = singlePartition ? "1" : null;
 
         List<AdHocPlannedStatement> stmts = new ArrayList<>();
-        AdHocPlannedStatement result = null;
-
-        result = compileAdHocSQL(ptool,
-                                 sql,
-                                 false, // do not infer partitioning
-                                 partitionKey, // use as partition key
-                                 ExplainMode.NONE,
-                                 false, // not a large query
-                                 false, // not swap tables
-                                 userParams);
+        AdHocPlannedStatement result = compileAdHocSQL(ptool, sql, false, partitionKey,
+                ExplainMode.NONE, false, false, userParams);
         stmts.add(result);
 
-
-        return new AdHocPlannedStmtBatch(userParams,
-                                         stmts,
-                                         -1,
-                                         null,
-                                         null,
-                                         userParams);
+        return new AdHocPlannedStmtBatch(userParams, stmts, -1, null, null, userParams);
     }
 
+    /**
+     * The {@link org.voltdb.plannerv2.SqlBatch} was designed to be
+     * self-contained. However, this is not entirely true due to the way that
+     * the legacy code was organized. Until I have further reshaped the legacy
+     * code path, I will leave this interface to call back into the private
+     * methods of {@link org.voltdb.sysprocs.AdHocNTBase}.
+     */
+    class AdHocNTBaseContext implements SqlBatch.Context {
+
+        @Override public CompletableFuture<ClientResponse> runDDLBatch(
+        List<String> sqlStatements, List<SqlNode> sqlNodes) {
+            throw new UnsupportedOperationException("Not Implemented.");
+        }
+
+        @Override public void logBatch(CatalogContext context, AdHocPlannedStmtBatch batch, Object[] userParams) {
+            AdHocNTBase.this.logBatch(context, batch, userParams);
+        }
+
+        @Override public VoltLogger getLogger() {
+            return adhocLog;
+        }
+
+        @Override public long getClientHandle() {
+            return AdHocNTBase.this.getClientHandle();
+        }
+
+        @Override public CompletableFuture<ClientResponse> createAdHocTransaction(
+                AdHocPlannedStmtBatch plannedStmtBatch) throws VoltTypeException {
+            return AdHocNTBase.this.createAdHocTransaction(plannedStmtBatch, false);
+        }
+
+        @Override public CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch plannedStmtBatch) {
+            return AdHocNTBase.processExplainPlannedStmtBatch(plannedStmtBatch);
+        }
+    }
 }

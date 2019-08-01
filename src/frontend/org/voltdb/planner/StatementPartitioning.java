@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -498,6 +499,16 @@ public class StatementPartitioning implements Cloneable{
                     // Only need one constant value.
                     break;
                 }
+            }
+        } else if (scans.size() == 1) {
+            // ENG-15117
+            // For query like "select * from (select DL_REGISTER_IP_CITY  from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;"
+            // There is no filter on the outer query,
+            // the inferredParameterIndex should be inferred from the subquery instead of uninitialized (-1).
+            StmtTableScan tableScan = scans.iterator().next();
+            if (tableScan instanceof StmtSubqueryScan) {
+                StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
+                m_inferredParameterIndex = subScan.getScanPartitioning().getInferredParameterIndex();
             }
         }
     }

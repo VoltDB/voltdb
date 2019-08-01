@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
@@ -85,6 +84,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMultimap;
 import com.google_voltpatches.common.collect.Maps;
@@ -92,6 +92,8 @@ import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.primitives.Longs;
+
+import io.netty.handler.ssl.SslContext;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -154,7 +156,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public String group = AbstractTopology.PLACEMENT_GROUP_DEFAULT;
         public int localSitesCount;
         public final boolean startPause;
-
+        public String recoveredPartitions;
         public Config(String coordIp, int coordPort, boolean paused) {
             startPause = paused;
             if (coordIp == null || coordIp.length() == 0) {
@@ -261,14 +263,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private final static String HOST_IP = "hostIp";
         private final static String GROUP = "group";
         private final static String LOCAL_SITES_COUNT = "localSitesCount";
+        private final static String RECOVERED_PARTITION_IDS = "recoveredPartitions";
         public final String m_hostIp;
         public final String m_group;
         public final int m_localSitesCount;
+
+        // comma separated partition ids
+        public final String m_recoveredPartitions;
 
         public HostInfo(String hostIp, String group, int localSitesCount) {
             m_hostIp = hostIp;
             m_group = group;
             m_localSitesCount = localSitesCount;
+            m_recoveredPartitions = "";
+        }
+
+        public HostInfo(String hostIp, String group, int localSitesCount, String partitionIds) {
+            m_hostIp = hostIp;
+            m_group = group;
+            m_localSitesCount = localSitesCount;
+            m_recoveredPartitions = partitionIds;
         }
 
         public byte[] toBytes() throws JSONException
@@ -278,6 +292,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             js.keySymbolValuePair(HOST_IP, m_hostIp);
             js.keySymbolValuePair(GROUP, m_group);
             js.keySymbolValuePair(LOCAL_SITES_COUNT, m_localSitesCount);
+            js.keySymbolValuePair(RECOVERED_PARTITION_IDS, m_recoveredPartitions);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -285,7 +300,31 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
             final JSONObject obj = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
-            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP), obj.getInt(LOCAL_SITES_COUNT));
+            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP), obj.getInt(LOCAL_SITES_COUNT),
+                    obj.getString(RECOVERED_PARTITION_IDS));
+        }
+
+        public Set<Integer> getRecoveredPartitions() {
+            Set<Integer> partitionSet = Sets.newHashSet();
+            if (StringUtils.isEmpty(m_recoveredPartitions)) {
+                return partitionSet;
+            }
+            String partitions[] = m_recoveredPartitions.split(",");
+            for (String partition : partitions) {
+                try {
+                    partitionSet.add(Integer.valueOf(partition));
+                } catch (NumberFormatException e) {
+                    // The partition list is persisted by server and should not
+                    // be edited. If non-numeric chars get in, ignore it to avoid confusing users.
+                }
+            }
+            return partitionSet;
+        }
+
+        @Override
+        public String toString() {
+            return "HostInfo [m_hostIp=" + m_hostIp + ", m_group=" + m_group + ", m_localSitesCount="
+                    + m_localSitesCount + "]";
         }
     }
 
@@ -331,7 +370,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * connections.
      * Updates via COW
      */
-    volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
+    volatile ImmutableListMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableListMultimap.of();
 
     /*
      * Track dead ForeignHosts that are reported independently by zookeeper and PicoNetwork.
@@ -364,14 +403,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /* Peers within the same partition group */
     private Set<Integer> m_peers;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
-    private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
+    private static Map<Integer, Integer> s_nextForeignHost = new HashMap<>();
     /*
      * used when coordinating joining hosts
      */
     private final JoinAcceptor m_acceptor;
-    private final SSLContext m_sslContext;
 
     private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
 
@@ -379,10 +417,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_siteMailboxes.get(hsId);
     }
 
-    public HostMessenger(Config config, HostWatcher hostWatcher, SSLContext sslContext) {
+    public HostMessenger(Config config, HostWatcher hostWatcher) {
+        this(config, hostWatcher, null, null);
+    }
+
+    public HostMessenger(Config config, HostWatcher hostWatcher, SslContext sslServerContext,
+            SslContext sslClientContext) {
         m_config = config;
         m_hostWatcher = hostWatcher;
-        m_sslContext = sslContext;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_acceptor = config.acceptor;
         //This ref is updated after the mesh decision is made.
@@ -393,7 +435,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_paused,
                 m_acceptor,
                 this,
-                m_sslContext);
+                sslServerContext,
+                sslClientContext);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
         // when crashLocalVoltDB() is called because System.exit() can get called from
@@ -544,8 +587,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_acceptor.detract(failedHostIds);
                 // notifying any watchers who are interested in failure -- used
                 // initially to do ZK cleanup when rejoining nodes die
-                if (m_hostWatcher != null) {
+                if (m_hostWatcher != null && !m_shuttingDown) {
                     m_hostWatcher.hostsFailed(failedHostIds);
+                }
+            }
+        }
+
+        @Override
+        public void disconnectWithoutMeshDetermination() {
+            synchronized(HostMessenger.this) {
+                if (m_hostWatcher != null && !m_shuttingDown) {
+                    m_hostWatcher.hostsFailed(Sets.newHashSet());
                 }
             }
         }
@@ -703,7 +755,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group, m_config.localSitesCount);
+            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group, m_config.localSitesCount,
+                    m_config.recoveredPartitions);
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
@@ -799,7 +852,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
+            m_foreignHosts = ImmutableListMultimap.<Integer, ForeignHost>builder()
                     .putAll(m_foreignHosts)
                     .put(hostId, fh)
                     .build();
@@ -822,7 +875,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private void removeForeignHost(final int hostId) {
         ImmutableCollection<ForeignHost> fhs = m_foreignHosts.get(hostId);
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
+            m_foreignHosts = ImmutableListMultimap.<Integer, ForeignHost>builder()
                     .putAll(Multimaps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
                     .build();
 
@@ -950,7 +1003,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 synchronized(HostMessenger.this) {
                     removeForeignHost(hostId);
                 }
-                m_acceptor.detract(hostId);
+                m_acceptor.detract(m_zk, hostId);
                 socket.close();
                 return;
             }
@@ -1019,7 +1072,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             hostObj.put(SocketJoiner.PORT, m_config.internalPort);
             jsArray.put(hostObj);
             for (Entry<Integer, Collection<ForeignHost>> entry : m_foreignHosts.asMap().entrySet()) {
-                if (entry.getValue().isEmpty()) continue;
+                if (entry.getValue().isEmpty()) {
+                    continue;
+                }
                 int hsId = entry.getKey();
                 Iterator<ForeignHost> it = entry.getValue().iterator();
                 // all fhs to same host have the same address and port
@@ -1131,10 +1186,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
             hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
-                                    m_config.group, m_config.localSitesCount);
+                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions);
         } else {
             hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
-                                    m_config.group, m_config.localSitesCount);
+                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions);
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -1180,7 +1235,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Wait until all the nodes have built a mesh.
      */
     public Map<Integer, HostInfo> waitForGroupJoin(int expectedHosts) {
-        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
+        Map<Integer, HostInfo> hostInfos = Maps.newTreeMap();
 
         try {
             while (true) {
@@ -1261,13 +1316,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
 
         // wait for the last callback to finish
-        byte[] lastPayload = lastCallback.getData();
+        byte[] lastPayload = lastCallback.get();
         final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
         hostInfoMap.put(parseHostId(lastChild), lastOne);
 
         // now all previous callbacks should have finished
         for (int i = 0; i < children.size() - 1; i++) {
-            byte[] payload = callbacks.poll().getData();
+            byte[] payload = callbacks.poll().get();
             final HostInfo info = HostInfo.fromBytes(payload);
             hostInfoMap.put(parseHostId(children.get(i)), info);
         }
@@ -1350,7 +1405,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // the foreign machine case
-        ImmutableCollection<ForeignHost> fhosts = m_foreignHosts.get(hostId);
+        ImmutableList<ForeignHost> fhosts = m_foreignHosts.get(hostId);
         if (fhosts.isEmpty()) {
             if (!m_knownFailedHosts.containsKey(hostId)) {
                 networkLog.warn(
@@ -1371,16 +1426,33 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * case of binding all sites to the primary connection, this check has been added to prevent it.
              */
             if (m_hasAllSecondaryConnectionCreated) {
+                // fast path
                 // assign a foreign host for regular mailbox
                 fhost = m_fhMapping.get(hsId);
                 if (fhost == null) {
-                    int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
-                    fhost = (ForeignHost) fhosts.toArray()[index];
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
-                                " to " + fhost.hostnameAndIPAndPort());
+                    // slow path
+                    // The synchronized block below is invoked on first message to the destination only.
+                    synchronized(this) {
+                        if (s_nextForeignHost.isEmpty()) {
+                            for (Integer hId : getLiveHostIds()) {
+                                s_nextForeignHost.put(hId, 1);
+                            }
+                        }
+                        // in case of multiple threads send to the same hsId at the same time
+                        fhost = m_fhMapping.get(hsId);
+                        if (fhost == null) {
+                            Integer perFHCounter = s_nextForeignHost.get(hostId);
+                            int index = Math.abs(perFHCounter % fhosts.size());
+                            s_nextForeignHost.put(hostId, ++perFHCounter);
+                            fhost = fhosts.get(index);
+                            if (hostLog.isDebugEnabled()) {
+                                hostLog.debug("bind " + CoreUtils.hsIdToString(hsId) +
+                                        " to " + fhost.hostnameAndIPAndPort() + " nextForeignHost=" +
+                                        perFHCounter + " hostId=" + hostId + " fhosts.size=" + fhosts.size());
+                            }
+                            bindForeignHost(hsId, fhost);
+                        }
                     }
-                    bindForeignHost(hsId, fhost);
                 }
             } else {
                 // otherwise use primary for a short while
@@ -1427,18 +1499,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    private ForeignHost getPrimary(ImmutableCollection<ForeignHost> fhosts, int hostId) {
-        ForeignHost fhost = null;
-        for (ForeignHost f : fhosts) {
-            if (f.isPrimary()) {
-                fhost = f;
-                break;
-            }
-        }
-        if (fhost == null) { // unlikely
-            networkLog.warn("Attempted to deliver a message to host " +
-                        hostId + " but there is no primary connection to the host.");
-        }
+    private ForeignHost getPrimary(ImmutableList<ForeignHost> fhosts, int hostId) {
+        ForeignHost fhost = fhosts.get(0);
+        assert fhost.isPrimary();
         return fhost;
     }
 
@@ -1540,7 +1603,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
             for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getKey().equals(hsId)) continue;
+                if (e.getKey().equals(hsId)) {
+                    continue;
+                }
                 b.put(e.getKey(), e.getValue());
             }
             m_siteMailboxes = b.build();
@@ -1554,7 +1619,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
             for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getValue() == mbox) continue;
+                if (e.getValue() == mbox) {
+                    continue;
+                }
                 b.put(e.getKey(), e.getValue());
             }
             m_siteMailboxes = b.build();
@@ -1579,7 +1646,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             new HashMap<ForeignHost, ArrayList<Long>>(32);
         for (long hsId : destinationHSIds) {
             ForeignHost host = presend(hsId, message);
-            if (host == null) continue;
+            if (host == null) {
+                continue;
+            }
             ArrayList<Long> bundle = foreignHosts.get(host);
             if (bundle == null) {
                 bundle = new ArrayList<Long>();
@@ -1588,7 +1657,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             bundle.add(hsId);
         }
 
-        if (foreignHosts.size() == 0) return;
+        if (foreignHosts.size() == 0) {
+            return;
+        }
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
             e.getKey().send(Longs.toArray(e.getValue()), message);
@@ -1683,9 +1754,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public int countForeignHosts() {
         int retval = 0;
-        for (ForeignHost host : m_foreignHosts.values())
-            if ((host != null) && (host.isUp()))
+        for (ForeignHost host : m_foreignHosts.values()) {
+            if ((host != null) && (host.isUp())) {
                 retval++;
+            }
+        }
         return retval;
     }
 
@@ -1723,7 +1796,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
                 if (fh.isUp()) {
-                    fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
+                    fh.sendPoisonPill(err, cause);
                 }
             }
         }
@@ -1741,7 +1814,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public void sendPoisonPill(String err, int targetHostId, int cause) {
+    public void sendPoisonPill(int targetHostId, String err, int cause) {
         Iterator<ForeignHost> it = m_foreignHosts.get(targetHostId).iterator();
         if (it.hasNext()) {
             ForeignHost fh = it.next();
@@ -1759,7 +1832,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // Then contact other peers
         List<FutureTask<Void>> tasks = new ArrayList<FutureTask<Void>>();
         for (int hostId : m_foreignHosts.keySet()) {
-            if (hostId == m_localHostId) continue; /* skip target host */
+            if (hostId == m_localHostId) {
+                continue; /* skip target host */
+            }
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
@@ -1896,7 +1971,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // it is possible if some nodes are inactive
-        if (hostsToConnect.isEmpty()) return;
+        if (hostsToConnect.isEmpty()) {
+            return;
+        }
 
         for (int hostId : hostsToConnect) {
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();

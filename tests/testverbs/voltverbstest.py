@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -69,6 +69,7 @@ class Opt:
 admin = Opt('admin', 'adminport', str, 1)
 client = Opt('client', 'port', str, 1)
 externalinterface = Opt('externalinterface', 'externalinterface', str, 1)
+drpublic = Opt('drpublic', 'drpublic', str, 1)
 http = Opt('http', 'httpport', str, 1)
 internal = Opt('internal', 'internalport', str, 1)
 internalinterface = Opt('internalinterface', 'internalinterface', str, 1)
@@ -106,6 +107,7 @@ unknown = Opt('unknown', None, None, 0)
 
 volt_opts = {'create': [admin,
                         client,
+                        drpublic,
                         externalinterface,
                         http,
                         internal,
@@ -123,6 +125,7 @@ volt_opts = {'create': [admin,
 
              'recover': [admin,
                          client,
+                         drpublic,
                          externalinterface,
                          http,
                          internal,
@@ -139,6 +142,7 @@ volt_opts = {'create': [admin,
 
              'rejoin': [admin,
                         client,
+                        drpublic,
                         externalinterface,
                         http,
                         internal,
@@ -152,6 +156,7 @@ volt_opts = {'create': [admin,
 
              'add': [admin,
                      client,
+                     drpublic,
                      externalinterface,
                      http,
                      internal,
@@ -171,6 +176,7 @@ volt_opts = {'create': [admin,
 
              'start': [admin,
                        client,
+                       drpublic,
                        externalinterface,
                        http,
                        internal,
@@ -291,7 +297,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     if expectedOut:
         haddiffs = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
+            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + "\nTest Failed!\n\n"
             haddiffs = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
@@ -389,7 +395,10 @@ def test_java_opts_override(verb = 'start', reportout = None):
     haddiffs = False
     override_env = dict(os.environ.copy(), **volt_override)
     stdout, _ = run_voltcli(verb, [], environ=override_env)
-    matched_java_opts = ignore_re.match(stdout).group('java_opts')
+    m = ignore_re.match(stdout)
+    if m is None:
+        raise RuntimeError("No matches found in: '%s'" % stdout)
+    matched_java_opts = m.group('java_opts')
     reportout.write("Given: " + " ".join([k + '=' + v for k, v in volt_override.items()]) + "\n" +
                     "Got JVM Options: " + matched_java_opts + "\n")
     if 'VOLTDB_HEAPMAX' in volt_override:

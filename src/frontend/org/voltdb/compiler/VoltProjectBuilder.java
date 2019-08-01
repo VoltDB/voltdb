@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -306,7 +306,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
-    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<>();
+    private List<ExportConfigurationType> m_exportConfigs = new ArrayList<>();
 
     private Integer m_deadHostTimeout = null;
 
@@ -739,14 +739,30 @@ public class VoltProjectBuilder {
         m_ilImportConnectors.add(importConnector);
     }
 
-    public void addExport(boolean enabled, String exportTarget, Properties config) {
-        addExport(enabled, exportTarget, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    public void addExport(boolean enabled) {
+        addExport(enabled, null, null);
     }
 
-    public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
-        HashMap<String, Object> exportConnector = new HashMap<>();
-        exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
-        exportConnector.put("elEnabled", enabled);
+    public void addExport(boolean enabled, ServerExportEnum exportType, Properties config) {
+        addExport(enabled, exportType, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    }
+
+    public void addExport(boolean enabled, ServerExportEnum exportType, Properties config, String target) {
+        addExport(enabled, exportType, null, config, target);
+    }
+    public void addExport(boolean enabled, ServerExportEnum exportType, String connectorClass, Properties config, String target) {
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory = new org.voltdb.compiler.deploymentfile.ObjectFactory();
+
+        ExportConfigurationType exportConfig = factory.createExportConfigurationType();
+        exportConfig.setEnabled(enabled);
+
+        exportConfig.setType(exportType);
+        if (exportType == ServerExportEnum.CUSTOM) {
+            exportConfig.setExportconnectorclass(
+                    connectorClass == null ? System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) : connectorClass);
+        }
+
+        exportConfig.setTarget(target);
 
         if (config == null) {
             config = new Properties();
@@ -756,20 +772,19 @@ public class VoltProjectBuilder {
                     "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
-        exportConnector.put("elConfig", config);
+        List<PropertyType> configProperties = exportConfig.getProperty();
 
-        if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
-            exportConnector.put("elExportTarget", exportTarget);
-        }
-        else {
-            exportConnector.put("elExportTarget", "file");
-        }
-        exportConnector.put("elGroup", target);
-        m_elExportConnectors.add(exportConnector);
-    }
+        for(Object nameObj: config.keySet()) {
+            String name = (String) nameObj;
 
-    public void addExport(boolean enabled) {
-        addExport(enabled, null, null);
+            PropertyType prop = factory.createPropertyType();
+            prop.setName(name);
+            prop.setValue(config.getProperty(name));
+
+            configProperties.add(prop);
+        }
+
+        m_exportConfigs.add(exportConfig);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -1236,33 +1251,7 @@ public class VoltProjectBuilder {
         ExportType export = factory.createExportType();
         deployment.setExport(export);
 
-        for (HashMap<String,Object> exportConnector : m_elExportConnectors) {
-            ExportConfigurationType exportConfig = factory.createExportConfigurationType();
-            exportConfig.setEnabled((boolean)exportConnector.get("elEnabled") && exportConnector.get("elLoader") != null &&
-                    !((String)exportConnector.get("elLoader")).trim().isEmpty());
-
-            ServerExportEnum exportTarget = ServerExportEnum.fromValue(((String)exportConnector.get("elExportTarget")).toLowerCase());
-            exportConfig.setType(exportTarget);
-            if (exportTarget.equals(ServerExportEnum.CUSTOM)) {
-                exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
-            }
-
-            exportConfig.setTarget((String)exportConnector.get("elGroup"));
-
-            Properties config = (Properties)exportConnector.get("elConfig");
-            if((config != null) && (config.size() > 0)) {
-                List<PropertyType> configProperties = exportConfig.getProperty();
-
-                for( Object nameObj: config.keySet()) {
-                    String name = String.class.cast(nameObj);
-
-                    PropertyType prop = factory.createPropertyType();
-                    prop.setName(name);
-                    prop.setValue(config.getProperty(name));
-
-                    configProperties.add(prop);
-                }
-            }
+        for (ExportConfigurationType exportConfig : m_exportConfigs) {
             export.getConfiguration().add(exportConfig);
         }
 

@@ -4,8 +4,8 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true" target="custom" exportconnectorclass="customexport.OverflowingServerExportClient" >
-        <configuration>
+    <export>
+        <configuration enabled="true" target="abc" type="custom" exportconnectorclass="customexport.OverflowingServerExportClient">
             <property name="drain">true</property>
         </configuration>
     </export>

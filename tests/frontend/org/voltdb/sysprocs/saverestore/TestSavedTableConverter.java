@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -79,7 +79,9 @@ public class TestSavedTableConverter extends TestCase {
             result = SavedTableConverter.convertTable(inputTable,
                                                       m_catalogTable,
                                                       false,
-                                                      false);
+                                                      false,
+                                                      false,
+                                                      true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -163,7 +165,7 @@ public class TestSavedTableConverter extends TestCase {
         boolean failed = false;
         try {
             result = SavedTableConverter.convertTable(inputTable,
-                    catalogTable, false, false);
+                    catalogTable, false, false, false, true);
             result.resetRowPosition();
             assertEquals(10, result.getRowCount());
         } catch (Exception e) {
@@ -191,7 +193,7 @@ public class TestSavedTableConverter extends TestCase {
         try {
             result = SavedTableConverter.convertTable(inputTable,
                                                       m_catalogTable,
-                                                      false, false);
+                                                      false, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -225,7 +227,7 @@ public class TestSavedTableConverter extends TestCase {
         try {
             result = SavedTableConverter.convertTable(inputTable,
                                                       m_catalogTable,
-                                                      false, false);
+                                                      false, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -260,7 +262,7 @@ public class TestSavedTableConverter extends TestCase {
         try {
             result = SavedTableConverter.convertTable(inputTable,
                                                       m_catalogTable,
-                                                      false, false);
+                                                      false, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -294,7 +296,7 @@ public class TestSavedTableConverter extends TestCase {
         }
 
         try {
-            SavedTableConverter.convertTable(inputTable, m_catalogTable, false, false);
+            SavedTableConverter.convertTable(inputTable, m_catalogTable, false, false, false, true);
         } catch (Exception e) {
             assertTrue(true);
             return;
@@ -309,8 +311,8 @@ public class TestSavedTableConverter extends TestCase {
                         new ColumnInfo("HAS_NULLABLE_FLOAT", VoltType.FLOAT),
                         new ColumnInfo("HAS_NADA", VoltType.FLOAT));
 
-        assertFalse(SavedTableConverter.needsConversion(inputTableWithoutDRCol, m_catalogTable, false, false));
-        assertTrue(SavedTableConverter.needsConversion(inputTableWithoutDRCol, m_catalogTable, true, false));
+        assertFalse(SavedTableConverter.needsConversion(inputTableWithoutDRCol, m_catalogTable, false, false, false, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableWithoutDRCol, m_catalogTable, true, false, false, true));
 
         for (int i = 0; i < 10; i++) {
             inputTableWithoutDRCol.addRow(i, Integer.toString(i), new Double(i), new Double(i));
@@ -318,7 +320,7 @@ public class TestSavedTableConverter extends TestCase {
 
         VoltTable result = null;
         try {
-            result = SavedTableConverter.convertTable(inputTableWithoutDRCol, m_catalogTable, true, false);
+            result = SavedTableConverter.convertTable(inputTableWithoutDRCol, m_catalogTable, true, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -350,10 +352,10 @@ public class TestSavedTableConverter extends TestCase {
                         new ColumnInfo(CatalogUtil.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
 
         // Missing HAS_NULLABLE_STRING and HAS_NULLABLE_FLOAT
-        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false));
-        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, true, false));
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false, false, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, true, false, false, true));
         // Extra DR Column in input
-        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false));
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false, false, true));
 
         for (int i = 0; i < 10; i++) {
             inputTableIdentical.addRow(i, Integer.toString(i), new Double(i), new Double(i), new Long(i));
@@ -361,7 +363,7 @@ public class TestSavedTableConverter extends TestCase {
 
         VoltTable result = null;
         try {
-            result = SavedTableConverter.convertTable(inputTableIdentical, m_catalogTable, false, false);
+            result = SavedTableConverter.convertTable(inputTableIdentical, m_catalogTable, false, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -383,7 +385,7 @@ public class TestSavedTableConverter extends TestCase {
                         new ColumnInfo("HAS_NADA", VoltType.FLOAT),
                         new ColumnInfo(CatalogUtil.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
 
-        assertTrue(SavedTableConverter.needsConversion(inputTable, m_catalogTable, true, false));
+        assertTrue(SavedTableConverter.needsConversion(inputTable, m_catalogTable, true, false, false, true));
 
         for (int i = 0; i < 10; i++) {
             inputTable.addRow(i, new Double(i), new Long(i));
@@ -391,7 +393,7 @@ public class TestSavedTableConverter extends TestCase {
 
         VoltTable result = null;
         try {
-            result = SavedTableConverter.convertTable(inputTable, m_catalogTable, true, false);
+            result = SavedTableConverter.convertTable(inputTable, m_catalogTable, true, false, false, true);
         } catch (Exception e) {
             e.printStackTrace();
             fail("SavedTableConverter.convert should not have thrown here");
@@ -420,8 +422,8 @@ public class TestSavedTableConverter extends TestCase {
                         new ColumnInfo("HAS_NADA", VoltType.FLOAT),
                         new ColumnInfo(CatalogUtil.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
 
-        assertTrue(SavedTableConverter.needsConversion(inputTableWithDRCol, m_catalogTable, false, false));
-        assertFalse(SavedTableConverter.needsConversion(inputTableWithDRCol, m_catalogTable, true, false));
+        assertTrue(SavedTableConverter.needsConversion(inputTableWithDRCol, m_catalogTable, false, false, false, true));
+        assertFalse(SavedTableConverter.needsConversion(inputTableWithDRCol, m_catalogTable, true, false, false, true));
     }
 
     public void testViewWithoutCountStar() {
@@ -431,8 +433,171 @@ public class TestSavedTableConverter extends TestCase {
                         new ColumnInfo("HAS_NULLABLE_FLOAT", VoltType.FLOAT),
                         new ColumnInfo("HAS_NADA", VoltType.FLOAT),
                         new ColumnInfo(CatalogUtil.VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
-        assertTrue(SavedTableConverter.needsConversion(inputTableWithViewCol, m_catalogTable, false, false));
-        assertFalse(SavedTableConverter.needsConversion(inputTableWithViewCol, m_catalogTable, false, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableWithViewCol, m_catalogTable, false, false, false, true));
+        assertFalse(SavedTableConverter.needsConversion(inputTableWithViewCol, m_catalogTable, false, true, false, true));
+    }
+
+    public void testDRPassiveMigrateToActiveNoMigrate() {
+        VoltTable inputTableWithoutDRColWithMigrate =
+                new VoltTable(new ColumnInfo("HAS_DEFAULT", VoltType.INTEGER),
+                        new ColumnInfo("HAS_NULLABLE_STRING", VoltType.STRING),
+                        new ColumnInfo("HAS_NULLABLE_FLOAT", VoltType.FLOAT),
+                        new ColumnInfo("HAS_NADA", VoltType.FLOAT),
+                        new ColumnInfo(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
+
+        assertFalse(SavedTableConverter.needsConversion(inputTableWithoutDRColWithMigrate, m_catalogTable, false, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableWithoutDRColWithMigrate, m_catalogTable, false, false, true, false));
+
+        for (int i = 0; i < 10; i++) {
+            inputTableWithoutDRColWithMigrate.addRow(i, Integer.toString(i), new Double(i), new Double(i), i);
+        }
+
+        VoltTable result = null;
+        try {
+            result = SavedTableConverter.convertTable(inputTableWithoutDRColWithMigrate, m_catalogTable, true, false, false, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SavedTableConverter.convert should not have thrown here");
+        }
+
+        assertEquals(5, result.getColumnCount());
+        for (int i = 0; i < 10; i++) {
+            VoltTableRow row = result.fetchRow(i);
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
+            assertEquals(Integer.toString(i), row.getString("HAS_NULLABLE_STRING"));
+            assertEquals(new Double(i), row.getDouble("HAS_NULLABLE_FLOAT"));
+            assertEquals(new Double(i), row.getDouble("HAS_NADA"));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(4));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(CatalogUtil.DR_HIDDEN_COLUMN_NAME));
+        }
+
+        inputTableWithoutDRColWithMigrate.resetRowPosition();
+        VoltTable result2 = null;
+        try {
+            result2 = SavedTableConverter.convertTable(inputTableWithoutDRColWithMigrate, m_catalogTable, true, false, false, false);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SavedTableConverter.convert should not have thrown here");
+        }
+
+        assertEquals(5, result2.getColumnCount());
+        for (int i = 0; i < 10; i++) {
+            VoltTableRow row = result2.fetchRow(i);
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
+            assertEquals(Integer.toString(i), row.getString("HAS_NULLABLE_STRING"));
+            assertEquals(new Double(i), row.getDouble("HAS_NULLABLE_FLOAT"));
+            assertEquals(new Double(i), row.getDouble("HAS_NADA"));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(4));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(CatalogUtil.DR_HIDDEN_COLUMN_NAME));
+        }
+    }
+
+    public void testDRActiveNoMigrateToPassiveMigrate() {
+        VoltTable inputTableDifferent =
+                new VoltTable(new ColumnInfo("HAS_DEFAULT", VoltType.INTEGER),
+                        new ColumnInfo("HAS_NADA", VoltType.FLOAT),
+                        new ColumnInfo(CatalogUtil.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
+
+        VoltTable inputTableIdentical =
+                new VoltTable(new ColumnInfo("HAS_DEFAULT", VoltType.INTEGER),
+                        new ColumnInfo("HAS_NULLABLE_STRING", VoltType.STRING),
+                        new ColumnInfo("HAS_NULLABLE_FLOAT", VoltType.FLOAT),
+                        new ColumnInfo("HAS_NADA", VoltType.FLOAT),
+                        new ColumnInfo(CatalogUtil.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
+
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false, true, false));
+        // Remove DR Column and Add Migrate Column
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false, true, false));
+        // Add Migrate Column After DR Column
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, true, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, true, false, true, false));
+
+        for (int i = 0; i < 10; i++) {
+            inputTableIdentical.addRow(i, Integer.toString(i), new Double(i), new Double(i), new Long(i));
+        }
+
+        VoltTable result = null;
+        try {
+            result = SavedTableConverter.convertTable(inputTableIdentical, m_catalogTable, false, false, true, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SavedTableConverter.convert should not have thrown here");
+        }
+
+        assertEquals(5, result.getColumnCount());
+        for (int i = 0; i < 10; i++) {
+            VoltTableRow row = result.fetchRow(i);
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
+            assertEquals(Integer.toString(i), row.getString("HAS_NULLABLE_STRING"));
+            assertEquals(new Double(i), row.getDouble("HAS_NULLABLE_FLOAT"));
+            assertEquals(new Double(i), row.getDouble("HAS_NADA"));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME));
+        }
+
+        inputTableIdentical.resetRowPosition();
+        VoltTable result2 = null;
+        try {
+            result2 = SavedTableConverter.convertTable(inputTableIdentical, m_catalogTable, false, false, true, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SavedTableConverter.convert should not have thrown here");
+        }
+
+        assertEquals(5, result2.getColumnCount());
+        for (int i = 0; i < 10; i++) {
+            VoltTableRow row = result2.fetchRow(i);
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
+            assertEquals(Integer.toString(i), row.getString("HAS_NULLABLE_STRING"));
+            assertEquals(new Double(i), row.getDouble("HAS_NULLABLE_FLOAT"));
+            assertEquals(new Double(i), row.getDouble("HAS_NADA"));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME));
+        }
+
+    }
+
+    public void testMigrateToMigrateRestore() {
+        VoltTable inputTableDifferent =
+                new VoltTable(new ColumnInfo("HAS_DEFAULT", VoltType.INTEGER),
+                        new ColumnInfo("HAS_NADA", VoltType.FLOAT),
+                        new ColumnInfo(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
+
+        VoltTable inputTableIdentical =
+                new VoltTable(new ColumnInfo("HAS_DEFAULT", VoltType.INTEGER),
+                        new ColumnInfo("HAS_NULLABLE_STRING", VoltType.STRING),
+                        new ColumnInfo("HAS_NULLABLE_FLOAT", VoltType.FLOAT),
+                        new ColumnInfo("HAS_NADA", VoltType.FLOAT),
+                        new ColumnInfo(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT));
+
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableDifferent, m_catalogTable, false, false, true, false));
+
+        // Same Table schema with Recover and Restore
+        assertFalse(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false, true, true));
+        assertTrue(SavedTableConverter.needsConversion(inputTableIdentical, m_catalogTable, false, false, true, false));
+
+        for (int i = 0; i < 10; i++) {
+            inputTableIdentical.addRow(i, Integer.toString(i), new Double(i), new Double(i), new Long(i));
+        }
+
+        VoltTable result = null;
+        try {
+            result = SavedTableConverter.convertTable(inputTableIdentical, m_catalogTable, false, false, true, false);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SavedTableConverter.convert should not have thrown here");
+        }
+
+        assertEquals(5, result.getColumnCount());
+        for (int i = 0; i < 10; i++) {
+            VoltTableRow row = result.fetchRow(i);
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
+            assertEquals(Integer.toString(i), row.getString("HAS_NULLABLE_STRING"));
+            assertEquals(new Double(i), row.getDouble("HAS_NULLABLE_FLOAT"));
+            assertEquals(new Double(i), row.getDouble("HAS_NADA"));
+            assertEquals(VoltType.NULL_BIGINT, row.getLong(CatalogUtil.MIGRATE_HIDDEN_COLUMN_NAME));
+        }
     }
 
     private MockVoltDB m_catalogCreator;

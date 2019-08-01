@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,22 +27,28 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.Sets.SetView;
 
-import junit.framework.Test;
-
 public class TestStopNode extends RegressionSuite
 {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     static LocalCluster m_config;
     static int kfactor = 3;
@@ -113,6 +119,8 @@ public class TestStopNode extends RegressionSuite
         }
     }
 
+    @Test
+    @Flaky(description="TestStopNode.testStopNode")
     public void testStopNode() throws Exception {
         Client client = ClientFactory.createClient();
 
@@ -164,6 +172,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
     public void testStopThreeNodesSimultaneously() throws Exception {
         if (kfactor < 1) return;
 
@@ -211,7 +220,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
-
+    @Test
     public void testConcurrentStopNode() throws Exception {
         if (kfactor < 1) return;
 
@@ -265,6 +274,8 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
+    @Flaky(description="TestStopNode.testStopNodesMoreThanAllowed")
     public void testStopNodesMoreThanAllowed() throws Exception {
         if (kfactor < 1) return;
 
@@ -311,6 +322,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
     public void testMixStopNodeWithNodeFailure() throws Exception {
         if (kfactor < 1) return;
 
@@ -357,12 +369,48 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
+    public void testPrepareStopNode() throws Exception {
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost", m_config.port(0));
+
+        try {
+            client.callProcedure("@PrepareStopNode", 1);
+            final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+            int leaderCount = Integer.MAX_VALUE;
+            long start = System.currentTimeMillis();
+            while (leaderCount > 0) {
+                leaderCount = 0;
+                VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+                while (vt.advanceRow()) {
+                    long partition = vt.getLong("Partition");
+                    if (MpInitiator.MP_INIT_PID == partition) { continue; }
+                    String leader = vt.getString("Leader").split(":")[0];
+                    if (leader.equals("1")) {
+                        leaderCount++;
+                    }
+                }
+                if (leaderCount > 0) {
+                    if (maxSleep < (System.currentTimeMillis() - start)) {
+                        break;
+                    }
+                    try { Thread.sleep(1000); } catch (Exception ignored) { }
+                }
+            }
+            assert(leaderCount == 0);
+        } catch (Exception ex) {
+            //We should not get here
+            ex.printStackTrace();
+            fail();
+        }
+    }
+
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
     }
 
-    static public Test suite() throws IOException {
+    static public junit.framework.Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestStopNode.class);
 
@@ -370,8 +418,9 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
+        m_config = new LocalCluster("teststopnode.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
+        m_config.setDelayBetweenNodeStartup(1000);
         project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);
         assertTrue(success);

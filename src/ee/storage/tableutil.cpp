@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -79,7 +79,7 @@ inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent)
 }
 
 inline int JumpingTableIterator::getTuplesInNextBlock() {
-    assert(getBlockIterator() != m_end);
+    vassert(getBlockIterator() != m_end);
     return getBlockIterator().data()->activeTuples();
 }
 
@@ -88,7 +88,7 @@ inline bool JumpingTableIterator::hasNextBlock() {
 }
 
 inline void JumpingTableIterator::nextBlock() {
-    assert(getBlockIterator() != m_end);
+    vassert(getBlockIterator() != m_end);
     TBPtr currentBlock = getBlockIterator().data();
     auto blockIt = getBlockIterator();
     ++blockIt;
@@ -132,7 +132,7 @@ bool tableutil::getLastTuple(const voltdb::PersistentTable* table, voltdb::Table
         while (it.next(out)) {
             if (idx-- == 0) {
                 voltdb::TableTuple tmp;
-                assert(!it.next(tmp));
+                vassert(!it.next(tmp));
                 return true;
             }
         }
@@ -144,8 +144,8 @@ bool tableutil::getLastTuple(const voltdb::PersistentTable* table, voltdb::Table
 
 void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple)
 {
-    assert(table);
-    assert(tuple);
+    vassert(table);
+    vassert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = table->schema()->getColumnInfo(col_ctr);
         NValue value = ValueFactory::getRandomValue(columnInfo->getVoltType(), columnInfo->length);
@@ -168,7 +168,7 @@ void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple)
 
 bool tableutil::addRandomTuples(Table* table, int num_of_tuples)
 {
-    assert(num_of_tuples >= 0);
+    vassert(num_of_tuples >= 0);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
         TableTuple &tuple = table->tempTuple();
         setRandomTupleValues(table, &tuple);
@@ -190,7 +190,7 @@ bool tableutil::addRandomTuples(Table* table, int num_of_tuples)
 
 bool tableutil::addDuplicateRandomTuples(Table* table, int num_of_tuples)
 {
-    assert(num_of_tuples > 1);
+    vassert(num_of_tuples > 1);
     TableTuple &tuple = table->tempTuple();
     setRandomTupleValues(table, &tuple);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {

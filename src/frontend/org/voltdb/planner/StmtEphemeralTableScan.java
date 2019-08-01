@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -119,7 +120,8 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
                                                 + columnName
                                                 + ", "
                                                 + expr.getDifferentiator()
-                                                + "> in common table expression.  Please notify VoltDB Support.");
+                                                + "> in common table expression. Please update your query.",
+                                            1);
         }
         SchemaColumn schemaCol = getOutputSchema().getColumn(idx);
 

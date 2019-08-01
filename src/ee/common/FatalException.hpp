@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -200,7 +200,7 @@ inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
                 throwFatalLogicErrorStreamed(STREAMABLES);                                    \
             } else {                                                                          \
                 std::cout << STREAMABLES;                                                     \
-                assert(CONDITION);                                                            \
+                vassert(CONDITION);                                                            \
             }                                                                                 \
         }                                                                                     \
     }

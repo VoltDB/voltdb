@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -71,7 +71,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
         }
@@ -96,7 +96,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
             ++i;
@@ -110,7 +110,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
         }

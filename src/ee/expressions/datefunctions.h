@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -682,7 +682,7 @@ template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -726,7 +726,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -761,7 +761,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vect
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -796,7 +796,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -840,7 +840,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<N
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -884,7 +884,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -928,7 +928,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vecto
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -972,7 +972,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vecto
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
@@ -1016,7 +1016,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::vector<NValue>& arguments) {
-    assert (arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& number = arguments[0];
     if (number.isNull()) {

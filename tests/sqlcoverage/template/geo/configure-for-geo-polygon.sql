@@ -39,7 +39,7 @@
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions
 {@optionalfn = "_geofun"}
 {@plus10 = ""} -- You cannot add to a polygon
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "ID, AsText(PT1), AsText(POLY1), AsText(POLY2), AsText(POLY3), RATIO"}
 {@lhsstar = "LHS.ID, AsText(LHS.PT1), AsText(LHS.POLY1), AsText(LHS.POLY2), AsText(LHS.POLY3)"}
 {@updatecolumn = "POLY3"}

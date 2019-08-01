@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -37,14 +37,14 @@ public interface ExportDataProcessor  {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
-    /**
-     * Allow the processor access to the Export logger. Processor may
-     * log to this logger to produce Export category output.
-     * @param logger log4j logger created from VoltDB logger factory.
-     */
-    void addLogger(VoltLogger logger);
-
     void setExportGeneration(ExportGeneration generation);
+
+    /**
+     * Get export client from processor, used by initializing export data source
+     * @param tableName
+     * @return
+     */
+    public ExportClientBase getExportClient(String tableName);
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -72,5 +72,4 @@ public interface ExportDataProcessor  {
      * @param config an instance of {@linkplain Properties}
      */
     public void checkProcessorConfig(Properties config);
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,6 +34,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +44,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Matchers;
@@ -49,6 +52,8 @@ import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
@@ -62,6 +67,9 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(ExportToFileClient.class)
 public class TestExportToFileClient extends ExportClientTestBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
     private static MockVoltDB s_mockVoltDB = new MockVoltDB("foo", "bar");
 
@@ -198,7 +206,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -255,7 +268,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -325,7 +343,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+                ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                int schemaSize = bb.getInt();
+                ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+                bb.getInt(); // row size
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -373,7 +396,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+                ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                int schemaSize = bb.getInt();
+                ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+                bb.getInt(); // row size
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -403,7 +431,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 + "does not exist but cannot be created, or cannot be opened for any other reason");
 
         // throw IOexception first two times on create new FileOutputStream (mock cannot create csv file case)
-        PowerMockito.whenNew(FileOutputStream.class).withArguments(Matchers.anyString(),Matchers.anyBoolean()).
+        PowerMockito.whenNew(FileOutputStream.class).withParameterTypes(File.class, boolean.class).withArguments(Matchers.any(), Matchers.anyBoolean()).
             thenThrow(fnfe).
             thenThrow(fnfe).
             thenReturn(fos);
@@ -422,7 +450,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+                ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                int schemaSize = bb.getInt();
+                ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+                bb.getInt(); // row size
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -459,7 +492,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -512,7 +550,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -542,6 +585,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
     }
 
     @Test
+    @Flaky(description="TestExportToFileClient.testFilenameUnbatchedUnique")
     public void testFilenameUnbatchedUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();
@@ -564,7 +608,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -608,7 +657,12 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);

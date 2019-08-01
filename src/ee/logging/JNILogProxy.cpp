@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "JNILogProxy.h"
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 
 namespace voltdb {
@@ -39,8 +39,8 @@ JNILogProxy* JNILogProxy::getJNILogProxy(JNIEnv *env, JavaVM *vm) {
     };
     checkEnv = NULL;
     jint result = vm->GetEnv( &env_p, JNI_VERSION_1_2);
-    assert(result == JNI_OK);
-    assert(env == checkEnv);
+    vassert(result == JNI_OK);
+    vassert(env == checkEnv);
 #endif
     jclass eeLoggersClassLocal = env->FindClass("org/voltdb/jni/EELoggers");
     jclass eeLoggersClass;
@@ -80,8 +80,8 @@ void JNILogProxy::log(LoggerId loggerId, LogLevel level, const char *statement) 
     };
     checkEnv = NULL;
     jint result = const_cast<JavaVM*>(m_vm)->GetEnv( &env_p, JNI_VERSION_1_2);
-    assert(result == JNI_OK);
-    assert(m_env == checkEnv);
+    vassert(result == JNI_OK);
+    vassert(m_env == checkEnv);
 #endif
     jstring jStatement = m_env->NewStringUTF(statement);
     if (jStatement == NULL) {

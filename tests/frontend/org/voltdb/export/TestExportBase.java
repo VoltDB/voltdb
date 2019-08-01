@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -151,6 +151,10 @@ public class TestExportBase extends RegressionSuite {
                     new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
     };
 
+    public TestExportBase(String s) {
+        super(s);
+    }
+
     /**
      * Wait for export processor to catch up and have nothing to be exported.
      *
@@ -192,9 +196,13 @@ public class TestExportBase extends RegressionSuite {
                     ts = tts;
                 }
                 if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                    long m = stats.getLong("TUPLE_ALLOCATED_MEMORY");
+                    if (0 != m) {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        String ttable = stats.getString("TABLE_NAME");
+                        Long host = stats.getLong("HOST_ID");
+                        Long pid = stats.getLong("PARTITION_ID");
+                        System.out.println("Partition Not Zero: " + ttable + ":" + m  + ":" + host + ":" + pid);
                         break;
                     }
                 }
@@ -218,9 +226,71 @@ public class TestExportBase extends RegressionSuite {
         assertTrue(passed);
     }
 
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void waitForExportAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
 
-    public TestExportBase(String s) {
-        super(s);
+        //Quiesc to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        //Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            long ts = 0;
+            while (stats.advanceRow()) {
+                Long tts = stats.getLong("TIMESTAMP");
+                //Get highest timestamp and watch is change
+                if (tts > ts) {
+                    ts = tts;
+                }
+                if (0 != stats.getLong("TUPLE_PENDING")) {
+                    passedThisTime = false;
+                    System.out.println("Partition Not Zero. pendingTuples:"+stats.getLong("TUPLE_PENDING"));
+                    break;
+                }
+            }
+            if (passedThisTime) {
+                if (ftime == 0) {
+                    ftime = ts;
+                    continue;
+                }
+                //we got 0 stats 2 times in row with diff highest timestamp.
+                if (ftime != ts) {
+                    passed = true;
+                    break;
+                }
+                System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        //System.out.println(stats);
+        assertTrue(passed);
     }
 
+    public void tearDown() throws Exception {
+        super.tearDown();
+    }
 }

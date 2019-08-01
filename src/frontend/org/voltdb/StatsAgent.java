@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,8 +45,8 @@ public class StatsAgent extends OpsAgent
     {
         super("StatsAgent");
         StatsSelector selectors[] = StatsSelector.values();
-        for (int ii = 0; ii < selectors.length; ii++) {
-            m_registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
+        for (StatsSelector selector : selectors) {
+            m_registeredStatsSources.put(selector, new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
         }
     }
 
@@ -519,6 +519,7 @@ public class StatsAgent extends OpsAgent
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:
+        case IDLETIME:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
         case QUEUE:
@@ -561,6 +562,7 @@ public class StatsAgent extends OpsAgent
             stats = collectStats(StatsSelector.COMMANDLOG, false);
             break;
         case IMPORTER:
+        case IMPORT:
             stats = collectStats(StatsSelector.IMPORTER, interval);
             break;
         case DRROLE:
@@ -571,6 +573,9 @@ public class StatsAgent extends OpsAgent
             break;
         case TTL:
             stats = collectStats(StatsSelector.TTL, interval);
+            break;
+        case EXPORT:
+            stats = collectStats(StatsSelector.EXPORT, interval);
             break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
@@ -587,8 +592,11 @@ public class StatsAgent extends OpsAgent
     {
         VoltTable[] stats = null;
 
-        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
+        // TODO: getStatsRowKeyIterator method in NodeStatsSource and PartitionStatsSource has an implicit assumption
+        // that they are going to be called togeher and in the order of NodeStatsSource followed by PartitionStatsSource
+        // call individual stats or out of order could result stale DRPRODUCERPARTITION stats
         VoltTable[] nodeStats = collectStats(StatsSelector.DRPRODUCERNODE, false);
+        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats[0];
@@ -677,13 +685,7 @@ public class StatsAgent extends OpsAgent
                 m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        //putIfAbsent idiom, may return existing map value from another thread
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
-        if (statsSources == null) {
-            statsSources = new NonBlockingHashSet<StatsSource>();
-            siteIdToStatsSources.putIfAbsent(siteId, statsSources);
-        }
-        statsSources.add(source);
+        siteIdToStatsSources.computeIfAbsent(siteId, s -> new NonBlockingHashSet<>()).add(source);
     }
 
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {

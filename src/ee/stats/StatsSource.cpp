@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,7 +16,6 @@
  */
 
 #include "stats/StatsSource.h"
-
 #include "common/executorcontext.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -114,7 +113,7 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     m_interval = interval;
     if (m_statsTable == NULL) {
         VOLT_DEBUG("Table stats for site %" PRId64 ", partition %d is missing", siteId, partitionId);
-        assert (m_statsTable != NULL);
+        vassert(m_statsTable != NULL);
         return NULL;
     }
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
@@ -123,7 +122,6 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(siteId >> 32)));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(partitionId));
     updateStatsTuple(&m_statsTuple);
-
     // this was put in to collect history, but wasn't bounded so it leaked
     // also maybe better to collect history elsewhere
     //m_statsTable->insertTuple(m_statsTuple);

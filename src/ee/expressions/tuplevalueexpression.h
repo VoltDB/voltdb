@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -64,7 +64,7 @@ class TupleValueExpression : public AbstractExpression {
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         if (tuple_idx == 0) {
-            assert(tuple1);
+            vassert(tuple1);
             if ( ! tuple1 ) {
                 throw SerializableEEException("TupleValueExpression::"
                                               "eval:"
@@ -73,7 +73,7 @@ class TupleValueExpression : public AbstractExpression {
             return tuple1->getNValue(value_idx);
         }
         else {
-            assert(tuple2);
+            vassert(tuple2);
             if ( ! tuple2 ) {
                 throw SerializableEEException("TupleValueExpression::"
                                               "eval:"
@@ -93,7 +93,7 @@ class TupleValueExpression : public AbstractExpression {
 
   protected:
 
-    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int tuple_idx;           // which tuple
     const int value_idx;           // which (offset) column of the tuple
 };
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,8 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
-import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import java.io.File;
 
@@ -35,7 +35,6 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltCompiler;
@@ -56,20 +55,24 @@ public class TestConcurrentUpdateCatalog {
 
     private static LocalCluster cluster = null;
     private static VoltProjectBuilder builder = null;
+    private final boolean m_usingCalcite = Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false"));
 
     @Test
     public void testConcurrentUAC() throws Exception {
         init(false, false);
-        ClientImpl client = getClient();
+        Client client = getClient();
 
-        LocalCluster config = new LocalCluster("concurrentCatalogUpdate-cluster-addtable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("concurrentCatalogUpdate-cluster-addtable.jar",
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
         project.setDeadHostTimeout(6);
         assertTrue(config.compile(project));
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addtable.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addtable.xml"));
 
-        config = new LocalCluster("concurrentCatalogUpdate-cluster-addmoretable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("concurrentCatalogUpdate-cluster-addmoretable.jar",
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new VoltProjectBuilder();
         project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
         // Add many tables to make sure this catalog is slow to write
@@ -79,7 +82,8 @@ public class TestConcurrentUpdateCatalog {
         }
         project.setDeadHostTimeout(6);
         assertTrue(config.compile(project));
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addmoretable.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addmoretable.xml"));
 
         String deploymentURL = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-base.xml");
         String newCatalogURL1 = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addtable.jar");
@@ -96,7 +100,7 @@ public class TestConcurrentUpdateCatalog {
     @Test
     public void testConcurrentUpdateClasses() throws Exception {
         init(true, false);
-        ClientImpl client = getClient();
+        Client client = getClient();
 
         InMemoryJarfile jar = new InMemoryJarfile();
         VoltCompiler comp = new VoltCompiler(false);
@@ -120,14 +124,14 @@ public class TestConcurrentUpdateCatalog {
     public void testConcurrentAdHoc() throws Exception {
         init(true, false);
 
-        ClientImpl client  = getClient();
+        Client client  = getClient();
         SyncCallback cb1 = new SyncCallback();
         SyncCallback cb2 = new SyncCallback();
         StringBuilder sb1 = new StringBuilder();
         StringBuilder sb2 = new StringBuilder();
         for (int i = 0; i < 200; i++) {
-            sb1.append("CREATE TABLE T" + Integer.toString(i) + " (ID INT PRIMARY KEY, A INT UNIQUE);");
-            sb2.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+            sb1.append("CREATE TABLE T").append(i).append(" (ID INT PRIMARY KEY, A INT UNIQUE);");
+            sb2.append("CREATE TABLE K").append(i).append(" (ID INT, A INT UNIQUE, B VARCHAR(30));");
         }
         client.callProcedure(cb1, "@AdHoc", sb1.toString());
         client.callProcedure(cb2, "@AdHoc", sb2.toString());
@@ -140,7 +144,7 @@ public class TestConcurrentUpdateCatalog {
         // This is a fake dr cluster
         init(true, true);
 
-        ClientImpl client = getClient();
+        Client client = getClient();
 
         SyncCallback cb1 = new SyncCallback();
         SyncCallback cb2 = new SyncCallback();
@@ -148,20 +152,23 @@ public class TestConcurrentUpdateCatalog {
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 200; i++) {
-            sb.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+            sb.append("CREATE TABLE K").append(i).append(" (ID INT, A INT UNIQUE, B VARCHAR(30));");
         }
         client.callProcedure(cb2, "@AdHoc", sb.toString());
 
         cb1.waitForResponse();
         cb2.waitForResponse();
 
-        // checkResults(cb1, cb2);  // NOTE/TODO: The check is voided because of calling SqlParserFactory.parse(sql) in SqlTaskImpl.java
+        // ENG-16619 The check is voided because of calling SqlParserFactory.parse(sql) in SqlTaskImpl.java
+        if (! m_usingCalcite) {
+            checkResults(cb1, cb2);
+        }
     }
 
     @Test
     public void testConcurrentMixedUpdate() throws Exception {
         init(true, false);
-        ClientImpl client = getClient();
+        Client client = getClient();
 
         SyncCallback cb1 = new SyncCallback();
         SyncCallback cb2 = new SyncCallback();
@@ -177,13 +184,16 @@ public class TestConcurrentUpdateCatalog {
         comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
 
         for (int i = 0; i < 200; i++) {
-            sb.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+            sb.append("CREATE TABLE K").append(i).append(" (ID INT, A INT UNIQUE, B VARCHAR(30));");
         }
 
         client.callProcedure(cb1, "@AdHoc", sb.toString());
         client.callProcedure(cb2, "@UpdateClasses", jar.getFullJarBytes(), null);
 
-        // checkResults(cb1, cb2);  // NOTE/TODO: The check is voided because of calling SqlParserFactory.parse(sql) in SqlTaskImpl.java
+        // ENG-16619 The check is voided because of calling SqlParserFactory.parse(sql) in SqlTaskImpl.java
+        if (! m_usingCalcite) {
+            checkResults(cb1, cb2);
+        }
     }
 
     /*
@@ -215,14 +225,12 @@ public class TestConcurrentUpdateCatalog {
         cluster = null;
     }
 
-    private static ClientImpl getClient() throws Exception {
-        ClientConfig clientConfig = new ClientConfig();
+    private static Client getClient() throws Exception {
+        final ClientConfig clientConfig = new ClientConfig();
         clientConfig.setProcedureCallTimeout(2 * 60 * 1000); // 2 min
-        Client client = ClientFactory.createClient(clientConfig);
+        final Client client = ClientFactory.createClient(clientConfig);
         client.createConnection(cluster.getAdminAddress(1));
-
-        assertTrue(client instanceof ClientImpl);
-        return (ClientImpl) client;
+        return client;
     }
 
     /*
@@ -241,6 +249,6 @@ public class TestConcurrentUpdateCatalog {
         // At least one should fail, it could lead to both failures
         final boolean succ1 = ClientResponse.SUCCESS == cb1.getResponse().getStatus(),
                 succ2 = ClientResponse.SUCCESS == cb2.getResponse().getStatus();
-        assertTrue("At most one call could succeed", ! (succ1 && succ2));
+        assertFalse("At most one call could succeed", succ1 && succ2);
     }
 }

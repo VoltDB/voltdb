@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -64,7 +65,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         LOOKUP_TYPE,
         HAS_OFFSET_RANK,
         PURPOSE,
-        SORT_DIRECTION;
+        SORT_DIRECTION
     }
 
     /**
@@ -77,17 +78,17 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
      */
 
     // The index to use in the scan operation
-    protected String m_targetIndexName;
+    String m_targetIndexName;
 
     // When this expression evaluates to true, we will stop scanning
-    protected AbstractExpression m_endExpression;
+    private AbstractExpression m_endExpression;
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
+    final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
-    protected final List<Boolean> m_compareNotDistinct = new ArrayList<>();
+    final List<Boolean> m_compareNotDistinct = new ArrayList<>();
 
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
@@ -101,24 +102,27 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     // (see setSkipNullPredicate() beblow).
     private AbstractExpression m_skip_null_predicate;
 
+    private AbstractExpression m_partialIndexPredicate = null;
+
     // The overall index lookup operation type
-    protected IndexLookupType m_lookupType = IndexLookupType.EQ;
+    IndexLookupType m_lookupType = IndexLookupType.EQ;
 
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     // offset rank index
-    protected boolean m_hasOffsetRankOptimization = false;
+    private boolean m_hasOffsetRankOptimization = false;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
-    protected Index m_catalogIndex = null;
+    Index m_catalogIndex = null;
 
     private List<AbstractExpression> m_bindings = new ArrayList<>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
     private static final int FOR_DETERMINISM = 3;
+    private static final int FOR_PARTIAL_INDEX = 4;
 
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
@@ -156,87 +160,87 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_tableScan = srcNode.getTableScan();
     }
 
-    public void setSkipNullPredicate() {
+    /**
+     * Calcite needs to know an index of the table associated with this scan to set
+     * it properly for the SkipNullPredicate. Volt planner is capable of resolving table index
+     * using persistent table schema but in case of Calcite, this schema is unavalable and
+     * the index must be passed in as a parameter.
+     *
+     * @param tableIdx- 1 if a scan is an inner scan of the NJIJ. 0 otherwise.
+     */
+    public void setSkipNullPredicate(int tableIdx) {
         // prepare position of non null key
         if (m_lookupType == IndexLookupType.EQ || isReverseScan()) {
             m_skip_null_predicate = null;
-            return;
-        }
-        int searchKeySize = m_searchkeyExpressions.size();
-
-        int nullExprIndex;
-        if (m_endExpression != null &&
-                searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
-            nullExprIndex = searchKeySize;
-        } else if (searchKeySize == 0) {
-            m_skip_null_predicate = null;
-            return;
         } else {
-            nullExprIndex = searchKeySize - 1;
+            final int searchKeySize = m_searchkeyExpressions.size();
+            final int nullExprIndex;
+            if (m_endExpression != null && searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
+                nullExprIndex = searchKeySize;
+            } else if (searchKeySize == 0) {
+                m_skip_null_predicate = null;
+                return;
+            } else {
+                nullExprIndex = searchKeySize - 1;
+            }
+            setSkipNullPredicate(nullExprIndex, tableIdx);
         }
-
-        setSkipNullPredicate(nullExprIndex);
     }
 
-    public void setSkipNullPredicate(int nullExprIndex) {
-        assert(nullExprIndex >= 0);
-
-        m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
-                                                        m_searchkeyExpressions, m_compareNotDistinct);
+    public void setSkipNullPredicate(int nullExprIndex, int tableIdx) {
+        m_skip_null_predicate = buildSkipNullPredicate(
+                nullExprIndex, m_catalogIndex, m_tableScan, tableIdx, m_searchkeyExpressions, m_compareNotDistinct);
     }
 
-    public static AbstractExpression buildSkipNullPredicate(
-            int nullExprIndex, Index catalogIndex, StmtTableScan tableScan,
+    static AbstractExpression buildSkipNullPredicate(
+            int nullExprIndex, Index catalogIndex, StmtTableScan tableScan, int tableIdx,
             List<AbstractExpression> searchkeyExpressions, List<Boolean> compareNotDistinct) {
+        assert nullExprIndex >= 0;
 
-        String exprsjson = catalogIndex.getExpressionsjson();
-        List<AbstractExpression> indexedExprs = null;
+        final String exprsjson = catalogIndex.getExpressionsjson();
+        final List<AbstractExpression> indexedExprs;
         if (exprsjson.isEmpty()) {
             indexedExprs = new ArrayList<>();
 
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
+            final List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
             assert(nullExprIndex < indexedColRefs.size());
             for (int i = 0; i <= nullExprIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(
-                        tableScan.getTableName(), tableScan.getTableAlias(),
-                        col, col.getIndex());
-
+                        tableScan.getTableName(), tableScan.getTableAlias(), col, col.getIndex());
+                tve.setTableIndex(tableIdx);
                 indexedExprs.add(tve);
             }
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
-                assert(nullExprIndex < indexedExprs.size());
+                assert nullExprIndex < indexedExprs.size();
             } catch (JSONException e) {
-                e.printStackTrace();
-                assert(false);
+                throw new PlanningErrorException(e.getCause());
             }
         }
 
         // For a partial index extract all TVE expressions from it predicate if it's NULL-rejecting expression
         // These TVEs do not need to be added to the skipNUll predicate because it's redundant.
-        AbstractExpression indexPredicate = null;
-        Set<TupleValueExpression> notNullTves = null;
-        String indexPredicateJson = catalogIndex.getPredicatejson();
+        final AbstractExpression indexPredicate;
+        final Set<TupleValueExpression> notNullTves = new HashSet<>();
+        final String indexPredicateJson = catalogIndex.getPredicatejson();
         if (!StringUtil.isEmpty(indexPredicateJson)) {
             try {
                 indexPredicate = AbstractExpression.fromJSONString(indexPredicateJson, tableScan);
-                assert(indexPredicate != null);
+                assert indexPredicate != null;
             } catch (JSONException e) {
-                e.printStackTrace();
-                assert(false);
+                throw new PlanningErrorException(e.getCause());
             }
             if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
-                notNullTves = new HashSet<>();
                 notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
             }
         }
 
-        AbstractExpression nullExpr = indexedExprs.get(nullExprIndex);
+        final AbstractExpression nullExpr = indexedExprs.get(nullExprIndex);
         AbstractExpression skipNullPredicate = null;
-        if (notNullTves == null || !notNullTves.contains(nullExpr)) {
+        if (! notNullTves.contains(nullExpr)) {
             List<AbstractExpression> exprs = new ArrayList<>();
             for (int i = 0; i < nullExprIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
@@ -245,24 +249,29 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                         && compareNotDistinct.get(i)) {
                     exprType = ExpressionType.COMPARE_NOTDISTINCT;
                 }
-                AbstractExpression expr = new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone());
-                exprs.add(expr);
+                exprs.add(new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone()));
             }
             // If nullExprIndex fell out of the search key range (there will be no m_compareNotDistinct for it)
             // or m_compareNotDistinct flag says it should ignore null values,
             // then we add "nullExpr IS NULL" to the expression for matching tuples to skip. (ENG-11096)
             if (nullExprIndex == searchkeyExpressions.size()
-                    || compareNotDistinct.get(nullExprIndex) == false) { // nullExprIndex == m_searchkeyExpressions.size() - 1
-                AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-                exprs.add(expr);
-            }
-            else {
+                    || !compareNotDistinct.get(nullExprIndex)) { // nullExprIndex == m_searchkeyExpressions.size() - 1
+                exprs.add(new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null));
+            } else {
                 return null;
             }
-            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
+            skipNullPredicate = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
+    }
+
+    public void setPartialIndexPredicate(AbstractExpression e) {
+        m_partialIndexPredicate = e;
+    }
+
+    public AbstractExpression getPartialIndexPredicate() {
+        return m_partialIndexPredicate;
     }
 
     @Override
@@ -272,12 +281,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     @Override
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
+            Collection<String> indexes) {
         super.getTablesAndIndexes(tablesRead, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
-            assert(m_targetIndexName.length() > 0);
             indexes.add(m_targetIndexName);
         }
     }
@@ -288,7 +295,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
         // There needs to be at least one search key expression
         if (m_searchkeyExpressions.isEmpty()) {
-            throw new Exception("ERROR: There were no search key expressions defined for " + this);
+            throw new PlanningErrorException("ERROR: There were no search key expressions defined for " + this);
         }
 
         // Validate Expression Trees
@@ -314,25 +321,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // would not produce predictably ordered results even when the other table is ordered by all of its display columns
             // but NOT the column used in the equality filter.
             return true;
+        } else {
+            // Assuming (?!) that the relative order of the "multiple entries" in a non-unique index can not be guaranteed,
+            // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
+            // because it would ignore any differences in the entries.
+            // TODO: return true for an index-only scan --
+            // That would require testing for an inline projection node consisting solely
+            // of (functions of?) the indexed columns.
+            m_nondeterminismDetail = "index scan may provide insufficient ordering";
+            return false;
         }
-        // Assuming (?!) that the relative order of the "multiple entries" in a non-unique index can not be guaranteed,
-        // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
-        // because it would ignore any differences in the entries.
-        // TODO: return true for an index-only scan --
-        // That would require testing for an inline projection node consisting solely
-        // of (functions of?) the indexed columns.
-        m_nondeterminismDetail = "index scan may provide insufficient ordering";
-        return false;
     }
 
-    private void setCatalogIndex(Index index)
-    {
+    private void setCatalogIndex(Index index) {
         m_catalogIndex = index;
         m_targetIndexName = index.getTypeName();
     }
 
-    public Index getCatalogIndex()
-    {
+    public Index getCatalogIndex() {
         return m_catalogIndex;
     }
 
@@ -368,16 +374,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
         // Verify that all sort expressions are covered by the consecutive index expressions
         // starting from the first one
-        List<AbstractExpression> indexedExprs = new ArrayList<>();
-        List<ColumnRef> indexedColRefs = new ArrayList<>();
-        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
-                indexedExprs, indexedColRefs);
-        int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
+        final List<AbstractExpression> indexedExprs = new ArrayList<>();
+        final List<ColumnRef> indexedColRefs = new ArrayList<>();
+        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(
+                getCatalogIndex(), getTableScan(), indexedExprs, indexedColRefs);
+        int indexExprCount = columnIndex ? indexedColRefs.size() : indexedExprs.size();
         if (indexExprCount < sortExpressions.size()) {
             // Not enough index expressions to cover all of the sort expressions
             return false;
-        }
-        if (columnIndex) {
+        } else if (columnIndex) {
             for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
                 AbstractExpression sortExpression = sortExpressions.get(idxToCover);
                 if (!isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan())) {
@@ -398,13 +403,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<AbstractExpression> indexedExprs,
             int idxToCover) {
         assert(idxToCover < indexedExprs.size());
-        AbstractExpression indexExpression = indexedExprs.get(idxToCover);
-        List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
+        final AbstractExpression indexExpression = indexedExprs.get(idxToCover);
+        final List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
         if (bindings != null) {
             m_bindings.addAll(bindings);
             return true;
+        } else {
+            return false;
         }
-        return false;
     }
 
     private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,
@@ -416,11 +422,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
         if (tve != null && tableScan.getTableAlias().equals(tve.getTableAlias())) {
             ColumnRef indexColumn = indexedColRefs.get(idxToCover);
-            if (indexColumn.getColumn().getTypeName().equals(tve.getColumnName())) {
-                return true;
-            }
+            return indexColumn.getColumn().getTypeName().equals(tve.getColumnName());
+        } else {
+            return false;
         }
-        return false;
     }
 
     /**
@@ -456,10 +461,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     /**
      * @param endExpression the end expression to set
      */
-    public void setEndExpression(AbstractExpression endExpression)
-    {
-        if (endExpression != null)
-        {
+    public void setEndExpression(AbstractExpression endExpression) {
+        if (endExpression != null) {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
@@ -467,25 +470,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
     }
 
-    public void addEndExpression(AbstractExpression newExpr)
-    {
-        if (newExpr != null)
-        {
-            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
+    public void addEndExpression(AbstractExpression newExpr) {
+        if (newExpr != null) {
+            final List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add(newExpr.clone());
-            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, newEndExpressions);
         }
     }
 
-    public void clearSearchKeyExpression()
-    {
+    public void clearSearchKeyExpression() {
         m_searchkeyExpressions.clear();
     }
 
-    public void addSearchKeyExpression(AbstractExpression expr)
-    {
-        if (expr != null)
-        {
+    public void addSearchKeyExpression(AbstractExpression expr) {
+        if (expr != null) {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
@@ -497,9 +495,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_compareNotDistinct.add(flag);
     }
 
-    public void removeLastSearchKey()
-    {
-        int size = m_searchkeyExpressions.size();
+    public void removeLastSearchKey() {
+        final int size = m_searchkeyExpressions.size();
         if (size <= 1) {
             clearSearchKeyExpression();
         } else {
@@ -509,8 +506,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     // CAUTION: only used in MIN/MAX optimization of reverse scan
     // we know this plan should be chosen, so we can change it safely
-    public void resetPredicate()
-    {
+    public void resetPredicate() {
         m_predicate = null;
     }
 
@@ -541,7 +537,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_hasOffsetRankOptimization = offsetRank;
     }
 
-    public boolean isReverseScan() {
+    boolean isReverseScan() {
         return m_sortDirection == SortDirectionType.DESC ||
                 m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
     }
@@ -584,8 +580,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             m_lookupType != IndexLookupType.EQ &&
             m_lookupType != IndexLookupType.GEO_CONTAINS) {
             keyWidth -= 0.5;
-        }
-        else if (keyWidth == 0.0 && m_endExpression != null) {
+        } else if (keyWidth == 0.0 && m_endExpression != null) {
             // When there is no start key, count an end-key as a single-column range scan key.
 
             // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
@@ -596,16 +591,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     @Override
-    public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-                                     DatabaseEstimates estimates,
-                                     ScalarValueHints[] unusedParamHints) {
+    public void computeCostEstimates(
+            long unusedChildOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
-        // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered
-        // otherwise, count non-equality scans as -0.5 coverage
-        // prefer hash index to tree, all else being equal
-        // prefer partial index, all else being equal
+        // 1. unique, covering index always wins
+        // 2. otherwise, pick the index with the most columns covered
+        // 3. otherwise, count non-equality scans as -0.5 coverage
+        // 4. prefer hash index to tree, all else being equal
+        // 5. prefer partial index, all else being equal
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
@@ -625,38 +619,35 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // -- as if all rows found in the index passed any additional post-filter conditions.
         // This ignoring of post-filter effects is at least consistent with the SeqScanPlanNode.
         // In effect, it gives index scans an "unfair" advantage
-        // -- follow-on sorts (etc.) are costed lower as if they are operating on fewer rows
+        // -- follow-on sorts (etc.) are cost lower as if they are operating on fewer rows
         // than would have come out of the seqscan, though that's nonsense.
         // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but
         // IndexScanPlanNode costing only ignores post-filters.
-        // In any case, it's important to keep this code roughly in synch with any changes to
+        // In any case, it's important to keep this code roughly in sync with any changes to
         // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
-        int tuplesToRead = 0;
+        int tuplesToRead;
 
         // Assign minor priorities for different index types (tiebreakers).
         if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
             tuplesToRead = 2;
-        }
-        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
+        } else if (m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue() ||
+                 m_catalogIndex.getType() == IndexType.BTREE.getValue()) {
             tuplesToRead = 3;
-        }
-        else if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+        } else if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             // "Covering cell" indexes get further special treatment below that tries to
             // properly credit their benefit even when they do not actually eliminate
             // the expensive exact contains post-filter.
             tuplesToRead = 3;
+        } else {
+            throw new PlanningErrorException("No tuple to read");
         }
-        assert(tuplesToRead > 0);
 
         // special case a unique match for the output count
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
-        }
-        else {
-            // If not a unique, covering index, favor (discount)
-            // the choice with the most columns pre-filtered by the index.
-            // Cost starts at 90% of a comparable seqscan AND
+        } else {
+            // If not a unique, covering index, favor (discount) the choice with the most columns
+            // pre-filtered by the index. Cost starts at 90% of a comparable seqscan AND
             // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
             // One intentional benchmark is for a single range-covered
             // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
@@ -671,9 +662,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // "Covering cell" indexes get a special adjustment to make them look more favorable
             // than non-unique range filters in particular.
             // I can't quite justify that rationally, but it "seems reasonable". --paul
+            // Please note this discount only applies when query is checking "geometry contains point"
+            // otherwise geo index can't be used and thus will be given a penalty, worse than seq scan
             if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
-                final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
-                tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
+                if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+                    final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
+                    tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
+                } else {
+                    final double GEO_INDEX_ARTIFICIAL_TUPLE_PENALTY_FACTOR = 10.0;
+                    tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_PENALTY_FACTOR;
+                }
             }
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more
@@ -785,12 +783,22 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // load initial_expression
         m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
         // load searchkey_expressions
-        AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        AbstractExpression.loadFromJSONArrayChild(
+                m_searchkeyExpressions, jobj, Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
         // load COMPARE_NOTDISTINCT flag vector
         loadBooleanArrayFromJSONObject(jobj, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
         // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
+    }
+
+    public boolean isForSortOrderOnly() {
+        return m_searchkeyExpressions.isEmpty() &&
+                m_purpose != FOR_DETERMINISM && m_purpose != FOR_GROUPING &&
+                ! m_hasOffsetRankOptimization;
+    }
+
+    public void setForPartialIndexOnly() {
+        m_purpose = FOR_PARTIAL_INDEX;
     }
 
     @Override
@@ -805,28 +813,29 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
 
         String usageInfo;
-        String predicatePrefix;
+        final String predicatePrefix;
         if (keySize == 0) {
             // The plan is easy to explain if it isn't using indexed expressions.
             // Just explain why an index scan was chosen
             // -- either for determinism or for an explicit ORDER BY requirement.
-            if (m_purpose == FOR_DETERMINISM) {
-                usageInfo = " (for deterministic order only)";
-            }
-            else if (m_purpose == FOR_GROUPING) {
-                usageInfo = " (for optimized grouping only)";
-            }
-            else if (m_hasOffsetRankOptimization) {
-                usageInfo = " (for offset rank lookup and for sort order)";
-            }
-            else {
-                usageInfo = " (for sort order only)";
+            switch (m_purpose) {
+                case FOR_DETERMINISM :
+                    usageInfo = " (for deterministic order only)";
+                    break;
+                case FOR_GROUPING :
+                    usageInfo = " (for optimized grouping only)";
+                    break;
+                case FOR_PARTIAL_INDEX :
+                    usageInfo = " (for partial index only)";
+                    break;
+                default:
+                    usageInfo = m_hasOffsetRankOptimization ?
+                            " (for offset rank lookup and for sort order)" : " (for sort order only)";
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.
             // e.g. " filter by OTHER_COL = 1"
             predicatePrefix = "\n" + indent + " filter by ";
-        }
-        else {
+        } else {
             int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
             String[] asIndexed = new String[indexSize];
             // Not really expecting to need these fall-back labels,
@@ -843,8 +852,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                     Column col = cref.getColumn();
                     asIndexed[cref.getIndex()] = col.getName();
                 }
-            }
-            else {
+            } else {
                 try {
                     List<AbstractExpression> indexExpressions =
                         AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
@@ -852,7 +860,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(getTableNameForExplain());
                     }
-                } catch (JSONException e) {
+                } catch (JSONException ignored) {
                     // If something unexpected went wrong,
                     // just fall back on the positional key labels.
                 }
@@ -867,15 +875,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 // " scan matches for (event_type = 1) AND (event_location = x.region)"
                 if (m_catalogIndex.getUnique()) {
                     usageInfo = "\n" + indent + " uniquely match " + start;
-                }
-                else {
+                } else {
                     usageInfo = "\n" + indent + " scan matches for " + start;
                 }
-            }
-            else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+            } else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
                 usageInfo = "\n" + indent + " scan for " + start;
-            }
-            else {
+            } else {
                 usageInfo = "\n" + indent;
                 if (isReverseScan()) {
                     usageInfo += "reverse ";
@@ -885,8 +890,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
                     usageInfo += "range-scan covering from " + start;
-                }
-                else {
+                } else {
                     usageInfo += String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
                 // Explain the criteria for continuinuing the scan such as
@@ -925,45 +929,42 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     /// Explain that this index scan begins at the "start" of the index
     /// or at a particular key, possibly compound.
-    private String explainSearchKeys(String[] asIndexed, int nCovered)
-    {
+    private String explainSearchKeys(String[] asIndexed, int nCovered) {
         // By default, indexing starts at the start of the index.
         if (m_searchkeyExpressions.isEmpty()) {
             return "start";
         }
         String conjunction = "";
-        String result = "(";
+        StringBuilder result = new StringBuilder("(");
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction + asIndexed[ii] + (m_compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ") +
-                    m_searchkeyExpressions.get(ii).explain(getTableNameForExplain());
+            result.append(conjunction).append(asIndexed[ii]).append(m_compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ")
+                   .append(m_searchkeyExpressions.get(ii).explain(getTableNameForExplain()));
             conjunction = ") AND (";
         }
         // last element
-        result += conjunction + asIndexed[prefixSize] + " ";
+        result.append(conjunction).append(asIndexed[prefixSize]).append(" ");
         if (m_lookupType == IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize)) {
-            result += "NOT DISTINCT";
+            result.append("NOT DISTINCT");
+        } else {
+            result.append(m_lookupType.getSymbol());
         }
-        else {
-            result += m_lookupType.getSymbol();
-        }
-        result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain());
+        result.append(" ").append(m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()));
         if (m_lookupType != IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize)) {
-            result += ", including NULLs";
+            result.append(", including NULLs");
         }
-        result += ")";
-        return result;
+        return result.append(")").toString();
     }
 
     /// Explain that this index scans "to end" of the index
     /// or only "while" an end expression involving indexed key values remains true.
-    private String explainEndKeys()
-    {
+    private String explainEndKeys() {
         // By default, indexing starts at the start of the index.
         if (m_endExpression == null) {
             return " to end";
+        } else {
+            return " while " + m_endExpression.explain(getTableNameForExplain());
         }
-        return " while " + m_endExpression.explain(getTableNameForExplain());
     }
 
     public void setBindings(List<AbstractExpression> bindings) {
@@ -1023,16 +1024,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         AbstractExpression expr = predicates.get(0);
         if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
             return false;
-        }
-        if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
+        } else if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
             return false;
+        } else { // Not reverse scan.
+            return m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
         }
-        // Not reverse scan.
-        if (m_lookupType != IndexLookupType.LT && m_lookupType != IndexLookupType.LTE) {
-            return false;
-        }
-
-        return true;
     }
 
     @Override

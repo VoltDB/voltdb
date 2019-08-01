@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,8 +41,7 @@ public class TestMaxSuite extends RegressionSuite {
     private static String LONG_STRING_TEMPLATE = "This is a long string to test. It will make the client easier "
             + "to generate very long long string.";
     private static int APPEND_TIMES = SQL_TEXT_MAX_LENGTH / LONG_STRING_TEMPLATE.length();
-
-    private static int PARAMETERS_MAX_JOIN = 100;
+    private static int PARAMETERS_MAX_JOIN = 50;
     private static int PARAMETERS_MAX_COLUMN = 1024;
     private static int PARAMETERS_MAX_IN = 6000;
 
@@ -153,27 +153,39 @@ public class TestMaxSuite extends RegressionSuite {
         assertEquals(0, results.fetchRow(0).getLong(0));
     }
 
-    public void testMaxJoin() throws Exception {
+    private Pair<ClientResponse, String> testMaxJoin(int maxJoins) throws Exception {
         final Client client = this.getClient();
 
         ClientResponse resp = null;
+        String errMessage = null;
 
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+        for (int i = 0; i < maxJoins; i++) {
             resp = client.callProcedure("MAX_JOIN_TABLE" + i + ".insert", 1, 1);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
 
         sb = new StringBuilder("select * from ");
-        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+        for (int i = 0; i < maxJoins; i++) {
             sb.append("max_join_table");
             sb.append(i);
-            if (i != PARAMETERS_MAX_JOIN - 1) {
+            if (i != maxJoins - 1) {
                 sb.append(",");
             }
         }
 
-        resp = client.callProcedure("@AdHoc", sb.toString());
+        try {
+            resp = client.callProcedure("@AdHoc", sb.toString());
+        } catch (Exception ex) {
+            errMessage = ex.getMessage();
+        }
+        return Pair.of(resp, errMessage);
+    }
+
+    public void testMaxJoinSuccess() throws Exception {
+        Pair<ClientResponse, String> result = testMaxJoin(PARAMETERS_MAX_JOIN);
+        ClientResponse resp = result.getFirst();
+        assertNotNull(resp);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
         assertEquals(1, resp.getResults().length);
@@ -185,7 +197,7 @@ public class TestMaxSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
+        VoltServerConfig config;
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestMaxSuite.class);
 

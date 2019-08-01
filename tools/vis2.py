@@ -14,18 +14,17 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
 import matplotlib
 matplotlib.use('Agg')
-from matplotlib.colors import rgb2hex
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
-from operator import itemgetter, attrgetter
 import numpy as np
 import csv
 import time
 import datetime
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 NaN = float("nan")
+REFERENCE_BRANCH = 'master'  # this is global but can be modified by the 4th parameter if any
 
 # These are the "Tableau 20" colors as RGB.
 COLORS = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
@@ -47,7 +46,7 @@ APX = 80
 APY = 10
 last = -1
 
-DATA_HEADER = "branch|chart|master-last|master-ma-last|master-stdev|branch-last|no-stdev-vs-master(neg=worse)|pct-vs-master(neg=worse)".split(
+DATA_HEADER = "branch|chart|ref-last|ref-ma-last|ref-stdev|branch-last|#-of-stdev-vs-ref(neg=worse)|pct-vs-ref(neg=worse)".split(
     "|")
 
 branch_colors = {}
@@ -212,18 +211,17 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
     toc = dict()
-    branches_sort = sorted(plot_data.keys())
 
-    if 'master' in branches_sort:
-        branches_sort.remove('master')
-        branches_master_first = ['master'] + branches_sort
+    if REFERENCE_BRANCH in branches_sort:
+        branches_sort.remove(REFERENCE_BRANCH)
+        branches_reference_first = [REFERENCE_BRANCH] + branches_sort
     else:
-        branches_master_first = branches_sort
-        print "WARN: has no master: %s" % title
+        branches_reference_first = branches_sort
+        print "WARN: has no reference: %s" % title
 
-    # loop thru branches, 'master' is first
+    # loop thru branches, 'reference' branch is first
     bn = 0
-    for b in branches_master_first:
+    for b in branches_reference_first:
         bd = plot_data[b]
         bn += 1
         # k is the chart type like lat95, lat99, thpt, etc
@@ -235,7 +233,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             if k not in toc.keys():
                 toc[k] = []
             v = sorted(v, key=lambda x: x[0])
-            # u is the chart data
+            # u is the chart data as [(y values,...), (x values,...)]
             u = zip(*v)
 
             # get the colors and markers
@@ -243,76 +241,74 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 branch_colors[b] = (
                 COLORS[len(branch_colors.keys()) % len(COLORS)], MARKERS[len(branch_colors.keys()) % len(MARKERS)])
 
-            # compute and saved master's average, median, std on raw (all) data
+            # compute and saved reference's average, median, std on raw (all) data
             bdata = Bdata(branch=b, title=title, chart=k, color=None, seriescolor=branch_colors[b][0],
                           seriesmarker=branch_colors[b][1], xdata=u[0], ydata=u[1],
                           last=u[1][-1], avg=np.average(u[1]), median=np.median(u[1]), stdev=np.std(u[1]), ma=[NaN],
-                          ama=NaN, mstd=[NaN],
-                          pctmadiff=NaN, mnstddiff=NaN, failed=None, bgcolor=None)
+                          ama=NaN, mstd=[NaN], mastd=NaN, pctmadiff=NaN, mnstddiff=NaN, failed=None, bgcolor=None,
+                          pctmaxdev=NaN, mnstdmadiff=NaN)
 
             analyze.append(bdata)
 
             # plot the series
             pl.plot(u[0], u[1], bdata.seriescolor, bdata.seriesmarker, bdata.branch, '-')
 
-            # master is processed first, but set this up in case there is no master data for a chart
-            master = analyze[-1]  # remember master
+            # reference is processed first, but set this up in case there is no reference data for a chart
+            reference = analyze[0]  # remember reference
 
             MOVING_AVERAGE_DAYS = 10
 
-            (ma, ama, mstd, mastd) = moving_average(bdata.ydata, MOVING_AVERAGE_DAYS)
+            (ma_series, ma_avg, ma_std_series, ma_std) = moving_average(bdata.ydata, MOVING_AVERAGE_DAYS)
 
-            if len(ma) > MOVING_AVERAGE_DAYS:
-                pl.plot(bdata.xdata, ma, bdata.seriescolor, None, None, ":")
+            # plot the moving average
+            if len(ma_series) > MOVING_AVERAGE_DAYS:
+                pl.plot(bdata.xdata, ma_series, bdata.seriescolor, None, None, ":")
 
-            if b == 'master':
+            # the reference branch
+            if b == REFERENCE_BRANCH:
                 # if we have enough data compute moving average and moving std dev
-                # std is std of data correspoinding to each ma window
+                # std is std of data corresponding to each ma_series window
                 # nb. std is used only in the charts for the 2-sigma line
-                # ama is mean of moving average population
-                # mstd is std of moving average all values
+                # ma_avg is mean of moving average population
+                # ma_std_series is std of moving average all values
 
+                if len(ma_series) >= MOVING_AVERAGE_DAYS:
 
-                if len(ma) >= MOVING_AVERAGE_DAYS:
-
-                    bdata.update(ma=ma, ama=ama, mstd=mstd, mastd=mastd)
-
-                    # plot the moving average
+                    bdata.update(ma=ma_series, ama=ma_avg, mstd=ma_std_series, mastd=ma_std)
 
                     # see if the series should be flagged out of spec
                     failed = 0
                     if polarity == 1:
                         # increasing is bad
-                        bestpoint = np.nanmin(ma)
-                        localminormax = (bdata.xdata[np.nanargmin(ma)], bestpoint)
-                        if b == 'master' and bdata.ma[last] > bdata.median * 1.05:
-                            failed = 1
+                        bestmapoint = np.nanmin(ma_series)
+                        localminormax = (bdata.xdata[np.nanargmin(ma_series)], bestmapoint)
+                        # if b == REFERENCE_BRANCH and bdata.ma[last] > bdata.median * 1.05:
+                        #     failed = 1
                     else:
                         # decreasing is bad
-                        bestpoint = np.nanmax(ma)
-                        localminormax = (bdata.xdata[np.nanargmax(ma)], bestpoint)
-                        if b == 'master' and bdata.ma[last] < bdata.median * 0.95:
-                            failed = 1
+                        bestmapoint = np.nanmax(ma_series)
+                        localminormax = (bdata.xdata[np.nanargmax(ma_series)], bestmapoint)
+                        # if b == REFERENCE_BRANCH and bdata.ma[last] < bdata.median * 0.95:
+                        #     failed = 1
 
-                    # plot the 2-sigma line
+                    # plot the 2-sigma line on the reference series
                     twosigma = np.sum([np.convolve(bdata.mstd, polarity * 2), bdata.ma], axis=0)
                     pl.plot(bdata.xdata, twosigma, bdata.seriescolor, None, None, '-.')
                     pl.ax.annotate(r"$2\sigma$", xy=(bdata.xdata[last], twosigma[last]), xycoords='data',
                                    xytext=(20, 0),
                                    textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
 
-                    # plot the 20% line
+                    # plot the 20% line on the reference series
                     twntypercent = np.sum([np.convolve(bdata.ma, polarity * 0.2), bdata.ma], axis=0)
                     pl.plot(bdata.xdata, twntypercent, bdata.seriescolor, None, None, '-.')
                     pl.ax.annotate(r"20%", xy=(bdata.xdata[last], twntypercent[last]), xycoords='data', xytext=(20, 0),
                                    textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
 
-                    #pctmaxdev = (bestpoint - master.ma[last]) / bestpoint * 100. * polarity  # pct diff min/max
-                    pctmaxdev = (ama - master.ma[last]) / ama * 100. * polarity  # pct diff ma deviation
-                    # pctmedian = (master.ma[last] - bdata.median) / master.median * 100.  #pct diff median
-                    pctmadiff = (master.ma[last] - bdata.ydata[last]) / master.ma[last] * 100. * polarity  # pct diff last vs ma mean
-                    mnstddiff = (master.ma[last] - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
-                    mnstdmadiff = (master.ma[last] - bdata.ydata[last]) / master.mstd[last] * polarity  # no std diff std of most recent window
+                    pctmaxdev = (bestmapoint - reference.ma[last]) / bestmapoint * 100. * polarity  # pct diff min/max
+                    # pctmedian = (reference.ma_series[last] - bdata.median) / reference.median * 100.  #pct diff median
+                    pctmadiff = (reference.ma[last] - bdata.ydata[last]) / reference.ma[last] * 100. * polarity  # pct diff last vs ma_series mean
+                    mnstddiff = (reference.ma[last] - bdata.ydata[last]) / reference.stdev * polarity  # no std diff last vs ma_series
+                    mnstdmadiff = (reference.ma[last] - bdata.ydata[last]) / reference.mstd[last] * polarity  # no std diff std of most recent window
 
                     bdata.update(pctmadiff=pctmadiff, mnstddiff=mnstddiff)
 
@@ -329,13 +325,14 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     failed = False
                     color = None
                     # moving average has degraded by 5+ (yellow) or 10+ (red) pct
-                    # last has degraded from ma (mean) by 5+ or 10+ pcs AND last >= 1.5 stdev off the last mean
+                    # last has degraded from ma_series (mean) by 5+ or 10+ pcs AND last >= 1.5 stdev off the last mean
                     if pctmaxdev <= -10.0 or \
                             pctmadiff <= -10.0 and mnstddiff <= -1.5:
                         color = 'red'
-                    elif  pctmaxdev <= -5.0 or \
+                    elif pctmaxdev <= -5.0 or \
                             pctmadiff > -10.0 and pctmadiff <= -5.0 and mnstddiff <= -1.5:
                         color = 'yellow'
+
                     if color:
                         failed = True
                     print title, b, k, pctmaxdev, pctmadiff, mnstddiff, str(color)
@@ -350,10 +347,10 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     bdata.update(failed=failed, bgcolor=color)
 
                     # annotate value of the best point aka localminormax
-                    pl.ax.annotate("%.2f" % bestpoint, xy=localminormax, xycoords='data', xytext=(0, -10 * polarity),
+                    pl.ax.annotate("%.2f" % bestmapoint, xy=localminormax, xycoords='data', xytext=(0, -10 * polarity),
                                    textcoords='offset points', ha='center', color=bdata.seriescolor, alpha=0.5)
 
-                    # annotate value and percent vs reference point of most recent moving average on master
+                    # annotate value and percent vs reference point of most recent moving average on reference
                     pl.ax.annotate("%.2f" % bdata.ma[last], xy=(bdata.xdata[last], bdata.ma[last]), xycoords='data',
                                    xytext=(5, +5), textcoords='offset points', ha='left', alpha=0.5)
 
@@ -362,11 +359,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                                    textcoords='offset points', ha='left', alpha=0.5)
 
                     # annotation with moving average values
-                    # bdata.update(pctmedian=pctmedian, bestpoint=bestpoint, pctmaxdev=pctmaxdev)
+                    # bdata.update(pctmedian=pctmedian, bestmapoint=bestmapoint, pctmaxdev=pctmaxdev)
+
                     # raw data to the chart
-                    pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma) ma: %.2f'
-                                   ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #mstd) avg(ma):'
-                                   ' %.2f std(ma): %.2f' % (
+                    pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma_series) ma_series: %.2f'
+                                   ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #ma_std_series) avg(ma_series):'
+                                   ' %.2f std(ma_series): %.2f' % (
                                        bdata.seriesmarker, bdata.branch, bdata.bgcolor, len(bdata.ydata),
                                        bdata.ydata[last],
                                        bdata.avg, bdata.stdev, bdata.stdev / bdata.avg * 100., bdata.stdev / bdata.ma[last] * 100.,
@@ -376,13 +374,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                                    color=bdata.seriescolor, fontsize=10, alpha=1.0)
 
             else:
-                # branches comparing to master (no moving average component)
-                if master.ama is not NaN:
-                    pctmadiff = (master.ama - bdata.ydata[
-                        last]) / master.ama * 100. * polarity  # pct diff last vs ma mean
-                    mnstddiff = (master.ama - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
+                # branches comparing to reference
+                if reference.ama is not NaN:
+                    pctmadiff = (reference.ama - bdata.ydata[last]) / reference.ama * 100. * polarity  # pct diff last vs ma_series mean
+                    mnstddiff = (reference.ama - bdata.ydata[last]) / reference.stdev * polarity  # no std diff last vs ma_series
 
-                    color = 'black'
+                    color = None
                     if pctmadiff > -10.0 and pctmadiff <= -5.0:
                         color = 'yellow'
                     elif pctmadiff <= -10.0:
@@ -390,14 +387,22 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     if mnstddiff >= 2.0:
                         color = 'red'
 
+                    bdata.update(ma=ma_series, ama=ma_avg, mstd=ma_std_series, mastd=ma_std)
+
                     bdata.update(bgcolor=color, pctmadiff=pctmadiff, mnstddiff=mnstddiff)
 
-                pl.ax.annotate(
-                    bdata.seriesmarker + ' %s: %s n: %d last %.2f avg: %.2f sdev: %.2f (%.2f%% of ma) no-std-master-avg(ma): %.2f pct-master-avg(ma): %.2f' %
-                    (bdata.branch, bdata.bgcolor, len(bdata.ydata), bdata.ydata[last], bdata.avg, bdata.stdev,
-                     bdata.stdev / master.ama * 100., bdata.mnstddiff, bdata.pctmadiff),
-                    xy=(APX, APY * bn), xycoords='figure points', horizontalalignment='left', verticalalignment='top',
-                    color=bdata.seriescolor, fontsize=10, alpha=1.0)
+                pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma_series) ma_series: %.2f'
+                               ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #ma_std_series) avg(ma_series):'
+                               ' %.2f std(ma_series): %.2f' % (
+                                   bdata.seriesmarker, bdata.branch, bdata.bgcolor, len(bdata.ydata),
+                                   bdata.ydata[last],
+                                   bdata.avg, bdata.stdev, bdata.stdev / bdata.avg * 100.,
+                                   bdata.stdev / bdata.ma[last] * 100.,
+                                   bdata.ma[last], bdata.pctmaxdev, bdata.pctmadiff, bdata.mnstddiff, bdata.mnstdmadiff, bdata.ama,
+                                   bdata.mastd),
+                               xy=(APX, APY * bn),
+                               xycoords='figure points', horizontalalignment='left', verticalalignment='top',
+                               color=bdata.seriescolor, fontsize=10, alpha=1.0)
 
         if len(analyze) == 1:
             pl.ax.annotate(datetime.datetime.today().strftime("%Y/%m/%d %H:%M:%S"), xy=(.20, .95),
@@ -431,6 +436,7 @@ def generate_index_file(filenames, branches):
   </head>
   <body>
     Generated on %s<br>
+    Reference branch is '%s'<br>
     %s
     <table frame="box" width="100%%">
 %s
@@ -491,7 +497,7 @@ def generate_index_file(filenames, branches):
             last_app = i[0]
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
-    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), branches, ''.join(rows))
+    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), REFERENCE_BRANCH, branches, ''.join(rows))
 
 
 def generate_data_file(data, branches, prefix):
@@ -512,7 +518,7 @@ def generate_data_file(data, branches, prefix):
          </table>
          <table frame="box" width="100%%">
          <tr>
-             <th colspan="8"><a name="%s">%s</a></th>
+             <th colspan="8"><a name="%s">%s (vs: %s)</a></th>
          </tr>
             %s
     """
@@ -524,6 +530,7 @@ def generate_data_file(data, branches, prefix):
       </head>
       <body>
         Generated on %s<br>
+        Reference is branch %s<br>
             %s
         <table frame="box" width="100%%">
     %s
@@ -546,62 +553,63 @@ def generate_data_file(data, branches, prefix):
     """
 
     rows = []
-    header2 = DATA_HEADER[1:]
-    #for i in range(0, len(header2) * 2, 2):
-    #    header2.insert(i + 1, header2[i])
-
     last_app = None
     bgcolors = {'black': 'white', 'None': 'white'}
     # data is an numpy ndarray = trouble
+    # i looks like [(branch, flag-color, chart-name, analyze-data...), ...] ie. the analyze tuples
     for d in range(len(data)):
         i = tuple(data[d])
         if i[0] != last_app:
-            rows.append(sep % ((i[0], i[0], hrow % tuple(header2))))
+            rows.append(sep % (i[0], i[0], REFERENCE_BRANCH, hrow % tuple(DATA_HEADER[1:])))
             last_app = i[0]
+        # use the char'ts pass/failed state from its background color to render a flag
+        # the bgcolor can be yellow, red or None.
         bgcolor = bgcolors.get(i[1], i[1] or 'white')
         rows.append(row % ((bgcolor, png_filename(i[2], prefix), i[2]) + tuple([round(x, 3) for x in i[3:]])))
 
-    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), branches, ''.join(rows))
+    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), REFERENCE_BRANCH, branches, ''.join(rows))
+
 
 def png_filename(filename, prefix):
     return prefix + "_" + filename.replace(" ", "_") + ".png"
 
-def moving_average(x, n, type='simple'):
+
+def moving_average(series, window_size, type='simple'):
     """
-    compute an n period moving average.
+    compute an window_size period moving average.
 
     type is 'simple' | 'exponential'
 
     """
 
-    if len(x) < n:
-        return ([], NaN, [], NaN)
+    if len(series) < window_size:
+        return [NaN], NaN, [NaN], NaN
 
-    x = np.asarray(x)
+    series = np.asarray(series)
     if type == 'simple':
-        weights = np.ones(n)
+        weights = np.ones(window_size)
     else:
-        weights = np.exp(np.linspace(-1., 0., n))
+        weights = np.exp(np.linspace(-1., 0., window_size))
 
     weights /= weights.sum()
 
-    a = [NaN]*(n-1) + list(np.convolve(x, weights, mode='valid'))
+    ma_series = [NaN] * (window_size - 1) + list(np.convolve(series, weights, mode='valid'))
 
-    # compute the mean of the moving avearage population
+    # compute the mean of the moving average population
     # over the most recent ma group
-    ama = np.average(a[len(a)-n:])
+    ma_avg = np.average(ma_series[len(ma_series) - window_size:])
 
     # compute the standard deviation of the set of data
     # corresponding to each moving average window
-    s = [NaN]*(n-1)
-    for d in range(0, len(x)-n+1):
-        s.append(np.std(x[d : d+n]))
+    ma_std_series = [NaN]*(window_size - 1)
+    for d in range(0, len(series) - window_size + 1):
+        ma_std_series.append(np.std(series[d: d + window_size]))
 
     # also compute the standard deviation of the moving avg
     # all available data points. scalar result
-    z = np.std(a[n - 1:])
+    ma_std = np.std(ma_series[window_size - 1:])
 
-    return (a, ama, s, z)
+    return (ma_series, ma_avg, ma_std_series, ma_std)
 
 
 def usage():
@@ -619,20 +627,25 @@ def main():
         exit(-1)
 
     if not os.path.exists(sys.argv[1]):
+        print (os.getcwd())
         print sys.argv[1], "does not exist"
-        exit(-1)
+        os.mkdir(sys.argv[1])
+        #exit(-1)
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
     ndays = 2000
     if len(sys.argv) >= 4:
         ndays = int(sys.argv[3])
+    if len(sys.argv) >= 5:
+        global REFERENCE_BRANCH
+        REFERENCE_BRANCH = str(sys.argv[4])
     width = WIDTH
     height = HEIGHT
-    if len(sys.argv) >= 5:
-        width = int(sys.argv[4])
     if len(sys.argv) >= 6:
-        height = int(sys.argv[5])
+        width = int(sys.argv[5])
+    if len(sys.argv) >= 7:
+        height = int(sys.argv[6])
 
     # show all the history
     (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
@@ -650,6 +663,7 @@ def main():
         (study, nodes) = group
         study = study.replace('/', '')
 
+        # if you just want to test one study, put it's name here and uncomment...
         #if study != 'CSV-narrow-ix':
         #    continue
 
@@ -680,18 +694,19 @@ def main():
             fns.append(prefix + fn)
             toc = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate,
                        maxdate, r['polarity'], aanalyze)
-            master = Bdata()
+            reference = Bdata()
             if len(aanalyze):
-                master = aanalyze[0]
+                reference = aanalyze[0]
             for branch in aanalyze:
                 analyze.append(tuple(
-                    [branch['branch'], branch['bgcolor'], branch['title'], master['last'], master['ma'][last], master['stdev'], branch['last'],
+                    [branch['branch'], branch['bgcolor'], branch['title'], reference['last'], reference['ma'][last], reference['stdev'], branch['last'],
                      branch['mnstddiff'], branch['pctmadiff']]))
+
             if toc:
                 tocs.update(toc)
-
-        #if len(analyze)/3 >= 6:
-        #  break
+        # there's an analyze tuple for each chart
+        # if len(analyze)/3 >= 6:
+        #     break
 
         fns.append(iorder)
         fns.append(tocs)
@@ -718,7 +733,7 @@ def main():
         writer = csv.writer(f, delimiter='|')
         writer.writerows(DATA_HEADER)
         aa = np.array(analyze,
-                      dtype=[('branch-name', 'S99'), ('bgcolor', 'S99'), ('file', 'S99'), ('master', float),
+                      dtype=[('branch-name', 'S99'), ('bgcolor', 'S99'), ('file', 'S99'), ('reference', float),
                              ('ma', float), ('std', float), ('branch-last', float), ('nstd', float), ('pct', float)])
         branches = []
         sanalyze = np.sort(aa, order=['branch-name', 'nstd'])
@@ -727,9 +742,10 @@ def main():
                 branches.append(r[0])
         writer.writerows(sanalyze)
 
-    # make convenient links to the branch studies tables
+    # make convenient hlinks to the branch studies tables
     branches = '\n'.join(
-        ["<a href=" + prefix + "-analyze.html#" + b + ">" + b + "</a><br>" for b in sorted(np.unique(branches))])
+        ["<a href=" + prefix + "-analyze.html#" + b + ">" + b + " (vs. " + REFERENCE_BRANCH + ")</a><br>"
+         for b in sorted(np.unique(branches))])
 
     # generate branch study html page
     with open(root_path + '-analyze.html', 'w') as data_file:

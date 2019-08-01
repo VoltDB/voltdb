@@ -163,7 +163,7 @@ public:
   void remove(const value_type& x)
   {
     group* a = &index_to_group[get(id, x) / log_n];
-    assert(groups[get(id, x)] != 0);
+    assert(groups[get(id, x)]);
     a->value = x;
     a->kind = smallest_key;
     promote(a);
@@ -191,7 +191,9 @@ public:
     return !smallest_value || (smallest_value->kind == largest_key);
   }
 
-  bool contains(const value_type& x) const { return groups[get(id, x)]; }
+  bool contains(const value_type& x) const {
+    return static_cast<bool>(groups[get(id, x)]);
+  }
 
   void pop()
   {

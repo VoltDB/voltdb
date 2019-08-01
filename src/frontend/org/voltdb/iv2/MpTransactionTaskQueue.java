@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,6 +50,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     private MpRoSitePool m_sitePool = null;
+
+    private long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -299,17 +301,23 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             Iterator<TransactionTask> it = m_backlog.iterator();
             Set<String> pendingInvocations = new HashSet<>(m_backlog.size()*2);
             if (it.hasNext()) {
-                String procName = it.next().m_txnState.getInvocation().getProcName();
+                String procName = getProcName(it.next());
                 pendingInvocations.add(procName);
                 sb.append("\n\tPENDING: ").append(procName);
             }
             while(it.hasNext()) {
-                String procName = it.next().m_txnState.getInvocation().getProcName();
+                String procName = getProcName(it.next());
                 if (pendingInvocations.add(procName)) {
                     sb.append(", ").append(procName);
                 }
             }
         }
+    }
+
+    private String getProcName(TransactionTask task) {
+        return (task.m_txnState == null) ? "Null txn state" :
+                   (task.m_txnState.getInvocation() == null) ?
+                   "Null invocation" : task.m_txnState.getInvocation().getProcName();
     }
 
     @Override
@@ -318,5 +326,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         StringBuilder sb = new StringBuilder();
         toString(sb);
         return sb.toString();
+    }
+
+    public long getRepairLogTruncationHandle() {
+        return m_repairLogTruncationHandle;
+    }
+
+     public void setRepairLogTruncationHandle(long repairLogTruncationHandle) {
+        m_repairLogTruncationHandle = repairLogTruncationHandle;
     }
 }

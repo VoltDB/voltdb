@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -269,6 +269,12 @@ public abstract class ProcedureCompiler {
             boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
+
+            // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+            if (isSinglePartition && stmt.getText().toUpperCase().startsWith("TRUNCATE")) {
+                throw compiler.new VoltCompilerException("Single partitioned procedure: " +
+                        procedure.getClassname() + " has TRUNCATE statement: \"" + stmt.getText() + "\".");
+            }
 
             // if this was a cache hit or specified single, don't worry about figuring out more partitioning
             if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
@@ -750,6 +756,12 @@ public abstract class ProcedureCompiler {
         for (String curStmt : stmts) {
             // Skip processing 'END' statement in multi-statement procedures
             if (curStmt.equalsIgnoreCase("end")) continue;
+
+            // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+            if (info.isSinglePartition() && curStmt.toUpperCase().startsWith("TRUNCATE")) {
+                throw compiler.new VoltCompilerException("Single partitioned procedure: " +
+                        shortName + " has TRUNCATE statement: \"" + curStmt + "\".");
+            }
 
             // Add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));

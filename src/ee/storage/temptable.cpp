@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -73,8 +73,7 @@ void TempTable::deleteAllTempTupleDeepCopies() {
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         TableTuple target(m_schema);
         TableIterator iter(this, m_data.begin(), false);
-        while (iter.hasNext()) {
-            iter.next(target);
+        while (iter.next(target)) {
             target.freeObjectColumns();
         }
     }

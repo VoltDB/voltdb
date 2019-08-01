@@ -4,8 +4,8 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true" target="file">
-        <configuration>
+    <export>
+        <configuration enabled="true" target="ABC">
             <property name="type">csv</property>
             <property name="with-schema">false</property>
             <property name="batched">false</property>

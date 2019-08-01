@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,7 @@ import java.util.Map;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestEELibraryLoaderSuite extends RegressionSuite {
@@ -63,7 +63,7 @@ public class TestEELibraryLoaderSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         Map<String, String> additionalEnv = new HashMap<>();
-        additionalEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+        additionalEnv.put(NativeLibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
         config = new LocalCluster("ee-library-loader",
                 SITES, HOSTS, KFACTOR,
                 BackendTarget.NATIVE_EE_JNI,

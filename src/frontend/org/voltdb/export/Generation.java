@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,12 @@
 package org.voltdb.export;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 
-import org.voltcore.messaging.HostMessenger;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -27,15 +30,23 @@ import org.voltcore.messaging.HostMessenger;
  */
 public interface Generation {
 
-    public void acceptMastership(int partitionId);
-    public void close(final HostMessenger messenger);
+    public void becomeLeader(int partitionId);
+    public void close();
 
-    public long getQueuedExportBytes(int partitionId, String signature);
-    public void onSourceDone(int partitionId, String signature);
+    public List<ExportStatsRow> getStats(boolean interval);
+    public void onSourceDrained(int partitionId, String tableName);
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync);
-    public void pushEndOfStream(int partitionId, String signature);
-    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
+    public void pushExportBuffer(int partitionId, String signature,
+                                long seqNo, long committedSeqNo, int tupleCount,
+                                 long uniqueId, ByteBuffer buffer);
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                StreamStartAction action,
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
+                                                boolean isLowestSite);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
+
+    public int getCatalogVersion();
+
+    public void updateGenerationId(long genId);
 }

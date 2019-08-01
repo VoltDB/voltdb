@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -349,7 +349,7 @@ public class MeshProber implements JoinAcceptor {
     }
 
     @Override
-    public void detract(int hostId) {
+    public void detract(ZooKeeper zooKeeper, int hostId) {
         checkArgument(hostId >= 0, "host id %s is not greater or equal to 0", hostId);
         Map<Integer,HostCriteria> expect;
         Map<Integer,HostCriteria> update;
@@ -360,6 +360,7 @@ public class MeshProber implements JoinAcceptor {
                 .putAll(Maps.filterKeys(expect, not(equalTo(hostId))))
                 .build();
         } while (!m_hostCriteria.compareAndSet(expect, update));
+        CoreZK.removeRejoinNodeIndicatorForHost(zooKeeper, hostId);
     }
 
     @Override
@@ -717,24 +718,32 @@ public class MeshProber implements JoinAcceptor {
 
         @Override @Generated("by eclipse's equals and hashCode source generators")
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             Determination other = (Determination) obj;
-            if (hostCount != other.hostCount)
+            if (hostCount != other.hostCount) {
                 return false;
-            if (paused != other.paused)
+            }
+            if (paused != other.paused) {
                 return false;
-            if (startAction != other.startAction)
+            }
+            if (startAction != other.startAction) {
                 return false;
+            }
             if (terminusNonce == null) {
-                if (other.terminusNonce != null)
+                if (other.terminusNonce != null) {
                     return false;
-            } else if (!terminusNonce.equals(other.terminusNonce))
+                }
+            } else if (!terminusNonce.equals(other.terminusNonce)) {
                 return false;
+            }
             return true;
         }
 

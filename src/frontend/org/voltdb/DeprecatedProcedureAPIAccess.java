@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 
 /**
  * Version 6.0 removes some long deprecated functions from {@link org.voltdb.VoltProcedure VoltProcedure}.
@@ -71,40 +72,18 @@ public abstract class DeprecatedProcedureAPIAccess {
      *
      * @deprecated This method is not fully tested to be used in all contexts.
      * @param procedure {@link org.voltdb.VoltProcedure VoltProcedure} instance on which to access deprecated method.
-     * @param clusterName Name of the cluster containing the database, containing the table
-     *                    that the records will be loaded in.
-     * @param databaseName Name of the database containing the table to be loaded.
      * @param tableName Name of the table records should be loaded in.
      * @param data {@link org.voltdb.VoltTable VoltTable} containing the records to be loaded.
      *             {@link org.voltdb.VoltTable.ColumnInfo VoltTable.ColumnInfo} schema must match the schema of the table being
      *             loaded.
-     * @param returnUniqueViolations If true will not fail on unique violations, will return the violating rows.
-     * @return A byte array representing constraint violations in a semi-opaque format.
      * @throws VoltAbortException on failure.
      */
     @Deprecated
-    public static byte[] voltLoadTable(VoltProcedure procedure,
-                                String clusterName,
-                                String databaseName,
-                                String tableName,
-                                VoltTable data,
-                                boolean returnUniqueViolations,
-                                boolean shouldDRStream)
-    throws VoltAbortException
-    {
-        return voltLoadTable(procedure, clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream, false);
-    }
-
-    public static byte[] voltLoadTable(VoltProcedure procedure,
-                                       String clusterName,
-                                       String databaseName,
+    public static void voltLoadTable(VoltProcedure procedure,
                                        String tableName,
-                                       VoltTable data,
-                                       boolean returnUniqueViolations,
-                                       boolean shouldDRStream,
-                                       boolean undo)
+                                       VoltTable data)
             throws VoltAbortException
     {
-        return procedure.m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream, undo);
+        procedure.m_runner.voltLoadTable(tableName, data, LoadTableCaller.CLIENT);
     }
 }

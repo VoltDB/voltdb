@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -56,13 +57,13 @@ import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.ProClass;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -111,8 +112,9 @@ public class Inits {
                 catch (InterruptedException e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-                if (iw instanceof COMPLETION_WORK)
+                if (iw instanceof COMPLETION_WORK) {
                     return;
+                }
                 //hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
@@ -135,8 +137,12 @@ public class Inits {
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
         for (Class<?> cls : declaredClasses) {
             // skip base classes and fake classes
-            if (cls == InitWork.class) continue;
-            if (cls == COMPLETION_WORK.class) continue;
+            if (cls == InitWork.class) {
+                continue;
+            }
+            if (cls == COMPLETION_WORK.class) {
+                continue;
+            }
 
             if (InitWork.class.isAssignableFrom(cls)) {
                 InitWork instance = null;
@@ -395,12 +401,19 @@ public class Inits {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0)) {
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
+            }
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
+            try {
+                catalog.execute(serializedCatalog);
+            } catch (CatalogException e) {
+                // Disallow recovering from an incompatible Enterprise catalog.
+                VoltDB.crashLocalVoltDB(e.getLocalizedMessage());
+            }
+
             serializedCatalog = null;
 
             // note if this fails it will print an error first
@@ -446,7 +459,8 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
+                        DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole()),
+                        m_rvdb.getConfig().m_startAction))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
@@ -467,24 +481,10 @@ public class Inits {
 
             if (logConfig.getEnabled()) {
                 if (m_config.m_isEnterprise) {
-                    try {
-                        Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
-                                                                   "Command logging", false);
-                        if (loggerClass != null) {
-                            final Constructor<?> constructor = loggerClass.getConstructor(boolean.class,
-                                                                                          int.class,
-                                                                                          int.class,
-                                                                                          String.class,
-                                                                                          String.class);
-                            m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
-                                                                                       logConfig.getFsyncinterval(),
-                                                                                       logConfig.getMaxtxns(),
-                                                                                       VoltDB.instance().getCommandLogPath(),
-                                                                                       VoltDB.instance().getCommandLogSnapshotPath());
-                        }
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
-                    }
+                    m_rvdb.m_commandLog = ProClass.newInstanceOf("org.voltdb.CommandLogImpl", "Command logging",
+                            ProClass.HANDLER_LOG, logConfig.getSynchronous(), logConfig.getFsyncinterval(),
+                            logConfig.getMaxtxns(), VoltDB.instance().getCommandLogPath(),
+                            VoltDB.instance().getCommandLogSnapshotPath());
                 }
             }
         }
@@ -497,19 +497,13 @@ public class Inits {
         @Override
         public void run() {
             if (m_config.m_isEnterprise && m_deployment.getSnmp() != null && m_deployment.getSnmp().isEnabled()) {
-                try {
-                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.snmp.SnmpTrapSenderImpl",
-                                                               "SNMP Adapter", false);
-                    if (loggerClass != null) {
-                        final Constructor<?> constructor = loggerClass.getConstructor();
-                        m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
+                m_rvdb.m_snmp = ProClass.newInstanceOf("org.voltdb.snmp.SnmpTrapSenderImpl", "SNMP Adapter",
+                        ProClass.HANDLER_LOG);
+                if (m_rvdb.m_snmp != null) {
                         m_rvdb.m_snmp.initialize(
                                 m_deployment.getSnmp(),
                                 m_rvdb.getHostMessenger(),
                                 m_rvdb.getCatalogContext().cluster.getDrclusterid());
-                    }
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);
                 }
             }
         }
@@ -526,8 +520,8 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, m_config.m_sslContextFactory, mustListen
-                            );
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort,
+                            m_config.m_sslContextFactory, mustListen);
                     success = true;
                     break;
                 } catch (Exception e1) {
@@ -600,8 +594,9 @@ public class Inits {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
             // allow command line override
-            if (m_config.m_adminPort > 0)
+            if (m_config.m_adminPort > 0) {
                 adminPort = m_config.m_adminPort;
+            }
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
             //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
@@ -776,12 +771,12 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-                if (catalog != null) {
-                    m_statusTracker.setNodeState(NodeState.RECOVERING);
-                }
+
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others.
                 if (catalog != null) {
+                    m_statusTracker.set(NodeState.RECOVERING);
+
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
@@ -808,9 +803,10 @@ public class Inits {
                                 // when c/l is disabled resolves this issue.
                                 if (clenabled == true && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                                     VoltDB.crashLocalVoltDB(String.format(
-                                            "Unable to load version %s catalog \"%s\" "
-                                                    + "from snapshot into a version %s server.",
-                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                                "Cannot load command logs from one version (%s) into a different version of VoltDB (%s). " +
+                                                "To upgrade the VoltDB software, first use \"voltadmin shutdown --save\", then " +
+                                                "upgrade and restart.", catalogVersion, serverVersion),
+                                            false, null);
                                     return;
                                 }
                                 // upgrade the catalog - the following will save the recpmpiled catalog

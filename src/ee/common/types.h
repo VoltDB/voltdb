@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -139,6 +139,8 @@ enum ConstraintType {
     CONSTRAINT_TYPE_PRIMARY_KEY    = 4,
     CONSTRAINT_TYPE_NOT_NULL       = 5,
     CONSTRAINT_TYPE_PARTITIONING   = 6,
+    CONSTRAINT_TYPE_LIMIT          = 7,                    // org.voltdb.types.ConstraintType.java
+    CONSTRAINT_TYPE_NUMERIC        = 8,
 };
 
 // ------------------------------------------------------------------
@@ -186,6 +188,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_NESTLOOP         = 20,
     PLAN_NODE_TYPE_NESTLOOPINDEX    = 21,
+    PLAN_NODE_TYPE_MERGEJOIN        = 22,
 
     //
     // Operator Nodes
@@ -195,6 +198,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
     PLAN_NODE_TYPE_SWAPTABLES       = 34,
+    PLAN_NODE_TYPE_MIGRATE          = 35,
 
     //
     // Communication Nodes
@@ -400,11 +404,6 @@ enum TableStreamType {
     // was used for TABLE_STREAM_ELASTIC_INDEX_READ.
     TABLE_STREAM_ELASTIC_INDEX_CLEAR,
 
-    // Table stream types that don't use predicates.
-    // Add new non-predicate types below TABLE_STREAM_RECOVERY so
-    // that tableStreamTypeHasPredicates() doesn't have to change.
-    TABLE_STREAM_RECOVERY,
-
     // Table stream type provided when no stream is active.
     TABLE_STREAM_NONE = -1
 };
@@ -432,13 +431,6 @@ inline bool tableStreamTypeIsSnapshot(TableStreamType streamType) {
 }
 
 /**
- * Return true if the table stream type is for recovery.
- */
-inline bool tableStreamTypeIsRecovery(TableStreamType streamType) {
-    return streamType == TABLE_STREAM_RECOVERY;
-}
-
-/**
  * Return true if the table stream type valid.
  */
 inline bool tableStreamTypeIsValid(TableStreamType streamType) {
@@ -455,33 +447,6 @@ inline bool tableStreamTypeIsStreamIndexing(TableStreamType streamType) {
 enum StatisticsSelectorType {
     STATISTICS_SELECTOR_TYPE_TABLE,
     STATISTICS_SELECTOR_TYPE_INDEX
-};
-
-// ------------------------------------------------------------------
-// Recovery protocol message types
-// ------------------------------------------------------------------
-enum RecoveryMsgType {
-    /*
-     * Message containing freshly scanned tuples to be inserted
-     */
-    RECOVERY_MSG_TYPE_SCAN_TUPLES = 0,
-    /*
-     * Message indicating that the table scan is complete, future polling
-     * will produce delta data
-     */
-    RECOVERY_MSG_TYPE_SCAN_COMPLETE = 1,
-    /*
-     * Message containing whole tuples that are either updates or inserts
-     */
-    RECOVERY_MSG_TYPE_DELTA_MERGE_TUPLES = 2,
-    /*
-     * Message containing primary keys that must be deleted
-     */
-    RECOVERY_MSG_TYPE_DELTA_DELETE_PKEYS = 3,
-    /*
-     * Generated when all recovery data for a table has been generated
-     */
-    RECOVERY_MSG_TYPE_COMPLETE = 4
 };
 
 // ------------------------------------------------------------------
@@ -520,6 +485,7 @@ enum DREventType {
 // Types of DR records
 // ------------------------------------------------------------------
 enum DRRecordType {
+    DR_RECORD_INVALID = -1,
     DR_RECORD_INSERT = 0,
     DR_RECORD_DELETE = 1,
     DR_RECORD_UPDATE = 2,
@@ -541,14 +507,6 @@ enum DRTxnPartitionHashFlag {
     TXN_PAR_HASH_MULTI = 3,       // txn contains multiple partition key hashes
     TXN_PAR_HASH_SPECIAL = 4      // txn contains TRUNCATE_TABLE record(s)
 };
-
-// ------------------------------------------------------------------
-// Masks for DR records type and DR transaction partition hash flag
-// ------------------------------------------------------------------
-// Keep sync with Java REPLICATED_TABLE_MASK at PartitionDRGateway.java
-// This mask uses -128 which corresponds to 0x80
-// The first bit is set with this mask to indicate that subsequent records are for replicated tables
-static const int8_t REPLICATED_TABLE_MASK = INT8_MIN;
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
     // Warning: Currently, the PersistentTableUndo*Actions rely on
@@ -609,6 +567,99 @@ enum DRConflictOnPK {
     NOT_CONFLICT_ON_PK,
     CONFLICT_ON_PK,
 };
+
+/*
+ * Keep it sync with frontend/org/voltdb/TableType.java
+ */
+enum TableType {
+     // This will be unset and hence 0 for pre-9.0 catalogs
+     INVALID = 0,
+
+      // Regular PersistentTable
+     PERSISTENT = 1,
+
+      // StreamTable without ExportTupleStream
+     CONNECTOR_LESS_STREAM = 2,
+
+     // StreamTable with ExportTupleStream
+     STREAM = 3,
+
+     // PersistentTable with associated Stream for migrating DELETES
+     PERSISTENT_MIGRATE  = 4,
+
+     // PersistentTable with associated Stream for linking INSERTS
+     PERSISTENT_EXPORT_INSERT = 8,
+     PERSISTENT_EXPORT_DELETE = 16,
+     PERSISTENT_EXPORT_UPDATE_OLD = 32,
+     PERSISTENT_EXPORT_UPDATE_NEW = 64,
+     PERSISTENT_EXPORT_INSERT_DELETE = PERSISTENT_EXPORT_INSERT +
+                                       PERSISTENT_EXPORT_DELETE,
+     PERSISTENT_EXPORT_INSERT_UPDATEold = PERSISTENT_EXPORT_INSERT +
+                                          PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_DELETE_UPDATEold = PERSISTENT_EXPORT_DELETE +
+                                          PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATEold = PERSISTENT_EXPORT_INSERT_DELETE +
+                                                 PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_INSERT_UPDATEnew = PERSISTENT_EXPORT_INSERT +
+                                          PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_DELETE_UPDATEnew = PERSISTENT_EXPORT_DELETE +
+                                          PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATEnew = PERSISTENT_EXPORT_INSERT_DELETE +
+                                                 PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_UPDATE = PERSISTENT_EXPORT_UPDATE_OLD + PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_INSERT_UPDATE = PERSISTENT_EXPORT_INSERT +
+                                       PERSISTENT_EXPORT_UPDATE,
+     PERSISTENT_EXPORT_DELETE_UPDATE = PERSISTENT_EXPORT_DELETE +
+                                       PERSISTENT_EXPORT_UPDATE,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATE = PERSISTENT_EXPORT_INSERT_DELETE +
+                                              PERSISTENT_EXPORT_UPDATE,
+};
+
+inline bool tableTypeIsExportStream(TableType tableType) {
+    return tableType == STREAM;
+}
+
+inline bool tableTypeIsConnectorLessStream(TableType tableType) {
+    return tableType == CONNECTOR_LESS_STREAM;
+}
+
+inline bool tableTypeIsStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) ||
+            tableTypeIsConnectorLessStream(tableType);
+}
+
+inline bool isTableWithExport(TableType tableType) {
+    return tableType >= PERSISTENT_EXPORT_INSERT;
+}
+
+inline bool isTableWithExportInserts(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_INSERT);
+}
+
+inline bool isTableWithExportDeletes(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_DELETE);
+}
+
+inline bool isTableWithExportUpdateOld(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_UPDATE_OLD);
+}
+
+inline bool isTableWithExportUpdateNew(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_UPDATE_NEW);
+}
+
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType >= PERSISTENT_EXPORT_INSERT;
+}
+
+inline bool tableTypeNeedsTupleStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) || isTableWithStream(tableType);
+}
+
+inline bool isTableWithMigrate(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE;
+}
+
 
 // ------------------------------------------------------------------
 // Utility functions.

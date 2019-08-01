@@ -2,7 +2,7 @@
 
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -130,6 +130,15 @@ for s in "$@"; do
     programOPTS+=("${s}")
   fi
 done
+
+JAVA_MAJOR_VERSION=$("$JAVA" -version 2>&1 | sed -E -n 's/.* version "([0-9]+).*/\1/p')
+#echo $JAVA_MAJOR_VERSION
+if [[ "$JAVA_MAJOR_VERSION" -ge 11 ]]; then
+    jvmOPTS+=("--add-opens" "java.base/java.lang=ALL-UNNAMED")
+    jvmOPTS+=("--add-opens" "java.base/sun.nio.ch=ALL-UNNAMED")
+    jvmOPTS+=("--add-opens" "java.base/java.net=ALL-UNNAMED")
+    jvmOPTS+=("--add-opens" "java.base/java.nio=ALL-UNNAMED")
+fi
 
 jvmOPTS+=("-Xmx512m" "-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH}")
 jvmOPTS+=("-classpath" "${CLASSPATH}" "org.voltdb.utils.SQLCommand")

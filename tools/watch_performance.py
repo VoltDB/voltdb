@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -32,7 +32,33 @@ import time
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),"lib","python"))
 import voltdbclient
 
-parser = argparse.ArgumentParser(description="This script is used to monitor current performance metrics.")
+def print_usage():
+    # replaces the standard argparse-generated usage to include definitions of the output columns
+    return '''watch_performance.py
+
+Output column definitions:
+  time:          current local time
+  procedure:     name of each procedure that was executed in this interval
+  label:         SP (single partition), MP (multi-partition), RO (read-only), RW (read-write)
+  exec_pct:      percentage of the overall procedure execution workload during this interval
+  invocations:   # of executed transactions in the last interval
+  txn/sec:       rate of transactions in the last interval
+  exec_ms:       average execution time in fractional milliseconds
+                  (since the last schema change, not just for this interval)
+  lat_ms:        servers-side latency in milliseconds, including wait time
+                  (from the last of possibly multiple hosts that initiated this procedure)
+  c:             total partition execution time / elapsed time
+                  (1.0 means one ideal partition worked these invocations the entire interval)
+  cpu:           percentage CPU usage
+  partitions:    fraction of partitions that executed this procedure during this interval
+  skew:          coefficient of variance for the # of invocations executed by each partition
+                  (0 is exactly even, > 1 is very skewed)
+  inMB/s:        MB/s passed in as procedure invocation parameters
+  outMB/s:       MB/s returned as results of procedure invocations
+'''
+
+
+parser = argparse.ArgumentParser(description="This script is used to monitor current performance metrics.", usage=print_usage())
 parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server', default='localhost')
 parser.add_argument('-p', '--port', help='Port number of VoltDB server', type=int, default=21211)
 parser.add_argument('-u', '--username', help='User name (if security is enabled)', default='')
@@ -41,7 +67,7 @@ parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics
 parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', type=int, default=30)
 args = parser.parse_args()
 
-client = voltdbclient.FastSerializer(args.server, args.port, args.username, args.password)
+client = voltdbclient.FastSerializer(args.server, args.port, False, args.username, args.password)
 
 # procedure call response error handling
 def check_response(response):
@@ -186,6 +212,8 @@ print "-------- ---------------------------------------- ----- -------- --------
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
 end_time = start_time + args.duration * 60
+proc_labels = get_proc_labels()
+
 while end_time > time.time():
 
     partition_proc_stats.clear()
@@ -196,7 +224,6 @@ while end_time > time.time():
     # gather cpu and latency metrics
     cpu = get_cpu()
     latencies = get_latencies()
-    proc_labels = get_proc_labels()
 
     total_exec_millis = 0.0
 

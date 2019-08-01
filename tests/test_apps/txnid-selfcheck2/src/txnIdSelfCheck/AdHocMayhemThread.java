@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -72,8 +72,12 @@ public class AdHocMayhemThread extends BenchmarkThread {
             }
         }
 
-        sql += nextWriteAdHocStmt(replicated);
-
+        // every 10th, generate an error
+        if (counter % 10 == 1) {
+            sql += nextWriteAdHocFailureStmt(replicated);
+        } else {
+            sql += nextWriteAdHocStmt(replicated);
+        }
         if (batched) {
             if (rwMix == 2) {
                 sql += nextReadAdHocStmt(replicated);
@@ -94,6 +98,20 @@ public class AdHocMayhemThread extends BenchmarkThread {
         if (!replicated) {
             sql += " where id = " + r.nextInt(10);
         }
+        sql += ";";
+
+        return sql;
+    }
+
+    /* this should cause a constraint violation */
+    private String nextWriteAdHocFailureStmt(boolean replicated) {
+        String sql = "insert into ";
+        sql += replicated ? " adhocr " : " adhocp";
+        sql += " (id, ts, inc, jmp) values(";
+        sql += r.nextInt(10) +",";
+        sql += new Date().getTime() + ",";
+        sql += "0,";
+        sql += r.nextInt(10)+")";
         sql += ";";
 
         return sql;

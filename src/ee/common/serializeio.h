@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -55,7 +55,7 @@
 #include <iostream>
 #include <exception>
 #include <arpa/inet.h>
-#include <cassert>
+#include <common/debuglog.h>
 #include <boost/ptr_container/ptr_vector.hpp>
 
 #include "bytearray.h"
@@ -183,7 +183,7 @@ public:
         const char* result = current_;
         current_ += length;
         // TODO: Make this a non-optional check?
-        assert(current_ <= end_);
+        vassert(current_ <= end_);
         return result;
     }
 
@@ -194,7 +194,7 @@ public:
     /** Copy a string from the buffer. */
     inline std::string readTextString() {
         int32_t stringLength = readInt();
-        assert(stringLength >= 0);
+        vassert(stringLength >= 0);
         return std::string(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
     };
@@ -202,7 +202,7 @@ public:
     /** Copy a ByteArray from the buffer. */
     inline ByteArray readBinaryString() {
         int32_t stringLength = readInt();
-        assert(stringLength >= 0);
+        vassert(stringLength >= 0);
         return ByteArray(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
     };
@@ -254,7 +254,7 @@ protected:
     /** Set the buffer to buffer with capacity. Note this does not change the position. */
     void initialize(void* buffer, size_t capacity) {
         buffer_ = reinterpret_cast<char*>(buffer);
-        assert(position_ <= capacity);
+        vassert(position_ <= capacity);
         capacity_ = capacity;
     }
     void setPosition(size_t position) {
@@ -307,7 +307,7 @@ public:
     }
 
     inline void writeEnumInSingleByte(int value) {
-        assert(std::numeric_limits<int8_t>::min() <= value &&
+        vassert(std::numeric_limits<int8_t>::min() <= value &&
                 value <= std::numeric_limits<int8_t>::max());
         writeByte(static_cast<int8_t>(value));
     }
@@ -397,7 +397,7 @@ public:
     does not affect the current write position.  * @return offset +
     length */
     inline size_t writeBytesAt(size_t offset, const void *value, size_t length) {
-        assert(offset + length <= position_);
+        vassert(offset + length <= position_);
         memcpy(buffer_ + offset, value, length);
         return offset + length;
     }
@@ -440,7 +440,7 @@ private:
         if (minimum_desired > capacity_) {
             expand(minimum_desired);
         }
-        assert(capacity_ >= minimum_desired);
+        vassert(capacity_ >= minimum_desired);
     }
 
     // Beginning of the buffer.
@@ -584,7 +584,7 @@ protected:
     /** Resize this buffer to contain twice the amount desired. */
     virtual void expand(size_t minimum_desired) {
         size_t next_capacity = (bytes_.length() + minimum_desired) * 2;
-        assert(next_capacity < static_cast<size_t>(std::numeric_limits<int>::max()));
+        vassert(next_capacity < static_cast<size_t>(std::numeric_limits<int>::max()));
         bytes_.copyAndExpand(static_cast<int>(next_capacity));
         initialize(bytes_.data(), next_capacity);
     }

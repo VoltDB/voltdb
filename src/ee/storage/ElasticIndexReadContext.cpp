@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,8 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         const std::vector<std::string> &predicateStrings) :
     TableStreamerContext(table, surgeon, partitionId),
     m_predicateStrings(predicateStrings),
-    m_materialized(false)
+    m_materialized(false),
+    m_filter(HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, table.schema()))
 {}
 
 /**
@@ -141,7 +142,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                 // output.
                 if (!tuple.isPendingDelete()) {
                     // Write the tuple.
-                    yield = outputStreams.writeRow(tuple);
+                    yield = outputStreams.writeRow(tuple, m_filter);
                 } else {
                     throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }
@@ -209,7 +210,7 @@ bool ElasticIndexReadContext::parseHashRange(
                                                  boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
             }
-            catch(boost::bad_lexical_cast) {
+            catch(const boost::bad_lexical_cast&) {
                 char errMsg[1024 * 16];
                 snprintf(errMsg, 1024 * 16,
                          "Unable to parse ElasticIndexReadContext predicate \"%s\".",

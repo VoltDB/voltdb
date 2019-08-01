@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.lang.reflect.Method;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -173,7 +174,12 @@ public class VoltLogger {
         }
 
         final Runnable runnableLoggingTask = createRunnableLoggingTask(level, message, t);
-        m_asynchLoggerPool.execute(runnableLoggingTask);
+        try {
+            m_asynchLoggerPool.execute(runnableLoggingTask);
+        } catch (RejectedExecutionException e) {
+            m_logger.log(Level.DEBUG, "Failed to execute logging task. Running in-line", e);
+            runnableLoggingTask.run();
+        }
     }
 
     /**

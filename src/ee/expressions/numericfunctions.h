@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -321,7 +321,7 @@ template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
 
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     NValue retval(VALUE_TYPE_DOUBLE);
     const NValue& base = arguments[0];
     const NValue& exponent = arguments[1];
@@ -355,7 +355,7 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
  * It has the same semantics with C99 as: int(a / b) * b + MOD(a,b)  == a
  */
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& base = arguments[0];
     const NValue& divisor = arguments[1];
 
@@ -405,7 +405,7 @@ template<> inline NValue NValue::callConstant<FUNC_PI>() {
 
 /** implement the Volt SQL round function for decimal values */
 template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue &arg1 = arguments[0];
     if (arg1.isNull()) {
         return getNullStringValue();
@@ -482,6 +482,5 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
     std::string rv = out.str();
     return getDecimalValueFromString(rv);
 }
-
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -205,7 +205,7 @@ public class TestSpSchedulerDedupe
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>(), null, -1);
+        dut.updateReplicas(new ArrayList<Long>(), null, null);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -224,7 +224,7 @@ public class TestSpSchedulerDedupe
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>(), null, -1);
+        dut.updateReplicas(new ArrayList<Long>(), null, null);
         FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, true, primary_hsid, null);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -247,7 +247,7 @@ public class TestSpSchedulerDedupe
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas, null, -1);
+        dut.updateReplicas(replicas, null, null);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -278,7 +278,7 @@ public class TestSpSchedulerDedupe
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas, null, -1);
+        dut.updateReplicas(replicas, null, null);
         Iv2InitiateTaskMessage initTask = createMsg(txnid, false, true, primary_hsid);
         FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, false, primary_hsid, initTask);
         dut.deliver(sptask);

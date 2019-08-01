@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,20 +72,20 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
         if (jsData != null) {
             try {
                 JSONObject partitionObj = jsData.getJSONObject("partitionRanges");
-                Iterator partitionKey = partitionObj.keys();
+                Iterator<String> partitionKey = partitionObj.keys();
 
                 ImmutableList.Builder<PartitionRanges> partitionRangesBuilder =
                     ImmutableList.builder();
 
                 while (partitionKey.hasNext()) {
-                    String pidStr = (String) partitionKey.next();
+                    String pidStr = partitionKey.next();
                     JSONObject rangeObj = partitionObj.getJSONObject(pidStr);
-                    Iterator rangeKey = rangeObj.keys();
+                    Iterator<String> rangeKey = rangeObj.keys();
 
                     ImmutableSortedMap.Builder<Integer, Integer> rangeBuilder =
                         ImmutableSortedMap.naturalOrder();
                     while (rangeKey.hasNext()) {
-                        String rangeStartStr = (String) rangeKey.next();
+                        String rangeStartStr = rangeKey.next();
                         int rangeStart = Integer.parseInt(rangeStartStr);
                         int rangeEnd = rangeObj.getInt(rangeStartStr);
                         rangeBuilder.put(rangeStart, rangeEnd);

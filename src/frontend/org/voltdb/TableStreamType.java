@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,10 +43,4 @@ public enum TableStreamType {
      * Activation clears the index and the referenced tuples.
      */
     ELASTIC_INDEX_CLEAR,
-    /*
-     * A stream of tuple data that can be used to retrieve the latest state of a table
-     * that is actively being modified. The stream starts by transporting all the tuple data
-     * and then transports the set of modified and deleted tuples in a separate synchronous phase.
-     */
-    RECOVERY
 }

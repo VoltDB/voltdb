@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
-import org.voltcore.utils.Pair;
+import javax.annotation_voltpatches.Nullable;
+
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
@@ -31,6 +33,7 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
@@ -83,16 +86,10 @@ public interface SiteProcedureConnection {
      * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
      */
     public byte[] loadTable(
-            long txnId,
-            long spHandle,
-            long uniqueId,
-            String clusterName,
-            String databaseName,
+            TransactionState transactionState,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo)
+            LoadTableCaller caller)
     throws VoltAbortException;
 
     /**
@@ -104,9 +101,7 @@ public interface SiteProcedureConnection {
             long uniqueId,
             int tableId,
             VoltTable data,
-            boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo);
+            LoadTableCaller caller);
 
     /**
      * Execute a set of plan fragments.
@@ -141,10 +136,18 @@ public interface SiteProcedureConnection {
     public void setBatch(int batchIndex);
 
     /**
-     * Let the EE know what the name of the currently executing procedure is
-     * so it can include this information in any slow query progress log messages.
+     * Let the EE know what the name of the currently executing procedure is so it can include this information in any
+     * slow query progress log messages.
+     *
+     * @param procedureName Name of the procedure which is about to be run.
      */
-    public void setProcedureName(String procedureName);
+    public void setupProcedure(@Nullable String procedureName);
+
+    /**
+     * Let the EE know that the currently executing procedure has completed. Should be called by all callers of
+     * {@link #setupProcedure(String)}
+     */
+    public void completeProcedure();
 
     public void setBatchTimeout(int batchTimeout);
     public int getBatchTimeout();
@@ -188,6 +191,10 @@ public interface SiteProcedureConnection {
                                                      Column column,
                                                      ComparisonOperation op);
 
+    public ProcedureRunner getMigrateProcRunner(String procName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op);
     /**
      * @return SystemProcedureExecutionContext
      */
@@ -200,13 +207,13 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
-    public long[] getUSOForExportTable(String signature);
+    public long[] getUSOForExportTable(String streamName);
 
     public TupleStreamStateInfo getDRTupleStreamStateInfo();
 
@@ -219,10 +226,12 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId,
                              String tableSignature);
+
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId);
 
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
@@ -239,7 +248,7 @@ public interface SiteProcedureConnection {
 
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
 
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logsData[]);
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logsData[]);
     public void setDRProtocolVersion(int drVersion);
     /*
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of
@@ -252,4 +261,26 @@ public interface SiteProcedureConnection {
     public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
 
     public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
+
+    /**
+     * Use this to disable all external streams (DR, export) from this site.
+     * This is used by Elastic Shrink after all data from this site has been migrated.
+     * The site continues to participate in MP txns until the partition is fully removed from
+     * the cluster, but this will disable all external writes as well so that in effect the sites
+     * are not participating.
+     * <p> By default this is enabled in all sites.
+     */
+    public void disableExternalStreams();
+
+    /**
+     * Returns value showing whether external streams (DR and export) are enabled for this Site.
+     *
+     * @return true if external streams are enabled for this site, false otherwise.
+     */
+    public boolean externalStreamsEnabled();
+
+    /**
+     * @return the max size for all MP responses
+     */
+    public long getMaxTotalMpResponseSize();
 }

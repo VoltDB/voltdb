@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,19 +32,24 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeSet;
-
-import junit.framework.Assert;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
+import org.voltcore.utils.Pair;
+import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 
@@ -54,18 +59,66 @@ public class TestPersistentBinaryDeque {
 
     public final static File TEST_DIR = new File("/tmp/" + System.getProperty("user.name"));
     public static final String TEST_NONCE = "pbd_nonce";
+    // Number of entries which fit in a segment. 64MB segment / (2MB entries + headers) = 31 entries per segment.
+    static final int SEGMENT_FILL_COUNT = 31;
     private static final String CURSOR_ID = "testPBD";
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
-    private static ByteBuffer defaultBuffer() {
+    @Rule
+    public final RandomTestRule m_random = new RandomTestRule();
+
+    static ByteBuffer defaultBuffer() {
         return getFilledBuffer(42);
     }
 
-    private static BBContainer defaultContainer() {
+    static BBContainer defaultContainer() {
         return DBBPool.wrapBB(defaultBuffer());
     }
 
-    private PersistentBinaryDeque m_pbd;
+    private PersistentBinaryDeque<ExtraHeaderMetadata> m_pbd;
+    ExtraHeaderMetadata m_metadata;
+
+    @Before
+    public void setUp() throws Exception {
+        setupTestDir();
+        m_metadata = new ExtraHeaderMetadata(m_random);
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+    }
+
+    public static void setupTestDir() throws IOException {
+        if (TEST_DIR.exists()) {
+            for (File f : TEST_DIR.listFiles()) {
+                VoltFile.recursivelyDelete(f);
+            }
+            TEST_DIR.delete();
+        }
+        TEST_DIR.mkdir();
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        try {
+            m_pbd.close();
+        } catch (Exception e) {}
+        try {
+            tearDownTestDir();
+        } finally {
+            m_pbd = null;
+            m_metadata = null;
+        }
+        System.gc();
+        System.runFinalization();
+    }
+
+    public static void tearDownTestDir() {
+        if (TEST_DIR.exists()) {
+            for (File f : TEST_DIR.listFiles()) {
+                f.delete();
+            }
+            TEST_DIR.delete();
+        }
+    }
 
     public static ByteBuffer getFilledBuffer(long fillValue) {
         ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2);
@@ -88,18 +141,103 @@ public class TestPersistentBinaryDeque {
         return buf;
     }
 
-    public static TreeSet<String> getSortedDirectoryListing() {
-        TreeSet<String> names = new TreeSet<String>();
+    /**
+     * Return a "sorted" directory listing.
+     *
+     * Note: since the nonce is not passed in to filter out the output, this should only be
+     * used for tests that use only 1 nonce.
+     *
+     * Since the files are not guaranteed to be sorted by name, decode the file sequence.
+     *
+     * @return
+     * @throws IOException
+     */
+    public static List<File> getSortedDirectoryListing() throws IOException {
+        return getSortedDirectoryListing(false);
+    }
+
+    public static List<File>  getSortedDirectoryListing(boolean isPBDClosed) throws IOException {
+
+        HashMap<Long, File> filesById = new HashMap<>();
+        PairSequencer<Long> sequencer = new PairSequencer<>();
+
         for (File f : TEST_DIR.listFiles()) {
-            names.add(f.getName());
+            String fname = f.getName();
+            if (f.length()  ==0) {
+                System.out.println("Ignoring empty file " + fname);
+                continue;
+            }
+            PbdSegmentName segmentName = PbdSegmentName.parseFile(logger, f);
+            assertEquals(PbdSegmentName.Result.OK, segmentName.m_result);
+
+            filesById.put(segmentName.m_id, f);
+            sequencer.add(new Pair<Long, Long>(segmentName.m_prevId, segmentName.m_id));
         }
-        return names;
+
+        // Deduce the sequence from the extracted segment ids
+        Deque<Deque<Long>> sequences = sequencer.getSequences();
+        if (sequences.size() > 1) {
+            throw new IOException("Found " + sequences.size() + " PBD sequences");
+        }
+        Deque<Long> sequence = sequences.getFirst();
+
+        LinkedList<File> sorted = new LinkedList<>();
+        for (Long segmentId : sequence) {
+            File file = filesById.get(segmentId);
+            if (file == null) {
+                // This is an Instant in the sequence referring to a previous file that
+                // was deleted, so move on.
+                continue;
+            }
+            sorted.addLast(file);
+        }
+
+        // Verify the PBD segment finalization
+        File lastEntry = sorted.peekLast() != null ? sorted.removeLast() : null;
+        if (lastEntry != null) {
+            if (isPBDClosed) {
+                // When PBD is closed, last entry SHOULD be final
+                assertTrue(PBDSegment.isFinal(lastEntry));
+            }
+            else {
+                // When PBD is open, last entry SHOULD NOT be final
+                assertFalse(PBDSegment.isFinal(lastEntry));
+            }
+        }
+        File penultimate = sorted.peekLast() != null ? sorted.removeLast() : null;
+        if (penultimate != null) {
+            if (isPBDClosed) {
+                // When PBD is closed, penultimate entry SHOULD be final
+                assertTrue(PBDSegment.isFinal(penultimate));
+            }
+            else {
+                // When PBD is open, penultimateEntry entry MAY be final or not, depending on recovery scenario
+                // FIXME: we could test this
+                if (!PBDSegment.isFinal(penultimate)) {
+                    System.out.println("Penultimate segment not final: " + penultimate.getName());
+                }
+            }
+        }
+        for (File other : sorted) {
+            if (!PBDSegment.isFinal(other)) {
+                System.out.println("Every segment except last and optionally penultimate should be final: "
+                        + other.getName());
+            }
+        }
+
+        if (penultimate != null) {
+            sorted.addLast(penultimate);
+        }
+        if (lastEntry != null) {
+            sorted.addLast(lastEntry);
+        }
+        return sorted;
     }
 
     @Test
     public void testTruncateFirstElement() throws Exception {
         System.out.println("Running testTruncateFirstElement");
-        TreeSet<String> listing = getSortedDirectoryListing();
+        List<File> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
 
         for (int ii = 0; ii < 150; ii++) {
@@ -111,10 +249,12 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.close();
 
-        listing = getSortedDirectoryListing();
+        // Get directory listing with PBD closed
+        listing = getSortedDirectoryListing(true);
         assertEquals(listing.size(), 4);
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
 
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -128,22 +268,24 @@ public class TestPersistentBinaryDeque {
         });
 
         listing = getSortedDirectoryListing();
-        assertEquals(listing.size(), 1);
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        assertEquals(1, listing.size());
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
     }
 
     @Test
     public void testCloseEmptyShouldNotDelete() throws Exception {
         System.out.println("Running testCloseEmptyShouldNotDelete");
-        TreeSet<String> listing = getSortedDirectoryListing();
+        List<File> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
         m_pbd.close();
 
-        listing = getSortedDirectoryListing();
+        // Test directlry listing on closed PBD
+        listing = getSortedDirectoryListing(true);
         assertEquals(listing.size(), 1);
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
 
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
@@ -161,7 +303,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         for (long ii = 0; ii < 96; ii++) {
             BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             try {
@@ -184,18 +326,19 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testTruncatorWithFullTruncateReturn() throws Exception {
         System.out.println("Running testTruncatorWithFullTruncateReturn");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         for (int ii = 0; ii < 150; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
 
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
 
-        TreeSet<String> listing = getSortedDirectoryListing();
+        List<File> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
@@ -206,8 +349,8 @@ public class TestPersistentBinaryDeque {
                 if (b.getLong(0) != m_objectsParsed) {
                     System.out.println("asd");
                 }
-                assertEquals(b.getLong(0), m_objectsParsed);
-                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                assertEquals(m_objectsParsed, b.getLong(0));
+                assertEquals(1024 * 1024 * 2, b.remaining());
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
                     return PersistentBinaryDeque.fullTruncateResponse();
@@ -226,17 +369,21 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 2);
 
         for (int ii = 46; ii < 96; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+            // Note: new segment after truncate?
+            if (ii == 46) {
+                m_pbd.updateExtraHeader(new ExtraHeaderMetadata(m_random));
+            }
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
 
         reader = m_pbd.openForRead(CURSOR_ID);
         long actualSizeInBytes = 0;
         long reportedSizeInBytes = reader.sizeInBytes();
         long blocksFound = 0;
-        BBContainer cont = null;
-        while ((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+        BinaryDequeReader.Entry<ExtraHeaderMetadata> entry = null;
+        while ((entry = pollOnceWithoutDiscard(reader)) != null) {
             try {
-                ByteBuffer buffer = cont.b();
+                ByteBuffer buffer = entry.getData();
                 if (blocksFound == 45) {
                     blocksFound++;//white lie, so we expect the right block contents
                 }
@@ -248,7 +395,7 @@ public class TestPersistentBinaryDeque {
                 }
             } finally {
                 blocksFound++;
-                cont.discard();
+                entry.release();
             }
         }
         assertEquals(actualSizeInBytes, reportedSizeInBytes);
@@ -258,18 +405,20 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testTruncator() throws Exception {
         System.out.println("Running testTruncator");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         for (int ii = 0; ii < 160; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
 
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        ;
 
-        TreeSet<String> listing = getSortedDirectoryListing();
+        List<File> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
@@ -277,8 +426,8 @@ public class TestPersistentBinaryDeque {
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
-                assertEquals(b.getLong(0), m_objectsParsed);
-                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                assertEquals(m_objectsParsed, b.getLong(0));
+                assertEquals(1024 * 1024 * 2, b.remaining());
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
                     return new PersistentBinaryDeque.ByteBufferTruncatorResponse(b.slice());
@@ -299,16 +448,20 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 2);
 
         for (int ii = 46; ii < 96; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+            // Note: new segment after truncate?
+            if (ii == 46) {
+                m_pbd.updateExtraHeader(new ExtraHeaderMetadata(m_random));
+            }
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
 
         long actualSizeInBytes = 0;
         long reportedSizeInBytes = reader.sizeInBytes();
         long blocksFound = 0;
-        BBContainer cont = null;
-        while ((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+        BinaryDequeReader.Entry<ExtraHeaderMetadata> entry = null;
+        while ((entry = pollOnceWithoutDiscard(reader)) != null) {
             try {
-                ByteBuffer buffer = cont.b();
+                ByteBuffer buffer = entry.getData();
                 if (blocksFound == 45) {
                     assertEquals(buffer.remaining(), 1024 * 1024);
                 } else {
@@ -321,7 +474,7 @@ public class TestPersistentBinaryDeque {
                 }
             } finally {
                 blocksFound++;
-                cont.discard();
+                entry.release();
             }
         }
         assertEquals(actualSizeInBytes, reportedSizeInBytes);
@@ -331,16 +484,14 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testReaderIsEmpty() throws Exception {
         System.out.println("Running testReaderIsEmpty");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertTrue(reader.isEmpty());
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
         assertTrue(reader.isEmpty());
 
         m_pbd.offer(defaultContainer());
         assertFalse(reader.isEmpty());
-
-        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        retval.discard();
+        pollOnce(reader);
         assertTrue(reader.isEmpty());
 
         // more than one segment
@@ -349,8 +500,7 @@ public class TestPersistentBinaryDeque {
         }
         assertFalse(reader.isEmpty());
         for (int i = 0; i < 50; i++) {
-            retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            retval.discard();
+            pollOnce(reader);
             if (i<49) {
                 assertFalse(reader.isEmpty());
             } else {
@@ -363,7 +513,7 @@ public class TestPersistentBinaryDeque {
     public void testReaderNumObjects() throws Exception {
         System.out.println("Running testReaderNumObjects");
         String cursor1 = "testPBD1";
-        BinaryDequeReader reader1 = m_pbd.openForRead(cursor1);
+        BinaryDequeReader<ExtraHeaderMetadata> reader1 = m_pbd.openForRead(cursor1);
         int count = 0;
         int totalAdded = 0;
         assertEquals(count, reader1.getNumObjects());
@@ -377,12 +527,12 @@ public class TestPersistentBinaryDeque {
 
         // a second reader
         String cursor2 = "testPBD2";
-        BinaryDequeReader reader2 = m_pbd.openForRead(cursor2);
+        BinaryDequeReader<ExtraHeaderMetadata> reader2 = m_pbd.openForRead(cursor2);
 
-        pollDiscard(reader1);
+        pollOnce(reader1);
         assertEquals(count-1, reader1.getNumObjects());
         assertEquals(count, reader2.getNumObjects());
-        pollDiscard(reader2);
+        pollOnce(reader2);
         count--;
         assertEquals(count, reader1.getNumObjects());
         assertEquals(count, reader2.getNumObjects());
@@ -397,10 +547,10 @@ public class TestPersistentBinaryDeque {
         }
 
         for (int i = 0; i < 50; i++) {
-            pollDiscard(reader1);
+            pollOnce(reader1);
             assertEquals(count-1, reader1.getNumObjects());
             assertEquals(count, reader2.getNumObjects());
-            pollDiscard(reader2);
+            pollOnce(reader2);
             count--;
             assertEquals(count, reader1.getNumObjects());
             assertEquals(count, reader2.getNumObjects());
@@ -409,7 +559,7 @@ public class TestPersistentBinaryDeque {
         final int segmentfullCount = 47;
         // start a 3rd reader after segments have been deleted
         String cursor3 = "testPBD3";
-        BinaryDequeReader lateReader = m_pbd.openForRead(cursor3);
+        BinaryDequeReader<ExtraHeaderMetadata> lateReader = m_pbd.openForRead(cursor3);
         int toAddForLate = totalAdded%segmentfullCount;
         assertEquals(count+toAddForLate, lateReader.getNumObjects());
 
@@ -423,15 +573,15 @@ public class TestPersistentBinaryDeque {
         }
 
         for (int i = 0; i < 50; i++) {
-            pollDiscard(reader1);
+            pollOnce(reader1);
             assertEquals(count-1, reader1.getNumObjects());
             assertEquals(count, reader2.getNumObjects());
             assertEquals(count+toAddForLate, lateReader.getNumObjects());
-            pollDiscard(reader2);
+            pollOnce(reader2);
             assertEquals(count-1, reader1.getNumObjects());
             assertEquals(count-1, reader2.getNumObjects());
             assertEquals(count+toAddForLate, lateReader.getNumObjects());
-            pollDiscard(lateReader);
+            pollOnce(lateReader);
             count--;
             assertEquals(count, reader1.getNumObjects());
             assertEquals(count, reader2.getNumObjects());
@@ -440,7 +590,7 @@ public class TestPersistentBinaryDeque {
 
         assert(count==0);
         for (int i=0; i < toAddForLate; i++) {
-            pollDiscard(lateReader);
+            pollOnce(lateReader);
             assertEquals(toAddForLate-i-1, lateReader.getNumObjects());
         }
 
@@ -449,32 +599,26 @@ public class TestPersistentBinaryDeque {
         assertEquals(0, lateReader.getNumObjects());
     }
 
-    private void pollDiscard(BinaryDequeReader reader) throws IOException {
-        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        retval.discard();
-    }
-
     @Test
     public void testOfferThenPoll() throws Exception {
-        System.out.println("Running testOfferThanPoll");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        System.out.println("Running testOfferThenPoll");
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         //Make sure a single file with the appropriate data is created
         m_pbd.offer(defaultContainer());
         File files[] = TEST_DIR.listFiles();
         assertEquals( 1, files.length);
-        assertTrue( "pbd_nonce.0.pbd".equals(files[0].getName()));
+        assertTrue(createSegmentName(1, 2).equals(files[0].getName()));
 
         //Now make sure the current write file is stolen and a new write file created
-        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        retval.discard();
+        pollOnce(reader);
     }
 
     @Test
     public void testCloseOldSegments() throws Exception {
         System.out.println("Running testCloseOldSegments");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         final int total = 100;
@@ -483,29 +627,31 @@ public class TestPersistentBinaryDeque {
         for (int i = 0; i < total; i++) {
             m_pbd.offer(defaultContainer());
         }
-        File files[] = TEST_DIR.listFiles();
-        assertEquals( 3, files.length);
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 3);
+
         Set<String> actualFiles = Sets.newHashSet();
-        for (File f : files) {
+        for (File f : listing) {
             actualFiles.add(f.getName());
         }
         Set<String> expectedFiles = Sets.newHashSet();
-        for (int i = 0; i < 3; i++) {
-            expectedFiles.add("pbd_nonce." + i + ".pbd");
-        }
-        Assert.assertEquals(expectedFiles, actualFiles);
+        expectedFiles.add(createSegmentName(1, 2));
+        expectedFiles.add(createSegmentName(3, 1));
+        expectedFiles.add(createSegmentName(4, 3));
+        assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
         for (int i = 0; i < total; i++) {
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            retval.discard();
+            pollOnce(reader);
         }
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
     }
 
     @Test
     public void testDontCloseReadSegment() throws Exception {
-        System.out.println("Running testOfferPollOfferMoreThanPoll");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        System.out.println("Running testDontCloseReadSegment");
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         final int total = 100;
@@ -517,34 +663,36 @@ public class TestPersistentBinaryDeque {
         assertEquals(1, TEST_DIR.listFiles().length);
 
         // Read one buffer from the segment so that it's considered being polled from.
-        reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        pollOnce(reader);
 
         for (int i = 5; i < total; i++) {
             m_pbd.offer(defaultContainer());
         }
-        File files[] = TEST_DIR.listFiles();
-        assertEquals( 3, files.length);
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 3);
+
         Set<String> actualFiles = Sets.newHashSet();
-        for (File f : files) {
+        for (File f : listing) {
             actualFiles.add(f.getName());
         }
         Set<String> expectedFiles = Sets.newHashSet();
-        for (int i = 0; i < 3; i++) {
-            expectedFiles.add("pbd_nonce." + i + ".pbd");
-        }
-        Assert.assertEquals(expectedFiles, actualFiles);
+        expectedFiles.add(createSegmentName(1, 2));
+        expectedFiles.add(createSegmentName(3, 1));
+        expectedFiles.add(createSegmentName(4, 3));
+        assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
         for (int i = 1; i < total; i++) {
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            retval.discard();
+            pollOnce(reader);
         }
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
     }
 
     @Test
     public void testOfferThenPushThenPoll() throws Exception {
         System.out.println("Running testOfferThenPushThenPoll");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         assertTrue(reader.isEmpty());
         //Make it create two full segments
         for (int ii = 0; ii < 96; ii++) {
@@ -561,59 +709,56 @@ public class TestPersistentBinaryDeque {
         pushContainers[0] = DBBPool.dummyWrapBB(buffer1);
         pushContainers[1] = DBBPool.dummyWrapBB(buffer2);
 
-        m_pbd.push(pushContainers);
+        m_pbd.push(pushContainers, m_metadata);
 
         //Expect this to create a single new file
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals( 4, names.size());
-        assertTrue(names.first().equals("pbd_nonce.-1.pbd"));
-        assertTrue(names.contains("pbd_nonce.0.pbd"));
-        assertTrue(names.contains("pbd_nonce.1.pbd"));
-        assertTrue(names.last().equals("pbd_nonce.2.pbd"));
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals( 4, listing.size());
+
+        // Check the expected ordering of the PBDs
+        File f0 = listing.remove(0);
+        assertEquals(createSegmentName(2, 5), f0.getName());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(1, 2), f0.getName());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(3, 1), f0.getName());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(4, 3), f0.getName());
 
         //Poll the two at the front and check that the contents are what is expected
-        BBContainer retval1 = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        try {
-            buffer1.clear();
-            System.err.println(Long.toHexString(buffer1.getLong(0)) + " " + Long.toHexString(retval1.b().getLong(0)));
-            assertEquals(retval1.b(), buffer1);
+        buffer1.clear();
+        pollOnceAndVerify(reader, buffer1);
+        buffer2.clear();
+        pollOnceAndVerify(reader, buffer2);
 
-            BBContainer retval2 = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            try {
-                buffer2.clear();
-                assertEquals(retval2.b(), buffer2);
-
-                //Expect the file for the two polled objects to still be there
-                //until the discard
-                names = getSortedDirectoryListing();
-                assertEquals( 4, names.size());
-            } finally {
-                retval2.discard();
-            }
-
-        } finally {
-            retval1.discard();
-        }
-
-        names = getSortedDirectoryListing();
-        assertEquals( 3, names.size());
-        assertTrue(names.first().equals("pbd_nonce.0.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals(4, listing.size());
 
         ByteBuffer defaultBuffer = defaultBuffer();
+        pollOnceAndVerify(reader, defaultBuffer);
+        listing = getSortedDirectoryListing();
+        assertEquals(3, listing.size());
+
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(1, 2), f0.getName());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(3, 1), f0.getName());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(4, 3), f0.getName());
+
         //Now poll the rest and make sure the data is correct
-        for (int ii = 0; ii < 96; ii++) {
+        for (int ii = 0; ii < 95; ii++) {
             defaultBuffer.clear();
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            pollOnceAndVerify(reader, defaultBuffer);
         }
 
         assertTrue(reader.isEmpty());
 
         //Expect just the current write segment
-        names = getSortedDirectoryListing();
-        assertEquals( 1, names.size());
-        assertTrue(names.first().equals("pbd_nonce.2.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals( 1, listing.size());
+        f0 = listing.remove(0);
+        assertEquals(createSegmentName(4, 3), f0.getName());
     }
 
     @Test
@@ -629,22 +774,29 @@ public class TestPersistentBinaryDeque {
         m_pbd.sync();
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        ;
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
 
         ByteBuffer defaultBuffer = defaultBuffer();
         //Now poll all of it and make sure the data is correct
         for (int ii = 0; ii < 96; ii++) {
             defaultBuffer.clear();
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            pollOnceAndVerify(reader, defaultBuffer);
         }
 
-        //Expect just the current write segment
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals( 1, names.size());
-        assertTrue(names.first().equals("pbd_nonce.3.pbd"));
+        // Expect the current write segment and previous
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(2, listing.size());
+
+        m_pbd.offer(defaultContainer());
+        defaultBuffer.clear();
+        pollOnceAndVerify(reader, defaultBuffer);
+
+        // Expect just the current write segment
+        listing = getSortedDirectoryListing();
+        assertEquals(1, listing.size());
     }
 
     @Test
@@ -652,7 +804,8 @@ public class TestPersistentBinaryDeque {
         System.out.println("Running testInvalidDirectory");
         m_pbd.close();
         try {
-            m_pbd = new PersistentBinaryDeque( "foo", new File("/usr/bin"), logger);
+            m_pbd = PersistentBinaryDeque.builder("foo", new File("/usr/bin"), logger)
+                    .initialExtraHeader(m_metadata, SERIALIZER).build();
         } catch (IOException e) {
             return;
         }
@@ -666,11 +819,21 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(64)) );
         }
         m_pbd.close();
-        File toDelete = new File(TEST_DIR + File.separator + TEST_NONCE + ".4.pbd");
+
+        List<File> listing = getSortedDirectoryListing(true);
+        assertEquals(listing.size(), 6);
+
+        // Delete the fourth file
+        File toDelete = null;
+        for (int i = 0; i < 4; i++) {
+            toDelete = listing.remove(0);
+        }
         assertTrue(toDelete.exists());
         assertTrue(toDelete.delete());
         try {
-            m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
+            m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
+                    .initialExtraHeader(m_metadata, SERIALIZER).build();
+            ;
         } catch (IOException e) {
             return;
         }
@@ -719,7 +882,7 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testPollWhileClosed() throws Exception {
         System.out.println("Running testPollWhileClosed");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         m_pbd.close();
         try {
             reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
@@ -744,7 +907,7 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testIsEmptyWhileClosed() throws Exception {
         System.out.println("Running testIsEmptyWhileClosed");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         m_pbd.close();
         try {
             reader.isEmpty();
@@ -787,33 +950,34 @@ public class TestPersistentBinaryDeque {
     public void testOverlappingNonces() throws Exception {
         System.out.println("Running testOverlappingNonces");
         for (int i = 0; i < 20; i++) {
-            PersistentBinaryDeque pbd = new PersistentBinaryDeque(Integer.toString(i), TEST_DIR, logger);
+            PersistentBinaryDeque<ExtraHeaderMetadata> pbd = PersistentBinaryDeque
+                    .builder(
+                    Integer.toString(i), TEST_DIR, logger)
+                    .initialExtraHeader(m_metadata, SERIALIZER).build();
             pbd.offer(defaultContainer());
             pbd.close();
         }
 
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque("1", TEST_DIR, logger);
+        PersistentBinaryDeque<ExtraHeaderMetadata> pbd = PersistentBinaryDeque.builder("1", TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER)
+                .build();
         pbd.close();
     }
 
     @Test
     public void testNonceWithDots() throws Exception {
         System.out.println("Running testNonceWithDots");
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR, logger);
+        PersistentBinaryDeque<ExtraHeaderMetadata> pbd = PersistentBinaryDeque.builder("ha.ha", TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
         pbd.offer(defaultContainer());
         pbd.close();
 
-        pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR, logger);
-        BinaryDequeReader reader = pbd.openForRead(CURSOR_ID);
-        BBContainer bb = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        try {
-            ByteBuffer defaultBuffer = defaultBuffer();
-            defaultBuffer.clear();
-            assertEquals(defaultBuffer, bb.b());
-            pbd.close();
-        } finally {
-            bb.discard();
-        }
+        pbd = PersistentBinaryDeque.builder("ha.ha", TEST_DIR, logger).initialExtraHeader(null, SERIALIZER).build();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = pbd.openForRead(CURSOR_ID);
+        ByteBuffer defaultBuffer = defaultBuffer();
+        defaultBuffer.clear();
+        pollOnceAndVerify(reader, defaultBuffer);
+        pbd.close();
     }
 
     @Test
@@ -829,8 +993,9 @@ public class TestPersistentBinaryDeque {
         m_pbd.sync();
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         int cnt = reader.getNumObjects();
         assertEquals(cnt, 96);
 
@@ -844,19 +1009,13 @@ public class TestPersistentBinaryDeque {
         //Now poll all of it and make sure the data is correct
         for (int ii = 0; ii < 192; ii++) {
             ByteBuffer defaultBuffer = getFilledBuffer(ii);
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            try {
-                assertTrue(defaultBuffer.equals(retval.b()));
-            } finally {
-                retval.discard();
-            }
+            pollOnceAndVerify(reader, defaultBuffer);
             defaultBuffer.clear();
         }
 
         //Expect just the current write segment
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals(1, names.size());
-        assertTrue(names.first().equals("pbd_nonce.5.pbd"));
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(1, listing.size());
     }
 
     @Test
@@ -864,7 +1023,9 @@ public class TestPersistentBinaryDeque {
         System.out.println("Running testOfferCloseReopenOfferSmall");
         final String SMALL_TEST_NONCE = "asmall_pbd_nonce";
 
-        PersistentBinaryDeque small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
+        PersistentBinaryDeque<ExtraHeaderMetadata> small_pbd = PersistentBinaryDeque
+                .builder(SMALL_TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
         //Keep in 1 segment.
         for (int ii = 0; ii < 10; ii++) {
             small_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(ii)));
@@ -878,8 +1039,9 @@ public class TestPersistentBinaryDeque {
         System.gc();
         System.runFinalization();
 
-        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
-        BinaryDequeReader reader = small_pbd.openForRead(CURSOR_ID);
+        small_pbd = PersistentBinaryDeque.builder(SMALL_TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = small_pbd.openForRead(CURSOR_ID);
         int cnt = reader.getNumObjects();
         assertEquals(cnt, 10);
 
@@ -895,21 +1057,16 @@ public class TestPersistentBinaryDeque {
         System.gc();
         System.runFinalization();
 
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals(3, names.size());
-        assertTrue(names.first().equals("asmall_pbd_nonce.0.pbd"));
+        files = TEST_DIR.listFiles();
+        assertEquals(3, files.length);
 
-        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
+        small_pbd = PersistentBinaryDeque.builder(SMALL_TEST_NONCE, TEST_DIR, logger)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
         reader = small_pbd.openForRead(CURSOR_ID);
         //Now poll all of it and make sure the data is correct dont poll everything out.
         for (int ii = 0; ii < 10; ii++) {
             ByteBuffer defaultBuffer = getFilledSmallBuffer(ii);
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            try {
-                assertTrue(defaultBuffer.equals(retval.b()));
-            } finally {
-                retval.discard();
-            }
+            pollOnceAndVerify(reader, defaultBuffer);
             defaultBuffer.clear();
         }
         small_pbd.sync();
@@ -933,8 +1090,9 @@ public class TestPersistentBinaryDeque {
         m_pbd = null;
         System.gc();
         System.runFinalization();
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         int cnt = reader.getNumObjects();
         assertEquals(cnt, 96);
         for (int ii = 96; ii < 192; ii++) {
@@ -946,12 +1104,9 @@ public class TestPersistentBinaryDeque {
 
         //Now poll half of it and make sure the data is correct
         for (int ii = 0; ii < 96; ii++) {
-            ByteBuffer defaultBuffer = getFilledBuffer(ii);
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
-            defaultBuffer.clear();
+            pollOnceAndVerify(reader, getFilledBuffer(ii));
         }
+        pollOnceAndVerify(reader, getFilledBuffer(96));
         m_pbd.sync();
         m_pbd.close();
         m_pbd = null;
@@ -959,19 +1114,17 @@ public class TestPersistentBinaryDeque {
         System.runFinalization();
 
         //Expect just the current write segment
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals(3, names.size());
-        assertTrue(names.first().equals("pbd_nonce.3.pbd"));
-
+        List<File> listing = getSortedDirectoryListing(true);
+        assertEquals(3, listing.size());
         //Reload
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
         reader = m_pbd.openForRead(CURSOR_ID);
         cnt = reader.getNumObjects();
         assertEquals(cnt, 96);
         //Expect just the current write segment hole should be deleted.
-        names = getSortedDirectoryListing();
-        assertEquals(4, names.size());
-        assertTrue(names.first().equals("pbd_nonce.3.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals(4, listing.size());
 
         for (int ii = 96; ii < 192; ii++) {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
@@ -982,28 +1135,26 @@ public class TestPersistentBinaryDeque {
         //Now poll half of it and make sure the data is correct
         for (int ii = 96; ii < 192; ii++) {
             ByteBuffer defaultBuffer = getFilledBuffer(ii);
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            pollOnceAndVerify(reader, defaultBuffer);
             defaultBuffer.clear();
         }
+
+        pollOnceAndVerify(reader, getFilledBuffer(96));
+
         //Expect just the current write segment
-        names = getSortedDirectoryListing();
-        assertEquals(3, names.size());
-        assertTrue(names.first().equals("pbd_nonce.6.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals(3, listing.size());
 
         //Poll and leave one behind.
-        for (int ii = 96; ii < 191; ii++) {
+        for (int ii = 97; ii < 191; ii++) {
             ByteBuffer defaultBuffer = getFilledBuffer(ii);
-            BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            pollOnceAndVerify(reader, defaultBuffer);
             defaultBuffer.clear();
         }
+        assertEquals(1, reader.getNumObjects());
         //Expect just the current write segment
-        names = getSortedDirectoryListing();
-        assertEquals(1, names.size());
-        assertTrue(names.first().equals("pbd_nonce.8.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals(1, listing.size());
 
         //Push to get more segments at head
         BBContainer objs[] = new BBContainer[]{
@@ -1011,86 +1162,202 @@ public class TestPersistentBinaryDeque {
             DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)),
             DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32))};
         m_pbd.push(objs);
-        names = getSortedDirectoryListing();
-        assertEquals(4, names.size());
-        assertTrue(names.first().equals("pbd_nonce.5.pbd"));
+        listing = getSortedDirectoryListing();
+        assertEquals(4, listing.size());
 
-        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        retval.discard();
-        names = getSortedDirectoryListing();
-        assertEquals(3, names.size());
-        assertTrue(names.first().equals("pbd_nonce.6.pbd"));
+        for (int i = 0; i < 4; ++i) {
+            pollOnce(reader);
+            assertEquals(4 - (i + 1), reader.getNumObjects());
+            listing = getSortedDirectoryListing();
+            assertEquals(4 - i, listing.size());
+        }
     }
 
     @Test
-    public void testDeleteOnNonEmptyNextSegment() throws Exception {
-        System.out.println("Running testOfferPollOfferMoreThanPoll");
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
-        assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+    public void testUpdateExtraHeader() throws Exception {
+        List<ExtraHeaderMetadata> extraHeaders = new ArrayList<>();
+        extraHeaders.add(m_metadata);
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 2; j++) {
+                m_pbd.offer(defaultContainer());
+            }
+            assertEquals(i + 1, TEST_DIR.listFiles().length);
 
-        final int total = 47;      // Number of buffers it takes to fill a segment
-
-        //Make sure a single file with the appropriate data is created
-        for (int i = 0; i < total; i++) {
-            m_pbd.offer(defaultContainer());
+            ExtraHeaderMetadata ehm = new ExtraHeaderMetadata(m_random);
+            extraHeaders.add(ehm);
+            m_pbd.updateExtraHeader(ehm);
         }
-        assertEquals(1, TEST_DIR.listFiles().length);
+        assertEquals(6, TEST_DIR.listFiles().length);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        // Open second reader to prevent segments from being deleted
+        m_pbd.openForRead(CURSOR_ID + 1);
 
-        // Read read all the buffers from the segment (isEmpty() returns true)
-        for (int i = 0; i < total; i++) {
-            reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        ByteBuffer expectedData = defaultBuffer();
+        for (int i = 0; i< 5 ;++i) {
+            ExtraHeaderMetadata expectedMetadata = extraHeaders.get(i);
+            for (int j = 0; j < 2; j++) {
+                pollOnceAndVerify(reader, expectedData.asReadOnlyBuffer(), expectedMetadata);
+            }
         }
 
-        assert(reader.isEmpty());
-        File files[] = TEST_DIR.listFiles();
-        assertEquals(1, files.length);
-        assert(files[0].getName().equals("pbd_nonce.0.pbd"));
+        m_pbd.sync();
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
 
+        reader = m_pbd.openForRead(CURSOR_ID);
+        for (int i = 0; i < 5; ++i) {
+            ExtraHeaderMetadata expectedMetadata = extraHeaders.get(i);
+            for (int j = 0; j < 2; j++) {
+                pollOnceAndVerify(reader, expectedData.asReadOnlyBuffer(), expectedMetadata);
+            }
+        }
+    }
+
+    @Test
+    public void testCloseLastReader() throws Exception {
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        pollOnceAndVerify(reader, null);
+        m_pbd.closeCursor(CURSOR_ID);
         m_pbd.offer(defaultContainer());
-
-        files = TEST_DIR.listFiles();
-        // Make sure a new segment was created and the old segment was deleted
-        assertEquals(1, files.length);
-        assert(files[0].getName().equals("pbd_nonce.1.pbd"));
     }
 
-    @Before
-    public void setUp() throws Exception {
-        setupTestDir();
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-    }
+    @Test
+    public void testSegmentClosingWriterOnly() throws Exception {
+        // Initially no readers and nothing written. Open segments must be 1
+        assertEquals(1, m_pbd.numOpenSegments());
 
-    public static void setupTestDir() throws IOException {
-        if (TEST_DIR.exists()) {
-            for (File f : TEST_DIR.listFiles()) {
-                VoltFile.recursivelyDelete(f);
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < SEGMENT_FILL_COUNT; j++) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)));
             }
-            TEST_DIR.delete();
+            assertEquals(1, m_pbd.numOpenSegments());
         }
-        TEST_DIR.mkdir();
     }
 
-    @After
-    public void tearDown() throws Exception {
+    @Test
+    public void testSegmentClosingWriterReaderLockStep() throws Exception {
+        assertEquals(1, m_pbd.numOpenSegments());
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("reader0");
+
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < SEGMENT_FILL_COUNT; j++) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)));
+                BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+                bbC.discard();
+            }
+            assertEquals(1, m_pbd.numOpenSegments());
+        }
+    }
+
+    static <M> BinaryDequeReader.Entry<M> pollOnceWithoutDiscard(BinaryDequeReader<M> reader) throws IOException {
+        BinaryDequeReader.Entry<M> entry = reader
+                .pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        if (entry != null) {
+            try {
+                assertNotNull(entry.getExtraHeader());
+            } catch (Throwable t) {
+                entry.release();
+                throw t;
+            }
+        }
+        return entry;
+    }
+
+    static void pollOnce(BinaryDequeReader<ExtraHeaderMetadata> reader) throws IOException {
+        BinaryDequeReader.Entry<ExtraHeaderMetadata> retval = pollOnceWithoutDiscard(reader);
+        if (retval != null) {
+            retval.release();
+        }
+    }
+
+    void pollOnceAndVerify(BinaryDequeReader<ExtraHeaderMetadata> reader, ByteBuffer destBuf) throws IOException {
+        pollOnceAndVerify(reader, destBuf, m_metadata);
+    }
+
+    static <M> void pollOnceAndVerify(BinaryDequeReader<M> reader, ByteBuffer expectedData, M expectedMetadata)
+            throws IOException {
+        BinaryDequeReader.Entry<M> retval = pollOnceWithoutDiscard(reader);
         try {
-            m_pbd.close();
-        } catch (Exception e) {}
-        try {
-            tearDownTestDir();
+            if (expectedData == null) {
+                assertNull(retval);
+            } else {
+                assertEquals(expectedMetadata, retval.getExtraHeader());
+                assertEquals(expectedData, retval.getData());
+            }
         } finally {
-            m_pbd = null;
-        }
-        System.gc();
-        System.runFinalization();
-    }
-
-    public static void tearDownTestDir() {
-        if (TEST_DIR.exists()) {
-            for (File f : TEST_DIR.listFiles()) {
-                f.delete();
+            if (retval != null) {
+                retval.release();
             }
-            TEST_DIR.delete();
         }
     }
 
+    private static String createSegmentName(long id, long prevId) {
+        return PbdSegmentName.createName(TEST_NONCE, id, prevId, false);
+    }
+
+    static class ExtraHeaderMetadata {
+        final int m_int;
+        final long m_long;
+        final byte[] m_bytes;
+
+        ExtraHeaderMetadata(Random random) {
+            m_int = random.nextInt();
+            m_long = random.nextLong();
+            m_bytes = new byte[random.nextInt(256)];
+            random.nextBytes(m_bytes);
+        }
+
+        ExtraHeaderMetadata(ByteBuffer buffer) {
+            m_int = buffer.getInt();
+            m_long = buffer.getLong();
+            m_bytes = new byte[buffer.getInt()];
+            buffer.get(m_bytes);
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + Arrays.hashCode(m_bytes);
+            result = prime * result + m_int;
+            result = prime * result + (int) (m_long ^ (m_long >>> 32));
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            ExtraHeaderMetadata other = (ExtraHeaderMetadata) obj;
+            return m_int == other.m_int && m_long == other.m_long && Arrays.equals(m_bytes, other.m_bytes);
+        }
+    }
+
+    static final BinaryDequeSerializer<ExtraHeaderMetadata> SERIALIZER = new BinaryDequeSerializer<ExtraHeaderMetadata>() {
+        @Override
+        public int getMaxSize(ExtraHeaderMetadata object) throws IOException {
+            return Integer.BYTES + Long.BYTES + Integer.BYTES + object.m_bytes.length;
+        }
+
+        @Override
+        public void write(ExtraHeaderMetadata object, ByteBuffer buffer) throws IOException {
+            buffer.putInt(object.m_int);
+            buffer.putLong(object.m_long);
+            buffer.putInt(object.m_bytes.length);
+            buffer.put(object.m_bytes);
+        }
+
+        @Override
+        public ExtraHeaderMetadata read(ByteBuffer buffer) throws IOException {
+            return new ExtraHeaderMetadata(buffer);
+        }
+    };
 }

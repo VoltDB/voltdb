@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -52,6 +53,7 @@ import org.voltdb.largequery.LargeBlockResponse;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
@@ -66,6 +68,7 @@ import org.voltdb.utils.VoltTrace;
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
     protected static VoltLogger LOG = new VoltLogger("HOST");
+    protected static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
@@ -111,6 +114,37 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         RW_BATCH,
         CATALOG_UPDATE,
         CATALOG_LOAD
+    }
+
+    /**
+     * Enum needs to align with LoadTableCaller in ee
+     */
+    public static enum LoadTableCaller {
+        SNAPSHOT_REPORT_UNIQ_VIOLATIONS(0, false),
+        SNAPSHOT_THROW_ON_UNIQ_VIOLATION(1, false),
+        DR(2, false),
+        BALANCE_PARTITIONS(3),
+        CLIENT(4);
+
+        private final byte m_id;
+        private final boolean m_undo;
+
+        private LoadTableCaller(int id) {
+            this(id, true);
+        }
+
+        private LoadTableCaller(int id, boolean undo) {
+            m_id = (byte) id;
+            m_undo = undo;
+        }
+
+        public byte getId() {
+            return m_id;
+        }
+
+        public boolean createUndoToken() {
+            return m_undo;
+        }
     }
 
     private FragmentContext m_fragmentContext = FragmentContext.UNKNOWN;
@@ -227,7 +261,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         m_siteId = siteId;
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         if (statsAgent != null) {
@@ -577,6 +611,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
+                                                HiddenColumnFilter hiddenColumnFilter,
                                                 long undoQuantumToken,
                                                 byte[] predicates);
 
@@ -592,8 +627,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                                List<DBBPool.BBContainer> outputBuffers);
 
-    public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
-
     /** Releases the Engine object. */
     public abstract void release() throws EEException, InterruptedException;
 
@@ -608,8 +641,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass the catalog to the engine */
     public void loadCatalog(long timestamp, String serializedCatalog) {
         try {
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
+            setupProcedure(null);
             m_fragmentContext = FragmentContext.CATALOG_LOAD;
             coreLoadCatalog(timestamp, getStringBytes(serializedCatalog));
         }
@@ -623,8 +655,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException {
         try {
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
+            setupProcedure(null);
             m_fragmentContext = FragmentContext.CATALOG_UPDATE;
             coreUpdateCatalog(timestamp, isStreamUpdate, diffCommands);
         }
@@ -639,8 +670,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_currentBatchIndex = batchIndex;
     }
 
-    public void setProcedureName(String procedureName) {
+    public void setupProcedure(String procedureName) {
         m_currentProcedureName = procedureName;
+        m_startTime = 0;
+        m_logDuration = INITIAL_LOG_DURATION;
+    }
+
+    public void completeProcedure() {
+        m_currentProcedureName = null;
     }
 
     /** Run multiple plan fragments */
@@ -658,15 +695,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long lastCommittedSpHandle,
             long uniqueId,
             long undoQuantumToken,
-            boolean traceOn) throws EEException
-    {
+            boolean traceOn) throws EEException {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_fragmentContext = (undoQuantumToken == Long.MAX_VALUE) ? FragmentContext.RO_BATCH : FragmentContext.RW_BATCH;
 
             // reset context for progress updates
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
             m_sqlTexts = sqlTexts;
 
             if (traceOn) {
@@ -733,8 +767,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
-        long undoToken) throws EEException;
+            long lastCommittedSpHandle, long uniqueId, long undoToken, LoadTableCaller caller) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -792,14 +825,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long uso, long seqNo, int partitionId, String tableSignature);
+            ExportSnapshotTuple sequences, int partitionId, String streamName);
+
+    /**
+     * Execute an Delete of migrated rows in the execution engine.
+     */
+    public abstract boolean deleteMigratedRows(
+            long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken);
 
     /**
      * Get the seqNo and offset for an export table.
-     * @param tableSignature the signature of the table being polled or acked.
+     * @param streamName the name of the stream being polled.
      * @return the response ExportMessage
      */
-    public abstract long[] getUSOForExportTable(String tableSignature);
+    public abstract long[] getUSOForExportTable(String streamName);
 
     /**
      * Calculate a hash code for a table.
@@ -862,13 +902,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract void setViewsEnabled(String viewNames, boolean enabled);
 
+    /**
+     * Use this to disable writing to all streams from EE like export and DR.
+     * Currently used by elastic shrink to stop a site from writing to export and DR streams
+     * once all its data has been migrated and it is ready to be shutdown.
+     * All streams are enabled by default.
+     */
+    public abstract void disableExternalStreams();
+
+    /**
+     * Return the EE state that indicates if external streams are enabled for this Site or not.
+     */
+    public abstract boolean externalStreamsEnabled();
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
      * jni_class instances in the execution engine. From the EE perspective, a single
      * JNI class is better.  So put this here with the backend->frontend api definition.
      */
-
     protected native byte[] nextDependencyTest(int dependencyId);
 
     /**
@@ -959,17 +1011,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * This method is called to initially load table data.
-     * @param pointer the VoltDBEngine pointer
-     * @param table_id catalog ID of the table
-     * @param serialized_table the table data to be loaded
-     * @param Length of the serialized table
-     * @param undoToken token for undo quantum where changes should be logged.
-     * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
-     * @param undoToken The undo token to release
+     *
+     * @param pointer               the VoltDBEngine pointer
+     * @param table_id              catalog ID of the table
+     * @param serialized_table      the table data to be loaded
+     * @param txnId                 ID of the transaction
+     * @param spHandle              SP handle for this transaction
+     * @param lastCommittedSpHandle Most recently committed SP Handled
+     * @param uniqueId              Unique ID for the transaction
+     * @param undoToken             token for undo quantum where changes should be logged.
+     * @param callerId              ID of the caller who is invoking load table
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
-            long undoToken);
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -1088,11 +1142,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param schemaFilterType ID for which schema filter should be used during this table stream
      * @param undoQuantumToken Undo quantum allowing destructive index clearing to be undone
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, long undoQuantumToken, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte schemaFilterType,
+            long undoQuantumToken, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
@@ -1106,13 +1162,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *         (such as the table not being COW mode).
      */
     protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
-
-    /**
-     * Process a recovery message and load the data it contains.
-     * @param pointer Pointer to an engine instance
-     * @param message Recovery message to load
-     */
-    protected native void nativeProcessRecoveryMessage(long pointer, long message, int offset, int length);
 
     /**
      * Calculate a hash code for a table.
@@ -1138,7 +1187,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckOffset The offset being ACKd.
-     * @param mTableSignature Signature of the table being acted against
+     * @param seqNo The current export sequence number
+     * @param generationId The timestamp from the most-recently restored snapshot
+     * @param mStreamName Name of the stream being acted against
      * @return
      */
     protected native long nativeExportAction(
@@ -1146,18 +1197,44 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
-            byte mTableSignature[]);
+            long generationId,
+            byte mStreamName[]);
+
+    /**
+     * Complete the deletion of the Migrated Table rows.
+     * @param pointer Pointer to an engine instance
+     * @param txnId The transactionId of the currently executing stored procedure
+     * @param spHandle The spHandle of the currently executing stored procedure
+     * @param uniqueId The uniqueId of the currently executing stored procedure
+     * @param mTableName The name of the table that the deletes should be applied to.
+     * @param deletableTxnId The transactionId of the last row that can be deleted
+     * @param undoToken The token marking the rollback point for this transaction
+     * @return true if more rows to be deleted
+     */
+    protected native boolean nativeDeleteMigratedRows(long pointer,
+            long txnid, long spHandle, long uniqueId,
+            byte mTableName[], long deletableTxnId, long undoToken);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
+
+    /**
+     * @see ExecutionEngine#disableExternalStreams()
+     */
+    protected native void nativeDisableExternalStreams(long pointer);
+
+    /**
+     * @see ExecutionEngine#externalStreamsEnabled()
+     */
+    protected native boolean nativeExternalStreamsEnabled(long pointer);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.
      *
      * @param pointer Pointer to an engine instance
-     * @param tableId The table in question
+     * @param stream name of the stream we need state (USO + Seqno) from
      * @return The USO for the export table.
      */
-    public native long[] nativeGetUSOForExportTable(long pointer, byte mTableSignature[]);
+    public native long[] nativeGetUSOForExportTable(long pointer, byte streamName[]);
 
     /**
      * This code only does anything useful on MACOSX.

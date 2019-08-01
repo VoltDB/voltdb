@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -192,109 +192,6 @@ namespace voltdb {
       }
    };
 #endif
-
-   /**
-    * Resource pool for all heteregeous VoltAllocs. Only one
-    * global pool is used, and all new() operations are blocking,
-    * so that at most one thread calls Pool::allocate() method. I
-    * found it exactly the same as using std::new()/delete()
-    * method.
-    *
-    * NOTE: another use case for the allocator is to allocate
-    * from a given pool, rather than the global allocator pool.
-    * This however, would require the allocator to be stateful,
-    * which needs full C++11 support. Therefore, I leave it till
-    * we migrate off from any C++11-partial-supported
-    * compilers/platforms.
-    *
-    * Warning: Be cautious when using this global pool. The pool
-    * itself does not compact, and therefore will never release memory.
-    * This means it is leaking memory as soon as you start using it
-    * on anything but ephemeral storages!!!
-    */
-   class VoltAllocResourceMng {
-      static Pool s_VoltAllocatorPool;
-      static volatile sig_atomic_t s_numInstances;
-      static std::mutex s_allocMutex;
-   public:
-      static void* operator new(std::size_t sz) {
-         std::lock_guard<std::mutex> lock(s_allocMutex);
-         ++s_numInstances;
-         return s_VoltAllocatorPool.allocate(sz);
-      }
-      static void* operator new(std::size_t sz, void* p) {
-         return p;
-      }
-      static void operator delete(void*) {
-         // We don't need to lock here, because the atomic
-         // integer can be only decremented to 0 once.
-         if (0 == --s_numInstances) {
-            s_VoltAllocatorPool.purge();
-         }
-      }
-   };
-   /**
-    * An allocator to be used in lieu with STL containers, but
-    * allocate from a global memory pool.
-    * e.g. std::vector<TxnMem, VoltAlloc<TxnMem>> s;
-    *
-    * The voltdb::allocator (conceptually) uses a common global
-    * Pool with small chunk size, and locks when allocating.
-    * This means:
-    *
-    * 1. The allocator is thread-safe, i.e. multiple threads
-    * using allocator should be free to use it in any manner;
-    *
-    * 2. One thread's memory is invisible to the other, meaning
-    * that they cannot access the same object in any manner.
-    *
-    * 3. Small chunk size helps avoid memory fragmentation, and
-    * increases memory utility.
-    */
-   template<typename T> class allocator {
-   public:
-      typedef std::size_t     size_type;
-      typedef std::ptrdiff_t  difference_type;
-      typedef T*       pointer;
-      typedef const T* const_pointer;
-      typedef T&       reference;
-      typedef const T& const_reference;
-      typedef T        value_type;
-      template<typename R> struct rebind { typedef allocator<R> other; };
-
-      allocator() throw() { }
-      allocator(const allocator&) throw() { }
-      template<typename R> allocator(const allocator<R>&) throw() { }
-      ~allocator() throw() { }
-#ifdef MODERN_CXX
-      pointer address(reference x) const throw() { return std::addressof(x); }
-      const_pointer address(const_reference x) const throw() { return std::addressof(x); }
-#else
-      pointer address(reference x) const throw() { return &x; }
-      const_pointer address(const_reference x) const throw() { return &x; }
-#endif
-      pointer allocate(size_type n, const void* = NULL) {
-         if (n > this->max_size())
-            throw std::bad_alloc();
-         return static_cast<T*>(VoltAllocResourceMng::operator new(n * sizeof(T)));
-      }
-      void deallocate(pointer p, size_type n) {
-         VoltAllocResourceMng::operator delete(p);
-      }
-      size_type max_size() const throw() {
-         return std::numeric_limits<size_type>::max() / sizeof(T);
-      }
-      void construct(pointer p, const T& val) {
-         new((void *)p) T(val);       // NOTE: this calls placement new
-      }
-      template<typename R> void destroy(R* p) {
-         p->~R();
-      }
-   };
-   template<typename T1, typename T2> inline bool operator==(const allocator<T1>&, const allocator<T2>&) throw() { return true; }
-   template<typename T> inline bool operator==(const allocator<T>&, const allocator<T>&) throw() { return true; }
-   template<typename T1, typename T2> inline bool operator!=(const allocator<T1>&, const allocator<T2>&) throw() { return false; }
-   template<typename T> inline bool operator!=(const allocator<T>&, const allocator<T>&) throw() { return false; }
 
    /**
     * Pattern for static factory of creating arbitrary C++ class

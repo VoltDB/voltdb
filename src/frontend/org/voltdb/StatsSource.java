@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -184,6 +184,14 @@ public abstract class StatsSource {
         rowValues[0] = now;
         rowValues[1] = m_hostId;
         rowValues[2] = m_hostname;
+    }
+
+    public Integer getHostId() {
+        return m_hostId;
+    }
+
+    public String getHostname() {
+        return m_hostname;
     }
 
     /**

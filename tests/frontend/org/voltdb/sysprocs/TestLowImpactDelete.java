@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -67,7 +67,7 @@ public class TestLowImpactDelete extends TestCase {
               + "    id BIGINT not null, \n"
               + "    ts TIMESTAMP not null, "
               + "    PRIMARY KEY (id) \n"
-              + " ) USING TTL 10 SECONDS ON COLUMN TS BATCH_SIZE 10 MAX_FREQUENCY 3; \n"
+              + " ) USING TTL 30 SECONDS ON COLUMN TS BATCH_SIZE 10 MAX_FREQUENCY 3; \n"
               + "PARTITION TABLE ttl ON COLUMN id;"
               + "CREATE INDEX ttlindex ON ttl (ts);"
 
@@ -86,8 +86,8 @@ public class TestLowImpactDelete extends TestCase {
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
         builder.addStmtProcedure("ttlcount", "select count(*) from ttl;");
         builder.setUseDDLSchema(true);
-        m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
-        m_cluster.setHasLocalServer(true);
+        m_cluster = new LocalCluster("fooxx.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
+        m_cluster.setHasLocalServer(false);
         m_cluster.compile(builder);
         m_cluster.startUp();
 
@@ -320,7 +320,7 @@ public class TestLowImpactDelete extends TestCase {
         }
         //allow TTL to work, the inserted rows should be deleted after 10 seconds
         try {
-            Thread.sleep(60*1000);
+            Thread.sleep(90*1000);
             VoltTable vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
             System.out.println(vt.toFormattedString());
             vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];
@@ -333,7 +333,7 @@ public class TestLowImpactDelete extends TestCase {
                     fail("fail to insert data for TTL testing.");
                 }
             }
-            Thread.sleep(60*1000);
+            Thread.sleep(90*1000);
             vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
             System.out.println(vt.toFormattedString());
             vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];

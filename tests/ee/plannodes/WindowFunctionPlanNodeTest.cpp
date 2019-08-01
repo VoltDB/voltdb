@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -231,11 +231,11 @@ TEST_F(WindowFunctionPlanNodeTest, TestJSON)
         const char *jsonString = jsonStrings[jsonIdx];
         jsonDescription *jsonDescr = &jsonDescrs[jsonIdx];
         PlannerDomRoot root(jsonString);
-        PlannerDomValue obj(root.rootObject());
+        PlannerDomValue obj(root());
         // If the json string is busted this will be true.
         EXPECT_FALSE(root.isNull());
         boost::shared_ptr<voltdb::WindowFunctionPlanNode>
-            pn(dynamic_cast<WindowFunctionPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
+            pn(dynamic_cast<WindowFunctionPlanNode*>(AbstractPlanNode::fromJSONObject(obj).release()));
         EXPECT_TRUE(pn.get() != NULL);
         EXPECT_EQ(jsonDescr->nAggs, pn->getAggregates().size());
         for (int aggIdx = 0; aggIdx < pn->getAggregates().size(); aggIdx += 1) {

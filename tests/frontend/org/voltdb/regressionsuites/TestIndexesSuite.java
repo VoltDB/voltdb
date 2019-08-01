@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,13 +27,13 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.TreeSet;
 
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
@@ -58,15 +58,27 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Truncate table " + tb);
         }
     }
-    public void testOrderedIntIndex()
-            throws IOException, ProcCallException
-    {
-        subTestOrderedMultiMultiPrefixOnly();
-        subTestOrderedUniqueOneColumnIntIndex();
-        subTestOrderedMultiOneColumnIntIndex();
-        subTestOrderedMultiOneColumnIndexLessThan();
-        subTestOrderedMultiMultiColumnIntIndex();
-        subTestOrderedMultiMultiIntGTEFailure();
+
+    @Test
+    public void testUnaryMinusIndex() throws IOException, ProcCallException {
+        Client client = getClient();
+        String sql, explainPlanStr;
+
+        explainPlanStr = "INDEX SCAN of \"P1\" using \"P1_IDX_UNARY_MINUS\" (for sort order only)";
+        // exactly match
+        sql = "select * from P1 order by -NUM, NUM2;";
+        checkQueryPlan(client, sql, explainPlanStr);
+    }
+
+    @Test
+    public void testCreateIndexDESC() throws IOException {
+        Client client = getClient();
+        try {
+            client.callProcedure("@AdHoc", "CREATE INDEX negIndex ON P1(ID DESC)");
+            fail("DESC should not be allowed in CREATE INDEX.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("unexpected token: DESC"));
+        }
     }
 
     // Index stuff to test:
@@ -81,13 +93,11 @@ public class TestIndexesSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    private void subTestOrderedMultiMultiPrefixOnly()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedMultiMultiPrefixOnly() throws IOException, ProcCallException {
         String[] tables = {"P3", "R3"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
             client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
             client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
             client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
@@ -106,9 +116,8 @@ public class TestIndexesSuite extends RegressionSuite {
         truncateTables(tables);
     }
 
-    private void subTestOrderedUniqueOneColumnIntIndex()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedUniqueOneColumnIntIndex() throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
         for (String table : tables)
@@ -183,9 +192,8 @@ public class TestIndexesSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    private void subTestOrderedMultiOneColumnIntIndex()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedMultiOneColumnIntIndex() throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
         for (String table : tables)
@@ -255,9 +263,8 @@ public class TestIndexesSuite extends RegressionSuite {
     /**
      * Multimap one column less than.
      */
-    private void subTestOrderedMultiOneColumnIndexLessThan()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedMultiOneColumnIndexLessThan() throws IOException, ProcCallException {
         Client client = getClient();
         client.callProcedure("Insert", "P3", 0, "a", 1, 2, 1.0);
         client.callProcedure("Insert", "P3", 1, "b", 1, 2, 2.0);
@@ -297,9 +304,8 @@ public class TestIndexesSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    private void subTestOrderedMultiMultiColumnIntIndex()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedMultiMultiColumnIntIndex() throws IOException, ProcCallException {
         String[] tables = {"P3", "R3"};
         Client client = getClient();
         for (String table : tables)
@@ -319,9 +325,8 @@ public class TestIndexesSuite extends RegressionSuite {
         truncateTables(tables);
     }
 
-    private void subTestOrderedMultiMultiIntGTEFailure()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testOrderedMultiMultiIntGTEFailure() throws IOException, ProcCallException {
         final Client client = getClient();
         final VoltTable results[] = client.callProcedure("CheckMultiMultiIntGTEFailure").getResults();
         if (results == null) {
@@ -458,9 +463,8 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals( ((Double)expected[4]).doubleValue(), vt.getDouble(4), 0.001);
     }
 
-    public void testInList()
-            throws IOException, ProcCallException
-    {
+    @Test
+    public void testInList() throws IOException, ProcCallException {
         String[] tables = {"P3", "R3"};
         Object [] line1 = new Object[] {1, "a", 100, 1, 14.5};
         Object [] line2 = new Object[] {2, "b", 100, 2, 15.5};
@@ -831,20 +835,8 @@ public class TestIndexesSuite extends RegressionSuite {
 
     }
 
-    public void testRegressEdgeCases() throws Exception {
-        subTestParameterizedLimitOnIndexScan();
-        subTestPushDownAggregateWithLimit();
-
-        subTestNaNInIndexes();
-        subTestTicket195();
-
-        subTestUpdateRange();
-
-        subTestKeyCastingOverflow();
-    }
-
-    private void subTestParameterizedLimitOnIndexScan()
-            throws IOException, ProcCallException {
+    @Test
+    public void testParameterizedLimitOnIndexScan() throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
         for (String table : tables)
@@ -863,7 +855,8 @@ public class TestIndexesSuite extends RegressionSuite {
         truncateTables(tables);
     }
 
-    private void subTestPushDownAggregateWithLimit() throws IOException, ProcCallException {
+    @Test
+    public void testPushDownAggregateWithLimit() throws IOException, ProcCallException {
         String[] tables = {"R1", "P1", "P2", "R2"};
         Client client = getClient();
         for (String table : tables)
@@ -885,7 +878,8 @@ public class TestIndexesSuite extends RegressionSuite {
         truncateTables(tables);
     }
 
-    private void subTestNaNInIndexes() throws IOException, ProcCallException {
+    @Test
+    public void testNaNInIndexes() throws IOException, ProcCallException {
         // current hsql seems to fail on null handling
         if (isHSQL()) return;
 
@@ -913,9 +907,8 @@ public class TestIndexesSuite extends RegressionSuite {
         System.out.println(results);
     }
 
-    private void subTestTicket195()
-    throws IOException, ProcCallException
-    {
+    @Test
+    public void testTicket195() throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
         for (String table : tables)
@@ -941,7 +934,8 @@ public class TestIndexesSuite extends RegressionSuite {
     }
 
     // Testing ENG-506 but this probably isn't enough to trust...
-    private void subTestUpdateRange() throws Exception {
+    @Test
+    public void testUpdateRange() throws Exception {
         final Client client = getClient();
         VoltTable[] results;
 
@@ -1172,7 +1166,8 @@ public class TestIndexesSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc", "delete from R1IX").getResults();
     }
 
-    private void subTestKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
+    @Test
+    public void testKeyCastingOverflow() throws IOException, ProcCallException {
         Client client = getClient();
 
         ClientResponseImpl cr =
@@ -1190,7 +1185,8 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
-    public void testVarbinaryIndex() throws NoConnectionsException, IOException, ProcCallException {
+    @Test
+    public void testVarbinaryIndex() throws IOException, ProcCallException {
         Client client = getClient();
         String sql, explainPlanStr;
 
@@ -1244,6 +1240,7 @@ public class TestIndexesSuite extends RegressionSuite {
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD", "0A0BEF"});
     }
 
+    @Test
     public void testBooleanExpressions() throws Exception {
         Client client = getClient();
         VoltTable results;
@@ -1286,6 +1283,7 @@ public class TestIndexesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("indexes-ddl.sql"));
         project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.setUseDDLSchema(true);
         project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");

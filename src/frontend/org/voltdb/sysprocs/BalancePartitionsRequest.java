@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,13 @@ public class BalancePartitionsRequest implements JSONString {
             this.rangeStart = rangeStart;
             this.rangeEnd = rangeEnd;
         }
+
+        @Override
+        public String toString() {
+            return "PartitionPair [srcPartition=" + srcPartition + ", destPartition=" + destPartition + ", rangeStart="
+                    + rangeStart + ", rangeEnd=" + rangeEnd + "]";
+        }
+
     }
 
     public final List<PartitionPair> partitionPairs;

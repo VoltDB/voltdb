@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ package org.voltdb.planner;
 
 import java.util.List;
 
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public class TestPlansMatView extends PlannerTestCase {
