@@ -53,9 +53,7 @@ public:
         vassert(tuple1);
         if ( ! tuple1 ) {
             throw SerializableEEException(
-                    "TupleValueExpression::"
-                    "eval:"
-                    " Couldn't find tuple 1 (possible index scan planning error)");
+                    "TupleValueExpression::eval: Couldn't find tuple 1 (possible index scan planning error)");
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
 

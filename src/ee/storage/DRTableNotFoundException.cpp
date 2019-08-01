@@ -21,7 +21,7 @@
 using namespace voltdb;
 
 DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string const& message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND, message),
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND, message),
     m_hash(hash)
 { }
 
