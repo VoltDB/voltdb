@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DefaultProcedureManager;
 import org.voltdb.DependencyPair;
@@ -29,6 +30,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -38,7 +40,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.VoltTable.ColumnInfo;
 
 public class MigrateRowsBase extends VoltSystemProcedure {
     VoltLogger exportLog = new VoltLogger("EXPORT");
@@ -48,10 +49,12 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             new ColumnInfo("LEFT_ROWS", VoltType.BIGINT)       /* number of rows to be deleted after this invocation */
     };
 
+    @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
     }
 
+    @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
@@ -209,7 +212,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         VoltTable result = null;
         result = executePrecompiledSQL(countStmt, params, replicated);
         long rowCount = result.asScalarLong();
-        if (exportLog.isDebugEnabled()) {
+        if (rowCount > 0 && exportLog.isDebugEnabled()) {
             exportLog.debug("Migrate on table " + tableName +
                     " on partition " + ctx.getPartitionId() +
                     " reported " + rowCount + " matching rows. txnid:" + TxnEgo.txnIdToString(m_runner.getTxnState().txnId) + " sphandle:" +

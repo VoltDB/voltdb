@@ -872,8 +872,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     if (sequenceNumber < 0) {
-                        exportLog.error("Snapshot does not include valid truncation point for partition " +
-                                m_partitionId);
+                        if (sequenceNumber == -1L && generationIdCreated == 0 && m_partitionId != 0 && m_gapTracker.isEmpty()) {
+                            // ENG-17199: we are creating EDS instances for all partitions on replicated tables
+                            // but only partition 0 is used and can be truncated
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Ignoring truncation for partition " + m_partitionId);
+                            }
+                        } else {
+                            exportLog.error("Snapshot does not include valid truncation point for partition " +
+                                    m_partitionId);
+                        }
                         return;
                     }
                     if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
