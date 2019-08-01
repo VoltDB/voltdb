@@ -73,6 +73,11 @@ public class DRLogSegmentId implements Serializable {
         return makeDRIdFromComponents(clusterId, 0L) - 1L;
     }
 
+    public static boolean isMaxDrIdForCluster(long drId, byte clusterId) {
+        return (clusterId == getClusterIdFromDRId(drId) &&
+                MAX_SEQUENCE_NUMBER == getSequenceNumberFromDRId(drId));
+    }
+
     /*
      * Empty DR Id is used as a sentinel
      * 1) in EndOfSnapshotBuffer to indicate the partition doesn't have any snapshot buffer,
@@ -84,6 +89,16 @@ public class DRLogSegmentId implements Serializable {
      */
     public static boolean isEmptyDRId (long drId) {
         return ((drId >>> 63) == 1L) && (drId != -1);
+    }
+
+    // Constructing InitialAckDRId changes the clusterId in the DrId.
+    // To correctly say if a DRId is an initial ack id, we need the clusterId as well.
+    public static boolean isInitialAckDRId(long drId, byte clusterId) {
+        if (drId == -1 && clusterId == 0) {
+            return true;
+        }
+        drId += 1;
+        return (clusterId == getClusterIdFromDRId(drId) && (getSequenceNumberFromDRId(drId) == 0));
     }
 
     /*
@@ -98,8 +113,12 @@ public class DRLogSegmentId implements Serializable {
         return false;
     }
 
-    public static boolean seqIsBeforeZero(long drId) {
-        return (getSequenceNumberFromDRId(-1L) == getSequenceNumberFromDRId(drId));
+    public static boolean seqIsBeforeZero(long drId, byte clusterId) {
+        if (drId == -1 && clusterId == 0) {
+            return true;
+        } else {
+            return getClusterIdFromDRId(drId) == (clusterId - 1);
+        }
     }
 
     public static int getClusterIdFromDRId(long drId) {

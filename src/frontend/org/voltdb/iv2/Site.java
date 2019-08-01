@@ -74,6 +74,7 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogSerializer;
@@ -490,17 +491,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                     if (lastReceivedLogId >= logId) {
                         // This is a duplicate
-                        drLog.info(String.format("P%d binary log site idempotency check returning DUP. " +
-                                                  "Site's tracker lastReceivedLogId is %d while the logId is %d",
-                                                  producerPartitionId, lastReceivedLogId, logId));
+                        if (drLog.isDebugEnabled()) {
+                            drLog.debug(String.format("P%d binary log site idempotency check returning DUP. " +
+                                    "Site's tracker lastReceivedLogId is %d while the logId is %d",
+                                    producerPartitionId, lastReceivedLogId, logId));
+                        }
                         return DRIdempotencyResult.DUPLICATE;
                     }
                     drLog.info(String.format("P%d binary log site idempotency check returning GAP. " +
                             "Site's tracker lastReceivedLogId %d while the logId %d",
                             producerPartitionId, lastReceivedLogId, logId));
 
-                    if (drLog.isTraceEnabled()) {
-                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                    if (drLog.isDebugEnabled()) {
+                        drLog.debug(String.format("P%d binary log site idempotency check failed. " +
                                                   "Site's tracker lastReceivedLogId %d while the logId %d",
                                                   producerPartitionId, lastReceivedLogId, logId));
                     }

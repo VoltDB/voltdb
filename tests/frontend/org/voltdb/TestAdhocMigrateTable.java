@@ -62,13 +62,15 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     public void testSimple() throws Exception {
         testMigrate(
                 "CREATE TABLE with_ttl migrate to target foo (i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
-                "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT);\n" +
+                "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT, k VARCHAR(20));\n" +
                 "CREATE TABLE with_ttl_no_target(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
                 "CREATE TABLE without_ttl_no_target(i int NOT NULL, j FLOAT);\n",
                 Stream.of(
                         Pair.of("MIGRATE FROM without_ttl;", false),
                         Pair.of("MIGRATE FROM without_ttl WHERE not migrating;", true),
                         Pair.of("MIGRATE FROM without_ttl WHERE i < 0 and not migrating;", true),
+                         // ENG-17049 add support for like ''
+                        Pair.of("MIGRATE FROM without_ttl WHERE k Like 'sss%' and not migrating;", true),
                         Pair.of("MIGRATE FROM with_ttl;", false),
                         Pair.of("MIGRATE FROM with_ttl WHERE j > 0;", false),
                         Pair.of("MIGRATE FROM with_ttl WHERE not migrating;", true),

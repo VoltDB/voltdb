@@ -217,6 +217,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * Create a new data source.
+     *
      * @param db
      * @param tableName
      * @param partitionId
@@ -241,7 +242,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_tableName = tableName;
         m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
         String nonce = m_tableName + "_" + partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, partitionId, genId);
+
+        // Create a NEW PBD: this will discard any stale data discovered on disk
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, partitionId, genId, true);
         m_gapTracker = m_committedBuffers.scanForGap();
         // Set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, StreamStartAction.INITIALIZATION);
@@ -384,6 +387,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new IOException(e);
         }
 
+        // Create a PBD, recovering any data present on disk
         final String nonce = m_tableName + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, m_partitionId, genId);
         m_gapTracker = m_committedBuffers.scanForGap();
@@ -443,35 +447,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             });
         }
-    }
-
-    // In truncateExportToSeqNo() we try to cleanup stale PBD segments. If truncation isn't invoked
-    // due to an empty snapshot or stream not present in snapshot, this is our last chance to clean
-    // stale PBD segments. This MUST be called before the {@code GuestProcessor} starts polling.
-    public ListenableFuture<?> cleanupStaleBuffers(StreamStartAction action) {
-        return m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                // *Created* generation id is either from EDS constructor or from export buffer
-                // truncation (which comes from loading snapshot)
-                long generationIdCreated = m_committedBuffers.getGenerationIdCreated();
-                try {
-                    assert(!m_readyForPolling);
-
-                    if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
-                        // Stale export buffers are deleted , re-create the tracker.
-                        m_gapTracker = m_committedBuffers.scanForGap();
-                        // If we reach here it means the stream hasn't got sequence number
-                        // from snapshot because either it's empty or stream isn't exist in snapshot.
-                        // In both case we can safely assume here the start sequence number is O.
-                        resetStateInRejoinOrRecover(0L, action);
-                    }
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error while trying to delete stale PBD segments older than generation " +
-                            generationIdCreated, true, e);
-                }
-            }
-        });
     }
 
     public void markInCatalog(boolean inCatalog) {
@@ -916,8 +891,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     long seqNo = 0L;
                     if (action == StreamStartAction.RECOVER || action == StreamStartAction.REJOIN) {
                         seqNo = sequenceNumber;
+                        m_coordinator.setInitialSequenceNumber(seqNo);
                     }
-                    m_coordinator.setInitialSequenceNumber(seqNo);
+
                     m_tupleCount = seqNo;
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(seqNo, action);

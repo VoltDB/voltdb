@@ -31,11 +31,11 @@ public class ExplainCatalog extends AdHocNTExplain {
 
     @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        return runInternal(params);
+        return runUsingLegacy(params);
     }
 
     @Override
-    public CompletableFuture<ClientResponse> run(String sql) {
+    public CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         throw new PlanningErrorException("Unsupported operation");
     }
 

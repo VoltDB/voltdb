@@ -51,6 +51,7 @@
 #include "executors/abstractexecutor.h"
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
+#include "executors/migrateexecutor.h"
 #include "executors/indexscanexecutor.h"
 #include "executors/indexcountexecutor.h"
 #include "executors/tablecountexecutor.h"

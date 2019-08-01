@@ -2468,7 +2468,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Exception ex = null;
         try {
             String sql = String.format("select inet%s_aton(pres) from %s;", ipVersion, tableName);
-            client.callProcedure("@AdHoc", sql);
+            cr = client.callProcedure("@AdHoc", sql);
             fail(String.format("Expected inet address %s to fail.", presentation));
         } catch (Exception e) {
             ex = e;

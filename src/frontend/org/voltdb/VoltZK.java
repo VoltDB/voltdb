@@ -123,7 +123,7 @@ public class VoltZK {
         return builder.toString();
     }
 
-    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+    public static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
         builder.append(dir).append(":\t ");
         try {
             List<String> keys = zk.getChildren(dir, null);
@@ -526,7 +526,7 @@ public class VoltZK {
         }
 
         if (errorMsg != null) {
-            VoltZK.removeActionBlocker(zk, node, null);
+            VoltZK.removeActionBlocker(zk, node, hostLog);
             return "Can't do " + request + " " + errorMsg;
         }
 
@@ -535,18 +535,27 @@ public class VoltZK {
         return null;
     }
 
-    public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log)
-    {
+    public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log) {
+        if (log != null) {
+            log.info("Removing action blocker " + node);
+        }
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
+            if (e.code() == KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+                    log.info("Action blocker " + node + " does not exist.");
                 }
-                return false;
+                return true;
             }
+            if (log != null) {
+                log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+            }
+            return false;
         } catch (InterruptedException e) {
+            if (log != null) {
+                log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+            }
             return false;
         }
         if (log != null) {

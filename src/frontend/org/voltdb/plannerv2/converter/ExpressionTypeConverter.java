@@ -38,6 +38,7 @@ public class ExpressionTypeConverter {
                     .build();
 
     public static ExpressionType calciteTypeToVoltType(SqlKind sqlKind) {
-        return calciteToVoltDBExpressionTypeMap.get(sqlKind.lowerName);
+        ExpressionType exprType = calciteToVoltDBExpressionTypeMap.get(sqlKind.lowerName);
+        return exprType != null ? exprType : ExpressionType.INVALID;
     }
 }

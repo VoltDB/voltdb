@@ -46,6 +46,7 @@
 #include "plannodes/plannodeutil.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
+#include "plannodes/migratenode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"

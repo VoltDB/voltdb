@@ -1441,7 +1441,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         // in case of multiple threads send to the same hsId at the same time
                         fhost = m_fhMapping.get(hsId);
                         if (fhost == null) {
-                            Integer perFHCounter = s_nextForeignHost.get(hostId);
+                            int perFHCounter = s_nextForeignHost.getOrDefault(hostId, 0);
                             int index = Math.abs(perFHCounter % fhosts.size());
                             s_nextForeignHost.put(hostId, ++perFHCounter);
                             fhost = fhosts.get(index);

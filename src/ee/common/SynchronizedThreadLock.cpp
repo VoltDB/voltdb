@@ -112,9 +112,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
 
             delete s_mpEngine.stringData;
             s_mpEngine.stringData = new CompactingStringStorage();
-
-            delete s_mpEngine.allocated;
-            s_mpEngine.allocated = new std::size_t(0);
+            s_mpEngine.allocated = new size_t(0);   // NOTE: cannot delete allocated here
         }
     }
 }
@@ -134,18 +132,16 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.poolData = NULL;
             delete s_mpEngine.stringData;
             s_mpEngine.stringData = NULL;
-            delete s_mpEngine.allocated;
-            s_mpEngine.allocated = NULL;
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
+            delete s_mpEngine.allocated;
+            s_mpEngine.allocated = nullptr;
             s_mpEngine.context = NULL;
 #ifdef VOLT_POOL_CHECKING
-            pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
-            pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);
-            ThreadLocalPool::SizeBucketMap_t::iterator mapForAdd = mapBySize.begin();
+            auto mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
-                ThreadLocalPool::AllocTraceMap_t& allocMap = mapForAdd->second;
+                auto& allocMap = mapForAdd->second;
                 mapForAdd++;
                 if (!allocMap.empty()) {
                     ThreadLocalPool::AllocTraceMap_t::iterator nextAlloc = allocMap.begin();
@@ -170,7 +166,6 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         EngineLocals& engine = s_enginesByPartitionId[partitionId];
         engine.poolData = NULL;
         engine.stringData = NULL;
-        engine.allocated = NULL;
         engine.enginePartitionId = NULL;
         engine.context = NULL;
         s_enginesByPartitionId.erase(partitionId);
