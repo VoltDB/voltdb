@@ -291,8 +291,13 @@ public final class PlanCostUtil {
     }
 
     private static double discountIndexCollation(Index index, RelCollation collation) {
-        return Math.log(index.getColumns().size() -
+        // No discount if the collation is empty
+        if (collation.getFieldCollations().isEmpty()) {
+            return 1.;
+        } else {
+            return Math.log(index.getColumns().size() -
                 commonPrefixLength(collationIndices(collation), indexColumns(index)) + E_CONST);
+        }
     }
 
     private static double getSearchExpressionKeyWidth(AccessPath accessPath, final double colCount) {

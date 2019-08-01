@@ -84,14 +84,21 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
                 .pass();
     }
 
-    // This tests recognition of covering parameters to prefer a hash index that would use a
-    // greater number of key components than a competing tree index.
-    // Not sure how this relates to ENG-931?
     public void testEng931Plan() {
-        // TODO: Volt Planner picks IDX_1_HASH index
+        // IDX_1_HASH index is selected because it uses a greater number of key components
+        // Note. "HASH" index is backed by the same Binary tree implementation
         m_tester.sql("select a from t where a = ? and b = ? and c = ? and d = ? " +
                 "and e >= ? and e <= ?")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, T]], split=[1], expr#0..4=[{inputs}], expr#5=[?0], expr#6=[=($t0, $t5)], expr#7=[?1], expr#8=[=($t1, $t7)], expr#9=[?2], expr#10=[=($t2, $t9)], expr#11=[?3], expr#12=[=($t3, $t11)], expr#13=[?4], expr#14=[>=($t4, $t13)], expr#15=[?5], expr#16=[<=($t4, $t15)], expr#17=[AND($t6, $t8, $t10, $t12, $t14, $t16)], A=[$t0], $condition=[$t17], index=[IDX_1_HASH_INVALIDEQ4_4])\n")
+                .pass();
+    }
+
+    public void testEng931Plan1() {
+        // cover2_TREE on t (a, b) exactly matches the ORDER collation
+        m_tester.sql("select a from t order by a, b")
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
+                    "  VoltPhysicalTableIndexScan(table=[[public, T]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}], index=[COVER2_TREE_ASCEQ0_0])\n")
+                .pass();
     }
 
     // This tests recognition of prefix parameters and constants to prefer an index that
