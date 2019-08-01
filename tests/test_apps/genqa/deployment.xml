@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <export>
-        <configuration enabled="true" target="FOO">
+        <configuration enabled="true" target="file_target">
             <property name="type">csv</property>
             <property name="with-schema">false</property>
             <property name="batched">false</property>
@@ -13,7 +13,7 @@
             <property name="period">1</property>
             <property name="outdir">exportdata</property>
         </configuration>
-        <configuration enabled="true" target="ABC" type="custom"
+        <configuration enabled="true" target="loopback_target" type="custom"
                exportconnectorclass="org.voltdb.exportclient.loopback.LoopbackExportClient">
             <property name="procedure">insert_with_metadata</property>
             <property name="skipinternals">false</property>

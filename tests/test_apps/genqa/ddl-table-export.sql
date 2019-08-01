@@ -24,7 +24,7 @@ CREATE TABLE partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -67,7 +67,7 @@ AS
  GROUP BY VOLT_EXPORT_OPERATION;
 
 -- Export Table for Partitioned Data Table
-CREATE TABLE export_partitioned_table EXPORT TO TARGET abc ON insert, update, delete
+CREATE TABLE export_partitioned_table EXPORT TO TARGET loopback_target ON insert, update, delete
 (
   txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -81,7 +81,7 @@ CREATE TABLE export_partitioned_table EXPORT TO TARGET abc ON insert, update, de
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -96,7 +96,7 @@ CREATE TABLE export_partitioned_table EXPORT TO TARGET abc ON insert, update, de
 );
 PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
+CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -110,7 +110,7 @@ CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO T
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -123,7 +123,7 @@ CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO T
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_partitioned_table2 EXPORT TO TARGET default1
+CREATE TABLE export_partitioned_table2 EXPORT TO TARGET file_target
 (
   txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -137,7 +137,7 @@ CREATE TABLE export_partitioned_table2 EXPORT TO TARGET default1
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -150,33 +150,6 @@ CREATE TABLE export_partitioned_table2 EXPORT TO TARGET default1
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
-
-CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
-(
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
-, rowid_group               TINYINT       NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT       NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT      NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER       NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT        NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT         NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)   NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)  NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-);
 
 CREATE TABLE export_mirror_partitioned_table
 (
@@ -192,7 +165,7 @@ CREATE TABLE export_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -220,7 +193,7 @@ CREATE TABLE export_mirror_partitioned_table2
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -258,7 +231,7 @@ CREATE TABLE replicated_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -303,7 +276,7 @@ CREATE TABLE  export_replicated_table EXPORT TO TARGET abc ON insert, delete, up
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -330,7 +303,7 @@ CREATE STREAM export_replicated_table_foo EXPORT TO TARGET foo
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -403,7 +376,7 @@ CREATE TABLE export_geo_partitioned_table EXPORT TO TARGET abc ON insert, delete
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -438,7 +411,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
