@@ -55,8 +55,8 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
@@ -220,7 +220,7 @@ public class SnapshotSiteProcessor {
         SiteProcedureConnection spc = context.getSiteProcedureConnection();
 
         for (Table t : database.getTables()) {
-            if (!CatalogUtil.isStream(database, t)) {
+            if (!TableType.needsExportDataSource(t.getTabletype())) {
                 continue;
             }
 
