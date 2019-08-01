@@ -17,7 +17,9 @@
 
 package org.voltdb;
 
-public interface VoltUDAggregate<T, U, S> {
+import org.voltdb.VoltType;
+
+public interface VoltUDAggregate<T, U> {
 
     /**
      * The customer needs to define their own data strucutes
@@ -35,10 +37,10 @@ public interface VoltUDAggregate<T, U, S> {
      * Combine the partial results of different tables together (partitioned)
      * @param other An instance of the implementing class of interface VoltUDAggregate
      */
-    public void combine(S other);
+    public void combine(U other);
 
     /**
      * @return return the aggregation results based on the used defined return value U
      */
-    public U end();
+    public Object end();
 }
