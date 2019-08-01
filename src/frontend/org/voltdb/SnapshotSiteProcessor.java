@@ -220,7 +220,7 @@ public class SnapshotSiteProcessor {
         SiteProcedureConnection spc = context.getSiteProcedureConnection();
 
         for (Table t : database.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(database, t)) {
+            if (!CatalogUtil.isStream(database, t)) {
                 continue;
             }
 
