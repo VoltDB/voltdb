@@ -297,6 +297,73 @@ public class TestSchedulerManager {
         assertEquals(4, s_postRunSchedulerCallCount.get());
     }
 
+    /*
+     * Test that stats are maintained while a previously running procedure is disabled but scheduler is restarted when
+     * enabled
+     */
+    @Test
+    public void disableReenableScheduler() throws Exception {
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+
+        startSync();
+        promoteToLeaderSync(schedule);
+        Thread.sleep(100);
+        assertEquals(1, s_firstSchedulerCallCount.get());
+
+        schedule.setEnabled(false);
+        processUpdateSync(schedule);
+        Thread.sleep(5);
+        validateStats();
+
+        schedule.setEnabled(true);
+        processUpdateSync(schedule);
+        Thread.sleep(20);
+        dropScheduleAndAssertCounts(2);
+    }
+
+    /*
+     * Test that newly promoted partitions honor the enable flag of a procedure
+     */
+    @Test
+    public void partitionPromotionAndDisabledSchedules() throws Exception {
+        ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerRerun.class,
+                SchedulerManager.RUN_LOCATION_PARTITIONS, 5);
+
+        startSync(schedule);
+
+        schedule.setEnabled(false);
+        processUpdateSync(schedule);
+
+        promotedPartitionsSync(0, 1);
+
+        assertEquals(0, getScheduleStats().getRowCount());
+
+        schedule.setEnabled(true);
+        processUpdateSync(schedule);
+
+        assertEquals(2, getScheduleStats().getRowCount());
+
+        promotedPartitionsSync(2, 3);
+        assertEquals(4, getScheduleStats().getRowCount());
+
+        schedule.setEnabled(false);
+        processUpdateSync(schedule);
+
+        promotedPartitionsSync(4, 5);
+        assertEquals(4, getScheduleStats().getRowCount());
+
+        schedule.setEnabled(true);
+        processUpdateSync(schedule);
+
+        assertEquals(6, getScheduleStats().getRowCount());
+
+        schedule.setEnabled(false);
+        processUpdateSync(schedule);
+
+        demotedPartitionsSync(3, 4, 5);
+        assertEquals(3, getScheduleStats().getRowCount());
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -327,11 +394,11 @@ public class TestSchedulerManager {
         return createProcedureSchedule(name.getMethodName(), clazz, runLocation, params);
     }
 
-    private ProcedureSchedule createProcedureSchedule(String name, Class<? extends Scheduler> clazz, String runLocation,
+    private ProcedureSchedule createProcedureSchedule(String scheduleName, Class<? extends Scheduler> clazz, String runLocation,
             Object... params) {
-        ProcedureSchedule ps = m_database.getProcedureschedules().add(name);
+        ProcedureSchedule ps = m_database.getProcedureschedules().add(scheduleName);
         ps.setEnabled(true);
-        ps.setName(name);
+        ps.setName(scheduleName);
         ps.setRunlocation(runLocation);
         ps.setSchedulerclass(clazz.getName());
         ps.setUser("user");
@@ -372,8 +439,12 @@ public class TestSchedulerManager {
         Futures.whenAllSucceed(futures).call(() -> null).get();
     }
 
+    private VoltTable getScheduleStats() {
+        return m_statsAgent.getStatsAggregate(StatsSelector.SCHEDULES, false, System.currentTimeMillis());
+    }
+
     private void validateStats() {
-        VoltTable table = m_statsAgent.getStatsAggregate(StatsSelector.SCHEDULER, false, System.currentTimeMillis());
+        VoltTable table = getScheduleStats();
         long totalSchedulerInvocations = 0;
         long totalProcedureInvocations = 0;
         while (table.advanceRow()) {
@@ -381,7 +452,7 @@ public class TestSchedulerManager {
             totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
         }
 
-        assertTrue(totalSchedulerInvocations > totalProcedureInvocations);
+        assertTrue(totalSchedulerInvocations >= totalProcedureInvocations);
         assertTrue(totalSchedulerInvocations <= s_firstSchedulerCallCount.get() + s_postRunSchedulerCallCount.get());
     }
 

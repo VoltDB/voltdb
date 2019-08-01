@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -478,6 +479,7 @@ public class SchedulerManager {
                 // Do not restart a schedule if it has not changed
                 if (handler.isSameSchedule(procedureSchedule, result.m_factory)) {
                     newHandlers.put(procedureSchedule.getName(), handler);
+                    handler.setEnabled(procedureSchedule.getEnabled());
                     continue;
                 }
                 handler.cancel();
@@ -585,12 +587,19 @@ public class SchedulerManager {
         }
 
         /**
+         * Does not include {@link ProcedureSchedule#getEnabled()} in {@code definition} comparison
+         *
          * @param definition {@link ProcedureSchedule} defining the schedule configuration
          * @param factory    {@link SchedulerFactory} derived from {@code definition}
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
         boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory) {
-            return m_definition.equals(definition) && m_factory.hashesMatch(factory);
+            return Objects.equals(m_definition.getName(), definition.getName())
+                    && Objects.equals(m_definition.getRunlocation(), definition.getRunlocation())
+                    && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
+                    && Objects.equals(m_definition.getUser(), definition.getUser())
+                    && Objects.equals(m_definition.getParameters(), definition.getParameters())
+                    && m_factory.hashesMatch(factory);
         }
 
         String getName() {
@@ -604,7 +613,13 @@ public class SchedulerManager {
         /**
          * Start executing this configured scheduler
          */
-        abstract void start();
+        final void start() {
+            if (m_definition.getEnabled()) {
+                startImpl();
+            }
+        }
+
+        abstract void startImpl();
 
         @Override
         public String toString() {
@@ -622,6 +637,13 @@ public class SchedulerManager {
          * @param partition which was promoted
          */
         abstract void promotedPartition(int partitionId);
+
+        /**
+         * Set the enabled state of the schedule.
+         */
+        void setEnabled(boolean enabled) {
+            m_definition.setEnabled(enabled);
+        };
 
         /**
          * Notify this scheduler configuration of partitions which were locally demoted from leader
@@ -650,13 +672,12 @@ public class SchedulerManager {
         SingleSchedulerHandler(ProcedureSchedule definition, String runLocation, SchedulerFactory factory) {
             super(definition, factory);
 
-            Scheduler scheduler = constructScheduler();
             switch (runLocation) {
             case RUN_LOCATION_HOSTS:
-                m_wrapper = new HostSchedulerWrapper(this, scheduler);
+                m_wrapper = new HostSchedulerWrapper(this);
                 break;
             case RUN_LOCATION_SYSTEM:
-                m_wrapper = new SystemSchedulerWrapper(this, scheduler);
+                m_wrapper = new SystemSchedulerWrapper(this);
                 break;
             default:
                 throw new IllegalArgumentException("Invalid run location: " + runLocation);
@@ -669,13 +690,19 @@ public class SchedulerManager {
         }
 
         @Override
+        void setEnabled(boolean enabled) {
+            super.setEnabled(enabled);
+            m_wrapper.setEnabled(enabled);
+        }
+
+        @Override
         void promotedPartition(int partitionId) {}
 
         @Override
         void demotedPartition(int partitionId) {}
 
         @Override
-        void start() {
+        void startImpl() {
             m_wrapper.start();
         }
     }
@@ -686,7 +713,7 @@ public class SchedulerManager {
      */
     private class PartitionedScheduleHandler extends SchedulerHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
-        private boolean m_started = false;
+        private boolean m_handlerStarted = false;
 
         PartitionedScheduleHandler(ProcedureSchedule definition, SchedulerFactory factory) {
             super(definition, factory);
@@ -701,13 +728,24 @@ public class SchedulerManager {
         }
 
         @Override
+        void setEnabled(boolean enabled) {
+            super.setEnabled(enabled);
+            for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
+                wrapper.setEnabled(enabled);
+            }
+            if (!enabled) {
+                m_handlerStarted = false;
+            }
+        }
+
+        @Override
         void promotedPartition(int partitionId) {
             assert !m_wrappers.containsKey(partitionId);
-            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, constructScheduler(), partitionId);
+            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId);
 
             m_wrappers.put(partitionId, wrapper);
 
-            if (m_started) {
+            if (m_handlerStarted) {
                 wrapper.start();
             }
         }
@@ -722,9 +760,9 @@ public class SchedulerManager {
         }
 
         @Override
-        void start() {
-            if (!m_started) {
-                m_started = true;
+        void startImpl() {
+            if (!m_handlerStarted) {
+                m_handlerStarted = true;
 
                 for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
                     wrapper.start();
@@ -746,7 +784,9 @@ public class SchedulerManager {
         /** Scheduler has exited gracefully */
         EXITED,
         /** Scheduler was cancelled by the manager either because of shutdown or configuration modification */
-        CANCELED;
+        CANCELED,
+        /** Scheduler was disabled by the user */
+        DISABLED;
     }
 
     /**
@@ -769,7 +809,7 @@ public class SchedulerManager {
 
         final H m_handler;
 
-        private final Scheduler m_scheduler;
+        private Scheduler m_scheduler;
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
         private ScheduleStatsSource m_stats;
@@ -777,9 +817,8 @@ public class SchedulerManager {
         // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
         private volatile long m_expectedExecutionTime;
 
-        SchedulerWrapper(H handler, Scheduler scheduler) {
+        SchedulerWrapper(H handler) {
             m_handler = handler;
-            m_scheduler = scheduler;
         }
 
         /**
@@ -789,8 +828,11 @@ public class SchedulerManager {
             if (m_state != SchedulerWrapperState.INITIALIZED) {
                 return;
             }
-            m_stats = new ScheduleStatsSource(m_handler.getName(), getRunLocation(), m_hostId, getSiteId());
-            m_statsAgent.registerStatsSource(StatsSelector.SCHEDULER, getSiteId(), m_stats);
+            m_scheduler = m_handler.constructScheduler();
+            if (m_stats == null) {
+                m_stats = new ScheduleStatsSource(m_handler.getName(), getRunLocation(), m_hostId, getSiteId());
+                m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
+            }
             setState(SchedulerWrapperState.RUNNING);
             submitHandleNextRun();
         }
@@ -802,15 +844,19 @@ public class SchedulerManager {
          * NOTE: method is not synchronized so the lock is not held during the scheduler execution
          */
         private void handleNextRun() {
-            if (m_state != SchedulerWrapperState.RUNNING) {
-                return;
+            Scheduler scheduler;
+            synchronized (this) {
+                if (m_state != SchedulerWrapperState.RUNNING) {
+                    return;
+                }
+                scheduler = m_scheduler;
             }
             long startTime = System.nanoTime();
             long waitTime = startTime - m_expectedExecutionTime;
 
             SchedulerResult result;
             try {
-                result = m_scheduler.nextRun(m_procedure);
+                result = scheduler.nextRun(m_procedure);
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
@@ -929,7 +975,17 @@ public class SchedulerManager {
          */
         void cancel() {
             shutdown(SchedulerWrapperState.CANCELED);
-            m_statsAgent.deregisterStatsSource(StatsSelector.SCHEDULER, getSiteId(), m_stats);
+            m_statsAgent.deregisterStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
+        }
+
+        synchronized void setEnabled(boolean enabled) {
+            if (enabled) {
+                if (m_state == SchedulerWrapperState.DISABLED) {
+                    setState(SchedulerWrapperState.INITIALIZED);
+                }
+            } else if (m_state != SchedulerWrapperState.DISABLED) {
+                shutdown(SchedulerWrapperState.DISABLED);
+            }
         }
 
         /**
@@ -1000,11 +1056,13 @@ public class SchedulerManager {
         }
 
         private synchronized void shutdown(SchedulerWrapperState state) {
-            if (!(m_state == SchedulerWrapperState.INITIALIZED || m_state == SchedulerWrapperState.RUNNING)) {
+            if (!(m_state == SchedulerWrapperState.INITIALIZED || m_state == SchedulerWrapperState.RUNNING
+                    || state == SchedulerWrapperState.DISABLED)) {
                 return;
             }
             setState(state);
 
+            m_scheduler = null;
             m_procedure = null;
 
             if (m_scheduledFuture != null) {
@@ -1042,8 +1100,8 @@ public class SchedulerManager {
      * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_SYSTEM}
      */
     private class SystemSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        SystemSchedulerWrapper(SingleSchedulerHandler definition, Scheduler scheduler) {
-            super(definition, scheduler);
+        SystemSchedulerWrapper(SingleSchedulerHandler definition) {
+            super(definition);
         }
 
         @Override
@@ -1066,8 +1124,8 @@ public class SchedulerManager {
      * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_HOSTS}
      */
     private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        HostSchedulerWrapper(SingleSchedulerHandler handler, Scheduler scheduler) {
-            super(handler, scheduler);
+        HostSchedulerWrapper(SingleSchedulerHandler handler) {
+            super(handler);
         }
 
         /**
@@ -1100,8 +1158,8 @@ public class SchedulerManager {
     private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedScheduleHandler> {
         private final int m_partition;
 
-        PartitionSchedulerWrapper(PartitionedScheduleHandler handler, Scheduler scheduler, int partition) {
-            super(handler, scheduler);
+        PartitionSchedulerWrapper(PartitionedScheduleHandler handler, int partition) {
+            super(handler);
             m_partition = partition;
         }
 
