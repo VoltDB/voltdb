@@ -94,7 +94,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * the Git branch name.
      */
     static final boolean USING_CALCITE =
-            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false")) ||
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "true")) ||
             Boolean.parseBoolean(System.getenv("plan_with_calcite"));
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
