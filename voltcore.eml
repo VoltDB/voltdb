@@ -8,6 +8,9 @@
 	<lib name="jline-2.10.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jline-2.10.jar!/"/>
 	</lib>
+	<lib name="hamcrest-2.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/hamcrest-2.1.jar!/"/>
+	</lib>
 	<lib name="ant-junit.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-junit.jar!/"/>
 	</lib>
@@ -59,14 +62,50 @@
 	<lib name="super-csv-2.1.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/super-csv-2.1.0.jar!/"/>
 	</lib>
+	<lib name="owner-1.0.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-1.0.10.jar!/"/>
+	</lib>
+	<lib name="owner-java8-1.0.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-java8-1.0.10.jar!/"/>
+	</lib>
 	<lib name="snmp4j-2.5.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/snmp4j-2.5.2.jar!/"/>
+	</lib>
+	<lib name="byte-buddy-1.9.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/byte-buddy-1.9.10.jar!/"/>
+	</lib>
+	<lib name="mockito-core-2.24.5.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/mockito-core-2.24.5.jar!/"/>
+	</lib>
+	<lib name="powermock-core-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-core-2.0.0.jar!/"/>
+	</lib>
+	<lib name="powermock-api-mockito2-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-api-mockito2-2.0.0.jar!/"/>
+	</lib>
+	<lib name="powermock-api-support-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-api-support-2.0.0.jar!/"/>
+	</lib>
+	<lib name="powermock-reflect-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-reflect-2.0.0.jar!/"/>
+	</lib>
+	<lib name="powermock-module-junit4-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-module-junit4-2.0.0.jar!/"/>
+	</lib>
+	<lib name="powermock-module-junit4-common-2.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-module-junit4-common-2.0.0.jar!/"/>
+	</lib>
+	<lib name="objenesis-3.0.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/objenesis-3.0.1.jar!/"/>
 	</lib>
 	<lib name="make-it-easy-3.1.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/make-it-easy-3.1.0.jar!/"/>
 	</lib>
 	<lib name="javaee-api-7.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javaee-api-7.0.jar!/"/>
+	</lib>
+	<lib name="kafka-clients-0.10.2.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-clients-0.10.2.1.jar!/"/>
 	</lib>
 	<lib name="lz4-1.2.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/lz4-1.2.0.jar!/"/>
@@ -82,6 +121,9 @@
 	</lib>
 	<lib name="jackson-mapper-asl-1.9.13.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-mapper-asl-1.9.13.jar!/"/>
+	</lib>
+	<lib name="felix-framework-5.6.12.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/felix-framework-5.6.12.jar!/"/>
 	</lib>
 	<lib name="httpclient-4.3.6.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpclient-4.3.6.jar!/"/>
@@ -113,6 +155,15 @@
 	<lib name="jackson-annotations-2.5.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-annotations-2.5.0.jar!/"/>
 	</lib>
+	<lib name="jackson-databind-2.9.4.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-databind-2.9.4.jar!/"/>
+	</lib>
+	<lib name="jackson-core-2.9.4.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-core-2.9.4.jar!/"/>
+	</lib>
+	<lib name="jackson-annotations-2.9.4.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-annotations-2.9.4.jar!/"/>
+	</lib>
 	<lib name="joda-time-2.9.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/joda-time-2.9.3.jar!/"/>
 	</lib>
@@ -130,6 +181,32 @@
 	</lib>
 	<lib name="javassist-3.20.0-GA.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javassist-3.20.0-GA.jar!/"/>
+	</lib>
+	<lib name="calcite-core-1.17.0.jar" scope="COMPILE">
+		<srcroot url="jar://$MODULE_DIR$/lib/calcite-core-1.17.0-sources.jar!/"/>
+		<relative-module-src project-related="jar://$PROJECT_DIR$/../../lib/calcite-core-1.17.0-sources.jar!/"/>
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/calcite-core-1.17.0.jar!/"/>
+	</lib>
+	<lib name="calcite-server-1.17.0.jar" scope="COMPILE">
+		<srcroot url="jar://$MODULE_DIR$/lib/calcite-server-1.17.0-sources.jar!/"/>
+		<relative-module-src project-related="jar://$PROJECT_DIR$/../../lib/calcite-server-1.17.0-sources.jar!/"/>
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/calcite-server-1.17.0.jar!/"/>
+	</lib>
+	<lib name="calcite-linq4j-1.17.0.jar" scope="COMPILE">
+		<srcroot url="jar://$MODULE_DIR$/lib/calcite-linq4j-1.17.0-sources.jar!/"/>
+		<relative-module-src project-related="jar://$PROJECT_DIR$/../../lib/calcite-linq4j-1.17.0-sources.jar!/"/>
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/calcite-linq4j-1.17.0.jar!/"/>
+	</lib>
+	<lib name="avatica-core-1.12.0.jar" scope="COMPILE">
+		<srcroot url="jar://$MODULE_DIR$/lib/avatica-core-1.12.0-sources.jar!/"/>
+		<relative-module-src project-related="jar://$PROJECT_DIR$/../../lib/avatica-core-1.12.0-sources.jar!/"/>
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avatica-core-1.12.0.jar!/"/>
+	</lib>
+	<lib name="janino-2.7.6.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/janino-2.7.6.jar!/"/>
+	</lib>
+	<lib name="commons-compiler-2.7.6.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-compiler-2.7.6.jar!/"/>
 	</lib>
 	<lib name="zkclient-0.10.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/zkclient-0.10.jar!/"/>
@@ -179,49 +256,9 @@
 	<lib name="netty-all-4.1.32.Final.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.32.Final.jar!/"/>
 	</lib>
-	<lib name="owner-1.0.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-1.0.10.jar!/"/>
-	</lib>
-	<lib name="owner-java8-1.0.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-java8-1.0.10.jar!/"/>
-	</lib>
-	<lib name="kafka-clients-0.10.2.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-clients-0.10.2.1.jar!/"/>
-	</lib>
-	<lib name="kafka_2.10-0.10.2.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka_2.10-0.10.2.1.jar!/"/>
-	</lib>
-	<lib name="powermock-api-mockito2-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-api-mockito2-2.0.0.jar!/"/>
-	</lib>
-	<lib name="powermock-core-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-core-2.0.0.jar!/"/>
-	</lib>
-	<lib name="powermock-module-junit4-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-module-junit4-2.0.0.jar!/"/>
-	</lib>
-	<lib name="powermock-module-junit4-common-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-module-junit4-common-2.0.0.jar!/"/>
-	</lib>
-	<lib name="mockito-core-2.24.5.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/mockito-core-2.24.5.jar!/"/>
-	</lib>
-	<lib name="hamcrest-2.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/hamcrest-2.1.jar!/"/>
-	</lib>
-	<lib name="powermock-api-support-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-api-support-2.0.0.jar!/"/>
-	</lib>
-	<lib name="byte-buddy-1.9.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/byte-buddy-1.9.10.jar!/"/>
-	</lib>
-	<lib name="byte-buddy-agent-1.9.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/byte-buddy-agent-1.9.10.jar!/"/>
-	</lib>
-	<lib name="powermock-reflect-2.0.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-reflect-2.0.0.jar!/"/>
-	</lib>
-	<lib name="objenesis-3.0.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/objenesis-3.0.1.jar!/"/>
-	</lib>
+	<levels>
+		<level name="3pty_jars" value="project"/>
+		<level name="jackson-annotations-2.9.4" value="project"/>
+		<level name="dependencies" value="project"/>
+	</levels>
 </component>

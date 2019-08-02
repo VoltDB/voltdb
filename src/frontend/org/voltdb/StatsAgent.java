@@ -472,7 +472,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private VoltTable[] collectDistributedStats(JSONObject obj) throws Exception
+    public VoltTable[] collectDistributedStats(JSONObject obj) throws Exception
     {
         VoltTable[] stats = null;
         // dispatch to collection

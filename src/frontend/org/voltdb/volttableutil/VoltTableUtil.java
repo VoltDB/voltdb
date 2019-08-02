@@ -66,7 +66,7 @@ public final class VoltTableUtil {
         return executeSql(sql, tables);
     }
 
-    private static VoltTable executeSql(String sql, List<Pair<String, VoltTable>> tables) {
+    public static VoltTable executeSql(String sql, List<Pair<String, VoltTable>> tables) {
         VoltTableData.Database db = new VoltTableData.Database();
         ImmutableList.Builder<VoltTableData.Table> builder = ImmutableList.builder();
         tables.forEach(pair -> builder.add(new VoltTableData.Table(pair)));
