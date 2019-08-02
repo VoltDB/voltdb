@@ -84,7 +84,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         }
 
         // The UDAF must implement interfaces "Serializable" and "VoltUDAggregate"
-        if (!Serializable.class.isAssignableFrom(funcClass) && !VoltUDAggregate.class.isAssignableFrom(funcClass)) {
+        if (!Serializable.class.isAssignableFrom(funcClass) || !VoltUDAggregate.class.isAssignableFrom(funcClass)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Cannot define a aggregate function without implementing Serializable or VoltUDAggregate in the class declaration"));
         }
@@ -99,8 +99,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         return funcClass;
     }
 
-    private Map<String, Method> retrieveMethodsFromClass(Class<?> funcClass)
-    throws VoltCompilerException
+    public static Map<String, Method> retrieveMethodsFromClass(Class<?> funcClass)
+    throws RuntimeException
     {
         Map<String, Method> methods = new HashMap<>();
         for (Method m : funcClass.getDeclaredMethods()) {
@@ -121,7 +121,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (isAllowedDataType(paramTypeClass)) {
                             methods.put("assemble", m);
                         } else {
-                            throw m_compiler.new VoltCompilerException(String.format("Unsupported parameter value type: " + paramTypeClass.getName()));
+                            //throw m_compiler.new VoltCompilerException(String.format("Unsupported parameter value type: " + paramTypeClass.getName()));
+                            throw new RuntimeException(String.format("Unsupported parameter value type: %s", paramTypeClass.getName()));
                         }
                     }
                     break;
@@ -131,7 +132,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (funcClass.equals(paramTypeClass)) {
                             methods.put("combine", m);
                         } else {
-                            throw m_compiler.new VoltCompilerException(String.format("Parameter type must be instance of Class: " + funcClass.getName()));
+                            //throw m_compiler.new VoltCompilerException(String.format("Parameter type must be instance of Class: " + funcClass.getName()));
+                            throw new RuntimeException(String.format("Parameter type must be instance of Class: %s", funcClass.getName()));
                         }
                     }
                     break;
@@ -141,7 +143,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (!returnTypeClass.equals(Void.TYPE) && isAllowedDataType(returnTypeClass)) {
                             methods.put("end", m);
                         } else {
-                            throw m_compiler.new VoltCompilerException(String.format("Unsupported return value type: " + returnTypeClass.getName()));
+                            //throw m_compiler.new VoltCompilerException(String.format("Unsupported return value type: " + returnTypeClass.getName()));
+                            throw new RuntimeException(String.format("Unsupported return value type: %s", returnTypeClass.getName()));
                         }
                     }
                     break;
@@ -153,7 +156,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
     }
 
     private VoltXMLElement createVoltXMLElementForUDAF(String functionName, String className, Map<String, Method> methods) 
-        throws VoltCompilerException 
+        throws VoltCompilerException, RuntimeException
     {
         // already check the validity of voltReturnType
         VoltType voltReturnType = VoltType.typeFromClass(methods.get("end").getReturnType());
@@ -194,7 +197,6 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         if (!statementMatcher.matches()) {
             return false;
         }
-
         // Clean up the names
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         // Class name is case sensitive.

@@ -21,6 +21,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.util.Vector;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
@@ -29,6 +31,7 @@ import org.voltdb.catalog.Function;
 import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.JavaBuiltInFunctions;
 import org.voltdb.compiler.statements.CreateFunction;
+import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.UserDefinedFunctionRunner;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -61,16 +64,21 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
     }
 
     public UserDefinedAggregateFunctionRunner(String functionName, int functionId, String className, Class<?> funcClass) {
+
         m_functionName = functionName;
         m_functionId = functionId;
         m_className = className;
         m_funcClass = funcClass;
-        initFunctionMethods();
+        m_functionMethods = funcClass.getDeclaredMethods();
         m_functionInstances = new Vector<Object>();
-        m_startMethod = initFunctionMethod("start");
-        m_assembleMethod = initFunctionMethod("assemble");
-        m_combineMethod = initFunctionMethod("combine");
-        m_endMethod = initFunctionMethod("end");
+
+        // Call the static method in class "CreateAggregateFunctionFromClass"
+        Map<String, Method> methods = CreateAggregateFunctionFromClass.retrieveMethodsFromClass(funcClass);
+        m_startMethod = methods.get("start");
+        m_assembleMethod = methods.get("assemble");
+        m_combineMethod = methods.get("combine");
+        m_endMethod = methods.get("end");
+
         Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
         m_paramCount = paramTypeClasses.length;
         m_paramTypes = new VoltType[m_paramCount];
@@ -90,92 +98,12 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
         FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
     }
 
-    private void initFunctionMethods() {
-        try {
-            Object functionInstance = m_funcClass.newInstance();
-            m_functionMethods = functionInstance.getClass().getDeclaredMethods();
-        }
-        catch (InstantiationException | IllegalAccessException e) {
-            throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
-        }
-    }
-
     private void addFunctionInstance() {
         try {
             Object tempFunctionInstance = m_funcClass.newInstance();
             m_functionInstances.add(tempFunctionInstance);
-        }
-        catch (InstantiationException | IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             throw new RuntimeException(String.format("Error instantiating function \"%s\"", m_className), e);
-        }
-    }
-
-    private Method initFunctionMethod(String methodName) {
-        Method temp_method = null;
-        for (final Method m : m_functionMethods) {
-            if (m.getName().equals(methodName)) {
-                if (!Modifier.isPublic(m.getModifiers())) {
-                    continue;
-                }
-                if (Modifier.isStatic(m.getModifiers())) {
-                    continue;
-                }
-                // The return type of start|assemble|combine function should be void
-                if (!methodName.equals("end")) {
-                    if (!m.getReturnType().equals(Void.TYPE)) {
-                        continue;
-                    }
-                    // If the start method has at least one parameter, this is not the start
-                    // method we're looking for
-                    if (methodName.equals("start") && m.getParameterCount() > 0) {
-                        continue;
-                    }
-                    // We only support one parameter for the assemble method currently.
-                    // If we can support more parameters in the future, we need to delete this check
-                    if (methodName.equals("assemble")) {
-                        // If the number of parameter is not one, this is not a correct assemble method
-                        if (m.getParameterCount() != 1) {
-                            continue;
-                        }
-                        // This assemble method has exactly one parameter
-                        // However, this parameter's type is not one of the allowed types
-                        if (!CreateFunction.isAllowedDataType(m.getParameterTypes()[0])) {
-                            continue;
-                        }
-                    }
-                    // The combine method can have one and only one parameter which is the
-                    // same type as the current class
-                    if (methodName.equals("combine") && m.getParameterCount() > 0) {
-                        if (m.getParameterCount() != 1) {
-                            continue;
-                        }
-                        else if (m.getParameterTypes()[0] != m_funcClass) {
-                            continue;
-                        }
-                    }
-                }
-                // However, the return type for the end function cannot be void
-                else {
-                    if (m.getReturnType().equals(Void.TYPE)) {
-                        continue;
-                    }
-                    // If the end method has at least one parameter, this is not the end
-                    // method we're looking for
-                    if (m.getParameterCount() > 0 || !CreateFunction.isAllowedDataType(m.getReturnType())) {
-                        continue;
-                    }
-                }
-                temp_method = m;
-                break;
-            }
-        }
-        if (temp_method == null) {
-            throw new RuntimeException(
-                    String.format("Error loading function %s: cannot find the %s() method.",
-                            m_functionName, methodName));
-        }
-        else {
-            return temp_method;
         }
     }
 
