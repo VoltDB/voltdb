@@ -121,7 +121,6 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (isAllowedDataType(paramTypeClass)) {
                             methods.put("assemble", m);
                         } else {
-                            //throw m_compiler.new VoltCompilerException(String.format("Unsupported parameter value type: " + paramTypeClass.getName()));
                             throw new RuntimeException(String.format("Unsupported parameter value type: %s", paramTypeClass.getName()));
                         }
                     }
@@ -132,7 +131,6 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (funcClass.equals(paramTypeClass)) {
                             methods.put("combine", m);
                         } else {
-                            //throw m_compiler.new VoltCompilerException(String.format("Parameter type must be instance of Class: " + funcClass.getName()));
                             throw new RuntimeException(String.format("Parameter type must be instance of Class: %s", funcClass.getName()));
                         }
                     }
@@ -143,7 +141,6 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         if (!returnTypeClass.equals(Void.TYPE) && isAllowedDataType(returnTypeClass)) {
                             methods.put("end", m);
                         } else {
-                            //throw m_compiler.new VoltCompilerException(String.format("Unsupported return value type: " + returnTypeClass.getName()));
                             throw new RuntimeException(String.format("Unsupported return value type: %s", returnTypeClass.getName()));
                         }
                     }
@@ -155,7 +152,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         return methods;
     }
 
-    private VoltXMLElement createVoltXMLElementForUDAF(String functionName, String className, Map<String, Method> methods) 
+    private VoltXMLElement createVoltXMLElementForUDAF(String functionName, String className, Map<String, Method> methods)
         throws VoltCompilerException, RuntimeException
     {
         // already check the validity of voltReturnType

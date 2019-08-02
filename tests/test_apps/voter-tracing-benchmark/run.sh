@@ -151,7 +151,6 @@ function start-voltdb() {
 }
 
 function tracing-benchmark() {
-    jars-ifneeded
     sqlcmd < ddl.sql > /dev/null
     java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
             voter.TracingBenchmark \
@@ -170,7 +169,7 @@ function tracing-benchmark-showAll() {
 function tracing-benchmark-figurePlot() {
     jars-ifneeded
     # SET THE NUMBER OF ITERATIONS HERE BY CHANGE THE VALUE OF VARIABLE N
-    NUM_ITER=10
+    NUM_ITER=50
 
     ###################
     # tracing tool off
