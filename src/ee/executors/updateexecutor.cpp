@@ -216,11 +216,9 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             if (s_modifiedTuples == -1) {
                 // An exception was thrown on the lowest site thread and we need to throw here as well so
                 // all threads are in the same state
-                char msg[1024];
-                snprintf(msg, 1024, "Replicated table update threw an unknown exception on other thread for table %s",
+                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+                        "Replicated table update threw an unknown exception on other thread for table %s",
                         targetTable->name().c_str());
-                VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }
     }

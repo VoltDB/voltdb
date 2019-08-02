@@ -41,28 +41,27 @@ const char* SQLException::volt_temp_table_memory_overflow = "V0002";
 const char* SQLException::volt_decimal_serialization_error = "V0003";
 const char* SQLException::volt_user_defined_function_error = "V0004";
 
-namespace {
-    std::string make_error_message(int error_no, std::string const&message) {
-        std::stringstream sb;
-        sb << message << ": ";
-        const char *strerror_msg = strerror(errno);
-        if (strerror_msg != NULL) {
-            sb << strerror_msg;
-        } else {
-            sb << "Unknown error " << error_no;
-        }
-        return sb.str();
+static std::string make_error_message(int error_no, std::string const&message) {
+    std::stringstream sb;
+    sb << message << ": ";
+    const char *strerror_msg = strerror(errno);
+    if (strerror_msg != NULL) {
+        sb << strerror_msg;
+    } else {
+        sb << "Unknown error " << error_no;
     }
+    return sb.str();
 }
 
 SQLException::SQLException(std::string const& sqlState, std::string const& message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_SQL, message),
     m_sqlState(sqlState), m_internalFlags(0) {
     vassert(m_sqlState.length() == 5);
 }
 
 SQLException::SQLException(std::string const& sqlState, int error_no, std::string const& message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, make_error_message(error_no, message)),
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_SQL,
+            make_error_message(error_no, message)),
     m_sqlState(sqlState), m_internalFlags(0) {
     vassert(m_sqlState.length() == 5);
 }
@@ -74,7 +73,7 @@ SQLException::SQLException(std::string const& sqlState, std::string const& messa
 }
 
 SQLException::SQLException(std::string const& sqlState, std::string const& message, int internalFlags) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_SQL, message),
     m_sqlState(sqlState), m_internalFlags(internalFlags) {
     vassert(m_sqlState.length() == 5);
 }

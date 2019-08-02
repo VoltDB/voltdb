@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VOLTDBENGINE_H
-#define VOLTDBENGINE_H
+#pragma once
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
@@ -309,7 +308,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                                      m_exceptionBufferCapacity,
                                                      startingPosition);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
-                    voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+                    static_cast<int32_t>(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE);
 
         }
 
@@ -880,4 +879,3 @@ inline bool startsWith(const string& s1, const string& s2) {
 
 } // namespace voltdb
 
-#endif // VOLTDBENGINE_H

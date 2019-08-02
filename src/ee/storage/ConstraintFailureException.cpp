@@ -23,14 +23,11 @@ using namespace voltdb;
 using std::string;
 
 ConstraintFailureException::ConstraintFailureException(
-        Table *table,
-        TableTuple tuple,
-        TableTuple otherTuple,
-        ConstraintType type,
-        PersistentTableSurgeon *surgeon) :
+        Table *table, TableTuple tuple, TableTuple otherTuple,
+        ConstraintType type, PersistentTableSurgeon *surgeon) :
     SQLException(SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
-            VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+            VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
@@ -48,13 +45,12 @@ ConstraintFailureException::ConstraintFailureException(
         SQLException(
                 SQLException::integrity_constraint_violation,
                 message,
-                VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
     m_type(CONSTRAINT_TYPE_PARTITIONING),
-    m_surgeon(surgeon)
-{
+    m_surgeon(surgeon) {
     vassert(table);
     vassert(!tuple.isNullTuple());
 }

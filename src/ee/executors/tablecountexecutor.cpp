@@ -54,8 +54,7 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
         vassert(input_table);
         AbstractTempTable* temp_table = dynamic_cast<AbstractTempTable*>(input_table);
         if ( ! temp_table) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "May not iterate a streamed table.");
+            throw SerializableEEException("May not iterate a streamed table.");
         }
         rowCounts = temp_table->tempTableTupleCount();
     } else {
