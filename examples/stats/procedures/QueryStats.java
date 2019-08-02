@@ -8,11 +8,14 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.volttableutil.VoltTableUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.security.ProtectionDomain;
 
 public class QueryStats extends VoltProcedure {
     Pattern stats_proc = Pattern.compile("(\\(\\s*exec\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
+    String[] proc_types = {"TABLE", "DR", "DRPRODUCER", "DRPRODUCERNODE", "DRPRODUCERPARTITION", "SNAPSHOTSTATUS",
+             "MEMORY", "CPU", "IOSTATS", "INITIATOR", "INDEX", "PROCEDURE", "PROCEDUREINPUT", "PROCEDUREOUTPUT",
+             "PROCEDUREPROFILE", "PROCEDUREDETAIL", "STARVATION", "IDLETIME", "QUEUE", "PLANNER", "LIVECLIENTS", "LATENCY",
+             "LATENCY_COMPRESSED", "LATENCY_HISTOGRAM", "MANAGEMENT", "REBALANCE", "KSAFETY", "DRCONSUMER",
+             "DRCONSUMERNODE", "DRCONSUMERPARTITION", "COMMANDLOG", "IMPORTER", "IMPORT", "DRROLE", "GC", "TTL", "EXPORT"};
 
     public QueryStats() {
     }
@@ -24,16 +27,23 @@ public class QueryStats extends VoltProcedure {
 
         while(m.find()) {
             String proc = m.group(1);
-            proc.substring(1, proc.length() - 1);
-            m.appendReplacement(buf, Matcher.quoteReplacement("tt" + tables.size()));
+            m.appendReplacement(buf, Matcher.quoteReplacement("TT" + tables.size()));
             JSONObject obj = new JSONObject();
+            Pattern subselector = Pattern.compile("[a-zA-Z]+");
+            Matcher s = subselector.matcher(proc);
             obj.put("selector", "STATISTICS");
-            obj.put("subselector", "TABLE");
+
+            for (String proc_type : proc_types) {
+                if(proc.toUpperCase().contains(proc_type)) {
+                    obj.put("subselector", proc_type);
+                }
+            }
+
             obj.put("interval", false);
-            tables.add(new Pair<String, VoltTable>("tt" + tables.size(), VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
+            tables.add(new Pair<String, VoltTable>("TT" + tables.size(), VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
         }
 
         m.appendTail(buf);
-        return VoltTableUtil.executeSql(buf.toString(), tables);
+        return VoltTableUtil.executeSql(buf.toString().replaceAll(";", ""), tables);
     }
 }

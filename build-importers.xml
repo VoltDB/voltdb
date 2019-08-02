@@ -69,9 +69,9 @@
             <zipfileset src="${base.dir}/third_party/java/jars/amazon-kinesis-client-1.6.2.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/aws-java-sdk-1.10.72.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/jackson-dataformat-cbor-2.5.3.jar" />
-            <zipfileset src="${base.dir}/third_party/java/jars/jackson-databind-2.5.3.jar" />
-            <zipfileset src="${base.dir}/third_party/java/jars/jackson-core-2.5.3.jar" />
-            <zipfileset src="${base.dir}/third_party/java/jars/jackson-annotations-2.5.0.jar" />
+            <zipfileset src="${base.dir}/third_party/java/jars/jackson-databind-2.9.4.jar" />
+            <zipfileset src="${base.dir}/third_party/java/jars/jackson-core-2.9.4.jar" />
+            <zipfileset src="${base.dir}/third_party/java/jars/jackson-annotations-2.9.4.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/joda-time-2.9.3.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/commons-lang-2.6.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/guava-18.0.jar" />

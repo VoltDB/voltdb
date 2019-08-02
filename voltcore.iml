@@ -101,6 +101,7 @@
       <sourceFolder url="file://$MODULE_DIR$/tests/hsqldb" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/hsqldb19b3" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/java/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/stats/procedures" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module-library">
@@ -446,24 +447,6 @@
       </library>
     </orderEntry>
     <orderEntry type="module-library">
-      <library name="jackson-core-asl-1.9.13.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jackson-core-asl-1.9.13.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library name="jackson-mapper-asl-1.9.13.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jackson-mapper-asl-1.9.13.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
       <library name="felix-framework-5.6.12.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/lib/felix-framework-5.6.12.jar!/" />
@@ -521,42 +504,6 @@
       <library name="aws-java-sdk-1.10.72.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/third_party/java/jars/aws-java-sdk-1.10.72.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library name="jackson-dataformat-cbor-2.5.3.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/third_party/java/jars/jackson-dataformat-cbor-2.5.3.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library name="jackson-databind-2.5.3.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/third_party/java/jars/jackson-databind-2.5.3.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library name="jackson-core-2.5.3.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/third_party/java/jars/jackson-core-2.5.3.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library name="jackson-annotations-2.5.0.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/third_party/java/jars/jackson-annotations-2.5.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -716,15 +663,6 @@
       </library>
     </orderEntry>
     <orderEntry type="module-library">
-      <library name="avro-1.7.7.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/avro-1.7.7.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
       <library name="httpasyncclient-4.0.2.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/lib/httpasyncclient-4.0.2.jar!/" />
@@ -824,42 +762,9 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="3pty_jars" level="project" />
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="file://$USER_HOME$/calcite/file/target/dependencies" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-        <jarDirectory url="file://$USER_HOME$/calcite/file/target/dependencies" recursive="false" />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jackson-annotations-2.9.4.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jackson-core-2.9.4.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jackson-databind-2.9.4.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
+    <orderEntry type="library" scope="PROVIDED" name="jackson-annotations-2.9.4" level="project" />
+    <orderEntry type="library" name="avro-1.9.0" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="jackson-core-2.9.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="jackson-databind-2.9.4" level="project" />
   </component>
 </module>

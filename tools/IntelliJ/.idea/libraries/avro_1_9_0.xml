@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="avro-1.9.0">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../../lib/avro-1.9.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -81,7 +81,7 @@ public class TestVoltTableUtil extends RegressionSuite {
         return builder;
     }
 
-    private void initTable() throws IOException, ProcCallException {
+    private void initTable() throws Exception {
         Client client = getClient();
 
         client.callProcedure("stations.insert", 4, "Alewife");
@@ -105,7 +105,7 @@ public class TestVoltTableUtil extends RegressionSuite {
     }
 
 
-    public void testSimple() throws IOException, ProcCallException {
+    public void testSimple() throws Exception {
         initTable();
 
         Client client = getClient();

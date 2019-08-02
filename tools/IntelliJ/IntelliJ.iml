@@ -9,5 +9,8 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="lib_extension" level="project" />
     <orderEntry type="library" name="3pty_jars" level="project" />
+    <orderEntry type="library" name="jackson-annotations-2.9.4" level="project" />
+    <orderEntry type="library" name="jackson-core-2.9.4" level="project" />
+    <orderEntry type="library" name="jackson-databind-2.9.4" level="project" />
   </component>
 </module>

@@ -17,20 +17,21 @@
 
 package org.voltdb.volttableutil;
 
+import org.apache.calcite.jdbc.Driver;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.jdbc.CalciteConnection;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
 import org.voltdb.plannerv2.ColumnTypes;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 
 /**
@@ -55,7 +56,7 @@ public final class VoltTableUtil {
      *             the volt_table it assigned to.
      * @return A result set represented in {@link VoltTable}.
      */
-    public static VoltTable executeSql(String sql, Object... args) {
+    public static VoltTable executeSql(String sql, Object... args) throws Exception {
         if (args.length % 2 == 1) {
             throw new IllegalArgumentException("Argument number not correct");
         }
@@ -66,7 +67,7 @@ public final class VoltTableUtil {
         return executeSql(sql, tables);
     }
 
-    public static VoltTable executeSql(String sql, List<Pair<String, VoltTable>> tables) {
+    public static VoltTable executeSql(String sql, List<Pair<String, VoltTable>> tables) throws Exception {
         VoltTableData.Database db = new VoltTableData.Database();
         ImmutableList.Builder<VoltTableData.Table> builder = ImmutableList.builder();
         tables.forEach(pair -> builder.add(new VoltTableData.Table(pair)));
@@ -75,11 +76,19 @@ public final class VoltTableUtil {
         String uuid = UUID.randomUUID().toString();
         VoltTableData.SCHEMA.put(uuid, db);
 
-        String connectString = String.format("jdbc:calcite:schemaFactory=org.voltdb.volttableutil.VoltTableSchemaFactory;schema.id=%s",
-                uuid);
+        Class.forName("org.apache.calcite.jdbc.Driver");
 
-        try (Connection connection =
-                     DriverManager.getConnection(connectString)) {
+        String connectString = String.format("jdbc:calcite:");
+
+        Properties info = new Properties();
+        info.setProperty("lex", "JAVA");
+        info.setProperty("schemaFactory", "org.voltdb.volttableutil.VoltTableSchemaFactory");
+        info.setProperty("schema.id", uuid);
+
+        try {
+            final Driver driver = new Driver();
+            CalciteConnection connection = (CalciteConnection)
+                driver.connect("jdbc:calcite:", info);
 
             Statement st = connection.createStatement();
             ResultSet result = st.executeQuery(sql);
