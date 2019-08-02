@@ -4044,7 +4044,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
 
                 // 4.6 Update scheduler (asynchronously)
-                m_schedulerManager.processUpdate(m_catalogContext);
+                m_schedulerManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register

@@ -317,7 +317,7 @@ public class SchedulerManager {
                             columns.addAll(ScheduleStatsSource.s_columns);
                         }
                     });
-            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader);
+            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
         });
     }
 
@@ -346,19 +346,20 @@ public class SchedulerManager {
             AuthSystem authSystem, ClassLoader classLoader) {
         return execute(() -> {
             m_leader = true;
-            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader);
+            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
         });
     }
 
     /**
      * Asynchronously process an update to the scheduler configuration
      *
-     * @param context     {@link CatalogContext} instance
+     * @param context        {@link CatalogContext} instance
+     * @param classesUpdated If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> processUpdate(CatalogContext context) {
+    public ListenableFuture<?> processUpdate(CatalogContext context, boolean classesUpdated) {
         return processUpdate(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
-                context.authSystem, context.getCatalogJar().getLoader());
+                context.authSystem, context.getCatalogJar().getLoader(), classesUpdated);
     }
 
     /**
@@ -368,11 +369,13 @@ public class SchedulerManager {
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
+     * @param classesUpdated     If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> processUpdate(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader) {
-        return execute(() -> processCatalogInline(configuration, procedureSchedules, authSystem, classLoader));
+            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
+        return execute(
+                () -> processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, classesUpdated));
     }
 
     /**
@@ -473,12 +476,13 @@ public class SchedulerManager {
      * Process any potential scheduler changes. Any modified schedules will be stopped and restarted with their new
      * configuration. If a schedule was not modified it will be left running.
      *
+     * @param configuration      Global configuration for all schedules
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load {@link Scheduler} classes
      */
     private void processCatalogInline(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader) {
+            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
         if (!m_started) {
             return;
         }
@@ -506,7 +510,7 @@ public class SchedulerManager {
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
-                if (handler.isSameSchedule(procedureSchedule, result.m_factory)) {
+                if (handler.isSameSchedule(procedureSchedule, result.m_factory, classesUpdated)) {
                     newHandlers.put(procedureSchedule.getName(), handler);
                     handler.setEnabled(procedureSchedule.getEnabled());
                     if (frequencyChanged) {
@@ -625,13 +629,13 @@ public class SchedulerManager {
          * @param factory    {@link SchedulerFactory} derived from {@code definition}
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
-        boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory) {
+        boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory, boolean checkHashes) {
             return Objects.equals(m_definition.getName(), definition.getName())
                     && Objects.equals(m_definition.getRunlocation(), definition.getRunlocation())
                     && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
                     && Objects.equals(m_definition.getUser(), definition.getUser())
                     && Objects.equals(m_definition.getParameters(), definition.getParameters())
-                    && m_factory.hashesMatch(factory);
+                    && (!checkHashes || m_factory.hashesMatch(factory));
         }
 
         String getName() {

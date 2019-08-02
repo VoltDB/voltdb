@@ -38,7 +38,11 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,7 +71,9 @@ import org.voltdb.catalog.ProcedureSchedule;
 import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.SchedulerType;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -394,6 +400,85 @@ public class TestSchedulerManager {
         assertEquals(1, s_postRunSchedulerCallCount.get());
     }
 
+    /*
+     * Test that schedules are only restarted when classes are updated and only if the class or one of its deps change
+     *
+     * TODO test changing the class restarts the schedule
+     */
+    @Test
+    public void relaodWithInMemoryJarFile() throws Exception {
+        InMemoryJarfile jarFile = new InMemoryJarfile();
+        VoltCompiler vc = new VoltCompiler(false);
+        vc.addClassToJar(jarFile, TestSchedulerManager.class);
+
+        ProcedureSchedule schedule1 = createProcedureSchedule("TestScheduler", TestScheduler.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM);
+        ProcedureSchedule schedule2 = createProcedureSchedule("TestSchedulerRerun", TestSchedulerRerun.class,
+                SchedulerManager.RUN_LOCATION_SYSTEM, Integer.MAX_VALUE);
+
+        startSync();
+        promoteToLeaderSync();
+        processUpdateSync(jarFile.getLoader(), false, schedule1, schedule2);
+
+        Thread.sleep(30);
+
+        VoltTable table = getScheduleStats();
+        Map<String, Long> invocationCounts = new HashMap<>();
+        while (table.advanceRow()) {
+            invocationCounts.put(table.getString(0), table.getLong(5));
+        }
+
+        // No schedules should restart since class and deps did not change
+        processUpdateSync(jarFile.getLoader(), false, schedule1, schedule2);
+        Thread.sleep(5);
+
+        table = getScheduleStats();
+        while (table.advanceRow()) {
+            String scheduleName = table.getString(0);
+            long currentCount = table.getLong(5);
+            assertTrue("Count decreased for " + scheduleName,
+                    invocationCounts.put(scheduleName, currentCount) < currentCount);
+        }
+
+        Thread.sleep(5);
+
+        // Only schedules which do not specify deps should restart
+        processUpdateSync(jarFile.getLoader(), true, schedule1, schedule2);
+        Thread.sleep(5);
+
+        table = getScheduleStats();
+        while (table.advanceRow()) {
+            String scheduleName = table.getString(0);
+            long currentCount = table.getLong(5);
+            long previousCount = invocationCounts.put(scheduleName, currentCount);
+            if (scheduleName.equals("TestScheduler")) {
+                assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
+            } else {
+                assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
+                        previousCount * 3 / 2 > currentCount);
+            }
+        }
+
+        Thread.sleep(5);
+
+        // Update class dep so all should restart
+        vc = new VoltCompiler(false);
+        jarFile = new InMemoryJarfile();
+        vc.addClassToJar(jarFile, TestSchedulerManager.class);
+        jarFile.removeClassFromJar(TestSchedulerParams.class.getName());
+        processUpdateSync(jarFile.getLoader(), true, schedule1, schedule2);
+        Thread.sleep(5);
+
+        table = getScheduleStats();
+        while (table.advanceRow()) {
+            String scheduleName = table.getString(0);
+            long currentCount = table.getLong(5);
+            long previousCount = invocationCounts.put(scheduleName, currentCount);
+            assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
+                    previousCount * 3 / 2 > currentCount);
+        }
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -453,8 +538,13 @@ public class TestSchedulerManager {
     }
 
     private void processUpdateSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
+        processUpdateSync(getClass().getClassLoader(), false, schedules);
+    }
+
+    private void processUpdateSync(ClassLoader classLoader, boolean classesUpdated, ProcedureSchedule... schedules)
+            throws InterruptedException, ExecutionException {
         m_schedulerManager
-                .processUpdate(m_schedulesConfig, Arrays.asList(schedules), m_authSystem, getClass().getClassLoader())
+                .processUpdate(m_schedulesConfig, Arrays.asList(schedules), m_authSystem, classLoader, classesUpdated)
                 .get();
     }
 
@@ -499,7 +589,12 @@ public class TestSchedulerManager {
             } else {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
-            return SchedulerResult.scheduleProcedure(1, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+            return SchedulerResult.scheduleProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        }
+
+        @Override
+        public Collection<String> getDependencies() {
+            return Collections.singleton(TestSchedulerParams.class.getName());
         }
     }
 
@@ -513,7 +608,7 @@ public class TestSchedulerManager {
             } else {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
-            return SchedulerResult.scheduleProcedure(1, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+            return SchedulerResult.scheduleProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
         }
     }
 
@@ -534,7 +629,7 @@ public class TestSchedulerManager {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
 
-            return ++m_runCount < m_maxRunCount ? SchedulerResult.rerun(1, TimeUnit.MICROSECONDS)
+            return ++m_runCount < m_maxRunCount ? SchedulerResult.rerun(100, TimeUnit.MICROSECONDS)
                     : SchedulerResult.exit(null);
         }
     }
