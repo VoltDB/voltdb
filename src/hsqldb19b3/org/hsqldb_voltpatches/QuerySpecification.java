@@ -780,14 +780,6 @@ public class QuerySpecification extends QueryExpression {
                 // End of VoltDB extension
             }
         }
-
-        if (havingCondition != null) {
-            havingCondition.resolveTypes(session, null);
-
-            if (havingCondition.getDataType() != Type.SQL_BOOLEAN) {
-                throw Error.error(ErrorCode.X_42568);
-            }
-        }
     }
 
     private void resolveAggregates() {
