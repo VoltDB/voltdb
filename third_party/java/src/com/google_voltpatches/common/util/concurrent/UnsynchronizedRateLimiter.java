@@ -416,7 +416,7 @@ public abstract class UnsynchronizedRateLimiter {
    *
    * @return time in microseconds to wait until the resource can be acquired.
    */
-  long reserve(int permits) {
+  public long reserve(int permits) {
     checkPermits(permits);
     return reserveNextTicket(permits, readSafeMicros());
   }
