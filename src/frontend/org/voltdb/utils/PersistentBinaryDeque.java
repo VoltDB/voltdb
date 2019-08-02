@@ -174,13 +174,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_segment = segment;
         }
 
-        void rewindTo(PBDSegment<M> segment) {
-            if (m_rewoundFromId == -1 && m_segment != null) {
-                m_rewoundFromId = m_segment.segmentId();
-            }
-            m_segment = segment;
-        }
-
         private void moveToValidSegment() {
             PBDSegment<M> firstSegment = peekFirstSegment();
             // It is possible that m_segment got closed and removed

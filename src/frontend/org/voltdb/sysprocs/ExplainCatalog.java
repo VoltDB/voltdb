@@ -27,7 +27,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.PlanningErrorException;
 
-public class ExplainCatalog extends AdHocNTExplain {
+public class ExplainCatalog extends AdHocNTBase {
 
     @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {

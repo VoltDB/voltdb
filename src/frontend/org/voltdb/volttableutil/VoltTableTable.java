@@ -27,7 +27,7 @@ import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.voltdb.VoltTable;
-import org.voltdb.calciteadapter.ColumnType;
+import org.voltdb.plannerv2.ColumnTypes;
 
 /**
  * An adaptor between a {@link VoltTable} and a {@link ScannableTable}.
@@ -58,7 +58,7 @@ public class VoltTableTable extends AbstractTable implements ScannableTable {
             RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
             for (int i = 0; i < m_table.getColumnCount(); i++) {
                 RelDataType sqlType = typeFactory.createSqlType(
-                        ColumnType.getCalciteType(m_table.getColumnType(i)));
+                        ColumnTypes.getCalciteType(m_table.getColumnType(i)));
                 sqlType = SqlTypeUtil.addCharsetAndCollation(sqlType, typeFactory);
                 fieldInfo.add(m_table.getColumnName(i).toUpperCase(), sqlType);
             }

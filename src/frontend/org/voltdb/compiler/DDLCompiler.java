@@ -169,9 +169,6 @@ public class DDLCompiler {
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
-    private static final String INVALID_CREATE_EXPORT = "Invalid CREATE TABLE statement: %s "
-            + "expected syntax: CREATE TABLE <table> [EXPORT TO TARGET <target> ON <OPERATIONS> (column datatype, ...);" +
-            " Only INSERT, DELETE, UPDATE (or one of UPDATE_NEW, UPDATE_OLD) are allowed for OPERATIONS.";
     static final String [][] DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS = {
         {DR_ROW_TYPE_COLUMN_NAME, "VARCHAR(3 BYTES) NOT NULL"},
         {DR_LOG_ACTION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},

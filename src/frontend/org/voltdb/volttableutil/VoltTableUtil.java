@@ -21,7 +21,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
-import org.voltdb.calciteadapter.ColumnType;
+import org.voltdb.plannerv2.ColumnTypes;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -101,7 +101,7 @@ public final class VoltTableUtil {
         for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
             // TODO: verify the type convert
             columnInfoArray[i] = new VoltTable.ColumnInfo(resultSetMetaData.getColumnName(i + 1),
-                    ColumnType.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1))));
+                    ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1))));
         }
         VoltTable vt = new VoltTable(columnInfoArray);
         while (resultSet.next()) {
@@ -109,7 +109,7 @@ public final class VoltTableUtil {
             for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
                 Object value = resultSet.getObject(i + 1);
                 if (resultSet.wasNull()) {
-                    value = ColumnType.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1)))
+                    value = ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1)))
                             .getNullValue();
                 }
                 row[i] = value;
