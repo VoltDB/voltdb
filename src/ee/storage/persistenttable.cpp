@@ -829,11 +829,12 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
         size_t drMark = drStream->appendTuple(m_signature, m_partitionColumn, currentSpHandle,
-                                              currentUniqueId, target, DR_RECORD_INSERT);
+                currentUniqueId, target, DR_RECORD_INSERT);
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_INSERT)));
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(
+                        drStream, drMark, rowCostForDRRecord(DR_RECORD_INSERT)));
         }
     }
 
