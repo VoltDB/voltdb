@@ -50,6 +50,7 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
+      <xs:element name="scheduler" minOccurs="0" type="schedulerType"/>
     </xs:all>
   </xs:complexType>
 
@@ -485,6 +486,19 @@
     <xs:attribute name="preferred-source" type="clusterIdType"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
     <xs:attribute name="ssl" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- SchedulerManager -->
+  <xs:complexType name="schedulerType">
+    <xs:attribute name="min-delay-ms" type="xs:int" default="0"/>
+    <xs:attribute name="max-run-frequency" type="xs:double" default="0"/>
+    <xs:attribute name="thread-count" default="1">
+      <xs:simpleType>
+	<xs:restriction base="xs:int">
+          <xs:minInclusive value="1"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
 
 </xs:schema>

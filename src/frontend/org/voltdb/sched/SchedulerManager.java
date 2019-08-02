@@ -35,6 +35,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -63,6 +64,7 @@ import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.SchedulerType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -71,6 +73,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
 
 /**
  * Manager for the life cycle of the current set of configured {@link Scheduler}s. Each schedule configuration is
@@ -101,6 +104,10 @@ public class SchedulerManager {
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
             ClientInterface.SCHEDULER_MANAGER_CID, getClass().getSimpleName());
 
+    // Global configuration values
+    volatile long m_minDelayNs = 0;
+    volatile double m_maxRunFrequency = 0;
+
     // Local host ID
     final int m_hostId;
 
@@ -108,10 +115,13 @@ public class SchedulerManager {
     private final ListeningExecutorService m_managerExecutor = MoreExecutors
             .listeningDecorator(CoreUtils.getSingleThreadExecutor(getClass().getSimpleName()));
 
+    // Raw ScheduledThreadPoolExecutor used only to change thread count
+    private final ScheduledThreadPoolExecutor m_rawWrapperExecutor = CoreUtils
+            .getScheduledThreadPoolExecutor("ProcedureScheduler", 1, CoreUtils.SMALL_STACK_SIZE);
+
     // Used to execute the schedulers and scheduled procedures only used by ScheculerWrappers
-    // TODO make thread count configurable for the wrapper executor
-    final ListeningScheduledExecutorService m_wrapperExecutor = MoreExecutors.listeningDecorator(CoreUtils.getScheduledThreadPoolExecutor("ProcedureScheduler",
-                    1, CoreUtils.SMALL_STACK_SIZE));
+    final ListeningScheduledExecutorService m_wrapperExecutor = MoreExecutors.listeningDecorator(m_rawWrapperExecutor);
+
     final ClientInterface m_clientInterface;
     final StatsAgent m_statsAgent;
 
@@ -274,21 +284,23 @@ public class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> start(CatalogContext context) {
-        return start(context.database.getProcedureschedules(), context.authSystem, context.getCatalogJar().getLoader());
+        return start(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
+                context.authSystem, context.getCatalogJar().getLoader());
     }
 
     /**
      * Asynchronously start the scheduler manager and any configured schedules which are eligible to be run on this
      * host.
      *
+     * @param configuration      Global configuration for all schedules
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> start(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            ClassLoader classLoader) {
+    ListenableFuture<?> start(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+            AuthSystem authSystem, ClassLoader classLoader) {
         return execute(() -> {
             m_started = true;
 
@@ -305,7 +317,7 @@ public class SchedulerManager {
                             columns.addAll(ScheduleStatsSource.s_columns);
                         }
                     });
-            processCatalogInline(procedureSchedules, authSystem, classLoader);
+            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader);
         });
     }
 
@@ -316,23 +328,25 @@ public class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> promoteToLeader(CatalogContext context) {
-        return promoteToLeader(context.database.getProcedureschedules(), context.authSystem,
+        return promoteToLeader(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
+                context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
     /**
      * Asynchronously promote this host to be the global leader
      *
+     * @param configuration      Global configuration for all schedules
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> promoteToLeader(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            ClassLoader classLoader) {
+    ListenableFuture<?> promoteToLeader(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+            AuthSystem authSystem, ClassLoader classLoader) {
         return execute(() -> {
             m_leader = true;
-            processCatalogInline(procedureSchedules, authSystem, classLoader);
+            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader);
         });
     }
 
@@ -343,21 +357,22 @@ public class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> processUpdate(CatalogContext context) {
-        return processUpdate(context.database.getProcedureschedules(), context.authSystem,
-                context.getCatalogJar().getLoader());
+        return processUpdate(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
+                context.authSystem, context.getCatalogJar().getLoader());
     }
 
     /**
      * Asynchronously process an update to the scheduler configuration
      *
+     * @param configuration      Global configuration for all schedules
      * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> processUpdate(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            ClassLoader classLoader) {
-        return execute(() -> processCatalogInline(procedureSchedules, authSystem, classLoader));
+    ListenableFuture<?> processUpdate(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+            AuthSystem authSystem, ClassLoader classLoader) {
+        return execute(() -> processCatalogInline(configuration, procedureSchedules, authSystem, classLoader));
     }
 
     /**
@@ -462,14 +477,28 @@ public class SchedulerManager {
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load {@link Scheduler} classes
      */
-    private void processCatalogInline(Iterable<ProcedureSchedule> procedureSchedules, AuthSystem authSystem,
-            ClassLoader classLoader) {
+    private void processCatalogInline(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+            AuthSystem authSystem, ClassLoader classLoader) {
         if (!m_started) {
             return;
         }
 
         Map<String, SchedulerHandler> newHandlers = new HashMap<>();
         m_authSystem = authSystem;
+
+        if (configuration == null) {
+            // No configuration provided so use defaults
+            configuration = new SchedulerType();
+        }
+
+        m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMinDelayMs());
+        double originalFrequency = m_maxRunFrequency;
+        m_maxRunFrequency = configuration.getMaxRunFrequency() / 60.0;
+        boolean frequencyChanged = m_maxRunFrequency != originalFrequency;
+
+        if (m_rawWrapperExecutor.getCorePoolSize() != configuration.getThreadCount()) {
+            m_rawWrapperExecutor.setCorePoolSize(configuration.getThreadCount());
+        }
 
         for (ProcedureSchedule procedureSchedule : procedureSchedules) {
             SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
@@ -480,6 +509,9 @@ public class SchedulerManager {
                 if (handler.isSameSchedule(procedureSchedule, result.m_factory)) {
                     newHandlers.put(procedureSchedule.getName(), handler);
                     handler.setEnabled(procedureSchedule.getEnabled());
+                    if (frequencyChanged) {
+                        handler.setMaxRunFrequency(m_maxRunFrequency);
+                    }
                     continue;
                 }
                 handler.cancel();
@@ -659,6 +691,8 @@ public class SchedulerManager {
         String generateLogMessage(String body) {
             return SchedulerManager.generateLogMessage(m_definition.getName(), body);
         }
+
+        abstract void setMaxRunFrequency(double frequency);
     }
 
     /**
@@ -704,6 +738,11 @@ public class SchedulerManager {
         @Override
         void startImpl() {
             m_wrapper.start();
+        }
+
+        @Override
+        void setMaxRunFrequency(double frequency) {
+            m_wrapper.setMaxRunFrequency(frequency);
         }
     }
 
@@ -769,6 +808,13 @@ public class SchedulerManager {
                 }
             }
         }
+
+        @Override
+        void setMaxRunFrequency(double frequency) {
+            for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
+                wrapper.setMaxRunFrequency(frequency);
+            }
+        }
     }
 
     /**
@@ -813,6 +859,7 @@ public class SchedulerManager {
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
         private ScheduleStatsSource m_stats;
+        private UnsynchronizedRateLimiter m_rateLimiter;
 
         // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
         private volatile long m_expectedExecutionTime;
@@ -833,6 +880,7 @@ public class SchedulerManager {
                 m_stats = new ScheduleStatsSource(m_handler.getName(), getRunLocation(), m_hostId, getSiteId());
                 m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
             }
+            setMaxRunFrequency(m_maxRunFrequency);
             setState(SchedulerWrapperState.RUNNING);
             submitHandleNextRun();
         }
@@ -988,6 +1036,18 @@ public class SchedulerManager {
             }
         }
 
+        synchronized void setMaxRunFrequency(double frequency) {
+            if (frequency > 0) {
+                if (m_rateLimiter == null) {
+                    m_rateLimiter = UnsynchronizedRateLimiter.create(frequency);
+                } else {
+                    m_rateLimiter.setRate(frequency);
+                }
+            } else {
+                m_rateLimiter = null;
+            }
+        }
+
         /**
          * Generate the parameters to pass to the procedure during execution
          *
@@ -1072,8 +1132,12 @@ public class SchedulerManager {
         }
 
         private synchronized long calculateDelay() {
-            // TODO include logic for min delay and max frequency
-            return m_procedure.getDelay(TimeUnit.NANOSECONDS);
+            long minDelayNs = m_minDelayNs;
+            if (m_rateLimiter != null) {
+                long rateLimitDelayNs = TimeUnit.MICROSECONDS.toNanos(m_rateLimiter.reserve(1));
+                minDelayNs = Math.max(minDelayNs, rateLimitDelayNs);
+            }
+            return Math.max(m_procedure.getDelay(TimeUnit.NANOSECONDS), minDelayNs);
         }
 
         /**

@@ -67,6 +67,7 @@ import org.voltdb.catalog.ProcedureSchedule;
 import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.deploymentfile.SchedulerType;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -88,6 +89,7 @@ public class TestSchedulerManager {
     private Database m_database;
     private Procedure m_procedure = new Procedure();
     private StatsAgent m_statsAgent = new StatsAgent();
+    private SchedulerType m_schedulesConfig = new SchedulerType();
 
     @Before
     public void setup() {
@@ -364,6 +366,34 @@ public class TestSchedulerManager {
         assertEquals(3, getScheduleStats().getRowCount());
     }
 
+    /*
+     * Test that minimum delay configuration is honored
+     */
+    @Test
+    public void minDelay() throws Exception {
+        m_schedulesConfig.setMinDelayMs(10000);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        startSync();
+        promoteToLeaderSync(schedule);
+        Thread.sleep(100);
+        assertEquals(1, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_postRunSchedulerCallCount.get());
+    }
+
+    /*
+     * Test that max run frequency configuration is honored
+     */
+    @Test
+    public void maxRunFrequency() throws Exception {
+        m_schedulesConfig.setMaxRunFrequency(1.0);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        startSync();
+        promoteToLeaderSync(schedule);
+        Thread.sleep(100);
+        assertEquals(1, s_firstSchedulerCallCount.get());
+        assertEquals(1, s_postRunSchedulerCallCount.get());
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -412,15 +442,20 @@ public class TestSchedulerManager {
     }
 
     private void startSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
-        m_schedulerManager.start(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+        m_schedulerManager.start(m_schedulesConfig, Arrays.asList(schedules), m_authSystem, getClass().getClassLoader())
+                .get();
     }
 
     public void promoteToLeaderSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
-        m_schedulerManager.promoteToLeader(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+        m_schedulerManager
+                .promoteToLeader(m_schedulesConfig, Arrays.asList(schedules), m_authSystem, getClass().getClassLoader())
+                .get();
     }
 
     private void processUpdateSync(ProcedureSchedule... schedules) throws InterruptedException, ExecutionException {
-        m_schedulerManager.processUpdate(Arrays.asList(schedules), m_authSystem, getClass().getClassLoader()).get();
+        m_schedulerManager
+                .processUpdate(m_schedulesConfig, Arrays.asList(schedules), m_authSystem, getClass().getClassLoader())
+                .get();
     }
 
     private void promotedPartitionsSync(int... partitionIds) throws InterruptedException, ExecutionException {
