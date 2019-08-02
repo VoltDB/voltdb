@@ -139,9 +139,7 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
 
         if(!(containsType && containsDistinct && containsOutputColumn)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type, distinct, or outputcolumn.");
+            throw SerializableEEException("AggregatePlanNode::loadFromJSONObject: Missing type, distinct, or outputcolumn.");
         }
         if ( ! containsExpression) {
             m_aggregateInputExpressions.push_back(NULL);
