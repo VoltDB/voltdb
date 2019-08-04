@@ -19,7 +19,6 @@ package org.voltdb.plannerv2.rel.util;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptUtil;
@@ -226,10 +225,17 @@ public final class PlanCostUtil {
         sparsity *= Math.log(E_CONST + colCount) / Math.log(Math.abs(colCount - keyWidth) + E_CONST);
         // penalize for collation mismatch
         sparsity /= discountIndexCollation(index, collation);
-        // Promote partial indexes that eliminates the most filters
+        // discount partial indexes
+        // The discount favors indexes that eliminate the most post filters
+        // (accessPath.getEliminatedPostExpressions()).
+        // The empirical const 0.7 subtracted from the number of the eliminated
+        // filter ensures the advantage of a regular index with keyWidth = 0.5
+        // The sum of the counts "other" and the "eliminated" expressions is
+        // always a const representing the initial count of the post filters
+        // for a give query
         if (!accessPath.getEliminatedPostExpressions().isEmpty()) {
-            sparsity *= Math.log(E_CONST +
-                    Math.abs(accessPath.getOtherExprs().size() - accessPath.getEliminatedPostExpressions().size()));
+            sparsity *= Math.log(E_CONST + (accessPath.getEliminatedPostExpressions().size() - 0.7)
+                            / (accessPath.getOtherExprs().size() + accessPath.getEliminatedPostExpressions().size()));
         }
 
         double tuplesToRead = Math.log(E_CONST - 1 + rowCount * sparsity) / sparsity;
@@ -238,24 +244,7 @@ public final class PlanCostUtil {
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
         }
 
-        // Apply discounts similar to the keyWidth one for the additional post-filters that get
-        // eliminated by exactly matched partial index filters. The existing discounts are not
-        // supposed to give a "full refund" of the optimized-out post filters, because there is
-        // an offsetting cost to using the index, typically order log(n). That offset cost will
-        // be lower (order log(smaller n)) for partial indexes, but it's not clear what the typical
-        // relative costs are of a partial index with x key components and y partial index predicates
-        // vs. a full or partial index with x+n key components and y-m partial index predicates.
-        double discountFactor = 1;
-        // Eliminated filters discount the cost of processing tuples with a rapidly
-        // diminishing effect that ranges from a discount of 0.9 for one skipped filter
-        // to a discount approaching 0.888... (=8/9) for many skipped filters.
-        if (!accessPath.getEliminatedPostExpressions().isEmpty() && tuplesToRead > 1) {
-            discountFactor -= IntStream.range(0, accessPath.getEliminatedPostExpressions().size())
-                    .mapToDouble(i -> Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1))
-                    .sum();
-        }
-        Preconditions.checkState(discountFactor > 0);
-        return tuplesToRead * discountFactor;
+        return tuplesToRead;
     }
 
     /**
