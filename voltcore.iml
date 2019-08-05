@@ -762,5 +762,14 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="3pty_jars" level="project" />
+    <orderEntry type="module-library">
+      <library name="avro-1.9.0">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/avro-1.9.0.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>

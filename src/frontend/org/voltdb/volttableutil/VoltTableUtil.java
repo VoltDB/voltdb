@@ -76,8 +76,6 @@ public final class VoltTableUtil {
         String uuid = UUID.randomUUID().toString();
         VoltTableData.SCHEMA.put(uuid, db);
 
-        Class.forName("org.apache.calcite.jdbc.Driver");
-
         String connectString = String.format("jdbc:calcite:");
 
         Properties info = new Properties();
@@ -88,7 +86,7 @@ public final class VoltTableUtil {
         try {
             final Driver driver = new Driver();
             CalciteConnection connection = (CalciteConnection)
-                driver.connect("jdbc:calcite:", info);
+                driver.connect(connectString, info);
 
             Statement st = connection.createStatement();
             ResultSet result = st.executeQuery(sql);
