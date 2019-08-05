@@ -762,9 +762,5 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="3pty_jars" level="project" />
-    <orderEntry type="library" scope="PROVIDED" name="jackson-annotations-2.9.4" level="project" />
-    <orderEntry type="library" name="avro-1.9.0" level="project" />
-    <orderEntry type="library" scope="PROVIDED" name="jackson-core-2.9.4" level="project" />
-    <orderEntry type="library" scope="PROVIDED" name="jackson-databind-2.9.4" level="project" />
   </component>
 </module>
