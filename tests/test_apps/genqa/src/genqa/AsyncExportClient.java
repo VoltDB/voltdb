@@ -229,35 +229,12 @@ public class AsyncExportClient
 
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(transType);
-                /*********
-                long txid = clientResponse.getResults()[0].asScalarLong();
-                final String trace = String.format("%d:%d:%d\n", m_type, txid, now);
-                try
-                {
-                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
-                *********/
             }
-            /*********
             else
             {
-                TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:-1:%d:%s\n", m_type, now,((ClientResponseImpl)clientResponse).toJSONString());
-                try
-                {
-                    m_writer.write(-1,trace);
-                }
-                catch (IOException e)
-                {
-                    log.error("Exception: " + e);
-                    e.printStackTrace();
-                }
+                final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
+                log.info("TableExport failed: " + trace);
             }
-            *********/
         }
     }
 
@@ -419,6 +396,26 @@ public class AsyncExportClient
             while (endTime > System.currentTimeMillis())
             {
                 long currentRowId = rowId.incrementAndGet();
+
+                // Table with Export
+                if (config.usetableexport) {
+                    // call TableExport twice, once will insert, the second will randomly update or delete
+                    for (int i = 0; i < 2; i++) {
+                        try {
+                            clientRef.get().callProcedure(
+                                    new TableExportCallback(writer, r.nextInt(3)+1),
+                                    "TableExport",
+                                    currentRowId,
+                                    0);
+                        }
+                        catch (Exception e) {
+                            log.fatal("Exception: " + e);
+                            e.printStackTrace();
+                            System.exit(-1);
+                        }
+                    }
+                }
+
                 // Post the request, asynchronously
                 try {
                     clientRef.get().callProcedure(
@@ -431,22 +428,6 @@ public class AsyncExportClient
                     log.fatal("Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
-                }
-
-                // Table with Export
-                if (config.usetableexport) {
-                    try {
-                        clientRef.get().callProcedure(
-                                new TableExportCallback(writer, r.nextInt(3)+1),
-                                "TableExport",
-                                currentRowId,
-                                0);
-                    }
-                    catch (Exception e) {
-                        log.fatal("Exception: " + e);
-                        e.printStackTrace();
-                        System.exit(-1);
-                    }
                 }
 
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
@@ -690,11 +671,16 @@ public class AsyncExportClient
                 if ( pending != lastPending) {
                     // reset the timer if we are making progress
                     maxTime = Instant.now().plusSeconds(timeout);
-                    pending = lastPending;
+                    lastPending = pending;
                 }
                 String stream = stats.getString("SOURCE");
+                String target = stats.getString("TARGET");
+                String active = stats.getString("ACTIVE");
                 Long partition = stats.getLong("PARTITION_ID");
-                log.info("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
+                // switch this message to debug out?
+                log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
+                if (active.equalsIgnoreCase("FALSE"))
+                    continue;
                 if (pending != 0) {
                     passedThisTime = false;
                     log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);

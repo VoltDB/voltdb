@@ -82,6 +82,35 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
+
+CREATE TABLE export_partitioned_table_loopback EXPORT TO TARGET loopback_target ON insert, update, delete
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+, rowid_group               TINYINT       NOT NULL
+, type_null_tinyint         TINYINT
+, type_not_null_tinyint     TINYINT       NOT NULL
+, type_null_smallint        SMALLINT
+, type_not_null_smallint    SMALLINT      NOT NULL
+, type_null_integer         INTEGER
+, type_not_null_integer     INTEGER       NOT NULL
+, type_null_bigint          BIGINT
+, type_not_null_bigint      BIGINT        NOT NULL
+, type_null_timestamp       TIMESTAMP
+, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
+, type_null_float           FLOAT
+, type_not_null_float       FLOAT         NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
+, type_null_varchar128      VARCHAR(128)
+, type_not_null_varchar128  VARCHAR(128)  NOT NULL
+, type_null_varchar1024     VARCHAR(1024)
+, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
+);
+PARTITION TABLE export_partitioned_table_loopback ON COLUMN rowid;
+
 -- Export Table for Partitioned Data Table deletions
 CREATE STREAM export_partitioned_table_kafka PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
@@ -430,6 +459,8 @@ CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 F
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
+
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_loopback COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;

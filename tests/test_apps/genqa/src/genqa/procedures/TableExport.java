@@ -36,11 +36,13 @@ import org.voltdb.VoltType;
  * the difference is tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
  */
 public class TableExport extends VoltProcedure {
-    public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM export_partitioned_table WHERE rowid = ?"); // don't try these on a STREAM
-    public final SQLStmt insert = new SQLStmt("INSERT INTO export_partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    public final SQLStmt update = new SQLStmt("UPDATE export_partitioned_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
-    public final SQLStmt delete = new SQLStmt("DELETE FROM export_partitioned_table WHERE rowid = ?");
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM export_partitioned_table_loopback WHERE rowid = ? ORDER BY rowid"); // don't try these on a STREAM
+
+    public final SQLStmt insert = new SQLStmt("INSERT INTO export_partitioned_table_loopback (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    public final SQLStmt update = new SQLStmt("UPDATE export_partitioned_table_loopback SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
+    public final SQLStmt delete = new SQLStmt("DELETE FROM export_partitioned_table_loopback WHERE rowid = ?");
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table_loopback (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(long rowid, long ignore)
     {
@@ -73,27 +75,27 @@ public class TableExport extends VoltProcedure {
                               export
                             , txid
                             , rowid
-                            , row.get( 1, VoltType.TINYINT)
                             , row.get( 2, VoltType.TINYINT)
                             , row.get( 3, VoltType.TINYINT)
-                            , row.get( 4, VoltType.SMALLINT)
+                            , row.get( 4, VoltType.TINYINT)
                             , row.get( 5, VoltType.SMALLINT)
-                            , row.get( 6, VoltType.INTEGER)
+                            , row.get( 6, VoltType.SMALLINT)
                             , row.get( 7, VoltType.INTEGER)
-                            , row.get( 8, VoltType.BIGINT)
+                            , row.get( 8, VoltType.INTEGER)
                             , row.get( 9, VoltType.BIGINT)
-                            , row.get(10, VoltType.TIMESTAMP)
+                            , row.get(10, VoltType.BIGINT)
                             , row.get(11, VoltType.TIMESTAMP)
-                            , row.get(12, VoltType.FLOAT)
-                            , row.get(13, VoltType.FLOAT)
+                            , row.get(12, VoltType.TIMESTAMP)
+                            , row.get(13, VoltType.DECIMAL)
                             , row.get(14, VoltType.DECIMAL)
-                            , row.get(15, VoltType.DECIMAL)
-                            , row.get(16, VoltType.STRING)
+                            , row.get(15, VoltType.FLOAT)
+                            , row.get(16, VoltType.FLOAT)
                             , row.get(17, VoltType.STRING)
                             , row.get(18, VoltType.STRING)
                             , row.get(19, VoltType.STRING)
                             , row.get(20, VoltType.STRING)
                             , row.get(21, VoltType.STRING)
+                            , row.get(22, VoltType.STRING)
                             );
             }
             else
@@ -135,6 +137,7 @@ public class TableExport extends VoltProcedure {
                 // SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               insert
+                            , txid
                             , rowid
                             , record.rowid_group
                             , record.type_null_tinyint
