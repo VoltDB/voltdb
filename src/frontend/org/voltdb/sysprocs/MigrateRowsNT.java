@@ -159,8 +159,8 @@ public class MigrateRowsNT extends VoltNTSystemProcedure {
     public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp,
             long chunksize, long timeoutms, long maxFrequency, long interval) {
 
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug(String.format("Executing migrate rows, table %s, column %s, value %s, batchsize %d, frequency %d" ,
+        if (exportLog.isTraceEnabled()) {
+            exportLog.trace(String.format("Executing migrate rows, table %s, column %s, value %s, batchsize %d, frequency %d" ,
                     tableName, columnName, valueStr, chunksize, maxFrequency));
         }
         VoltTable returnTable = new VoltTable(new ColumnInfo("ROWS_MIGRATED", VoltType.BIGINT),
