@@ -517,11 +517,7 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
         answer = new (memoryPool) WindowedSumAgg();
         break;
     default:
-        {
-            char message[128];
-            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
+        throwSerializableEEException("Unknown aggregate type %d", agg_type);
     }
     return answer;
 }

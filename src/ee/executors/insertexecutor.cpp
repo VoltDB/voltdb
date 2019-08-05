@@ -359,7 +359,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
                     m_targetTable->name().c_str());
             VOLT_DEBUG("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
         }
     }
 }
@@ -423,7 +423,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
          }
          VOLT_DEBUG("%s", msg);
          // NOTE!!! Cannot throw any other types like ConstraintFailureException
-         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
       }
    }
 

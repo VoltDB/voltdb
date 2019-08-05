@@ -31,12 +31,12 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Objects;
+
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.Type;
-
-import java.util.Objects;
 
 /**
  * Implementation of LIKE operations
@@ -204,7 +204,9 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
                 || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
 
-            likeObject.setIgnoreCase(ignoreCase);
+            if (likeObject != null) {
+                likeObject.setIgnoreCase(ignoreCase);
+            }
         } else if (!(nodes[LEFT].dataType.isBooleanType()
                 && nodes[RIGHT].dataType.isBooleanType())
                               && dataType.isBooleanType()) {
