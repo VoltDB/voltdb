@@ -290,7 +290,6 @@ public class PlannerTool {
     /**
      * Plan a query with the Calcite planner.
      * @param task the query to plan.
-     * @param batch the query batch which this query belongs to.
      * @return a planned statement.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
