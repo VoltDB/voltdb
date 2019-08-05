@@ -21,7 +21,6 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import com.google_voltpatches.common.collect.Lists;
-import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableType;
 import org.voltdb.VoltType;
@@ -2665,7 +2664,6 @@ public class PlanAssembler {
                 SchemaColumn schema_col = null;
                 SchemaColumn top_schema_col = null;
                 if (rootExpr instanceof AggregateExpression) {
-                    AggregateExpression tempRoot = (AggregateExpression)rootExpr;
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
 
@@ -2685,7 +2683,6 @@ public class PlanAssembler {
                     tve.setDifferentiator(col.m_differentiator);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
-                    aggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -2750,8 +2747,7 @@ public class PlanAssembler {
                          */
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
-                                 agg_expression_type != ExpressionType.USER_DEFINED_AGGREGATE) {
+                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -2764,7 +2760,6 @@ public class PlanAssembler {
                              * output column of the push-down aggregate node
                              */
                             boolean topDistinctFalse = false;
-                            topAggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
                             topAggNode.addAggregate(top_expression_type,
                                     topDistinctFalse, outputColumnIndex, tve);
                         }
@@ -3025,36 +3020,6 @@ public class PlanAssembler {
     }
 
     /**
-     * This function is called once it's been determined that we can push down
-     * an aggregation plan node.
-     *
-     * If an USER_DEFINED_AGGREGATE aggregate is distributed, then we need to
-     * update the return type of the distNode to be varbinary, change the isWorker to be false
-     * for the coordNode and updata the return type for the coordNode.
-     *
-     * @param distNode    The aggregate node executed on each partition
-     * @param coordNode   The aggregate node executed on the coordinator
-     */
-    private static void fixDistributedUserDefinedAggregate(
-            AggregatePlanNode distNode,
-            AggregatePlanNode coordNode) {
-
-        assert (distNode != null);
-        assert (coordNode != null);
-
-        List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
-        for (int i = 0; i < coordAggTypes.size(); ++i) {
-            coordNode.updateWorkerOrCoordinator(i);
-            if (coordNode.getUserAggregateId(i) != -1) {
-                String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId(i)).getNameString();
-                VoltType returnType = VoltType.typeFromString(typeName);
-                coordNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
-                distNode.updateUserDefinedAggregate(i);
-            }
-        }
-    }
-
-    /**
      * Push the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
      * is not distributed, or coordNode is not provided, the distNode
@@ -3129,9 +3094,6 @@ public class PlanAssembler {
             // Now that we're certain the aggregate will be pushed down
             // (no turning back now!), fix any APPROX_COUNT_DISTINCT aggregates.
             fixDistributedApproxCountDistinct(distNode, coordNode);
-            // change the return type for the distNode to be varbinary, update the isWorker for
-            // the coordNode to be false and update the return type for the coordinated aggregate function
-            fixDistributedUserDefinedAggregate(distNode, coordNode);
 
             // Put the send/receive pair back into place
             accessPlanTemp.getChild(0).addAndLinkChild(distNode);
@@ -3142,16 +3104,6 @@ public class PlanAssembler {
         else {
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
-            for (int i = 0; i < rootAggNode.getAggregateTypesSize(); ++i) {
-                // if this is an user-defined aggregate function,
-                // we need to update the return type to be the final return type
-                if (rootAggNode.getUserAggregateId(i) != -1) {
-                    rootAggNode.updatePartitionOrReplicate(i);
-                    String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId(i)).getNameString();
-                    VoltType returnType = VoltType.typeFromString(typeName);
-                    rootAggNode.getOutputSchema().getColumn(i).getExpression().setValueType(returnType);
-                }
-            }
         }
 
         // Set post predicate for final Aggregation node.

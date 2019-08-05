@@ -18,7 +18,6 @@
 package org.voltdb.expressions;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
@@ -26,30 +25,20 @@ public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
     private boolean m_distinct = false;
-    protected final int m_userAggregateId;
-    protected final String m_name;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
-        m_userAggregateId = -1;
-        m_name = "";
     }
 
-    public AggregateExpression(ExpressionType type, int id, String n) {
-        super(type);
-        m_userAggregateId = id;
-        m_name = n;
+    public AggregateExpression() {
+        //
+        // This is needed for serialization
+        //
+        super();
     }
 
     public void setDistinct() { m_distinct = true; }
     public boolean isDistinct() { return m_distinct;  }
-
-    /**
-     * @return user aggregate id
-     */
-    public int getUserAggregateId() {
-        return m_userAggregateId;
-    }
 
     @Override
     public boolean equals(Object obj) {
@@ -106,7 +95,6 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_MIN:
         case AGGREGATE_WINDOWED_MIN:
         case AGGREGATE_WINDOWED_MAX:
-        case USER_DEFINED_AGGREGATE:
             //
             // It's always whatever the base type is
             //
@@ -153,11 +141,4 @@ public class AggregateExpression extends AbstractExpression {
             m_left.explain(impliedTableName) + ")";
     }
 
-    public boolean isUserDefined() {
-        return FunctionForVoltDB.isUserDefinedFunctionId(m_userAggregateId);
-    }
-
-    public String getFunctionName() {
-        return m_name;
-    }
 }

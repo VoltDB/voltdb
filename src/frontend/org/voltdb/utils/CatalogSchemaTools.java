@@ -447,14 +447,8 @@ public abstract class CatalogSchemaTools {
 
     public static void toSchema(StringBuilder sb, Function func)
     {
-        String functionDDLTemplate;
-        if (func.getMethodname() == null ) {
-            functionDDLTemplate = "CREATE AGGREGATE FUNCTION %s FROM CLASS %s;\n\n";
-            sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname()));
-        } else {
-            functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
-            sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
-        }
+        String functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
+        sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
     }
 
     /**

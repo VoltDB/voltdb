@@ -66,38 +66,20 @@ class JNILocalFrameBarrier {
     }
 };
 
-jmethodID JNITopend::initJavaUserDefinedMethod(const char* name) {
-    // if this is the start method, we are going to pass in the functionId
-    if (strcmp(name, "callJavaUserDefinedAggregateStart") == 0) {
-        return m_jniEnv->GetMethodID(m_jniClass, name, "(I)I");
-    }
-    // if this is not the start method, we do not have to pass in any parameter
-    else {
-        return m_jniEnv->GetMethodID(m_jniClass, name, "()I");
-    }
-    m_jniEnv->ExceptionDescribe();
-    throw std::exception();
-}
-
-JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller), m_jniClass(m_jniEnv->GetObjectClass(m_javaExecutionEngine)),
-    m_callJavaUserDefinedFunctionMID(initJavaUserDefinedMethod("callJavaUserDefinedFunction")),
-    m_callJavaUserDefinedAggregateStartMID(initJavaUserDefinedMethod("callJavaUserDefinedAggregateStart")),
-    m_callJavaUserDefinedAggregateAssembleMID(initJavaUserDefinedMethod("callJavaUserDefinedAggregateAssemble")),
-    m_callJavaUserDefinedAggregateCombineMID(initJavaUserDefinedMethod("callJavaUserDefinedAggregateCombine")),
-    m_callJavaUserDefinedAggregateWorkerEndMID(initJavaUserDefinedMethod("callJavaUserDefinedAggregateWorkerEnd")),
-    m_callJavaUserDefinedAggregateCoordinatorEndMID(initJavaUserDefinedMethod("callJavaUserDefinedAggregateCoordinatorEnd")){
+JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller) {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
-    VOLT_TRACE("found class: %d", m_jniClass == NULL);
-    if (m_jniClass == NULL) {
+    jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
+    VOLT_TRACE("found class: %d", jniClass == NULL);
+    if (jniClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        vassert(m_jniClass != 0);
+        vassert(jniClass != 0);
         throw std::exception();
     }
 
     m_fallbackToEEAllocatedBufferMID =
             m_jniEnv->GetMethodID(
-                    m_jniClass,
+                    jniClass,
                     "fallbackToEEAllocatedBuffer",
                     "(Ljava/nio/ByteBuffer;)V");
     if (m_fallbackToEEAllocatedBufferMID == NULL) {
@@ -106,36 +88,44 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
+            jniClass, "callJavaUserDefinedFunction", "()I");
+    if (m_callJavaUserDefinedFunctionMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_callJavaUserDefinedFunctionMID != 0);
+        throw std::exception();
+    }
+
     m_resizeUDFBufferMID = m_jniEnv->GetMethodID(
-            m_jniClass, "resizeUDFBuffer", "(I)V");
+            jniClass, "resizeUDFBuffer", "(I)V");
     if (m_resizeUDFBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_resizeUDFBufferMID != 0);
         throw std::exception();
     }
 
-    m_nextDependencyMID = m_jniEnv->GetMethodID(m_jniClass, "nextDependencyAsBytes", "(I)[B");
+    m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_nextDependencyMID != 0);
         throw std::exception();
     }
 
-    m_traceLogMID = m_jniEnv->GetMethodID(m_jniClass, "traceLog", "(ZLjava/lang/String;Ljava/lang/String;)V");
+    m_traceLogMID = m_jniEnv->GetMethodID(jniClass, "traceLog", "(ZLjava/lang/String;Ljava/lang/String;)V");
     if (m_traceLogMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_traceLogMID != 0);
         throw std::exception();
     }
 
-    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(m_jniClass, "fragmentProgressUpdate", "(IIJJJ)J");
+    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(IIJJJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_fragmentProgressUpdateMID != 0);
         throw std::exception();
     }
 
-    m_planForFragmentIdMID = m_jniEnv->GetMethodID(m_jniClass, "planForFragmentId", "(J)[B");
+    m_planForFragmentIdMID = m_jniEnv->GetMethodID(jniClass, "planForFragmentId", "(J)[B");
     if (m_planForFragmentIdMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_planForFragmentIdMID != 0);
@@ -144,7 +134,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_crashVoltDBMID =
         m_jniEnv->GetStaticMethodID(
-            m_jniClass,
+            jniClass,
             "crashVoltDB",
             "(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;I)V");
     if (m_crashVoltDBMID == NULL) {
@@ -250,7 +240,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_storeLargeTempTableBlockMID = m_jniEnv->GetMethodID(m_jniClass,
+    m_storeLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                           "storeLargeTempTableBlock",
                                                           "(JJLjava/nio/ByteBuffer;)Z");
     if (m_storeLargeTempTableBlockMID == NULL) {
@@ -259,7 +249,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_loadLargeTempTableBlockMID = m_jniEnv->GetMethodID(m_jniClass,
+    m_loadLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                          "loadLargeTempTableBlock",
                                                           "(JJLjava/nio/ByteBuffer;)Z");
     if (m_loadLargeTempTableBlockMID == NULL) {
@@ -268,7 +258,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_releaseLargeTempTableBlockMID = m_jniEnv->GetMethodID(m_jniClass,
+    m_releaseLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                             "releaseLargeTempTableBlock",
                                                             "(JJ)Z");
     if (m_releaseLargeTempTableBlockMID == NULL) {
@@ -487,32 +477,6 @@ bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
 int32_t JNITopend::callJavaUserDefinedFunction() {
     return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
                                             m_callJavaUserDefinedFunctionMID);
-}
-
-int32_t JNITopend::callJavaUserDefinedAggregateStart(int functionId) {
-    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateStartMID,
-                                            functionId);
-}
-
-int32_t JNITopend::callJavaUserDefinedAggregateAssemble() {
-    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateAssembleMID);
-}
-
-int32_t JNITopend::callJavaUserDefinedAggregateCombine() {
-    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateCombineMID);
-}
-
-int32_t JNITopend::callJavaUserDefinedAggregateWorkerEnd() {
-    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateWorkerEndMID);
-}
-
-int32_t JNITopend::callJavaUserDefinedAggregateCoordinatorEnd() {
-    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                            m_callJavaUserDefinedAggregateCoordinatorEndMID);
 }
 
 void JNITopend::resizeUDFBuffer(int32_t size) {

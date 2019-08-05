@@ -233,9 +233,6 @@ protected:
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
     std::vector<ExpressionType> m_aggTypes;
-    std::vector<int> m_aggregateIds;
-    std::vector<bool> m_isWorker;
-    std::vector<bool> m_isPartition;
     std::vector<bool> m_distinctAggs;
     std::vector<AbstractExpression*> m_groupByExpressions;
     std::vector<AbstractExpression*> m_inputExpressions;

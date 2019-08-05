@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 
 import java.util.Objects;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -48,10 +47,6 @@ import org.hsqldb_voltpatches.store.ValuePool;
 public class ExpressionAggregate extends Expression {
 
     boolean isDistinctAggregate;
-    // if it's a user-defined aggregate function, we will give it an id and a name
-    private int m_userAggregateId;
-    private String m_name;
-
 
     ExpressionAggregate(int type, boolean distinct, Expression e) {
 
@@ -68,19 +63,6 @@ public class ExpressionAggregate extends Expression {
 
         isDistinctAggregate = e.isDistinctAggregate;
         nodes               = e.nodes;
-        m_userAggregateId   = e.m_userAggregateId;
-        m_name				= e.m_name;
-    }
-
-    ExpressionAggregate(int type, boolean distinct, Expression e, int id, String n) {
-
-        super(type);
-
-        nodes               = new Expression[UNARY];
-        isDistinctAggregate = distinct;
-        nodes[LEFT]         = e;
-        m_userAggregateId   = id;
-        m_name                = n;
     }
 
     @Override
@@ -261,16 +243,12 @@ public class ExpressionAggregate extends Expression {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (opType == OpTypes.USER_DEFINED_AGGREGATE) {
-            dataType = FunctionDescriptor.fn_by_name(m_name).getDataType();
-        } else {
-            dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
-        }
+        dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
     @Override
     public int hashCode() {
-        return (super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate)) * 1048573 + m_userAggregateId;
+        return super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate);
     }
 
     @Override
@@ -326,13 +304,5 @@ public class ExpressionAggregate extends Expression {
         }
 
         return ((SetFunction) currValue).getValue();
-    }
-
-    public int getUserAggregateId() {
-        return m_userAggregateId;
-    }
-
-    public String getName() {
-        return m_name;
     }
 }
