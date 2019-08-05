@@ -443,7 +443,7 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
-        if (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
+        if(parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
             final MVQueryRewriter rewriter;
             if (parsedStmt instanceof ParsedSelectStmt) {
                 rewriter = new MVQueryRewriter((ParsedSelectStmt) parsedStmt);

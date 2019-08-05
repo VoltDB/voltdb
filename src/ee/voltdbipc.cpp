@@ -78,12 +78,7 @@ public:
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
         kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
-        kErrorCode_pushEndOfStream = 113,              // Push EOF for dropped stream.
-        kErrorCode_callJavaUserDefinedAggregateStart = 114,  // Notify the frontend to call a Java user-defined aggregate function start method.
-        kErrorCode_callJavaUserDefinedAggregateAssemble = 115,  // Notify the frontend to call a Java user-defined aggregate function assemble method.
-        kErrorCode_callJavaUserDefinedAggregateCombine = 116,  // Notify the frontend to call a Java user-defined aggregate function combine method.
-        kErrorCode_callJavaUserDefinedAggregateWorkerEnd = 117,  // Notify the frontend to call a Java user-defined aggregate function worker end method.
-        kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd = 118  // Notify the frontend to call a Java user-defined aggregate function coordinator end method.
+        kErrorCode_pushEndOfStream = 113               // Push EOF for dropped stream.
     };
 
     VoltDBIPC(int fd);
@@ -209,19 +204,7 @@ private:
 
     void sendPerFragmentStatsBuffer();
 
-    int callJavaUserDefinedHelper(int kErrorCode);
-
     int callJavaUserDefinedFunction();
-
-    int callJavaUserDefinedAggregateStart(int functionId);
-
-    int callJavaUserDefinedAggregateAssemble();
-
-    int callJavaUserDefinedAggregateCombine();
-
-    int callJavaUserDefinedAggregateWorkerEnd();
-
-    int callJavaUserDefinedAggregateCoordinatorEnd();
 
     void setViewsEnabled(struct ipc_command*);
 
@@ -948,9 +931,9 @@ void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::strin
     }
 }
 
-int VoltDBIPC::callJavaUserDefinedHelper(int kErrorCode) {
+int VoltDBIPC::callJavaUserDefinedFunction() {
     // Send a special status code indicating that a UDF invocation request is coming on the wire.
-    int8_t statusCode = static_cast<int8_t>(kErrorCode);
+    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedFunction);
     writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
 
     // Get the UDF buffer size.
@@ -979,30 +962,6 @@ int VoltDBIPC::callJavaUserDefinedHelper(int kErrorCode) {
     bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
     checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
     return retval;
-}
-
-int VoltDBIPC::callJavaUserDefinedFunction() {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedFunction);
-}
-
-int VoltDBIPC::callJavaUserDefinedAggregateStart(int functionId) {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateStart);
-}
-
-int VoltDBIPC::callJavaUserDefinedAggregateAssemble() {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateAssemble);
-}
-
-int VoltDBIPC::callJavaUserDefinedAggregateCombine() {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateCombine);
-}
-
-int VoltDBIPC::callJavaUserDefinedAggregateWorkerEnd() {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateWorkerEnd);
-}
-
-int VoltDBIPC::callJavaUserDefinedAggregateCoordinatorEnd() {
-    return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd);
 }
 
 void VoltDBIPC::sendException(int8_t errorCode) {

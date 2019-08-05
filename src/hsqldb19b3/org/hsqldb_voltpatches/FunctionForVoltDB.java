@@ -59,7 +59,6 @@ public class FunctionForVoltDB extends FunctionSQL {
         final private Type[] m_paramTypes;
         final private short[] m_paramParseList;
         final private short[] m_paramParseListAlt;
-        final private boolean m_isAggregate; // this shows whether this is a scalar function or aggregate function
 
         public String getName() {
             return m_name;
@@ -85,24 +84,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_paramParseListAlt;
         }
 
-        public boolean isAggregate() {
-            return m_isAggregate;
-        }
-
         private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
-            this(name, type, id, typeParameter, paramTypes, paramParseList, null, false);
-        }
-        
-        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, boolean isAgg) {
-            this(name, type, id, typeParameter, paramTypes, paramParseList, null, isAgg);
-        }
-        
-        
-        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
-            this(name, type, id, typeParameter, paramTypes, paramParseList, paramParseListAlt, false);
+            this(name, type, id, typeParameter, paramTypes, paramParseList, null);
         }
 
-        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt, boolean isAgg) {
+        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
             m_name = name;
             m_type = type;
             m_id = id;
@@ -110,7 +96,6 @@ public class FunctionForVoltDB extends FunctionSQL {
             m_paramTypes = paramTypes;
             m_paramParseList = paramParseList;
             m_paramParseListAlt = paramParseListAlt;
-            m_isAggregate = isAgg;
         }
 
         static final int FUNC_VOLT_ID_NOT_DEFINED               = -1;
@@ -456,8 +441,6 @@ public class FunctionForVoltDB extends FunctionSQL {
          * This is the lookup table for user defined SQL functions.
          */
         private static Map<String, FunctionDescriptor> m_defined_functions = new HashMap<>();
-        private static Map<Integer, FunctionDescriptor> m_defined_functions_by_id = new HashMap<>();
-        private static Map<String, Integer> m_names_to_ids = new HashMap<>();
         /**
          * This is a saved set of user defined SQL functions.
          * <ol>
@@ -489,7 +472,7 @@ public class FunctionForVoltDB extends FunctionSQL {
          * @param anyCase
          * @return
          */
-        public static FunctionDescriptor fn_by_name(String anyCase) {
+        static FunctionDescriptor fn_by_name(String anyCase) {
             String downCase = anyCase.toLowerCase();
             FunctionDescriptor answer;
             answer = m_by_LC_name.get(downCase);
@@ -499,26 +482,16 @@ public class FunctionForVoltDB extends FunctionSQL {
             return answer;
         }
 
-        public static Type getReturnType(int functionId) {
-            return m_defined_functions_by_id.get(functionId).getDataType();
-        }
-
-
         public int getTypeParameter() {
             return m_typeParameter;
         }
 
-        public static void addDefinedFunction(String functionName, int functionId, FunctionDescriptor oldFd) {
-            m_defined_functions.put(functionName, oldFd);
-            m_defined_functions_by_id.put(functionId, oldFd);
-            m_names_to_ids.put(functionName, functionId);
+        public static void addDefinedFunction(String functionName, FunctionDescriptor oldFd) {
+            FunctionDescriptor.m_defined_functions.put(functionName, oldFd);
         }
 
         public static void removeOneDefinedFunction(String functionName) {
-            m_defined_functions.remove(functionName);
-            Integer functionId = m_names_to_ids.get(functionName);
-            m_names_to_ids.remove(functionName);
-            m_defined_functions_by_id.remove(functionId);
+            FunctionDescriptor.m_defined_functions.remove(functionName);
         }
 
         public static void clearSavedFunctions() {
@@ -550,24 +523,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         return function;
     }
 
-    public static Integer newVoltDBFunctionID(String token) {
-        FunctionDescriptor def = FunctionDescriptor.fn_by_name(token);
-        if (def == null) {
-            return null;
-        }
-        return def.getId();
-    }
-
     public static int getFunctionID(String token) {
         return FunctionDescriptor.fn_by_name(token).getId();
-    }
-
-    public static boolean isUserDefineAggregate(String token) {
-        FunctionDescriptor def = FunctionDescriptor.fn_by_name(token);
-        if (def == null) {
-            return false;
-        }
-        return def.isAggregate();
     }
 
     public FunctionForVoltDB(FunctionDescriptor fn) {
@@ -1016,8 +973,7 @@ public class FunctionForVoltDB extends FunctionSQL {
     private static FunctionDescriptor makeFunctionDescriptorFromParts(String functionName,
                                                                       int functionId,
                                                                       Type returnType,
-                                                                      Type[] parameterTypes,
-                                                                      boolean isAggregate) {
+                                                                      Type[] parameterTypes) {
 
         // A pair of parentheses + number of parameters
         int syntaxLength = 2 + parameterTypes.length;
@@ -1035,7 +991,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             syntax[idx++] = Tokens.QUESTION;
         }
         syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
-        return new FunctionDescriptor(functionName, returnType, functionId, -1, parameterTypes, syntax, isAggregate);
+        return new FunctionDescriptor(functionName, returnType, functionId, -1, parameterTypes, syntax);
     }
 
     /**
@@ -1045,14 +1001,12 @@ public class FunctionForVoltDB extends FunctionSQL {
      * @param functionId The function id.  If  this is -1 we don't have an opinion about the value.
      * @param voltReturnType The return type as a VoltType enumeration.
      * @param voltParameterTypes The parameter types as a VoltType enumeration.
-     * @param isAggregate This is a scalar function or an aggregate function
      * @return
      */
     public static synchronized int registerTokenForUDF(String functionName,
                                                        int functionId,
                                                        VoltType voltReturnType,
-                                                       VoltType[] voltParameterTypes,
-                                                       boolean isAggregate) {
+                                                       VoltType[] voltParameterTypes) {
         int retFunctionId;
         Type hsqlReturnType = hsqlTypeFromVoltType(voltReturnType);
         Type[] hsqlParameterTypes = hsqlTypeFromVoltType(voltParameterTypes);
@@ -1060,7 +1014,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         FunctionDescriptor oldFd = findFunction(functionName, hsqlReturnType, hsqlParameterTypes);
         if (oldFd != null) {
             // This may replace functionName with itself. This will not be an error.
-            FunctionDescriptor.addDefinedFunction(functionName, functionId, oldFd);
+            FunctionDescriptor.addDefinedFunction(functionName, oldFd);
             retFunctionId = oldFd.getId();
             // If we were given a non-negative function id, it
             // was defined in the catalog.  Our re-verification here
@@ -1079,10 +1033,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                 retFunctionId = getNextFunctionId();
             }
             FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
-                                                            hsqlReturnType, hsqlParameterTypes, isAggregate);
+                                                            hsqlReturnType, hsqlParameterTypes);
             // if the function id belongs to UDF, put it into the defined_function map
             if (isUserDefinedFunctionId(retFunctionId)) {
-                FunctionDescriptor.addDefinedFunction(functionName, functionId, fd);
+                FunctionDescriptor.addDefinedFunction(functionName, fd);
             }
             m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
                                         functionName, retFunctionId, voltParameterTypes.length));
@@ -1138,7 +1092,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         if (found == null) {
             found = FunctionDescriptor.m_defined_functions.get(functionName);
         }
-        return (found != null);
+        return (null != found);
     }
 
     public static boolean isUserDefinedFunctionId(int functionId) {

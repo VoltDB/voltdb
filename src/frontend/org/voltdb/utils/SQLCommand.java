@@ -622,13 +622,8 @@ public class SQLCommand {
             String functionName = tableData.getString("FUNCTION_NAME");
             String className = tableData.getString("CLASS_NAME");
             String methodName = tableData.getString("METHOD_NAME");
-            if (methodName != null) {
-                System.out.println(String.format(outputFormat, functionName,
-                        functionType + " function", className + "." + methodName));
-            } else {
-                System.out.println(String.format(outputFormat, functionName,
-                        functionType + " function", className));
-            }
+            System.out.println(String.format(outputFormat, functionName,
+                    functionType + " function", className + "." + methodName));
         }
         System.out.println();
     }
