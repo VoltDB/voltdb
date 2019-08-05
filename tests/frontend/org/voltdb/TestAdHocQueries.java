@@ -374,30 +374,30 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //        }
 //    }
 
-    @Test
-    public void testENG16982() {
-        final TestEnv env = new TestEnv(
-                "CREATE TABLE P5(ID INTEGER, VCHAR_INLINE VARCHAR(42), VCHAR_OUTLINE_MIN VARCHAR(16), VCHAR VARCHAR);\n" +
-                "CREATE UNIQUE INDEX IDX_P5_IV ON P5 (VCHAR) WHERE ID > 0;",
-                m_catalogJar, m_pathToDeployment, 2, 2, 1);
-        try {
-            env.setUp();
-            Stream.of("insert INTO P5(VCHAR, VCHAR_OUTLINE_MIN, ID) VALUES('', '', 5712);",
-                    "UPDATE P5 SET VCHAR = VCHAR_OUTLINE_MIN;",
-                    "UPDATE P5 SET VCHAR = VCHAR_INLINE;")
-                    .forEachOrdered(query -> {
-                        try {
-                            assertEquals("Query \"" + query + "\" Should have passed",
-                                    ClientResponse.SUCCESS,
-                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
-                        } catch (IOException | ProcCallException e) {
-                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
-                        }
-                    });
-        } finally {
-            env.tearDown();
-        }
-    }
+//    @Test
+//    public void testENG16982() {
+//        final TestEnv env = new TestEnv(
+//                "CREATE TABLE P5(ID INTEGER, VCHAR_INLINE VARCHAR(42), VCHAR_OUTLINE_MIN VARCHAR(16), VCHAR VARCHAR);\n" +
+//                "CREATE UNIQUE INDEX IDX_P5_IV ON P5 (VCHAR) WHERE ID > 0;",
+//                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+//        try {
+//            env.setUp();
+//            Stream.of("insert INTO P5(VCHAR, VCHAR_OUTLINE_MIN, ID) VALUES('', '', 5712);",
+//                    "UPDATE P5 SET VCHAR = VCHAR_OUTLINE_MIN;",
+//                    "UPDATE P5 SET VCHAR = VCHAR_INLINE;")
+//                    .forEachOrdered(query -> {
+//                        try {
+//                            assertEquals("Query \"" + query + "\" Should have passed",
+//                                    ClientResponse.SUCCESS,
+//                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+//                        } catch (IOException | ProcCallException e) {
+//                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
+//                        }
+//                    });
+//        } finally {
+//            env.tearDown();
+//        }
+//    }
 
 //    @Test
 //    public void testSimple() throws Exception {
@@ -554,13 +554,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //        }
 //    }
 //
-//    @Test
-//    public void testAdHocWithParams() throws Exception {
-//        System.out.println("Starting testAdHocWithParams");
-//        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
-//        try {
-//            env.setUp();
-//
+    @Test
+    public void testAdHocWithParams() throws Exception {
+        System.out.println("Starting testAdHocWithParams");
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+
 //            VoltTable modCount = env.m_client.callProcedure("@AdHoc",
 //                    "INSERT INTO BLAH VALUES (?, ?, ?);", 1, 1, 1).getResults()[0];
 //            assertEquals(1, modCount.getRowCount());
@@ -575,8 +575,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //            result = env.m_client.callProcedure("@AdHoc",
 //                    "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
 //            assertEquals(0, result.getRowCount());
-//            //System.out.println(result.toString());
-//
+            //System.out.println(result.toString());
+
 //            // test single-partition stuff
 //            // TODO: upgrade to use @GetPartitionKeys instead of TheHashinator interface
 //            VoltTable result1 = env.m_client.callProcedure("@AdHocSpForTest",
@@ -589,11 +589,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //            assertEquals(0, result1.getRowCount());
 //            assertEquals(1, result2.getRowCount());
 //
-//            try {
-//                env.m_client.callProcedure("@AdHocSpForTest", "INSERT INTO BLAH VALUES (?, ?, ?);",
-//                        2, 0, 0, 0);
-//                fail("Badly partitioned insert failed to throw expected exception");
-//            } catch (Exception ignored) {}
+            try {
+                env.m_client.callProcedure("@AdHocSpForTest", "INSERT INTO BLAH VALUES (?, ?, ?);",
+                        2, 0, 0, 0);
+                fail("Badly partitioned insert failed to throw expected exception");
+            } catch (Exception ignored) {
+                System.err.println(ignored.getMessage());
+            }
 //
 //            try {
 //                env.m_client.callProcedure("@AdHoc",
@@ -667,11 +669,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //            } catch (ProcCallException ex) {
 //                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
 //            }
-//        } finally {
-//            env.tearDown();
-//            System.out.println("Ending testAdHocWithParams");
-//        }
-//    }
+        } finally {
+            env.tearDown();
+            System.out.println("Ending testAdHocWithParams");
+        }
+    }
 //
 //    @Test
 //    public void testAdHocQueryForStackOverFlowCondition() throws Exception {
@@ -817,37 +819,37 @@ public class TestAdHocQueries extends AdHocQueryTester {
 //        }
 //    }
 //
-//    @Test
-//    public void testIndexViolationOnView2() {
-//        // Another sympton as ENG-15787 with the same root cause: ENG-15971
-//        final TestEnv env = new TestEnv("CREATE TABLE R3(VCHAR VARCHAR(15), id INTEGER NOT NULL);\n" +
-//                "CREATE VIEW VR3(VCHAR, ID) AS SELECT VCHAR, COUNT(*) FROM R3 GROUP BY VCHAR;\n" +
-//                "CREATE INDEX DIDX1 ON VR3(STR(ID, 10));",
-//                m_catalogJar, m_pathToDeployment, 2, 2, 1);
-//        try {
-//            env.setUp();
-//            Stream.of(
-//                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 0);", false),
-//                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 1);", false),
-//                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 2);", false))
-//                    .forEachOrdered(queryAndStatus -> {
-//                        final String query = queryAndStatus.getFirst();
-//                        final boolean success = queryAndStatus.getSecond();
-//                        try {
-//                            assertEquals(String.format("Query \"%s\" should have %s", query,
-//                                    success ? "passed" : "failed"),
-//                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
-//                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
-//                        } catch (IOException | ProcCallException e) {
-//                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
-//                        }
-//                    });
-//            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{0});
-//        } finally {
-//            env.tearDown();
-//        }
-//    }
-//
+    @Test
+    public void testIndexViolationOnView2() {
+        // Another sympton as ENG-15787 with the same root cause: ENG-15971
+        final TestEnv env = new TestEnv("CREATE TABLE R3(VCHAR VARCHAR(15), id INTEGER NOT NULL);\n" +
+                "CREATE VIEW VR3(VCHAR, ID) AS SELECT VCHAR, COUNT(*) FROM R3 GROUP BY VCHAR;\n" +
+                "CREATE INDEX DIDX1 ON VR3(STR(ID, 10));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 0);", false),
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 1);", false),
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 2);", false))
+                    .forEachOrdered(queryAndStatus -> {
+                        final String query = queryAndStatus.getFirst();
+                        final boolean success = queryAndStatus.getSecond();
+                        try {
+                            assertEquals(String.format("Query \"%s\" should have %s", query,
+                                    success ? "passed" : "failed"),
+                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
+                        }
+                    });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{0});
+        } finally {
+            env.tearDown();
+        }
+    }
+
 //    @Test
 //    public void testAdHocWithParamsNegative() {
 //        final TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
