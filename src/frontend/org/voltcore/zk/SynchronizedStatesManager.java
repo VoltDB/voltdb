@@ -1121,7 +1121,7 @@ public class SynchronizedStatesManager {
                         "Unexpected failure in StateMachine.", true, e);
                 membersWithResults = new TreeSet<String>();
             }
-            if (Sets.symmetricDifference(m_knownMembers, membersWithResults).isEmpty()) {
+            if (Sets.difference(m_knownMembers, membersWithResults).isEmpty()) {
                 processResultQuorum(membersWithResults);
                 assert(!debugIsLocalStateLocked());
             }
