@@ -70,8 +70,6 @@ function build-pro() {
     # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     test-tools-build-pro $BUILD_ARGS
-    # For now, the same deployment file is used for 'community' and 'pro'
-    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     code[0]=$code_tt_build
 }
 
@@ -190,8 +188,6 @@ function server-pro() {
     # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     test-tools-server-pro
-    # For now, the same deployment file is used for 'community' and 'pro'
-    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     code[3]=${code_tt_server}
 }
 

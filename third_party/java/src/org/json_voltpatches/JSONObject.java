@@ -1458,7 +1458,7 @@ public class JSONObject {
      * method (which is the most common case), then a text will be
      * produced by other means. If the value is an array or Collection,
      * then a JSONArray will be made from it and its toJSONString method
-     * will be called. If the value is a SCHEMA, then a JSONObject will be made
+     * will be called. If the value is a MAP, then a JSONObject will be made
      * from it and its toJSONString method will be called. Otherwise, the
      * value's toString method will be called, and the result will be quoted.
      *

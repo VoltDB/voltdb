@@ -524,7 +524,7 @@ public class Tokens {
     static final String        T_LEVEL                = "LEVEL";
     static final String        T_LOCATOR              = "LOCATOR";
     public static final String T_M_FACTOR             = "M";
-    static final String        T_MAP                  = "SCHEMA";
+    static final String        T_MAP                  = "MAP";
     static final String        T_MATCHED              = "MATCHED";
     static final String        T_MAXVALUE             = "MAXVALUE";
     static final String        T_MESSAGE_LENGTH       = "MESSAGE_LENGTH";
