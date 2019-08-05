@@ -220,8 +220,8 @@
 	<lib name="httpclient-4.3.4-tests.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.4-tests.jar!/"/>
 	</lib>
-	<lib name="avro-1.7.7.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avro-1.7.7.jar!/"/>
+	<lib name="avro-1.9.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avro-1.9.0.jar!/"/>
 	</lib>
 	<lib name="httpasyncclient-4.0.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpasyncclient-4.0.2.jar!/"/>

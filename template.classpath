@@ -83,7 +83,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/zookeeper-3.4.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-io-1.4.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/httpclient-4.3.4-tests.jar"/>
-	<classpathentry kind="lib" path="lib/avro-1.7.7.jar"/>
+	<classpathentry kind="lib" path="lib/avro-1.9.0.jar"/>
 	<classpathentry kind="lib" path="lib/httpasyncclient-4.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/httpcore-nio-4.3.2.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-continuation-9.4.15.v20190215.jar"/>
