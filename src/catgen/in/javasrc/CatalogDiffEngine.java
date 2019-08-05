@@ -1055,8 +1055,7 @@ public class CatalogDiffEngine {
 
             // now assume parent is a Table
             Table table = (Table) parent;
-            if (CatalogUtil.isStream((Database)table.getParent(), table) ||
-                    TableType.needsShadowStream(table.getTabletype())) {
+            if (TableType.needsExportDataSource(table.getTabletype())) {
                 m_requiresNewExportGeneration = true;
                 return null;
             }
