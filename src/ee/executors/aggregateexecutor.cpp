@@ -51,6 +51,8 @@
 
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
+#include "common/SerializableEEException.h"
+
 namespace voltdb {
 /*
  * Type of the hash set used to check for column aggregate distinctness
@@ -579,7 +581,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
         {
             char message[128];
             snprintf(message, sizeof(message), "Unknown aggregate type %d", aggType);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
 }
