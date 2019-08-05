@@ -344,6 +344,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
 
 void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
     // This should only be called from inlined insert executors because we have to change contexts every time
+    VOLT_DEBUG("InsertExecutor::p_execute_tuple() s_modifiedTuples=%ld\n", s_modifiedTuples);
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
             m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
