@@ -26,8 +26,9 @@ package org.voltdb_testfuncs;
 import java.io.Serializable;
 import java.lang.Integer;
 import java.util.*;
+import org.voltdb.VoltUDAggregate;
 
-public class Umedian implements Serializable {
+public class Umedian implements Serializable, VoltUDAggregate<Integer, Umedian> {
     private List<Integer> nums;
 
     public void start() {
@@ -42,7 +43,7 @@ public class Umedian implements Serializable {
         nums.addAll(other.nums);
     }
 
-    public double end () {
+    public Double end () {
         Collections.sort(nums);
         if (nums.size() % 2 == 0) {
             return ((double)nums.get(nums.size()/2 - 1) + (double)nums.get(nums.size()/2)) / 2;

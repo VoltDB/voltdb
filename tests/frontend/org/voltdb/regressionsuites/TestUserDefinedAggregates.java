@@ -156,6 +156,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         }
     }
 
+    // Unit tests for UDAFs
     public void testUavg() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1", "2", "3", "4"}};
@@ -254,12 +255,6 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(ceiling(NUM))/umax(ceiling(DEC))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
-    public void testUmaxNoSerializable() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umaxNoSerializable FROM CLASS org.voltdb_testfuncs.UmaxNoSerializable";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"Cannot define a aggregate function without implementing Serializable in the class declaration\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
     public void testUmedian() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"2", "4", "5", "10"}};
@@ -288,27 +283,9 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umedian(NUM), umedian(DEC), sum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
-    public void testUmedianEndMissing() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndMissing FROM CLASS org.voltdb_testfuncs.UmedianEndMissing";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndMissing for user-defined aggregate function umedianendmissing, you do not have the correctly formatted method end\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUmedianEndNoReturn() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndNoReturn FROM CLASS org.voltdb_testfuncs.UmedianEndNoReturn";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndNoReturn for user-defined aggregate function umedianendnoreturn, you do not have the correctly formatted method end\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
     public void testUmedianEndUnsupportedReturn() throws IOException, ProcCallException {
         String functionCall = "CREATE AGGREGATE FUNCTION umedianEndUnsupportedReturn FROM CLASS org.voltdb_testfuncs.UmedianEndUnsupportedReturn";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndUnsupportedReturn for user-defined aggregate function umedianendunsupportedreturn, you do not have the correctly formatted method end\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUmedianEndWithParameter() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umedianEndWithParameter FROM CLASS org.voltdb_testfuncs.UmedianEndWithParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmedianEndWithParameter for user-defined aggregate function umedianendwithparameter, you do not have the correctly formatted method end\"";
+        String errorMessage = "Unexpected condition occurred applying DDL statements: Unsupported return value type: java.util.List";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
@@ -324,24 +301,6 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
         Object[] expected = {1.0D};
         testFunction("add2Float(umin(NUM),1001.0)", expected, VoltType.FLOAT, columnNames, columnValues);
-    }
-
-    public void testUminStartMissing() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uminStartMissing FROM CLASS org.voltdb_testfuncs.UminStartMissing";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartMissing for user-defined aggregate function uminstartmissing, you do not have the correctly formatted method start\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUminStartWithParameter() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uminStartWithParameter FROM CLASS org.voltdb_testfuncs.UminStartWithParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartWithParameter for user-defined aggregate function uminstartwithparameter, you do not have the correctly formatted method start\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUminStartWithReturn() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uminStartWithReturn FROM CLASS org.voltdb_testfuncs.UminStartWithReturn";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UminStartWithReturn for user-defined aggregate function uminstartwithreturn, you do not have the correctly formatted method start\"";
-        testCreateFunctionException(functionCall, errorMessage);
     }
 
     public void testUmode() throws IOException, ProcCallException {
@@ -365,27 +324,9 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("add2Integer(umode(INT), umode(BIG))", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
-    public void testUmodeAssembleMissing() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleMissing FROM CLASS org.voltdb_testfuncs.UmodeAssembleMissing";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleMissing for user-defined aggregate function umodeassemblemissing, you do not have the correctly formatted method assemble\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUmodeAssembleNoParameter() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleNoParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleNoParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleNoParameter for user-defined aggregate function umodeassemblenoparameter, you do not have the correctly formatted method assemble\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
     public void testUmodeAssembleUnsupportedParameter() throws IOException, ProcCallException {
         String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleUnsupportedParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleUnsupportedParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleUnsupportedParameter for user-defined aggregate function umodeassembleunsupportedparameter, you do not have the correctly formatted method assemble\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUmodeAssembleWithReturn() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleWithReturn FROM CLASS org.voltdb_testfuncs.UmodeAssembleWithReturn;";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UmodeAssembleWithReturn for user-defined aggregate function umodeassemblewithreturn, you do not have the correctly formatted method assemble\"";
+        String errorMessage = "Unexpected condition occurred applying DDL statements: Unsupported parameter value type: java.util.ArrayList";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
@@ -417,27 +358,9 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uprimesum(INT) - uprimesum(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
-    public void testUprimesumCombineMissing() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineMissing FROM CLASS org.voltdb_testfuncs.UprimesumCombineMissing";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineMissing for user-defined aggregate function uprimesumcombinemissing, you do not have the correctly formatted method combine\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUprimesumCombineNoParameter() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineNoParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineNoParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineNoParameter for user-defined aggregate function uprimesumcombinenoparameter, you do not have the correctly formatted method combine\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
-    public void testUprimesumCombineWithReturn() throws IOException, ProcCallException {
-        String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineWithReturn FROM CLASS org.voltdb_testfuncs.UprimesumCombineWithReturn";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineWithReturn for user-defined aggregate function uprimesumcombinewithreturn, you do not have the correctly formatted method combine\"";
-        testCreateFunctionException(functionCall, errorMessage);
-    }
-
     public void testUprimesumCombineWrongParameter() throws IOException, ProcCallException {
         String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineWrongParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineWrongParameter";
-        String errorMessage = "[Ad Hoc DDL Input]: VoltDB DDL Error: \"In the class UprimesumCombineWrongParameter for user-defined aggregate function uprimesumcombinewrongparameter, you do not have the correctly formatted method combine\"";
+        String errorMessage = "Unexpected condition occurred applying DDL statements: Parameter type must be instance of Class: org.voltdb_testfuncs.UprimesumCombineWrongParameter";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
@@ -587,6 +510,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
+
 
         config = new LocalCluster("tudf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));

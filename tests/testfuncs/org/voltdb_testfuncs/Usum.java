@@ -24,15 +24,16 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+import org.voltdb.VoltUDAggregate;
 
-public class Usum implements Serializable {
+public class Usum implements Serializable, VoltUDAggregate<Double, Usum> {
     private double intermediateResult;
 
     public void start() {
         intermediateResult = 0;
     }
 
-    public void assemble (double value) {
+    public void assemble (Double value) {
         intermediateResult += value;
     }
 
@@ -40,7 +41,7 @@ public class Usum implements Serializable {
         intermediateResult += other.intermediateResult;
     }
 
-    public double end () {
+    public Double end () {
         return intermediateResult;
     }
 

@@ -24,8 +24,11 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+import java.lang.Double;
+import org.voltdb.VoltUDAggregate;
 
-public class Uavg implements Serializable {
+
+public class Uavg implements Serializable, VoltUDAggregate<Double, Uavg> {
     private int count = 0;
     private double sum = 0;
 
@@ -34,7 +37,7 @@ public class Uavg implements Serializable {
         sum = 0;
     }
 
-    public void assemble (double value) {
+    public void assemble (Double value) {
         count++;
         sum += value;
     }
@@ -44,7 +47,7 @@ public class Uavg implements Serializable {
         sum += other.sum;
     }
 
-    public double end () {
+    public Double end () {
         return (double)sum/(double)count;
     }
 }

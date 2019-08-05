@@ -26,8 +26,9 @@ package org.voltdb_testfuncs;
 import java.io.Serializable;
 import java.lang.Integer;
 import java.util.*;
+import org.voltdb.VoltUDAggregate;
 
-public class UmodeAssembleUnsupportedParameter implements Serializable {
+public class UmodeAssembleUnsupportedParameter implements Serializable, VoltUDAggregate<ArrayList<Integer>, UmodeAssembleUnsupportedParameter> {
     private List<Integer> nums;
 
     public void start() {

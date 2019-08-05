@@ -24,15 +24,16 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+import org.voltdb.VoltUDAggregate;
 
-public class UprimesumCombineWrongParameter implements Serializable {
+public class UprimesumCombineWrongParameter implements Serializable, VoltUDAggregate<Integer, Integer> {
     private int intermediateResult = 0;
 
     public void start() {
         intermediateResult = 0;
     }
 
-    public void assemble (int value) {
+    public void assemble (Integer value) {
         if (value > 1) {
             boolean prime = true;
             for (int i = 2; i < value; ++i) {
@@ -45,11 +46,11 @@ public class UprimesumCombineWrongParameter implements Serializable {
         }
     }
 
-    public void combine (int other) {
+    public void combine (Integer other) {
         intermediateResult += other;
     }
 
-    public int end () {
+    public Integer end () {
         return intermediateResult;
     }
 }

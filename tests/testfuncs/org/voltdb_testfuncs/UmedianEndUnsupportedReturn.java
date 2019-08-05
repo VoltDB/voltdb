@@ -26,8 +26,9 @@ package org.voltdb_testfuncs;
 import java.io.Serializable;
 import java.lang.Integer;
 import java.util.*;
+import org.voltdb.VoltUDAggregate;
 
-public class UmedianEndUnsupportedReturn implements Serializable {
+public class UmedianEndUnsupportedReturn implements Serializable, VoltUDAggregate<Integer, UmedianEndUnsupportedReturn> {
     private List<Integer> nums;
 
     public void start() {

@@ -97,7 +97,6 @@ public class PlannerTool {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
-        m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());

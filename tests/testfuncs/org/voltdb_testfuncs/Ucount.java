@@ -24,15 +24,16 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+import org.voltdb.VoltUDAggregate;
 
-public class Ucount implements Serializable {
+public class Ucount implements Serializable, VoltUDAggregate<Double, Ucount> {
     private int count = 0;
 
     public void start() {
         this.count = 0;
     }
 
-    public void assemble (double value) {
+    public void assemble (Double value) {
         this.count++;
     }
 
@@ -40,7 +41,7 @@ public class Ucount implements Serializable {
         this.count += other.count;
     }
 
-    public int end () {
+    public Integer end () {
         return count;
     }
 }

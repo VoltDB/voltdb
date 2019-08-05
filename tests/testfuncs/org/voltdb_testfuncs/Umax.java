@@ -24,15 +24,16 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+import org.voltdb.VoltUDAggregate;
 
-public class Umax implements Serializable {
+public class Umax implements Serializable, VoltUDAggregate<Double, Umax> {
     private double max;
 
     public void start() {
         max = -2147483648;
     }
 
-    public void assemble (double value) {
+    public void assemble (Double value) {
         if (value > max) {
             max = value;
         }
@@ -44,7 +45,7 @@ public class Umax implements Serializable {
         }
     }
 
-    public double end () {
+    public Double end () {
         return max;
     }
 }
