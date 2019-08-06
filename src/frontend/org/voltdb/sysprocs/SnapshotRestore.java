@@ -79,6 +79,7 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StartAction;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableCompressor;
+import org.voltdb.TableType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -1381,14 +1382,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         StreamStartAction action = isRecover ? StreamStartAction.RECOVER : StreamStartAction.SNAPSHOT_RESTORE;
 
-        //Iterate the export tables
+        // Iterate the tables actually exporting to a data source (PBD)
         for (Table t : db.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(db, t)) {
+            if (!TableType.needsExportDataSource(t.getTabletype())) {
                 continue;
             }
-
             String name = t.getTypeName();
-
 
             //Sequence numbers for this table for every partition
             Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
@@ -1914,7 +1913,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
                 tables_to_restore.add(table);
             }
-            else if (!CatalogUtil.isTableExportOnly(m_database, table)) {
+            else if (!CatalogUtil.isStream(m_database, table)) {
                 SNAP_LOG.info("Table: " + table.getTypeName() +
                               " does not have any savefile data and so will not be loaded from disk.");
             }
@@ -2521,7 +2520,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         int partition_col;
         VoltType partition_type;
         Table viewSource = catalog_table.getMaterializer();
-        if (viewSource != null && CatalogUtil.isTableExportOnly(m_database, viewSource)) {
+        if (viewSource != null && CatalogUtil.isStream(m_database, viewSource)) {
             String pname = viewSource.getPartitioncolumn().getName();
             //Get partition column name and find index and type in view table
             Column c = catalog_table.getColumns().get(pname);

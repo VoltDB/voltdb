@@ -421,7 +421,7 @@ public abstract class CatalogUtil {
             // Return false if it is not a materialized view.
             return false;
         }
-        if (CatalogUtil.isTableExportOnly(db, materializer)) {
+        if (CatalogUtil.isStream(db, materializer)) {
             // The view source table should not be a streamed table.
             return false;
         }
@@ -447,7 +447,7 @@ public abstract class CatalogUtil {
             // Return false if it is not a materialized view.
             return false;
         }
-        if (! CatalogUtil.isTableExportOnly(db, materializer)) {
+        if (! CatalogUtil.isStream(db, materializer)) {
             // Test if the view source table is a streamed table.
             return false;
         }
@@ -705,15 +705,18 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a stream
-     * This function is duplicated in CatalogUtil.h
+     * Return true if a table was explicitly declared as a STREAM in the DDL
+     *
      * @param database
      * @param table
      * @return true if a table is export or false otherwise
      */
-    public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
+    public static boolean isStream(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table) {
         int type = table.getTabletype();
+        // Starting from V9.2 we should not read pre-9.0 snapshots
+        // However, many JUnit tests mock the environment with invalid table types
+        // assert(!TableType.isInvalidType(type));
         if (TableType.isInvalidType(type)) {
             // This implementation uses connectors instead of just looking at the tableType
             // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
@@ -2733,7 +2736,7 @@ public abstract class CatalogUtil {
                 // We handle replicated tables and partitioned tables separately.
                 continue;
             }
-            if (isTableExportOnly(catalog, table)) {
+            if (isStream(catalog, table)) {
                 // Streamed tables are not considered as "normal" tables here.
                 continue;
             }
@@ -2767,14 +2770,14 @@ public abstract class CatalogUtil {
         for (Table table : catalog.getTables()) {
             if ((table.getIsreplicated() == isReplicated) &&
                     table.getMaterializer() == null &&
-                    !CatalogUtil.isTableExportOnly(catalog, table)) {
+                    !CatalogUtil.isStream(catalog, table)) {
                 tables.add(table);
                 continue;
             }
             //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
             //column as part of view.
             if ((table.getMaterializer() != null) && !isReplicated
-                    && (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
+                    && (CatalogUtil.isStream(catalog, table.getMaterializer()))) {
                 //Non partitioned export table are not allowed so it should not get here.
                 Column bpc = table.getMaterializer().getPartitioncolumn();
                 if (bpc != null) {

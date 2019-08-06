@@ -1271,7 +1271,7 @@ public class SnapshotUtil {
         CatalogMap<Table> all_tables = database.getTables();
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables) {
-            // Export tables are not included in the snapshot.
+            // STREAM tables are not included in the snapshot.
             if (TableType.isStream(table.getTabletype())) {
                 continue;
             }
