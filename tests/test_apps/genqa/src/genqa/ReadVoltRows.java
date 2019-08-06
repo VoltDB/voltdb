@@ -43,16 +43,18 @@ public class ReadVoltRows {
     long rowid = 0;
     long numread = 0;
     Client m_client;
+    boolean m_usegeo;
 
-    public ReadVoltRows(Client client) {
+    public ReadVoltRows(Client client, boolean usegeo) {
         m_client = client;
+        m_usegeo = usegeo;
     }
 
     public VoltTable readSomeRows(long rowid, long count)
             throws NoConnectionsException, IOException, ProcCallException {
         // log = new VoltLogger("ReadVoltRows.readSomeRows");
 
-        ClientResponse response = m_client.callProcedure("SelectwithLimit",
+        ClientResponse response = m_client.callProcedure((m_usegeo ? "SelectGeowithLimit" : "SelectwithLimit"),
                 rowid, rowid + count - 1, count);
         if (response.getStatus() != ClientResponse.SUCCESS) {
             System.out.println("Bad response on SelectwithLimit: "

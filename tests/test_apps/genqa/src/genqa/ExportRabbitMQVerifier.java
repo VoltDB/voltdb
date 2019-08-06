@@ -33,12 +33,15 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.QueueingConsumer;
 
+import org.voltcore.logging.VoltLogger;
+
 import java.io.IOException;
 
 /**
  * A RabbitMQ consumer that verifies the export data.
  */
 public class ExportRabbitMQVerifier {
+    static VoltLogger log = new VoltLogger("ExportRabbitMQVerifier");
     private static final long VALIDATION_REPORT_INTERVAL = 10000;
 
     private final ConnectionFactory m_connFactory;
@@ -64,15 +67,15 @@ public class ExportRabbitMQVerifier {
         try {
             channel.exchangeDeclare(m_exchangeName, "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE.#");
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2.#");
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE.#");
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_FOO.#");
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2_FOO.#");
-            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_FOO.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_RABBIT.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_RABBIT.#");
+            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2.#");
+            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_FOO.#");
+            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2_FOO.#");
+            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_FOO.#");
             String doneQueue = channel.queueDeclare().getQueue();
-            channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE.#");
-            channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_FOO.#");
+            channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_RABBIT.#");
+            // channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_FOO.#");
 
             // Setup callback for data stream
             channel.basicConsume(dataQueue, false, createConsumer(channel));
@@ -87,9 +90,14 @@ public class ExportRabbitMQVerifier {
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
 
             while (expectedRows > m_verifiedRows) {
-                Thread.sleep(1000);
-                System.err.println("Expected " + expectedRows + " " + m_verifiedRows);
-                success = false;
+                Thread.sleep(5000);
+                log.warn("Expected rows: " + expectedRows + ", Verified rows: " + m_verifiedRows +
+                    "\n\tdifference: " + (expectedRows - m_verifiedRows));
+                if (m_verifiedRows > expectedRows) {
+                    log.warn("More rows received than expected. Assume it's due to duplicates.");
+                    success = true;
+                } else
+                    success = false;
             }
         } finally {
             tearDown(channel);
@@ -124,12 +132,12 @@ public class ExportRabbitMQVerifier {
                     validationErr.printStackTrace();
                 }
                 if (err != null) {
-                    System.out.println("ERROR in validation: " + err.toString());
+                    log.info("ERROR in validation: " + err.toString());
                     success = false;
                 }
 
                 if (++m_verifiedRows % VALIDATION_REPORT_INTERVAL == 0) {
-                    System.out.println("Verified " + m_verifiedRows + " rows.");
+                    log.info("Verified " + m_verifiedRows + " rows.");
                 }
 
                 channel.basicAck(deliveryTag, false);
@@ -144,11 +152,13 @@ public class ExportRabbitMQVerifier {
 
     private static void usage()
     {
-        System.out.println("Command-line arguments: rabbitmq_server username password virtual_host");
+        log.info("Command-line arguments: rabbitmq_server username password virtual_host");
     }
 
     public static void main(String[] args) throws IOException, InterruptedException
     {
+        VoltLogger log = new VoltLogger("ExportRabbitMQVerifier.main");
+
         if (args.length != 5) {
             usage();
             System.exit(1);
