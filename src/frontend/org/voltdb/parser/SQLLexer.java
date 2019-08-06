@@ -88,7 +88,7 @@ public class SQLLexer extends SQLPatternFactory
     };
 
     private final static String[] MODIFIER_TOKENS = {
-        "assumeunique", "unique", "migrating"
+        "assumeunique", "unique", "migrating", "aggregate"
     };
 
     static final char BLOCK_DELIMITER_CHAR = '#';
