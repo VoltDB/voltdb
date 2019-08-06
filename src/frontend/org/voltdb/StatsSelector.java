@@ -64,5 +64,9 @@ public enum StatsSelector {
     COMMANDLOG,     // return number of outstanding bytes and txns on this node
     IMPORTER,       // synonym as IMPORT for backward compatibility
     IMPORT,
-    EXPORT
+    EXPORT;
+
+    public static StatsSelector[] getAllStatsCollector() {
+        return StatsSelector.class.getEnumConstants();
+    }
 }
