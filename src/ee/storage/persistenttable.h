@@ -773,7 +773,7 @@ private:
                           std::vector<TableIndex*> const& otherIndexes);
 
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    TBMap m_data{};
+    TBMap m_data;
 
     // default iterator
     TableIterator m_iter;
@@ -785,7 +785,7 @@ private:
     // Value reads from catalog table, no matter partition column exists or not
     bool m_isReplicated;
 
-    std::vector<bool> m_allowNulls{};
+    std::vector<bool> m_allowNulls;
 
     // partition key
     const int m_partitionColumn;
@@ -795,10 +795,10 @@ private:
 
     // Executor vector to be executed when imminent insert will exceed
     // tuple limit
-    boost::shared_ptr<ExecutorVector> m_purgeExecutorVector{};
+    boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewTriggerForWrite*> m_views{};
+    std::vector<MaterializedViewTriggerForWrite*> m_views;
 
     // STATS
     PersistentTableStats m_stats;
@@ -806,34 +806,34 @@ private:
     // STORAGE TRACKING
 
     // Map from load to the blocks with level of load
-    TBBucketPtrVector m_blocksNotPendingSnapshotLoad{};
+    TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
 
-    TBBucketPtrVector m_blocksPendingSnapshotLoad{};
+    TBBucketPtrVector m_blocksPendingSnapshotLoad;
 
     // Map containing blocks that aren't pending snapshot
-    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot{};
+    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
 
     // Map containing blocks that are pending snapshot
-    boost::unordered_set<TBPtr> m_blocksPendingSnapshot{};
+    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
 
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
-    stx::btree_set<TBPtr > m_blocksWithSpace{};
+    stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparati, including COW and recovery.
-    boost::shared_ptr<TableStreamerInterface> m_tableStreamer{};
+    boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
-    int m_failedCompactionCount = 0;
+    int m_failedCompactionCount;
 
     // This is a testability feature not intended for use in product logic.
-    int m_invisibleTuplesPendingDeleteCount = 0;
+    int m_invisibleTuplesPendingDeleteCount;
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
 
     // The original table subject to ELASTIC INDEX streaming prior to any swaps
     // or truncates in the current transaction.
-    PersistentTable*  m_tableForStreamIndexing = nullptr;
+    PersistentTable*  m_tableForStreamIndexing;
 
     // is DR enabled
     bool m_drEnabled;
@@ -841,26 +841,26 @@ private:
     // SHA-1 of signature string
     char m_signature[20];
 
-    bool m_noAvailableUniqueIndex = false;
+    bool m_noAvailableUniqueIndex;
 
-    TableIndex* m_smallestUniqueIndex = nullptr;
+    TableIndex* m_smallestUniqueIndex;
 
-    uint32_t m_smallestUniqueIndexCrc = 0;
+    uint32_t m_smallestUniqueIndexCrc;
 
     // indexes
     std::vector<TableIndex*> m_indexes;
 
     std::vector<TableIndex*> m_uniqueIndexes;
 
-    TableIndex* m_pkeyIndex = nullptr;
+    TableIndex* m_pkeyIndex;
 
     // If this is a view table, maintain a handler to handle the view update work.
-    MaterializedViewHandler* m_mvHandler = nullptr;
-    MaterializedViewTriggerForInsert* m_mvTrigger = nullptr;
+    MaterializedViewHandler* m_mvHandler;
+    MaterializedViewTriggerForInsert* m_mvTrigger;
 
     // If this is a source table of a view, notify all the relevant view handlers
     // when an update is needed.
-    std::vector<MaterializedViewHandler*> m_viewHandlers{};
+    std::vector<MaterializedViewHandler*> m_viewHandlers;
 
     // The delta table is only created when a view defined on a join query is
     // referencing this table as one of its source tables.
@@ -869,9 +869,9 @@ private:
     // this table will return the delta table instead of the original table.
     // WARNING: Do not manually flip this m_deltaTableActive flag. Instead,
     // use ScopedDeltaTableContext (currently defined in MaterializedViewHandler.h).
-    PersistentTable* m_deltaTable = nullptr;
+    PersistentTable* m_deltaTable;
 
-    bool m_deltaTableActive = false;
+    bool m_deltaTableActive;
 
     // Objects used to coordinate compaction of Replicated tables
     SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
@@ -879,14 +879,16 @@ private:
 
     // Pointer to Shadow streamed table (For Migrate) or nullptr
     TableType m_tableType;
-    StreamedTable* m_shadowStream = nullptr;
+    StreamedTable* m_shadowStream;
     typedef std::set<void*> MigratingBatch;
     typedef std::map<int64_t, MigratingBatch> MigratingRows;
     MigratingRows m_migratingRows;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
-    m_table(table), m_indexingComplete(false) { }
+    m_table(table),
+    m_indexingComplete(false)
+{ }
 
 inline TBMap& PersistentTableSurgeon::getData() const {
     return m_table.m_data;
@@ -900,9 +902,10 @@ inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
     m_table.insertTupleForUndo(tuple);
 }
 
-inline void PersistentTableSurgeon::updateTupleForUndo(
-        char* targetTupleToUpdate, char* sourceTupleWithNewValues, bool revertIndexes,
-        bool fromMigrate) {
+inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
+                                                       char* sourceTupleWithNewValues,
+                                                       bool revertIndexes,
+                                                       bool fromMigrate) {
     m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes, fromMigrate);
 }
 

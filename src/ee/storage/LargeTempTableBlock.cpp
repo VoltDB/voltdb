@@ -104,7 +104,7 @@ int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
 }
 
 void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
-    vassert(m_storage.get() == NULL);
+    vassert(m_storage.get() == nullptr);
     storage.swap(m_storage);
 
     vassert(m_activeTupleCount == *getStorageTupleCount());
