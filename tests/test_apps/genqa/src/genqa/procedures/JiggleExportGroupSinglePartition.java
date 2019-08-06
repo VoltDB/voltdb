@@ -29,11 +29,13 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class JiggleExportGroupSinglePartition extends VoltProcedure {
-    public final SQLStmt export_kafka = new SQLStmt("INSERT INTO export_partitioned_table_kafka (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)");
-    public final SQLStmt export_rabbit = new SQLStmt("INSERT INTO export_partitioned_table_rabbit (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    public final SQLStmt export_file = new SQLStmt("INSERT INTO export_partitioned_table_file (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    public final SQLStmt export_jdbc = new SQLStmt("INSERT INTO export_partitioned_table_jdbc (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO export_mirror_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    String template = "INSERT INTO export_partitioned_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
+
+    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
+    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
+    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
+    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
+    public final SQLStmt insert = new SQLStmt(template.replace("export_partitioned_table_BASE", "export_mirror_partitioned_table"));
 
     public long run(long rowid, int reversed)
     {
@@ -50,9 +52,10 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
           Useful for debugging export data correctness, but not useful
           for not running out of memory....
         */
-
-        voltQueueSQL(
-                      insert
+        SQLStmt [] statements = {insert, export_kafka, export_rabbit, export_file, export_jdbc};
+        for (SQLStmt stmt: statements) {
+            voltQueueSQL(
+                    stmt
                     , DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                     , rowid
                     , record.rowid_group
@@ -65,7 +68,7 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
                     , record.type_null_bigint
                     , record.type_not_null_bigint
                     , record.type_null_timestamp
-                    // , record.type_not_null_timestamp
+                    // , record.type_not_null_timestamp -- changed to "DEFAULT NOW" in ddl
                     , record.type_null_float
                     , record.type_not_null_float
                     , record.type_null_decimal
@@ -77,116 +80,12 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
-
-        voltQueueSQL(
-                     export_kafka
-                     , txid
-                     , rowid
-                     , record.rowid_group
-                     , record.type_null_tinyint
-                     , record.type_not_null_tinyint
-                     , record.type_null_smallint
-                     , record.type_not_null_smallint
-                     , record.type_null_integer
-                     , record.type_not_null_integer
-                     , record.type_null_bigint
-                     , record.type_not_null_bigint
-                     , record.type_null_timestamp
-                     // , record.type_not_null_timestamp
-                     , record.type_null_float
-                     , record.type_not_null_float
-                     , record.type_null_decimal
-                     , record.type_not_null_decimal
-                     , record.type_null_varchar25
-                     , record.type_not_null_varchar25
-                     , record.type_null_varchar128
-                     , record.type_not_null_varchar128
-                     , record.type_null_varchar1024
-                     , record.type_not_null_varchar1024
-        );
-        voltQueueSQL(
-                export_rabbit
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
-        voltQueueSQL(
-                export_file
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
-        voltQueueSQL(
-                export_jdbc
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
+        }
 
         // Execute last statement batch
         voltExecuteSQL(true);
 
-        // Retun to caller
+        // Return to caller
         return txid;
     }
 }

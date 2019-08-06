@@ -66,7 +66,7 @@ public class SampleRecord
         this.type_null_bigint           = nextBigint(rand, true);
         this.type_not_null_bigint       = nextBigint(rand);
         this.type_null_timestamp        = nextTimestamp(rand, true);
-        this.type_not_null_timestamp    = nextTimestamp(rand);
+        this.type_not_null_timestamp    = nextTimestamp(rand); // typically set to NOW at INSERT, but left as random here in case other Sample class users still depend on it
         this.type_null_float            = nextFloat(rand, true);
         this.type_not_null_float        = nextFloat(rand);
         this.type_null_decimal          = nextDecimal(rand, true);
