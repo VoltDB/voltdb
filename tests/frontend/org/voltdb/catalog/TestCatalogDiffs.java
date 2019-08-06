@@ -1477,7 +1477,8 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "stream3.jar"));
         Catalog catUpdated1 = catalogForJar(testDir + File.separator + "stream3.jar");
 
-        verifyDiff(catUpdated, catUpdated1, true, false, true, true, false, false);
+        // Note: the test stream is connector-less so we don't expect to require a new generation
+        verifyDiff(catUpdated, catUpdated1, true, false, true, false, false, false);
     }
 
 
