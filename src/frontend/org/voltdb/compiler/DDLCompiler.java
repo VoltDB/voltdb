@@ -1398,7 +1398,7 @@ public class DDLCompiler {
                 List<String> items= Stream.of(subNode.attributes.get("triggers").split(","))
                         .map(String::trim)
                         .collect(Collectors.toList());
-                int tblType = TableType.getPeristentExportTrigger(items);
+                int tblType = TableType.getPersistentExportTrigger(items);
                 table.setTabletype(tblType);
             }
             if (subNode.name.equals("columns")) {

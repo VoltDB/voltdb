@@ -95,7 +95,9 @@ public class PlannerRules {
             FilterSetOpTransposeRule.INSTANCE,
 
             // Reduces constants inside a LogicalCalc.
-            ReduceExpressionsRule.CALC_INSTANCE,
+            // CALC_INSTANCE_SKIP_CASE_WHEN_SIMPLIFICATION is the rule identical to
+            // CALC_INSTANCE, except that it does not simplify CASE-WHEN clause.
+            ReduceExpressionsRule.CALC_INSTANCE_SKIP_CASE_WHEN_SIMPLIFICATION,
 
             // -- VoltDB logical rules.
             VoltLSortRule.INSTANCE,

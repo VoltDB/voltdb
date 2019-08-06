@@ -20,7 +20,7 @@
 using namespace voltdb;
 
 InterruptException::InterruptException(std::string message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
 }
 
 void InterruptException::p_serialize(ReferenceSerializeOutput *output) const {

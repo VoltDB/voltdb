@@ -81,14 +81,16 @@ public enum TableType {
         return (e == CONNECTOR_LESS_STREAM.get());
     }
 
+    // return true if the table type is a STREAM explicitly declared in DDL
     public static boolean isStream(int e) {
-        return (e == STREAM.get() || e == CONNECTOR_LESS_STREAM.get());
+        return (e == STREAM.get() || isConnectorLessStream(e));
     }
 
     public static boolean isPersistentMigrate(int e) {
         return (e == PERSISTENT_MIGRATE.get());
     }
 
+    // return true if this is a persistent table associated with an export stream
     public static boolean needsShadowStream(int e) {
         return (e >= PERSISTENT_MIGRATE.get() && e <= PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get());
     }
@@ -97,11 +99,16 @@ public enum TableType {
         return (e >= PERSISTENT_EXPORT_INSERT.get() && e <= PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get());
     }
 
+    // return true if the table type needs a {@code ExportDataSource} instance
+    public static boolean needsExportDataSource(int e) {
+        return (e == STREAM.get() || needsShadowStream(e));
+    }
+
     public static boolean isInvalidType(int e) {
         return e == INVALID_TYPE.type;
     }
 
-    public static int getPeristentExportTrigger(List<String> triggers) {
+    public static int getPersistentExportTrigger(List<String> triggers) {
         int tableType = 0;
         for (String trigger : triggers) {
             if(trigger.equalsIgnoreCase("INSERT")) {

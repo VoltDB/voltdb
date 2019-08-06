@@ -1691,8 +1691,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
             message << "column " << i << ": " << names[i]
                     << ", type = " << getTypeName(types[i]) << std::endl;
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message.str().c_str());
+        throw SerializableEEException(message.str().c_str());
     }
 
     int tupleCount = serialInput.readInt();

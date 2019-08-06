@@ -35,10 +35,7 @@ voltdb::NValue ScalarValueExpression::eval(const TableTuple *tuple1, const Table
     Table* table = exeContext->getSubqueryOutputTable(subqueryId);
     vassert(table != NULL);
     if (table->activeTupleCount() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException("More than one row returned by a scalar/row subquery");
     }
     TableIterator iterator = table->iterator();
     TableTuple tuple(table->schema());
