@@ -77,18 +77,15 @@ namespace voltdb {
    }
 
 class SetAndRestorePendingDeleteFlag {
+    TableTuple& m_target;
 public:
     SetAndRestorePendingDeleteFlag(TableTuple& target) : m_target(target) {
         vassert(!m_target.isPendingDelete());
         m_target.setPendingDeleteTrue();
     }
-
     ~SetAndRestorePendingDeleteFlag() {
         m_target.setPendingDeleteFalse();
     }
-
-private:
-    TableTuple& m_target;
 };
 
 PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
@@ -174,9 +171,7 @@ PersistentTable::~PersistentTable() {
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
     }
-    if (m_shadowStream != nullptr) {
-        delete m_shadowStream;
-    }
+    delete m_shadowStream;
 }
 
 // ------------------------------------------------------------------
@@ -1034,7 +1029,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
             indexRequiresUpdate[i] = true;
             if (!index->deleteEntry(&targetTupleToUpdate)) {
                 throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
+                        m_name.c_str(), index->getName().c_str());
             }
         }
     }
