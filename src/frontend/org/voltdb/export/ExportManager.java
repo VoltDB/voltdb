@@ -650,15 +650,20 @@ public class ExportManager
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 StreamStartAction action,
-                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-                                                boolean isLowestSite) {
-        //If the generation was completely drained, wait for the task to finish running
-        //by waiting for the permit that will be generated
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition) {
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
             generation.updateInitialExportStateToSeqNo(partitionId, signature,
                                                        action,
-                                                       sequenceNumberPerPartition, isLowestSite);
+                                                       sequenceNumberPerPartition);
+        }
+    }
+
+    public void updateDanglingExportStates(StreamStartAction action,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
+        ExportGeneration generation = m_generation.get();
+        if (generation != null) {
+            generation.updateDanglingExportStates(action, exportSequenceNumbers);
         }
     }
 

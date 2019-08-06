@@ -135,8 +135,13 @@ public class TestExportDataSource extends TestCase {
         @Override
         public void updateInitialExportStateToSeqNo(int partitionId,
                 String signature, StreamStartAction action,
-                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-                boolean isLowestSite) {
+                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition) {
+        }
+
+        @Override
+        public void updateDanglingExportStates(StreamStartAction action,
+                Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
+
         }
 
         @Override
