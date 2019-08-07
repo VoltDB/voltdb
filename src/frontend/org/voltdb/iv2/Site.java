@@ -1510,7 +1510,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     catalogTable.getTypeName());
             // assign the stats to the other partition's value
             ExportManagerInterface.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
-                    StreamStartAction.REJOIN, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
+                    StreamStartAction.REJOIN, tableEntry.getValue());
+        }
+        if (m_sysprocContext.isLowestSiteId()) {
+            ExportManagerInterface.instance().updateDanglingExportStates(StreamStartAction.REJOIN, exportSequenceNumbers);
         }
 
         if (drSequenceNumbers != null) {

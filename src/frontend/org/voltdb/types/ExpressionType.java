@@ -173,7 +173,12 @@ public enum ExpressionType {
     // Subquery
     // -----------------------------
     ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
-    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>")
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
+
+    // -----------------------------
+    // User define function
+    // -----------------------------
+    USER_DEFINED_AGGREGATE   (AggregateExpression.class, 106, "USER_DEFINED_AGGREGATE"),
     ;
 
     private final int m_value;

@@ -1058,6 +1058,8 @@ public class CatalogDiffEngine {
             if (TableType.needsExportDataSource(table.getTabletype())) {
                 m_requiresNewExportGeneration = true;
                 return null;
+            } else if (TableType.isConnectorLessStream(table.getTabletype())) {
+                return null;
             }
 
             if (field.equals("index")) {

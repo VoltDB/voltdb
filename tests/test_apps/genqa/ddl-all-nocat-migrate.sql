@@ -16,7 +16,7 @@ CREATE TABLE partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table MIGRATE TO TARGET abc
+CREATE TABLE export_partitioned_table MIGRATE TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -62,7 +62,7 @@ CREATE TABLE export_partitioned_table MIGRATE TO TARGET abc
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -77,7 +77,7 @@ CREATE TABLE export_partitioned_table MIGRATE TO TARGET abc
 PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_idx ON  export_partitioned_table(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_partitioned_table_foo MIGRATE TO TARGET foo
+CREATE TABLE export_partitioned_table_foo MIGRATE TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -91,7 +91,7 @@ CREATE TABLE export_partitioned_table_foo MIGRATE TO TARGET foo
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -106,7 +106,7 @@ CREATE TABLE export_partitioned_table_foo MIGRATE TO TARGET foo
 PARTITION TABLE export_partitioned_table_foo ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_foo_idx ON  export_partitioned_table_foo(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_partitioned_table2 MIGRATE TO TARGET default1
+CREATE TABLE export_partitioned_table2 MIGRATE TO TARGET file_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -120,7 +120,7 @@ CREATE TABLE export_partitioned_table2 MIGRATE TO TARGET default1
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -134,6 +134,36 @@ CREATE TABLE export_partitioned_table2 MIGRATE TO TARGET default1
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
 CREATE INDEX export_partitioned_table2_idx ON  export_partitioned_table2(type_not_null_timestamp)  where not migrating;
+
+
+CREATE TABLE export_partitioned_table3 MIGRATE TO TARGET jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+, rowid_group               TINYINT       NOT NULL
+, type_null_tinyint         TINYINT
+, type_not_null_tinyint     TINYINT       NOT NULL
+, type_null_smallint        SMALLINT
+, type_not_null_smallint    SMALLINT      NOT NULL
+, type_null_integer         INTEGER
+, type_not_null_integer     INTEGER       NOT NULL
+, type_null_bigint          BIGINT
+, type_not_null_bigint      BIGINT        NOT NULL
+, type_null_timestamp       TIMESTAMP
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
+, type_null_float           FLOAT
+, type_not_null_float       FLOAT         NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
+, type_null_varchar128      VARCHAR(128)
+, type_not_null_varchar128  VARCHAR(128)  NOT NULL
+, type_null_varchar1024     VARCHAR(1024)
+, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
+PARTITION TABLE export_partitioned_table3 ON COLUMN rowid;
+CREATE INDEX export_partitioned_table3_idx ON  export_partitioned_table3(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_mirror_partitioned_table
 (
@@ -149,7 +179,7 @@ CREATE TABLE export_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -177,7 +207,7 @@ CREATE TABLE export_mirror_partitioned_table2
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -191,12 +221,12 @@ CREATE TABLE export_mirror_partitioned_table2
 );
 PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
+CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -215,7 +245,7 @@ CREATE TABLE replicated_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -246,7 +276,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE TABLE  export_replicated_table MIGRATE TO TARGET abc
+CREATE TABLE  export_replicated_table MIGRATE TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -260,7 +290,7 @@ CREATE TABLE  export_replicated_table MIGRATE TO TARGET abc
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -274,7 +304,7 @@ CREATE TABLE  export_replicated_table MIGRATE TO TARGET abc
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 CREATE INDEX export_replicated_table_idx ON  export_replicated_table(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_replicated_table_foo MIGRATE TO TARGET foo
+CREATE TABLE export_replicated_table_foo MIGRATE TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -288,7 +318,7 @@ CREATE TABLE export_replicated_table_foo MIGRATE TO TARGET foo
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL ASSUMEUNIQUE
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL ASSUMEUNIQUE
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -302,19 +332,25 @@ CREATE TABLE export_replicated_table_foo MIGRATE TO TARGET foo
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 CREATE INDEX export_replicated_table_foo_idx ON  export_replicated_table_foo(type_not_null_timestamp)  where not migrating;
 
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
+CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid EXPORT TO TARGET default2
+CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid EXPORT TO TARGET file_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table3 PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -341,7 +377,7 @@ CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_tabl
 -- CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportDoneTable;
 
 -- Export Stream with extra Geo columns
-CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -355,7 +391,7 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -389,7 +425,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -407,7 +443,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 );
 PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET kafkaabc
 (
   txnid                     BIGINT        NOT NULL
 );

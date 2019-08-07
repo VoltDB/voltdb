@@ -265,6 +265,37 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
 
     /*
+     * CREATE AGGREGATE FUNCTION <NAME> FROM CLASS <CLASS NAME>
+     *
+     * CREATE AGGREGATE FUNCTION with the designated method from the given class.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) The class name
+     */
+    private static final Pattern PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS =
+        SPF.statement(
+            SPF.token("create"), SPF.token("aggregate"), SPF.token("function"),
+            SPF.capture(SPF.functionName()), SPF.token("from"), SPF.token("class"),
+            SPF.capture(SPF.classPath())
+        ).compile("PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS");
+
+    /*
+     * DROP AGGREGATE FUNCTION <NAME> [IF EXISTS]
+     *
+     * Drop a user-defined aggregate function.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) If exists
+     */
+    private static final Pattern PAT_DROP_AGGREGATE_FUNCTION =
+        SPF.statement(
+            SPF.token("drop"), SPF.token("aggregate"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+        ).compile("PAT_DROP_AGGREGATE_FUNCTION");
+
+    /*
      * DROP FUNCTION <NAME> [IF EXISTS]
      *
      * Drop a user-defined function.
@@ -425,12 +456,12 @@ public class SQLParser extends SQLPatternFactory
 
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
-     *  one of create procedure, create role, drop procedure, drop role,
-     *  partition, replicate, export, import, or dr, the one match group
-     *  is set to the matching command EXCEPT as special (needlessly obscure)
-     *  cases, simply returns only "procedure" for "create procedure",
-     *  only "role" for "create role", and only "drop" for either
-     * "drop procedure" OR "drop role".
+     *  one of create procedure, create role, create function, create aggregate function,
+     *  drop procedure, drop role, partition, replicate, export, import, or dr,
+     *  the one match group is set to the matching command EXCEPT as special
+     *  (needlessly obscure) cases, simply returns only "procedure" for "create
+     *  procedure", only "role" for "create role", only "aggregate" for "create aggregate
+     *  function" and only "drop" for either "drop procedure" OR "drop role".
      *  ALSO (less than helpfully) returns "drop" for non-VoltDB-specific
      *  "drop" commands like "drop table".
      *  TODO: post-processing would be much simpler if this pattern reliably
@@ -445,7 +476,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|AGGREGATE)|" +                // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -879,6 +910,26 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateFunctionFromMethod(String statement)
     {
         return PAT_CREATE_FUNCTION_FROM_METHOD.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for create aggregate function from class
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateAggregateFunctionFromClass(String statement)
+    {
+        return PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for drop aggregate function
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropAggregateFunction(String statement)
+    {
+        return PAT_DROP_AGGREGATE_FUNCTION.matcher(statement);
     }
 
     /**
