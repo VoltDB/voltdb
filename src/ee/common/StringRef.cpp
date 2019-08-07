@@ -116,6 +116,7 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     vassert(sz >= 0);
     StringRef* result;
     if (sz == 0) {                         // Empty string is not stored on heap.
+        VOLT_DEBUG_STACK();
         return const_cast<StringRef*>(&EMPTY_STRING);
     } else if (tempPool) {
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(tempPool, sz);

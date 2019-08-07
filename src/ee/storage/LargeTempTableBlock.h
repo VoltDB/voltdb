@@ -56,7 +56,7 @@ class LargeTempTableBlock {
     const TupleSchema * m_schema;
 
     /** Pointer to block storage */
-    std::unique_ptr<char[]> m_storage;
+    std::unique_ptr<char[]> m_storage{new char [BLOCK_SIZE_IN_BYTES]};
 
     /** Points the address where the next tuple will be inserted */
     char* m_tupleInsertionPoint;

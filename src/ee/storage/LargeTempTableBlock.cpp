@@ -23,10 +23,9 @@
 
 namespace voltdb {
 
-LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema)
-    : m_id(id), m_schema(schema), m_storage(new char [BLOCK_SIZE_IN_BYTES])
-    , m_tupleInsertionPoint(tupleStorage())
-    , m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES) {
+LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema) :
+    m_id(id), m_schema(schema), m_tupleInsertionPoint(tupleStorage()),
+    m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES) {
     // Initialize the metadata in the header of the block:
     *(getStorageAddressPointer()) = &(m_storage[0]);
     *(getStorageTupleCount()) = 0;
@@ -59,7 +58,7 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     target.setNonInlinedDataIsVolatileTrue();
 
     ++m_activeTupleCount;
-    ++(*getStorageTupleCount());
+    ++*getStorageTupleCount();
     vassert(m_activeTupleCount == *getStorageTupleCount());
     m_tupleInsertionPoint += target.tupleLength();
 
@@ -97,7 +96,7 @@ int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
 
 int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
     if (isResident()) {
-        return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_nonInlinedInsertionPoint;
+        return m_storage.get() + BLOCK_SIZE_IN_BYTES - m_nonInlinedInsertionPoint;
     } else {
         return 0;
     }
@@ -112,7 +111,7 @@ void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
     char* origAddress = *(getStorageAddressPointer());
 
     // Update the insertion points to reflect the relocation
-    std::ptrdiff_t oldNewOffset = (m_storage.get() - origAddress);
+    std::ptrdiff_t oldNewOffset = m_storage.get() - origAddress;
     m_tupleInsertionPoint += oldNewOffset;
     m_nonInlinedInsertionPoint += oldNewOffset;
 

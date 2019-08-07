@@ -149,14 +149,12 @@ public:
     }
 
     std::vector<LargeTempTableBlockId>::iterator disownBlock(std::vector<LargeTempTableBlockId>::iterator pos) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        m_tupleCount -= lttBlockCache->getBlockTupleCount(*pos);
+        m_tupleCount -= ExecutorContext::getExecutorContext()->lttBlockCache().getBlockTupleCount(*pos);
         return m_blockIds.erase(pos);
     }
 
     void inheritBlock(LargeTempTableBlockId blockId) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        m_tupleCount += lttBlockCache->getBlockTupleCount(blockId);
+        m_tupleCount += ExecutorContext::getExecutorContext()->lttBlockCache().getBlockTupleCount(blockId);
         m_blockIds.push_back(blockId);
 
     }
