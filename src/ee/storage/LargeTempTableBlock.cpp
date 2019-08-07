@@ -27,8 +27,8 @@ LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSc
     m_id(id), m_schema(schema), m_tupleInsertionPoint(tupleStorage()),
     m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES) {
     // Initialize the metadata in the header of the block:
-    *(getStorageAddressPointer()) = &(m_storage[0]);
-    *(getStorageTupleCount()) = 0;
+    *getStorageAddressPointer() = &m_storage[0];
+    *getStorageTupleCount() = 0;
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {

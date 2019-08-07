@@ -406,20 +406,18 @@ TEST_F(LargeTempTableTest, OverflowCache) {
             if (! success) {
                 break;
             }
-            printf("%ld\n", i); fflush(stdout);
             ++i;
         }
-        puts("<finished>"); fflush(stdout);
         ASSERT_EQ(NUM_TUPLES, i);
     }
-//
-//    ltt->deleteAllTempTuples();
-//
-//    ASSERT_EQ(0, lttBlockCache.totalBlockCount());
-//    ASSERT_EQ(0, lttBlockCache.allocatedMemory());
-//
-//    LargeTempTableTopend* theTopend = dynamic_cast<LargeTempTableTopend*>(ExecutorContext::getExecutorContext()->getPhysicalTopend());
-//    ASSERT_EQ(0, theTopend->storedBlockCount());
+
+    ltt->deleteAllTempTuples();
+
+    ASSERT_EQ(0, lttBlockCache.totalBlockCount());
+    ASSERT_EQ(0, lttBlockCache.allocatedMemory());
+
+    LargeTempTableTopend* theTopend = dynamic_cast<LargeTempTableTopend*>(ExecutorContext::getExecutorContext()->getPhysicalTopend());
+    ASSERT_EQ(0, theTopend->storedBlockCount());
 }
 
 TEST_F(LargeTempTableTest, basicBlockCache) {
