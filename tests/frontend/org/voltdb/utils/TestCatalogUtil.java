@@ -1647,4 +1647,62 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(definedFullTableNames, returnedFullTableNames);
         assertEquals(definedOptionalTableNames, returnedOptionalTableNames);
     }
+
+    public void testThreadPoolSettings() {
+        final String goodDeploy1 =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <threadpools>\n" +
+                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpGoodDeploy1 = VoltProjectBuilder.writeStringToTempFile(goodDeploy1);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpGoodDeploy1.getPath(), false);
+        assertNull(msg);
+
+        final String goodDeploy2 =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"log\" type=\"file\" threadpoolname = \"tp2\">\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "            <property name=\"type\">csv</property>\n" +
+                        "            <property name=\"nonce\">MyExport</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpGoodDeploy2 = VoltProjectBuilder.writeStringToTempFile(goodDeploy2);
+        msg = CatalogUtil.compileDeployment(catalog, tmpGoodDeploy2.getPath(), false);
+        assertNull(msg);
+
+        final String nameNotExist =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"log\" type=\"file\" threadpoolname = \"tp5\">\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "            <property name=\"type\">csv</property>\n" +
+                        "            <property name=\"nonce\">MyExport</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpNameNotExist = VoltProjectBuilder.writeStringToTempFile(nameNotExist);
+        msg = CatalogUtil.compileDeployment(catalog, tmpNameNotExist.getPath(), false);
+        assertNull(msg);
+    }
 }

@@ -3270,6 +3270,9 @@ public abstract class CatalogUtil {
      * @return The size of the named thread pool. 0 if the thread pool name is not assigned(use the auto-generated thread pool).
      */
     private static int checkExportThreadPoolConfiguration(ExportConfigurationType exportConfiguration, ThreadPoolsType threadPoolsType) {
+        if (threadPoolsType == null) {
+            return 0;
+        }
         String threadPoolName = exportConfiguration.getThreadpoolname();
         // check if the thread-pool-name exists in the deployment file <threadpools> section
         if (!StringUtil.isEmpty(threadPoolName)) {
@@ -3291,6 +3294,9 @@ public abstract class CatalogUtil {
     }
 
     private static void validateThreadPoolsConfiguration(ThreadPoolsType threadPoolsType) {
+        if (threadPoolsType == null) {
+            return;
+        }
         Set<String> nameSet = new HashSet<>();
         for (ThreadPoolsType.Threadpool threadPool : threadPoolsType.getThreadpool()) {
             if (!nameSet.add(threadPool.getName())) {
