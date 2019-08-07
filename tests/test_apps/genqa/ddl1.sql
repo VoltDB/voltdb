@@ -42,7 +42,7 @@ CREATE TABLE partitioned_table_with_metadata
 , VOLT_EXPORT_TIMESTAMP     BIGINT
 , VOLT_EXPORT_SEQUENCE_NUMBER BIGINT
 , VOLT_PARTITION_ID         BIGINT
-, VOLT_SITE_ID BIGINT
+, VOLT_SITE_ID              BIGINT
 , VOLT_EXPORT_OPERATION     TINYINT
 , txnid                     BIGINT        DEFAULT 0 NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -464,8 +464,8 @@ CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_loopback COLUMN row
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
-CREATE PROCEDURE insert_with_metadata as insert into partitioned_table_with_metadata
-        values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+CREATE PROCEDURE insert_with_metadata PARTITION ON TABLE partitioned_table_with_metadata COLUMN rowid parameter 7 AS insert into partitioned_table_with_metadata
+      values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Export Stream with extra Geo columns
 CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target

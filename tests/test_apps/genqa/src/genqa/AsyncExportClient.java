@@ -179,6 +179,7 @@ public class AsyncExportClient
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
+                TransactionCounts.incrementAndGet(INSERT);
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 // log.info("Success " + trace);
@@ -232,6 +233,7 @@ public class AsyncExportClient
             }
             else
             {
+                TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
                 log.info("TableExport failed: " + trace);
             }
@@ -465,6 +467,7 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
@@ -668,23 +671,25 @@ public class AsyncExportClient
                     + "increase --timeout arg for slower clients" );
                 }
                 Long pending = stats.getLong("TUPLE_PENDING");
+                String stream = stats.getString("SOURCE");
+                String target = stats.getString("TARGET");
+                String active = stats.getString("ACTIVE");
+                Long partition = stats.getLong("PARTITION_ID");
+
+                // don't wait for inactive partitions.
+                // there are cases where ACTIVE==FALSE is a bug that won't get caught here anyway
+                if (active.equalsIgnoreCase("FALSE"))
+                    continue;
                 if ( pending != lastPending) {
                     // reset the timer if we are making progress
                     maxTime = Instant.now().plusSeconds(timeout);
                     lastPending = pending;
                 }
-                String stream = stats.getString("SOURCE");
-                String target = stats.getString("TARGET");
-                String active = stats.getString("ACTIVE");
-                Long partition = stats.getLong("PARTITION_ID");
                 // switch this message to debug out?
                 log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
-                if (active.equalsIgnoreCase("FALSE"))
-                    continue;
                 if (pending != 0) {
                     passedThisTime = false;
                     log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
-
                     break;
                 }
             }
