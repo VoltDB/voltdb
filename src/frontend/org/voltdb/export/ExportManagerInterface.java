@@ -125,10 +125,12 @@ public interface ExportManagerInterface {
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
 
-    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+    public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
             StreamStartAction action,
-            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-            boolean isLowestSite);
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition);
+
+    public void updateDanglingExportStates(StreamStartAction action,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers);
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
             VoltTable results);
