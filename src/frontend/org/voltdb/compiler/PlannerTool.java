@@ -54,6 +54,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -97,6 +98,9 @@ public class PlannerTool {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        if (AdHocNTBase.USING_CALCITE) {
+            m_schemaPlus = VoltSchemaPlus.from(m_database);
+        }
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
@@ -298,8 +302,8 @@ public class PlannerTool {
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO Calcite ready: enable when we are ready
-        throw new PlannerFallbackException("planSqlCalcite not ready");
-        // return new AdHocPlannedStatement(plan, core);
+        // throw new PlannerFallbackException("planSqlCalcite not ready");
+        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(

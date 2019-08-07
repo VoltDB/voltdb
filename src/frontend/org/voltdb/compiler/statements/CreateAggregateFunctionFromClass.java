@@ -41,6 +41,10 @@ import org.voltdb.VoltUDAggregate;
  * Process CREATE AGGREGATE FUNCTION <function-name> FROM CLASS <class-name>
  */
 public class CreateAggregateFunctionFromClass extends CreateFunction {
+    public final static String START = "start";
+    public final static String ASSEMBLE = "assemble";
+    public final static String COMBINE = "combine";
+    public final static String END = "end";
 
     public CreateAggregateFunctionFromClass(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
@@ -110,36 +114,36 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
             }
             String funcName = m.getName();
             switch(funcName) {
-                case "start":
+                case START:
                     if (m.getReturnType().equals(Void.TYPE) && m.getParameterCount() == 0) {
-                        methods.put("start", m);
+                        methods.put(START, m);
                     }
                     break;
-                case "assemble":
+                case ASSEMBLE:
                     if (m.getReturnType().equals(Void.TYPE) && m.getParameterCount() == 1) {
                         Class<?> paramTypeClass = m.getParameterTypes()[0];
                         if (isAllowedDataType(paramTypeClass)) {
-                            methods.put("assemble", m);
+                            methods.put(ASSEMBLE, m);
                         } else {
                             throw new RuntimeException(String.format("Unsupported parameter value type: %s", paramTypeClass.getName()));
                         }
                     }
                     break;
-                case "combine":
+                case COMBINE:
                     if (m.getReturnType().equals(Void.TYPE) && m.getParameterCount() == 1) {
                         Class<?> paramTypeClass = m.getParameterTypes()[0];
                         if (funcClass.equals(paramTypeClass)) {
-                            methods.put("combine", m);
+                            methods.put(COMBINE, m);
                         } else {
                             throw new RuntimeException(String.format("Parameter type must be instance of Class: %s", funcClass.getName()));
                         }
                     }
                     break;
-                case "end":
+                case END:
                     if (m.getParameterCount() == 0) {
                         Class<?> returnTypeClass = m.getReturnType();
                         if (!returnTypeClass.equals(Void.TYPE) && isAllowedDataType(returnTypeClass)) {
-                            methods.put("end", m);
+                            methods.put(END, m);
                         } else {
                             throw new RuntimeException(String.format("Unsupported return value type: %s", returnTypeClass.getName()));
                         }
@@ -164,7 +168,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                                     .withValue("returnType", String.valueOf(voltReturnType.getValue()));
 
         // here for current case, the assemble method has only 1 argument
-        Class<?>[] paramTypeClasses = methods.get("assemble").getParameterTypes();
+        Class<?>[] paramTypeClasses = methods.get(ASSEMBLE).getParameterTypes();
         VoltType[] voltParamTypes = new VoltType[paramTypeClasses.length];
         for (int i = 0; i < paramTypeClasses.length; i++) {
             // this loop only run once
@@ -203,8 +207,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         // check the validity of loaded class
         Class<?> funcClass = isSQLParamValid(functionName, className, shortName);
         // find the four(start, assemble, combine, end) functions in the class
-        // the methods are stored in a hashmap with their fuction name as the key
-        // for example, methods.get("assemble") gives the assmble method
+        // the methods are stored in a hashmap with their function name as the key
+        // for example, methods.get("assemble") gives the assemble method
         // use VoltUDAggregate interface ensures the fours method must exist
         Map<String, Method> methods = retrieveMethodsFromClass(funcClass);
 

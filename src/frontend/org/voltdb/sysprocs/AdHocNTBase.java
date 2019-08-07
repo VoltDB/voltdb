@@ -93,8 +93,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Note that changes made to enviroment variable masks the mechanism how build.xml decides to pick planner based on
      * the Git branch name.
      */
-    static final boolean USING_CALCITE =
-            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false")) ||
+    public static final boolean USING_CALCITE =
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "true")) ||
             Boolean.parseBoolean(System.getenv("plan_with_calcite"));
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();

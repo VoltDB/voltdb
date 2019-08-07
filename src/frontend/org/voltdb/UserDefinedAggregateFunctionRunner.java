@@ -74,10 +74,10 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
 
         // Call the static method in class "CreateAggregateFunctionFromClass"
         Map<String, Method> methods = CreateAggregateFunctionFromClass.retrieveMethodsFromClass(funcClass);
-        m_startMethod = methods.get("start");
-        m_assembleMethod = methods.get("assemble");
-        m_combineMethod = methods.get("combine");
-        m_endMethod = methods.get("end");
+        m_startMethod = methods.get(CreateAggregateFunctionFromClass.START);
+        m_assembleMethod = methods.get(CreateAggregateFunctionFromClass.ASSEMBLE);
+        m_combineMethod = methods.get(CreateAggregateFunctionFromClass.COMBINE);
+        m_endMethod = methods.get(CreateAggregateFunctionFromClass.END);
 
         Class<?>[] paramTypeClasses = m_assembleMethod.getParameterTypes();
         m_paramCount = paramTypeClasses.length;

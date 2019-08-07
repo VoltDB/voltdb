@@ -24,9 +24,11 @@ import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.schema.impl.AggregateFunctionImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.ScalarFunctionDescriptor;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions.AggregateFunctionDescriptor;
+import org.voltdb.types.ExpressionType;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -62,10 +64,25 @@ public class VoltSchemaPlus {
         // Get all user-defined function from the database and add them to the SchemaPlus.
         db.getFunctions().forEach(function -> {
             try {
-                schema.add(function.getFunctionname().toUpperCase(),
-                        ScalarFunctionImpl.create(
-                                VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname()),
-                                function.getMethodname()));
+                Class<?> functionClass = VoltDB.instance().getCatalogContext().classForProcedureOrUDF(function.getClassname());
+                // UDFs have a single method name, but UDAFs have four methods.
+                // Therefore the function name field is only defined for UDF.
+                if (function.getMethodname() != null) {
+                    schema.add(function.getFunctionname().toUpperCase(),
+                            ScalarFunctionImpl.create(
+                            functionClass,
+                            function.getMethodname()));
+                } else {
+                    schema.add(function.getFunctionname().toUpperCase(),
+                            AggregateFunctionImpl.create(
+                            functionClass,
+                            CreateAggregateFunctionFromClass.START,
+                            CreateAggregateFunctionFromClass.ASSEMBLE,
+                            CreateAggregateFunctionFromClass.COMBINE,
+                            CreateAggregateFunctionFromClass.END,
+                            false,
+                            ExpressionType.USER_DEFINED_AGGREGATE.getValue()));
+                }
             } catch (ClassNotFoundException e) {
                 // This exception is unhandled because during catalog recovery, classes containing the UDF definitions
                 // are loaded after the catalog is restored. Thus, some function definitions may exist in the catalog
