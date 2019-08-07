@@ -971,6 +971,14 @@ public class CatalogDiffEngine {
             m_requiresNewExportGeneration = true;
             return null;
         }
+        if (suspect instanceof Connector && "threadpoolname".equals(field)) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
+        if (suspect instanceof Connector && "threadpoolsize".equals(field)) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
         // ENG-6511 Allow materialized views to change the index they use dynamically.
         if (suspect instanceof IndexRef && field.equals("name")) {
             return null;

@@ -113,32 +113,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.deploymentfile.ClusterType;
-import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.*;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
-import org.voltdb.compiler.deploymentfile.ConnectionType;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.DrType;
-import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.HttpdType;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.PathsType;
-import org.voltdb.compiler.deploymentfile.PropertyType;
-import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
-import org.voltdb.compiler.deploymentfile.SchemaType;
-import org.voltdb.compiler.deploymentfile.SecurityType;
-import org.voltdb.compiler.deploymentfile.ServerExportEnum;
-import org.voltdb.compiler.deploymentfile.ServerImportEnum;
-import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SnmpType;
-import org.voltdb.compiler.deploymentfile.SslType;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
@@ -879,6 +855,7 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
+            validateThreadPoolsConfiguration(deployment.getThreadpools());
 
             // add our hacky Deployment to the catalog
             if (catalog.getClusters().get("cluster").getDeployment().get("deployment") == null) {
@@ -907,7 +884,7 @@ public abstract class CatalogUtil {
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
 
             if (!isPlaceHolderCatalog) {
-                setExportInfo(catalog, deployment.getExport());
+                setExportInfo(catalog, deployment.getExport(), deployment.getThreadpools());
                 setImportInfo(catalog, deployment.getImport());
                 setSnmpInfo(deployment.getSnmp());
             }
@@ -1397,7 +1374,7 @@ public abstract class CatalogUtil {
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
-            //Validate that we can load the class.
+            // Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();
                 if (exportConfiguration.isEnabled()) {
@@ -1754,10 +1731,11 @@ public abstract class CatalogUtil {
 
     /**
      * Set deployment time settings for export
-     * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     * @param catalog The catalog to be updated.
+     * @param threadpools
      */
-    private static void setExportInfo(Catalog catalog, ExportType exportType) {
+    private static void setExportInfo(Catalog catalog, ExportType exportType, ThreadPoolsType threadPoolsType) {
         final Cluster cluster = catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
@@ -1830,6 +1808,9 @@ public abstract class CatalogUtil {
             // on-server export always uses the guest processor
             catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
             catconn.setEnabled(connectorEnabled);
+            int threadPoolSize = checkExportThreadPoolConfiguration(exportConfiguration, threadPoolsType);
+            catconn.setThreadpoolname(exportConfiguration.getThreadpoolname());
+            catconn.setThreadpoolsize(threadPoolSize);
 
             if (!connectorEnabled) {
                 hostLog.info("Export configuration for export target " + targetName + " is present and is " +
@@ -3279,5 +3260,44 @@ public abstract class CatalogUtil {
      */
     public static VoltTable.ColumnInfo catalogColumnToInfo(Column column) {
         return new VoltTable.ColumnInfo(column.getTypeName(), VoltType.get((byte) column.getType()));
+    }
+
+    /**
+     * Check if the thread pool name set in the export target configuration exists, return the size of
+     * the named thread pool.
+     * @param exportConfiguration
+     * @param threadPoolsType
+     * @return The size of the named thread pool. 0 if the thread pool name is not assigned(use the auto-generated thread pool).
+     */
+    private static int checkExportThreadPoolConfiguration(ExportConfigurationType exportConfiguration, ThreadPoolsType threadPoolsType) {
+        String threadPoolName = exportConfiguration.getThreadpoolname();
+        // check if the thread-pool-name exists in the deployment file <threadpools> section
+        if (!StringUtil.isEmpty(threadPoolName)) {
+            for (ThreadPoolsType.Threadpool threadPool : threadPoolsType.getThreadpool()) {
+                if (threadPool.getName().equals(threadPoolName)) {
+                    return threadPool.getSize();
+                }
+            }
+
+            String msg =
+                    "Export target: " + exportConfiguration.getTarget() +
+                            " failed to configure, failed to find" +
+                            " thread pool name: " + threadPoolName +
+                            " Disabling export.";
+            hostLog.error(msg);
+            throw new DeploymentCheckException(msg);
+        }
+        return 0;
+    }
+
+    private static void validateThreadPoolsConfiguration(ThreadPoolsType threadPoolsType) {
+        Set<String> nameSet = new HashSet<>();
+        for (ThreadPoolsType.Threadpool threadPool : threadPoolsType.getThreadpool()) {
+            if (!nameSet.add(threadPool.getName())) {
+                String msg = "Invalid thread pool configuration. Thread pool name: " + threadPool.getName() + " is not unique.";
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
+        }
     }
 }

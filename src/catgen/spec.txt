@@ -67,6 +67,8 @@ end
 
 begin Connector                 "Export connector"
   string loaderclass            "The class name of the connector"
+  string threadpoolname         "The name of the thread pool"
+  int threadpoolsize            "The size of the thread pool"
   bool enabled                  "Is the connector enabled"
   ConnectorTableInfo* tableInfo "Per table configuration"
   ConnectorProperty* config     "Connector configuration properties"
