@@ -868,8 +868,7 @@ public class ExportGeneration implements Generation {
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
                                                 StreamStartAction action,
-                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-                                                boolean isLowestSite) {
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
         List<ListenableFuture<?>> tasks = new ArrayList<>();
@@ -885,18 +884,49 @@ public class ExportGeneration implements Generation {
                 }
             }
         }
-        // After recovery partition layout may have changed, causing some export PBDs become dangling,
-        // truncate them as well, this should be done once per node.
-        if (isLowestSite) {
-            synchronized(m_dataSourcesByPartition) {
-                for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
-                    for (ExportDataSource source : dataSources.values()) {
-                        if (!source.inCatalog()) {
-                            ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(source.getPartitionId());
-                            if (sequences != null) {
-                                ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
-                                tasks.add(task);
+        try {
+            if (!tasks.isEmpty()) {
+                Futures.allAsList(tasks).get();
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
+                                    "You can back up export overflow data and start the " +
+                                    "DB without it to get past this error", true, e);
+        }
+    }
+
+    @Override
+    public void updateDanglingExportStates(StreamStartAction action,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
+        List<ListenableFuture<?>> tasks = new ArrayList<>();
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : dataSources.values()) {
+                    if (!source.inCatalog()) {
+                        Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(source.getTableName());
+                        if (sequenceNumberPerPartition == null) {
+                            exportLog.warn("Could not find export sequence number for table " + source.getTableName() +
+                                    ". This warning is safe to ignore if you are loading a pre 1.3 snapshot" +
+                                    " which would not contain these sequence numbers (added in 1.3)." +
+                                    " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                                    " are reset to 0");
+                            continue;
+                        }
+                        ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(source.getPartitionId());
+                        if (sequences != null) {
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Updating dangling export " + source);
                             }
+                            ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
+                            tasks.add(task);
+                        } else {
+                            exportLog.warn("Could not find an export sequence number for table " + source.getTableName() +
+                                    " partition " + source.getPartitionId() +
+                                    ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
+                                    " which would not contain these sequence numbers (added in 1.3)." +
+                                    " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                                    " are reset to 0");
+                            continue;
                         }
                     }
                 }
@@ -908,8 +938,8 @@ public class ExportGeneration implements Generation {
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                    "You can back up export overflow data and start the " +
-                                    "DB without it to get past this error", true, e);
+                    "You can back up export overflow data and start the " +
+                    "DB without it to get past this error", true, e);
         }
     }
 
