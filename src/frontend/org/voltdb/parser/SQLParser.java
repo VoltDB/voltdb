@@ -619,6 +619,19 @@ public class SQLParser extends SQLPatternFactory
             "\\s*;?\\s*",   // an optional semicolon surrounded by whitespace
             Pattern.CASE_INSENSITIVE);
 
+    // QUERYSTATS is followed by a SQL query. Capture group 2 is the query.
+    private static final Pattern QueryStatsToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "querystats" +          // required QUERYSTATS command token
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that help
+            // command diagnostics can "own" any line starting with the word
+            // help.
+            "\\s*" +          // optional whitespace before subcommand
+            "([^;\\s]*)" +    // optional subcommand (group 2)
+            InitiallyForgivingDirectiveTermination,
+            Pattern.CASE_INSENSITIVE);
+
     // Query Execution
     private static final Pattern ExecuteCallPreamble = Pattern.compile(
             "^\\s*" +            // optional indent at start of line
@@ -2119,6 +2132,33 @@ public class SQLParser extends SQLPatternFactory
      */
     public static String parseDescribeStatement(String statement) {
         Matcher matcher = DescribeToken.matcher(statement);
+        if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    // Return the subcommand keyword -- possibly a valid one.
+                    return matcher.group(2);
+                }
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                return matcher.group(2) + " " + trailings;
+            }
+            if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                return commandWordTerminator; // EOL or ; reached before subcommand
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parse QUERYSTATS statement for sqlcmd.
+     * @param statement  statement to parse
+     * @return           String containing full SQL query
+     */
+    public static String parseQueryStatsStatement(String statement) {
+        Matcher matcher = QueryStatsToken.matcher(statement);
         if (matcher.matches()) {
             String commandWordTerminator = matcher.group(1);
             if (OneWhitespace.matcher(commandWordTerminator).matches()) {

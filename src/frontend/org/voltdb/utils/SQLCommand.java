@@ -545,6 +545,13 @@ public class SQLCommand {
             return true;
         }
 
+        // QUERYSTATS
+        String queryStatsArgs = SQLParser.parseQueryStatsStatement(line);
+        if (queryStatsArgs != null) {
+            printResponse(m_client.callProcedure("@QueryStats", queryStatsArgs), false);
+            return true;
+        }
+
         // It wasn't a locally-interpreted directive.
         return false;
     }
@@ -705,7 +712,7 @@ public class SQLCommand {
      * i.e., a "here document" that is coming from the same input stream
      * as the "file" directive.
      *
-     * @param fileInfo    Info on the file directive being processed
+     * @param filesInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
      * @throws IOException
      */

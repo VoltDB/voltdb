@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -51,6 +54,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
@@ -72,6 +76,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
@@ -80,6 +85,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.volttableutil.VoltTableUtil;
 
 public final class InvocationDispatcher {
 
@@ -454,6 +460,9 @@ public final class InvocationDispatcher {
             else if ("@JStack".equals(procName)) {
                 return dispatchJstack(task);
             }
+            else if ("@QueryStats".equals(procName)) {
+                return dispatchQueryStats(task);
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -796,6 +805,51 @@ public final class InvocationDispatcher {
        }
 
        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    public ClientResponseImpl dispatchQueryStats(StoredProcedureInvocation task) {
+        String tempTableAlias = "TT";
+        Pattern stats_proc = Pattern.compile("(\\(\\s*exec\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
+        String sql = (String) task.getParams().getParam(0);
+
+        StatsSelector[] proc_types = StatsSelector.getAllStatsCollector();
+        List<Pair<String, VoltTable>> tables = new LinkedList<>();
+        StringBuffer buf = new StringBuffer();
+        Matcher m = stats_proc.matcher(sql);
+
+        while (m.find()) {
+            String proc = m.group(1);
+            m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
+            String[] statsProc = proc.split("[,]");
+
+            try {
+                JSONObject obj = new JSONObject();
+                Pattern subselector = Pattern.compile("[a-zA-Z]+");
+                obj.put("selector", "STATISTICS");
+
+                for (StatsSelector proc_type : proc_types) {
+                    if (proc.toUpperCase().contains(proc_type.name())) {
+                        obj.put("subselector", proc_type.name());
+                    }
+                }
+
+                obj.put("interval", false);
+                tables.add(new Pair<>(tempTableAlias + tables.size(),
+                VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
+            } catch (Exception e) {
+                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, null, "An unknown failure has occurred");
+            }
+        }
+
+        m.appendTail(buf);
+        VoltTable[] vt = new VoltTable[1];
+        try {
+            vt[0] = VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables);
+        } catch (Exception e) {
+            return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, null, "An unknown failure has occurred");
+        }
+
+        return new ClientResponseImpl(ClientResponse.SUCCESS, vt, "SUCCESS", task.clientHandle);
     }
 
     public final ClientResponseImpl dispatchNTProcedure(InvocationClientHandler handler,

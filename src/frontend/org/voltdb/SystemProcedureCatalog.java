@@ -312,6 +312,11 @@ public class SystemProcedureCatalog {
                         false, false, true,  0, VoltType.INVALID,
                         false, false, true,false,
                         false, true, false));
+        builder.put("@QueryStats",
+                new Config("org.voltdb.sysprocs.QueryStats",
+                        false, true, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        true, true, false));
         builder.put("@Resume",
                 new Config("org.voltdb.sysprocs.Resume",
                         false, false, true,  0, VoltType.INVALID,
@@ -648,11 +653,6 @@ public class SystemProcedureCatalog {
                         true, false, false, 0, VoltType.INVALID,
                         false, false, false, true,
                         true, false, false));
-        builder.put("@QueryStats",
-                new Config("org.voltdb.sysprocs.QueryStats",
-                        false, true, false, 0, VoltType.INVALID,
-                        false, false, true, false,
-                        true, true, false));
         builder.put("@ElasticRemoveNT",
                 Builder.createNp("org.voltdb.sysprocs.ElasticRemoveNT").commercial().allowedInReplica().build());
         builder.put("@ElasticRemove", Builder.createMp("org.voltdb.sysprocs.ElasticRemove").commercial().build());
