@@ -589,7 +589,7 @@ public class TestSchedulerManager {
             } else {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
-            return SchedulerResult.scheduleProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+            return SchedulerResult.createScheduledProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
         }
 
         @Override
@@ -608,7 +608,7 @@ public class TestSchedulerManager {
             } else {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
-            return SchedulerResult.scheduleProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+            return SchedulerResult.createScheduledProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
         }
     }
 
@@ -629,8 +629,8 @@ public class TestSchedulerManager {
                 s_postRunSchedulerCallCount.getAndIncrement();
             }
 
-            return ++m_runCount < m_maxRunCount ? SchedulerResult.rerun(100, TimeUnit.MICROSECONDS)
-                    : SchedulerResult.exit(null);
+            return ++m_runCount < m_maxRunCount ? SchedulerResult.createRerun(100, TimeUnit.MICROSECONDS)
+                    : SchedulerResult.createExit(null);
         }
     }
 }

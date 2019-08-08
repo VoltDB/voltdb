@@ -275,7 +275,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                     System.err.println("ERROR: " + previousProcedureRun.getResponse().getStatusString());
                 }
             }
-            return SchedulerResult.scheduleProcedure(m_delay, TimeUnit.MILLISECONDS, m_procedure, m_procedureParams);
+            return SchedulerResult.createScheduledProcedure(m_delay, TimeUnit.MILLISECONDS, m_procedure, m_procedureParams);
         }
     }
 }
