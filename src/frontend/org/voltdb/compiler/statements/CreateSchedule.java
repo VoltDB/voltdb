@@ -21,6 +21,7 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.Scanner;
 import org.hsqldb_voltpatches.Tokens;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.ProcedureSchedule;
@@ -60,7 +61,8 @@ public class CreateSchedule extends StatementProcessor {
         ProcedureSchedule schedule = schedules.add(name);
         configureScheduler(schedule, matcher, ddlStatement.newDdl);
 
-        SchedulerManager.SchedulerValidationResult result = SchedulerManager.validateScheduler(schedule, m_classLoader);
+        SchedulerManager.SchedulerValidationResult result = VoltDB.instance().getSchedulerManager()
+                .validateScheduler(schedule, m_classLoader);
         if (!result.isValid()) {
             schedules.delete(name);
             throw m_compiler.new VoltCompilerException(result.getErrorMessage());

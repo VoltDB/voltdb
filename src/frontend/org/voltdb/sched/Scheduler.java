@@ -24,6 +24,12 @@ import java.util.Collection;
  * Scheduler's constructor. Only valid column types are allowed as constructor parameters with one exception the last
  * parameter can be either {@code String[]} or {@code Object[]}. If the last parameter is an array then it will be
  * treated as a var args parameter.
+ * <p>
+ * Optionally an implementation can implement a {@code validateParameters} method which will be invoked during the DDL
+ * validation phase. If a {@code validateParameters} is provided the first parameter may be a
+ * {@link SchedulerValidationHelper}. All other parameters must match exactly the type of parameters of the constructor
+ * of the Scheduler implementation. The return of {@code validateParameters} must be a {@link String} which is
+ * {@code null} if no error is detected otherwise an appropriate error message should be returned.
  */
 public interface Scheduler {
     /**
