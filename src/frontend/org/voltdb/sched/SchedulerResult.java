@@ -36,7 +36,7 @@ public final class SchedulerResult {
      * @param message to log indicating the details of the error. May be {@code null}
      * @return A new {@link Status#ERROR} instance of {@link SchedulerResult}
      */
-    public static SchedulerResult error(String message) {
+    public static SchedulerResult createError(String message) {
         return new SchedulerResult(Status.ERROR, message, null);
     }
 
@@ -47,7 +47,7 @@ public final class SchedulerResult {
      * @param message to log indicating the details of the error. May be {@code null}
      * @return A new {@link Status#EXIT} instance of {@link SchedulerResult}
      */
-    public static SchedulerResult exit(String message) {
+    public static SchedulerResult createExit(String message) {
         return new SchedulerResult(Status.EXIT, message, null);
     }
 
@@ -60,7 +60,7 @@ public final class SchedulerResult {
      * @param procedureParameters to pass to procedure during execution
      * @return A new {@link Status#PROCEDURE} instance of {@link SchedulerResult}
      */
-    public static SchedulerResult scheduleProcedure(long delay, TimeUnit timeUnit, String procedure,
+    public static SchedulerResult createScheduledProcedure(long delay, TimeUnit timeUnit, String procedure,
             Object... procedureParameters) {
         return new SchedulerResult(Status.PROCEDURE, null,
                 new ScheduledProcedure(delay, timeUnit, Objects.requireNonNull(procedure), procedureParameters));
@@ -75,7 +75,7 @@ public final class SchedulerResult {
      * @param timeUnit {#link TimeUnit} of {@code delay}
      * @return A new {@link Status#RERUN} instance of {@link SchedulerResult}
      */
-    public static SchedulerResult rerun(long delay, TimeUnit timeUnit) {
+    public static SchedulerResult createRerun(long delay, TimeUnit timeUnit) {
         return new SchedulerResult(Status.RERUN, null, new ScheduledProcedure(delay, timeUnit, null));
     }
 
