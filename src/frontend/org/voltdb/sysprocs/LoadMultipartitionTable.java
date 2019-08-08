@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
@@ -54,6 +53,11 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
+    }
+
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{SysProcFragmentId.PF_distribute};
     }
 
 

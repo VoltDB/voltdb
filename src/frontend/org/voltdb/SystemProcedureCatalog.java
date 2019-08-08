@@ -17,11 +17,15 @@
 
 package org.voltdb;
 
+import java.util.List;
+
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.messaging.FragmentTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 /**
@@ -148,6 +152,14 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
+    // Cache the fragments of VoltSysemProcedure which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableSet<Long> s_allowableSysprocFragsInTaskLog;
+
+     // Cache VoltSysemProcedure by name which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableSet<String> s_allowableSysprocsInTaskLog;
+
     static {                                                                                                                    // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
@@ -226,4 +238,36 @@ public class SystemProcedureCatalog {
 
         listing = builder.build();
     }
+
+
+    // Set up the cache when system procedures are loaded on execution sites.
+   public static void setupAllowableSysprocFragsInTaskLog(List<Long> fragments, List<String> procs) {
+       if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null){
+           synchronized(SystemProcedureCatalog.class) {
+               if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null) {
+                   s_allowableSysprocFragsInTaskLog = ImmutableSet.<Long>builder().addAll(fragments).build();
+                   s_allowableSysprocsInTaskLog = ImmutableSet.<String>builder().addAll(procs).build();
+               }
+           }
+       }
+   }
+
+    // return true if the fragment or the system procedure is allowed to be replayed in TaskLog
+   public static boolean isAllowableInTaskLog(Long fragId, FragmentTaskMessage msg) {
+       if(s_allowableSysprocFragsInTaskLog == null || s_allowableSysprocsInTaskLog == null) {
+           return true;
+       }
+
+        // Check specified fragment IDs
+       if (s_allowableSysprocFragsInTaskLog.contains(fragId)) {
+           return true;
+       }
+
+        // If fragId is not in the allowed list, check proc name.
+       String procName = msg.getProcedureName();
+       if (procName != null) {
+           return s_allowableSysprocsInTaskLog.contains(procName);
+       }
+       return false;
+   }
 }
