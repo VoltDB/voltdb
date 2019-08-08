@@ -181,6 +181,7 @@ public class AsyncExportClient
                 TrackingResults.incrementAndGet(0);
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
+                // log.info("Success " + trace);
                 try
                 {
                     m_writer.write(TxnEgo.getPartitionId(txid),trace);
@@ -194,6 +195,7 @@ public class AsyncExportClient
             {
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
+                // log.info("Fail " + trace);
                 try
                 {
                     m_writer.write(-1,trace);
@@ -408,9 +410,11 @@ public class AsyncExportClient
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
+                log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
                 clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
             }
             else {
+                log.info("Insert row in Done table with JiggleExportDoneTable proc");
                 clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
             }
             writer.close(true);

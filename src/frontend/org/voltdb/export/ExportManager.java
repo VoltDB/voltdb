@@ -330,18 +330,7 @@ public class ExportManager
         ExportDataProcessor processor = m_processor.get();
         Preconditions.checkState(processor != null, "guest processor is not set");
 
-        // Notify export datasources to check the *generation* of export buffers,
-        // delete buffers older than current generation number or generation number
-        // from snapshot. This must be done before the processor starts polling.
-        cleanupStaleBuffers(action);
-
         processor.startPolling();
-    }
-
-    private void cleanupStaleBuffers(StreamStartAction action) {
-        if (m_generation.get() != null) {
-            m_generation.get().cleanupStaleBuffers(action);
-        }
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
@@ -661,15 +650,20 @@ public class ExportManager
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 StreamStartAction action,
-                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-                                                boolean isLowestSite) {
-        //If the generation was completely drained, wait for the task to finish running
-        //by waiting for the permit that will be generated
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition) {
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
             generation.updateInitialExportStateToSeqNo(partitionId, signature,
                                                        action,
-                                                       sequenceNumberPerPartition, isLowestSite);
+                                                       sequenceNumberPerPartition);
+        }
+    }
+
+    public void updateDanglingExportStates(StreamStartAction action,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
+        ExportGeneration generation = m_generation.get();
+        if (generation != null) {
+            generation.updateDanglingExportStates(action, exportSequenceNumbers);
         }
     }
 

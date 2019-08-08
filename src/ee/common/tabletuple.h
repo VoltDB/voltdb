@@ -1115,7 +1115,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                         << "(index=" << j << ")"
                         << "hidden column count=" << m_schema->hiddenColumnCount()
                         << std::endl;
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
+                throw SerializableEEException(
+                        message.str().c_str());
             }
 
             char *dataPtr = getWritableDataPtr(columnInfo);

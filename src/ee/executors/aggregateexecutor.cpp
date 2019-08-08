@@ -51,6 +51,8 @@
 
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
+#include "common/SerializableEEException.h"
+
 namespace voltdb {
 /*
  * Type of the hash set used to check for column aggregate distinctness
@@ -487,18 +489,72 @@ public:
     }
 };
 
+
+class UserDefineAgg : public Agg {
+    public:
+    UserDefineAgg(int id, bool isWorkerIn, bool isPartitionIn, int udafIndexIn)
+        : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()),
+            udafIndex(udafIndexIn), isPartition(isPartitionIn)
+    {
+        engine->callJavaUserDefinedAggregateStart(functionId);
+    }
+
+    virtual void advance(const NValue& val)
+    {
+        // if this is a worker, we will need to call the assemble method to accumulate
+        // the values within this partition
+        if (isWorker) {
+            engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
+        }
+        // if this is a coordinator (not worker), we will need to call the combine method
+        // to deserialize the byte arrays from other partitions and merge them
+        else {
+            engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
+        }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        // if this is a partitioned table and a worker, we will call the worker end method
+        // to serialize the instance to a byte array and send it to the coordinator
+        if (isPartition && isWorker) {
+            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, udafIndex);
+        }
+        // if this is not a partitioned table which means this is a replicated table, or this is
+        // a coordinator (not worker), we are ready to return the final result by calling the
+        // coordinator end method
+        else {
+            return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, udafIndex);
+        }
+    }
+
+    virtual void resetAgg()
+    {
+        engine->callJavaUserDefinedAggregateStart(functionId);
+    }
+
+private:
+    int functionId;
+    // worker or coordinator
+    bool isWorker;
+    VoltDBEngine* engine;
+    int udafIndex;
+    // partitioned or replicated
+    bool isPartition;
+};
+
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDistinct)
 {
-    switch (agg_type) {
+    switch (aggType) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
         return new (memoryPool) CountStarAgg();
     case EXPRESSION_TYPE_AGGREGATE_MIN:
         return new (memoryPool) MinAgg(&memoryPool);
-    case EXPRESSION_TYPE_AGGREGATE_MAX  :
+    case EXPRESSION_TYPE_AGGREGATE_MAX:
         return new (memoryPool) MaxAgg(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_COUNT:
         if (isDistinct) {
@@ -524,10 +580,14 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     default:
         {
             char message[128];
-            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            snprintf(message, sizeof(message), "Unknown aggregate type %d", aggType);
+            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
+}
+
+inline Agg* getUDAFAggInstance(Pool& memoryPool, int functionId, bool isWorker, bool isPartition, int udafIndex) {
+    return new (memoryPool) UserDefineAgg(functionId, isWorker, isPartition, udafIndex);
 }
 
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
@@ -566,7 +626,10 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_partialSerialGroupByColumns = node->getPartialGroupByColumns();
 
     m_aggTypes = node->getAggregates();
+    m_aggregateIds = node->getAggregateIds();
     m_distinctAggs = node->getDistinctAggregates();
+    m_isWorker = node->getIsWorker();
+    m_isPartition = node->getPartition();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
@@ -689,8 +752,28 @@ inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, const
 inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
+    std::unordered_map<int, int> udafIndexes;
+    // UDFTODO: If you make the change in AggregatePlanNode, you will need another index
+    // to track the id for udaf
+    /*
+        int udafJsonIndex = 0;
+        for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        if (m_aggTypes[ii] == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE) {
+            aggs[ii] = getUDAFAggInstance(m_memoryPool, m_aggregateIds[udafJsonIndex], m_isWorker[udafJsonIndex], m_isPartition[udafJsonIndex], udafIndexes[m_aggregateIds[udafJsonIndex]]++);
+            udafJsonIndex++;
+        }
+        else {
+            aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        }
+    }
+    */
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        if (m_aggTypes[ii] == EXPRESSION_TYPE_USER_DEFINED_AGGREGATE) {
+            aggs[ii] = getUDAFAggInstance(m_memoryPool, m_aggregateIds[ii], m_isWorker[ii], m_isPartition[ii], udafIndexes[m_aggregateIds[ii]]++);
+        }
+        else {
+            aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        }
     }
 }
 

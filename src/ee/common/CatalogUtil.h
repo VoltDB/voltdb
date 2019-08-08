@@ -29,58 +29,8 @@
   information from the catalog.
 */
 
-
-/**
- * A table is export only its catalog says so.
- */
-
-bool isTableExportOnly(catalog::Table const& catalogTable) {
-    return voltdb::tableTypeIsStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
-}
-
-/**
- * a table is only enabled for export if explicitly listed in
- * a connector's table list (regardless of the enabled state of
- * the connector) if export is enabled for the
- * database as a whole
- */
-bool isExportEnabledForTable(catalog::Database const & database, catalog::Table const& catalogTable) {
-
-    int32_t tableIndex = catalogTable.relativeIndex();
-    // export is disabled unless a connector exists
-    if (database.connectors().size() == 0) {
-        return false;
-    }
-    bool streamTable = isTableExportOnly(catalogTable);
-    if (!streamTable) {
-       return false;
-    }
-    // iterate through all connectors
-    std::map<std::string, catalog::Connector*>::const_iterator connIter;
-    for (connIter = database.connectors().begin();
-         connIter != database.connectors().end();
-         connIter++)
-    {
-        catalog::Connector *connector = connIter->second;
-
-        // iterate the connector tableinfo list looking for tableIndex matches
-        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-        for (it = connector->tableInfo().begin();
-             it != connector->tableInfo().end();
-             it++)
-        {
-            if (it->second->table()->relativeIndex() == tableIndex) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 bool isTableMaterialized(const catalog::Table &table) {
     return table.materializer() != NULL;
 }
-
 
 #endif

@@ -92,7 +92,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             serializer.writeCommandForField(db, "isActiveActiveDRed", true);
         }
         for (Table t : db.getTables()) {
-            if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isTableExportOnly(db, t)) {
+            if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isStream(db, t)) {
                 t.accept(serializer);
             }
         }

@@ -99,6 +99,28 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             containsType = true;
             string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
             m_aggregates.push_back(stringToExpression(aggregateColumnTypeString));
+            // if there is an user_aggregate_id in the json, put it into m_aggregateIds
+            if (aggregateColumnValue.hasNonNullKey("USER_AGGREGATE_ID")) {
+                int id = aggregateColumnValue.valueForKey("USER_AGGREGATE_ID").asInt();
+                m_aggregateIds.push_back(id);
+            }
+
+            // UDFTODO: If you make the change in AggregatePlanNode, you do not need
+            // the else statement here
+
+            // if there is not an user_aggregate_id in the json, this is not an user-defined
+            // aggregate function. Therefore, we put in -1 but we will not use it later on
+            else {
+                m_aggregateIds.push_back(-1);
+            }
+            if (aggregateColumnValue.hasNonNullKey("IS_WORKER")) {
+                bool isWorker = aggregateColumnValue.valueForKey("IS_WORKER").asBool();
+                m_isWorker.push_back(isWorker);
+            }
+            if (aggregateColumnValue.hasNonNullKey("IS_PARTITION")) {
+                bool isPartition = aggregateColumnValue.valueForKey("IS_PARTITION").asBool();
+                m_isPartition.push_back(isPartition);
+            }
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {
             containsDistinct = true;
@@ -117,9 +139,7 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
 
         if(!(containsType && containsDistinct && containsOutputColumn)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type, distinct, or outputcolumn.");
+            throw SerializableEEException("AggregatePlanNode::loadFromJSONObject: Missing type, distinct, or outputcolumn.");
         }
         if ( ! containsExpression) {
             m_aggregateInputExpressions.push_back(NULL);
