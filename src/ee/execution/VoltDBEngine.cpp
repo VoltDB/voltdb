@@ -667,7 +667,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     }
     resetUDFOutputBuffer();
 
-    // Serialize buffer size, function ID.
+    // Serialize buffer size, function ID, and udaf index
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
     m_udfOutput.writeInt(udafIndex);
@@ -676,6 +676,48 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
         cast_argument.serializeTo(m_udfOutput);
     }
 
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded == m_udfOutput.position());
+}
+
+void VoltDBEngine::serializeArgumentVectorToUDFOutputBuffer(int32_t functionId, vector<NValue>& argVector, int32_t argCount,
+                                                            ValueType type, int32_t udafIndex) {
+    printf("serialize data, argCount = %d\n", argCount);
+    // Determined the buffer size needed.
+    // Information put in the buffer (sequentially)
+    // * buffer size needed (int32_t)
+    // * function id (int32_t)
+    // * udaf index (int32_t)
+    // * parameter count (int32_t)
+    // * parameters
+
+    int32_t bufferSizeNeeded = 4 * sizeof(int32_t);
+    vector<NValue> cast_argument(argCount);
+    if (type != VALUE_TYPE_INVALID) {
+        for (int i = 0; i < argCount; i++) {
+            cast_argument[i] = argVector[i].castAs(type);
+            bufferSizeNeeded += cast_argument[i].serializedSize();
+        }
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    if (bufferSizeNeeded > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded);
+    }
+    resetUDFOutputBuffer();
+
+    // serialize data
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+    m_udfOutput.writeInt(udafIndex);
+    m_udfOutput.writeInt(argCount);
+
+    if (type != VALUE_TYPE_INVALID) {
+        for (int i = 0; i < argCount; i++) {
+            cast_argument[i].serializeTo(m_udfOutput);
+        }
+    }
     // Make sure we did the correct size calculation.
     assert(bufferSizeNeeded == m_udfOutput.position());
 }
@@ -725,15 +767,32 @@ void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
 }
 
+void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, vector<NValue>& argVector, int32_t argCount, int32_t udafIndex) {
+    printf("-> VoltDBEngine aggAssemble funcId = %d, udafIndex = %d, \n", functionId, udafIndex);
+    printf("-> argVector: [");
+    for (int i = 0; i < argCount; i++) {
+        printf("#%d: %s, ", i, argVector[i].debug().c_str());
+    }
+    printf("]\n");
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    serializeArgumentVectorToUDFOutputBuffer(functionId, argVector, argCount, info->paramTypes.front(), udafIndex);
+    // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble(); // code pass the length of vector here
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
+}
+/*
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int32_t udafIndex) {
+    printf("-> VoltDBEngine aggAssemble funcId = %d, udafIndex = %d, NNal = %s\n", functionId, udafIndex, argument.debug().c_str());
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
     serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front(), udafIndex);
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble(); // code pass the length of vector here
     checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
-}
+}*/
 
 void VoltDBEngine::callJavaUserDefinedAggregateCombine(
         int32_t functionId, const NValue& argument, int32_t udafIndex) {

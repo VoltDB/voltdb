@@ -491,11 +491,12 @@ public:
 
 
 class UserDefineAgg : public Agg {
-    public:
+public:
     UserDefineAgg(int id, bool isWorkerIn, bool isPartitionIn, int udafIndexIn)
         : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()),
-            udafIndex(udafIndexIn), isPartition(isPartitionIn)
+            udafIndex(udafIndexIn), isPartition(isPartitionIn), maxVecSize(4), currVecSize(0)
     {
+        argVector.resize(maxVecSize, NValue());
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
 
@@ -504,7 +505,24 @@ class UserDefineAgg : public Agg {
         // if this is a worker, we will need to call the assemble method to accumulate
         // the values within this partition
         if (isWorker) {
-            engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
+            //printf("Advance: funcId = %d, index = %d, NValue = %s\n", functionId, udafIndex, val.debug().c_str());
+            // need to make a deep copy of NValue here (using copy constructor)
+            argVector[currVecSize] = val;
+            printf("Advance: funcId = %d, index = %d, NValue = %s\n", functionId, udafIndex, argVector[currVecSize].debug().c_str());
+            //argVector.push_back(copyVal);
+            ++currVecSize;
+            printf("[");
+            for (int i = 0; i < currVecSize; i++) {
+                printf("#%d: %s, ", i, argVector[i].debug().c_str());
+            }
+            printf("]\n");
+            printf("vectorSize = %d\n", currVecSize);
+            if (currVecSize == maxVecSize) {
+                printf("Call assemble\n");
+                engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, currVecSize, udafIndex);
+                currVecSize = 0;
+            }
+            //engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
         }
         // if this is a coordinator (not worker), we will need to call the combine method
         // to deserialize the byte arrays from other partitions and merge them
@@ -515,6 +533,13 @@ class UserDefineAgg : public Agg {
 
     virtual NValue finalize(ValueType type)
     {
+        printf("Finalize: funcId = %d, index = %d, ReturnType = %s\n", functionId, udafIndex, getTypeName(type).c_str());
+        if (currVecSize > 0) {
+            printf("vectorSize = %d\n", currVecSize);
+            printf("execute advance\n");
+            engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, currVecSize, udafIndex);
+            currVecSize = 0;
+        }
         // if this is a partitioned table and a worker, we will call the worker end method
         // to serialize the instance to a byte array and send it to the coordinator
         if (isPartition && isWorker) {
@@ -541,6 +566,11 @@ private:
     int udafIndex;
     // partitioned or replicated
     bool isPartition;
+
+    // Used for vectorization
+    const int maxVecSize; // maybe set by the used
+    vector<NValue> argVector;
+    int currVecSize;
 };
 
 /*
@@ -587,6 +617,11 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
 inline Agg* getUDAFAggInstance(Pool& memoryPool, int functionId, bool isWorker, bool isPartition, int udafIndex) {
     return new (memoryPool) UserDefineAgg(functionId, isWorker, isPartition, udafIndex);
 }
+
+
+/**
+ * Aggregate Executor Base: protected methods
+ */
 
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
 {
@@ -801,6 +836,9 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
     return nextGroupByKeyTuple;
 }
 
+/**
+ * AggretaExecutorBase: public methods
+ */
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
                                                  ProgressMonitorProxy* pmp,
                                                  const TupleSchema * schema,
@@ -837,6 +875,10 @@ void AggregateExecutorBase::p_execute_finish()
 
     m_memoryPool.purge();
 }
+
+/**
+ * Aggregate Hash Executor
+ */
 
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
@@ -931,8 +973,11 @@ void AggregateHashExecutor::p_execute_finish() {
     AggregateExecutorBase::p_execute_finish();
 }
 
-AggregateSerialExecutor::~AggregateSerialExecutor() {}
+/**
+ * Aggregate Serial Executor
+ */
 
+AggregateSerialExecutor::~AggregateSerialExecutor() {}
 
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
                                                    ProgressMonitorProxy* pmp,
@@ -1045,9 +1090,9 @@ void AggregateSerialExecutor::p_execute_finish()
     AggregateExecutorBase::p_execute_finish();
 }
 
-//
-// Partial aggregate
-//
+/**
+ * Aggregate Partial Executor
+ */
 AggregatePartialExecutor::~AggregatePartialExecutor() {}
 
 TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,

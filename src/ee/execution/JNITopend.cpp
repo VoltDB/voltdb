@@ -496,6 +496,7 @@ int32_t JNITopend::callJavaUserDefinedAggregateStart(int functionId) {
 }
 
 int32_t JNITopend::callJavaUserDefinedAggregateAssemble() {
+    printf("\t-> TopEnd: callJavaUserDefinedAggregateAssemble\n");
     return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
                                             m_callJavaUserDefinedAggregateAssembleMID);
 }

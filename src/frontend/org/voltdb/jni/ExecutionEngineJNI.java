@@ -940,9 +940,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateAssemble() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
+        System.out.println("\t\t->ExecutionEngineJNI assemble : udafIndex = " + udafIndex);
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
+            // For vectorization, pass an array of arguments of same type, stored in m_udfBuffer
             udafRunner.assemble(m_udfBuffer, udafIndex);
             m_udfBuffer.clear();
             return 0;

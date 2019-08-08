@@ -209,7 +209,13 @@ class NValue {
     /* Create a default NValue */
     NValue();
 
+    /* Copy constructor of NValue */
+    //NValue(const NValue& val);
+
         // todo: free() should not really be const
+
+    /* assignment operator overload */
+    NValue& operator=(const NValue& val);
 
     /* Release memory associated to object type NValues */
     void free() const;
@@ -2455,6 +2461,25 @@ inline NValue::NValue() {
     setValueType(VALUE_TYPE_INVALID);
     setDefaultAttributes();
 }
+
+inline NValue& NValue::operator=(const NValue& val) {
+    if (this != &val) {
+        ::memcpy(m_data, val.m_data, 16);
+        m_valueType = val.m_valueType;
+        m_attributes = val.m_attributes;
+    }
+    return *this;
+}
+
+/**
+ * Public copy constructor that initialized an NValue with given NValue argument
+ */
+/*
+inline NValue::NValue(const NValue& val) {
+    ::memcpy(m_data, val.m_data, 16);
+    m_valueType = val.m_valueType;
+    m_attributes = val.m_attributes;
+}*/
 
 /**
  * Retrieve a boolean NValue that is true

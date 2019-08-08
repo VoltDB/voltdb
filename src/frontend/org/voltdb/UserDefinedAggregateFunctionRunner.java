@@ -113,14 +113,21 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
     }
 
     public void assemble(ByteBuffer udfBuffer, int udafIndex) throws Throwable {
-        Object[] paramsIn = new Object[m_paramCount];
-        for (int i = 0; i < m_paramCount; i++) {
-            paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
-            if (m_boxUpByteArray[i]) {
-                paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
+        int argNum = udfBuffer.getInt();
+        while (argNum-- > 0) {
+            // read the buffer multiple times for each argument and pass it to assmble method
+            // make sure for assmble method the parameter count is one, as deined in the voltUDAggregate interface
+            assert(m_paramCount == 1);
+            Object[] paramsIn = new Object[m_paramCount];
+            for (int i = 0; i < m_paramCount; i++) {
+                paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
+                if (m_boxUpByteArray[i]) {
+                    paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
+                }
             }
+            System.out.println("\t\t\t-> AggRunner, param = " + paramsIn[0]);
+            m_assembleMethod.invoke(m_functionInstances.get(udafIndex), paramsIn);
         }
-        m_assembleMethod.invoke(m_functionInstances.get(udafIndex), paramsIn);
     }
 
     public void combine(Object other, int udafIndex) throws Throwable {
