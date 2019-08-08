@@ -313,7 +313,7 @@ public class SystemProcedureCatalog {
                         false, false, true,false,
                         false, true, false));
         builder.put("@QueryStats",
-                new Config("org.voltdb.sysprocs.QueryStats",
+                new Config(null,
                         false, true, false, 0, VoltType.INVALID,
                         false, false, true, false,
                         true, true, false));

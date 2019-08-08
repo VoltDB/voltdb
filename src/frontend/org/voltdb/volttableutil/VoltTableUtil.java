@@ -79,7 +79,7 @@ public final class VoltTableUtil {
         String connectString = String.format("jdbc:calcite:");
 
         Properties info = new Properties();
-        info.setProperty("lex", "JAVA");
+
         info.setProperty("schemaFactory", "org.voltdb.volttableutil.VoltTableSchemaFactory");
         info.setProperty("schema.id", uuid);
 
