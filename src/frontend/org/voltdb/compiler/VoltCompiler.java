@@ -1960,8 +1960,9 @@ public class VoltCompiler {
             addClassToJar(jarOutput, ancestor);
         }
 
-        for (ProcedureSchedule scheule : db.getProcedureschedules()) {
-            SchedulerValidationResult result = SchedulerManager.validateScheduler(scheule, classLoader);
+        SchedulerManager schedulerManager = VoltDB.instance().getSchedulerManager();
+        for (ProcedureSchedule schedule : db.getProcedureschedules()) {
+            SchedulerValidationResult result = schedulerManager.validateScheduler(schedule, classLoader);
             if (!result.isValid()) {
                 throw new VoltCompilerException(result.getErrorMessage());
             }
