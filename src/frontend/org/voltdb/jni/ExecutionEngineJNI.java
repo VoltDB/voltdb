@@ -943,6 +943,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
+            // For vectorization, pass an array of arguments of same type, stored in m_udfBuffer
             udafRunner.assemble(m_udfBuffer, udafIndex);
             m_udfBuffer.clear();
             return 0;
@@ -974,8 +975,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             } finally {
                 try {
                     in.close();
-                } catch (IOException ex) {
-                }
+                } catch (IOException exIgnored) {}
             }
             // call the combine method with the deserialized worker object
             udafRunner.combine(workerObject, udafIndex);

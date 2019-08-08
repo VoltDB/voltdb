@@ -209,7 +209,10 @@ class NValue {
     /* Create a default NValue */
     NValue();
 
-        // todo: free() should not really be const
+    // todo: free() should not really be const
+
+    /* assignment operator overload */
+    NValue& operator=(const NValue& val);
 
     /* Release memory associated to object type NValues */
     void free() const;
@@ -2454,6 +2457,15 @@ inline NValue::NValue() {
     ::memset(m_data, 0, 16);
     setValueType(VALUE_TYPE_INVALID);
     setDefaultAttributes();
+}
+
+inline NValue& NValue::operator=(const NValue& val) {
+    if (this != &val) {
+        ::memcpy(m_data, val.m_data, sizeof(m_data));
+        m_valueType = val.m_valueType;
+        m_attributes = val.m_attributes;
+    }
+    return *this;
 }
 
 /**

@@ -233,14 +233,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Call the start method of the user-defined aggregate function
         void callJavaUserDefinedAggregateStart(int32_t functionId);
         // Call the assemble method of the user-defined aggregate function
-        void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int udafIndex);
+        //void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int udafIndex);
+        void callJavaUserDefinedAggregateAssemble(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount, int32_t udafIndex);
         // Deserialize the byte array from each worker and call
         // the combine method of the user-defined aggregate function
-        void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int udafIndex);
+        void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int32_t udafIndex);
         // Serialize each worker's object to a byte array and send it to the coordinator
-        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int udafIndex);
+        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex);
         // Call the end method of the user-defined aggregate function
-        NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int udafIndex);
+        NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex);
 
 
         // Created to transition existing unit tests to context abstraction.
@@ -638,10 +639,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // user defined aggregate functions helper functions
         /*
-         * put buffer size needed, function id, udaf index, and parameters (if there is any)
-         * into the buffers, so that the java side would receive them
+         * put buffer size needed, function id, udaf index, row count and a list of rows (if there is any)
+         * into the buffer, so that the java side would receive them
          */
-        void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
+        void serializeSingleRowToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
+        void serializeMultipleRowsToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount, ValueType type, int32_t udafIndex);
         /*
          * if the info related to this functionId is not found, throw an exception
          */
