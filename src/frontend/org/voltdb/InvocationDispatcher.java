@@ -809,7 +809,7 @@ public final class InvocationDispatcher {
 
     public ClientResponseImpl dispatchQueryStats(StoredProcedureInvocation task) {
         String tempTableAlias = "TT";
-        Pattern stats_proc = Pattern.compile("(\\(\\s*exec\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
+        Pattern stats_proc = Pattern.compile("(\\(\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
         String sql = (String) task.getParams().getParam(0);
 
         StatsSelector[] proc_types = StatsSelector.getAllStatsCollector();
@@ -820,7 +820,7 @@ public final class InvocationDispatcher {
         while (m.find()) {
             String proc = m.group(1);
             m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
-            String[] statsProc = proc.split("[,]");
+            String[] statsParam = proc.split("[,]");
 
             try {
                 JSONObject obj = new JSONObject();
@@ -830,14 +830,21 @@ public final class InvocationDispatcher {
                 for (StatsSelector proc_type : proc_types) {
                     if (proc.toUpperCase().contains(proc_type.name())) {
                         obj.put("subselector", proc_type.name());
+                        break;
                     }
                 }
 
-                obj.put("interval", false);
+                boolean interval = false;
+                if (statsParam.length == 3) {
+                    interval = Integer.valueOf(statsParam[2]) == 1;
+                }
+                obj.put("interval", interval);
                 tables.add(new Pair<>(tempTableAlias + tables.size(),
                 VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
             } catch (Exception e) {
-                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, null, "An unknown failure has occurred");
+                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "An unknown failure has occurred");
             }
         }
 
@@ -846,7 +853,9 @@ public final class InvocationDispatcher {
         try {
             vt[0] = VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables);
         } catch (Exception e) {
-            return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, null, "An unknown failure has occurred");
+            return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "An unknown failure has occurred");
         }
 
         return new ClientResponseImpl(ClientResponse.SUCCESS, vt, "SUCCESS", task.clientHandle);
