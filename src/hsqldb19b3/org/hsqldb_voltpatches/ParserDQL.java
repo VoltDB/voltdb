@@ -3689,7 +3689,7 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, OpTypes.TABLE_SUBQUERY);
+                         getPosition(), queryExpression, OpTypes.TABLE_SUBQUERY);
 
         sq.prepareTable();
 
@@ -3749,7 +3749,7 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, mode);
+                                   getPosition(), queryExpression, mode);
 
         Iterator it = compileContext.subQueryList.iterator();
         while (it.hasNext()) {
@@ -3781,7 +3781,7 @@ public class ParserDQL extends ParserBase {
         queryExpression.resolve(session);
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, view);
+                                   getPosition(), queryExpression, view);
 
         compileContext.subQueryList.add(sq);
         compileContext.subQueryDepth--;
@@ -3918,8 +3918,8 @@ public class ParserDQL extends ParserBase {
         compileContext.subQueryDepth++;
 
         Expression e = XreadInValueList(degree);
-        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.IN);
+        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
+                                   getPosition(), e, OpTypes.IN);
 
         compileContext.subQueryList.add(sq);
         compileContext.subQueryDepth--;
@@ -3939,8 +3939,8 @@ public class ParserDQL extends ParserBase {
         e.resolveTypes(session, null);
         e.prepareTable(session, null, e.nodes[0].nodes.length);
 
-        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.TABLE);
+        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
+                                   getPosition(), e, OpTypes.TABLE);
 
         compileContext.subQueryList.add(sq);
         compileContext.subQueryDepth--;
