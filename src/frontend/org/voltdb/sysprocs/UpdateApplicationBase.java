@@ -343,7 +343,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             for (Entry<String, byte[]> e : newJarfile.entrySet()) {
                 final String filename = e.getKey();
                 // Ignore root level, non-class file names
-                if (Paths.get(filename).getNameCount() == 1 || filename.endsWith(".class")) {
+                if (Paths.get(filename).getNameCount() != 1 || filename.endsWith(".class")) {
                     foundClasses = true;
                     jarfile.put(e.getKey(), e.getValue());
                 }
