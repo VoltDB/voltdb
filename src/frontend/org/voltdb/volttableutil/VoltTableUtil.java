@@ -92,11 +92,10 @@ public final class VoltTableUtil {
             ResultSet result = st.executeQuery(sql);
             return resultSetToVoltTable(result);
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw e;
         } finally {
             VoltTableData.SCHEMA.remove(uuid);
         }
-        return null;
     }
 
     private static VoltTable resultSetToVoltTable(ResultSet resultSet) throws SQLException {
