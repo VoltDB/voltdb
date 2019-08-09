@@ -842,7 +842,7 @@ public final class InvocationDispatcher {
                 tables.add(new Pair<>(tempTableAlias + tables.size(),
                 VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
             } catch (Exception e) {
-                return new ClientResponseImpl(ClientResponse.SUCCESS,
+                return new ClientResponseImpl(ClientResponse.OPERATIONAL_FAILURE,
                         new VoltTable[0],
                         "SQL error while compiling query.",
                         task.clientHandle);
@@ -854,7 +854,7 @@ public final class InvocationDispatcher {
         try {
             vt[0] = VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables);
         } catch (Exception e) {
-            return new ClientResponseImpl(ClientResponse.SUCCESS,
+            return new ClientResponseImpl(ClientResponse.OPERATIONAL_FAILURE,
                         new VoltTable[0],
                         "SQL error while compiling query.",
                         task.clientHandle);
