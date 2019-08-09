@@ -1730,7 +1730,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     // Called from {@code ExportCoordinator}, returns duplicate of tracker
-    ExportSequenceNumberTracker getTracker() {
+    public ExportSequenceNumberTracker getTracker() {
         ExportSequenceNumberTracker tracker = m_gapTracker.duplicate();
         return tracker;
     }
