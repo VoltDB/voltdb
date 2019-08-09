@@ -50,6 +50,7 @@ import org.hsqldb_voltpatches.result.Result;
 class SubQuery implements ObjectComparator {
 
     int                  level;
+    int                  pos;
     private boolean      isCorrelated;
     private boolean      isExistsPredicate;
     private boolean      uniqueRows;
@@ -135,7 +136,7 @@ class SubQuery implements ObjectComparator {
         return table;
     }
 
-    public void prepareTable(Session session) {
+    public void prepareTable() {
 
         if (table != null) {
             return;

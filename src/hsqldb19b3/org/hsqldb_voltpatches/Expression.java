@@ -1044,7 +1044,7 @@ public class Expression {
                 QueryExpression queryExpression = subQuery.queryExpression;
 
                 queryExpression.resolveTypes(session);
-                subQuery.prepareTable(session);
+                subQuery.prepareTable();
 
                 nodeDataTypes = queryExpression.getColumnTypes();
                 dataType      = nodeDataTypes[0];
