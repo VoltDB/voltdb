@@ -417,19 +417,20 @@ public class AsyncExportClient
                         }
                     }
                 }
-
+                else {
                 // Post the request, asynchronously
-                try {
-                    clientRef.get().callProcedure(
-                                                  new AsyncCallback(writer, currentRowId),
-                                                  config.procedure,
-                                                  currentRowId,
-                                                  0);
-                }
-                catch (Exception e) {
-                    log.fatal("Exception: " + e);
-                    e.printStackTrace();
-                    System.exit(-1);
+                    try {
+                        clientRef.get().callProcedure(
+                                                      new AsyncCallback(writer, currentRowId),
+                                                      config.procedure,
+                                                      currentRowId,
+                                                      0);
+                    }
+                    catch (Exception e) {
+                        log.fatal("Exception: " + e);
+                        e.printStackTrace();
+                        System.exit(-1);
+                    }
                 }
 
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
@@ -470,15 +471,8 @@ public class AsyncExportClient
             // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
-            //Write to export table to get count to be expected on other side.
-            if (config.exportGroups) {
-                log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
-                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
-            }
-            else {
-                log.info("Insert row in Done table with JiggleExportDoneTable proc");
-                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
-            }
+            log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
+            clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
             writer.close(true);
 
             // Now print application results:
