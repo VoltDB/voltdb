@@ -1,0 +1,3 @@
+querystats SELECT HOSTNAME FROM (@Statistics TABLE, 0) LIMIT 0
+HOSTNAME 
+---------
