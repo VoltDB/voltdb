@@ -47,9 +47,6 @@
 	<lib name="slf4j-api-1.6.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/slf4j-api-1.6.2.jar!/"/>
 	</lib>
-	<lib name="slf4j-nop-1.6.2.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/slf4j-nop-1.6.2.jar!/"/>
-	</lib>
 	<lib name="jna.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jna.jar!/"/>
 	</lib>
