@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 
-import javassist.bytecode.annotation.NoSuchClassError;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcedurePartitionData;
@@ -151,7 +150,7 @@ public abstract class ProcedureCompiler {
         VoltProcedure procInstance;
         try {
             procInstance = (VoltProcedure) procClass.newInstance();
-        } catch (InstantiationException | IllegalAccessException | NoSuchMethodError | NoSuchClassError e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             throw new RuntimeException("Error instantiating procedure " + procClass.getName(), e);
         }
         Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
