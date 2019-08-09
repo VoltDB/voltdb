@@ -32,6 +32,8 @@ import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.sched.CronScheduler;
+import org.voltdb.sched.DelayScheduler;
 import org.voltdb.sched.SchedulerManager;
 
 import com.google_voltpatches.common.base.MoreObjects;
@@ -75,34 +77,58 @@ public class CreateSchedule extends StatementProcessor {
         schedule.setName(matcher.group("name"));
         schedule.setRunlocation(
                 MoreObjects.firstNonNull(matcher.group("runLocation"), SchedulerManager.RUN_LOCATION_DEFAULT));
-        schedule.setSchedulerclass(matcher.group("class"));
+        if (matcher.group("class") != null) {
+            schedule.setSchedulerclass(matcher.group("class"));
+            fillOutParams(schedule.getParameters(), matcher.group("parameters"), 0);
+            if (matcher.group("procedure") != null) {
+                throw m_compiler.new VoltCompilerException(
+                        "Schedule configures procdure when scheduler parameters are expected.");
+            }
+        } else {
+            String config;
+            if (matcher.group("cron") != null) {
+                schedule.setSchedulerclass(CronScheduler.class.getName());
+                config =matcher.group("cron");
+            } else if (matcher.group("delay") != null) {
+                schedule.setSchedulerclass(DelayScheduler.class.getName());
+                config = matcher.group("delay");
+            } else {
+                throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
+            }
+
+            if (matcher.group("procedure") == null) {
+                throw m_compiler.new VoltCompilerException("Schedule does not specify procedure to execute");
+            }
+            CatalogMap<SchedulerParam> params = schedule.getParameters();
+            int index = 0;
+            addParameter(params, index++, schedule.getName());
+            addParameter(params, index++, MoreObjects.firstNonNull(matcher.group("onError"), "ABORT"));
+            addParameter(params, index++, config);
+            fillOutParams(params, matcher.group("procedure"), index);
+        }
         String user = matcher.group("asUser");
         // If no user is set and this is new DDL use the user which is creating the schedule
         schedule.setUser(user == null && newDdl ? m_compiler.getUser() : user);
         schedule.setEnabled(matcher.group("disabled") == null);
-        fillOutParams(schedule.getParameters(), matcher.group("parameters"));
 
         return schedule;
     }
 
-    private void fillOutParams(CatalogMap<SchedulerParam> params, String paramsCsv) throws VoltCompilerException {
+    private void fillOutParams(CatalogMap<SchedulerParam> params, String paramsCsv, int startIndex)
+            throws VoltCompilerException {
         if (paramsCsv == null) {
             return;
         }
 
         Scanner scanner = new Scanner();
         scanner.reset(paramsCsv);
-        int i = 0;
+        int i = startIndex;
         boolean minus = false;
         while (true) {
             scanner.scanNext();
             switch (scanner.getTokenType()) {
             case Tokens.X_VALUE:
-                SchedulerParam param = params.add(Integer.toString(i));
-                param.setIndex(i);
-                String paramString = minus ? '-' + scanner.getString() : scanner.getString();
-                param.setParameter(paramString);
-                ++i;
+                addParameter(params, i++, minus ? '-' + scanner.getString() : scanner.getString());
                 minus = false;
                 break;
             case Tokens.MINUS:
@@ -117,8 +143,14 @@ public class CreateSchedule extends StatementProcessor {
                 return;
             default:
                 throw m_compiler.new VoltCompilerException(
-                        "Unsupported token found in parameters: " + scanner.getString());
+                        "Unsupported token found encountered: " + scanner.getString());
             }
         }
+    }
+
+    private static void addParameter(CatalogMap<SchedulerParam> params, int index, String param) {
+        SchedulerParam schedulerParam = params.add(Integer.toString(index));
+        schedulerParam.setIndex(index);
+        schedulerParam.setParameter(param);
     }
 }
