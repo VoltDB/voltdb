@@ -421,20 +421,35 @@ public class SQLParser extends SQLPatternFactory
     /**
      * Build regex to support create schedule statement in the from of
      * <p>
-     * <code>
-     * CREATE SCHEDULE <schedule name> [ON (SYSTEM | HOSTS | PARTITIONS)] USING <scheduler class> [AS USER <user name>] [DISABLED] [WITH arg1, ...]
-     * </code>
+     *
+     * <pre>
+     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
+     *     USING &lt;scheduler class> [AS USER &lt;user&gt;] [DISABLED] [WITH arg1, ...]
+     * or
+     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
+     *     (DELAY &lt;delay&gt;|CRON &lt;cron expression&gt;)
+     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [AS USER &lt;user&gt;] [DISABLED] AS &lt;procedure&gt; [arg1, ...]
+     * </pre>
      */
     private static final Pattern PAT_CREATE_SCHEDULE =
             SPF.statement(
                 SPF.token("create"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.optional(SPF.clause(SPF.token("on"),
                         SPF.capture("runLocation", SPF.oneOf("system", "hosts", "partitions")))),
-                    SPF.token("using"), SPF.capture("class", SPF.className()),
+                SPF.oneOf(
+                    SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
+                    SPF.clause(SPF.oneOf(
+                    SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
+                    SPF.clause(SPF.token("cron"),
+                        SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                            SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD)))),
+                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                            SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))))),
                 SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
                 SPF.optional(SPF.capture("disabled", SPF.token("disabled"))),
-                SPF.optional(SPF.clause(SPF.token("with"),
-                        SPF.capture("parameters", SPF.commaList(SPF.token(".+")))))
+                SPF.optional(SPF.oneOf(
+                    SPF.clause(SPF.token("with"), SPF.capture("parameters", SPF.commaList(SPF.token(".+")))),
+                    SPF.clause(SPF.token("as"), SPF.capture("procedure", SPF.commaList(SPF.token(".+"))))))
             ).compile("PAT_CREATE_SCHEDULE");
 
     /**
