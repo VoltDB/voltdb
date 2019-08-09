@@ -1227,6 +1227,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("tinyint", "tinyint", "tinyint")).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@QueryStats",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Trace",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>())
                         .put( 1, Arrays.asList("varchar"))
