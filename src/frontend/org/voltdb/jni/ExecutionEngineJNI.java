@@ -940,7 +940,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateAssemble() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
-        System.out.println("\t\t->ExecutionEngineJNI assemble : udafIndex = " + udafIndex);
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
@@ -976,8 +975,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             } finally {
                 try {
                     in.close();
-                } catch (IOException ex) {
-                }
+                } catch (IOException ex) {}
             }
             // call the combine method with the deserialized worker object
             udafRunner.combine(workerObject, udafIndex);

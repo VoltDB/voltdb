@@ -125,7 +125,6 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
                     paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
                 }
             }
-            System.out.println("\t\t\t-> AggRunner, param = " + paramsIn[0]);
             m_assembleMethod.invoke(m_functionInstances.get(udafIndex), paramsIn);
         }
     }
