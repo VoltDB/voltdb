@@ -187,31 +187,30 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     //    }
 
     public void testCaseWhenIndex1() {
-        // TODO: Volt planner picks CASEWHEN_IDX1 -- ENG-15293: Calcite has extra cast, and
-        // this gets into the way of VoltPCalcScanToIndexRule, and sequential scan is picked instead.
         m_tester.sql("select * from l where CASE WHEN a > b THEN a ELSE b END > 8")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], " +
                         "expr#4=[>($t2, $t3)], expr#5=[CASE($t4, $t2, $t3)], expr#6=[8], expr#7=[>($t5, $t6)], " +
-                        "proj#0..3=[{exprs}], $condition=[$t7], index=[CASEWHEN_IDX1_INVALIDGT1_0])\n");
+                        "proj#0..3=[{exprs}], $condition=[$t7], index=[CASEWHEN_IDX1_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testCaseWhenIndex2() {
-        // TODO: Volt planner picks CASEWHEN_IDX2 -- ENG-15293: Calcite has extra cast, and
-        // this gets into the way of VoltPCalcScanToIndexRule, and sequential scan is picked instead.
         m_tester.sql("select * from l WHERE CASE WHEN a < 10 THEN a*5 ELSE a + 5 END > 2")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], expr#4=[10], " +
                         "expr#5=[<($t2, $t4)], expr#6=[5], expr#7=[*($t2, $t6)], expr#8=[+($t2, $t6)], " +
                         "expr#9=[CASE($t5, $t7, $t8)], expr#10=[2], expr#11=[>($t9, $t10)], proj#0..3=[{exprs}], " +
-                        "$condition=[$t11], index=[CASEWHEN_IDX2_INVALIDGT1_0])\n");
+                        "$condition=[$t11], index=[CASEWHEN_IDX2_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testCaseWhenIndex3() {
-        // TODO: Volt planner picks PK for deterministic order only (micro optimization)
+        // TODO: Volt planner picks PK for deterministic order only (micro optimization)?
         m_tester.sql("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[10], expr#5=[<($t2, $t4)], expr#6=[2], " +
                         "expr#7=[*($t2, $t6)], expr#8=[5], expr#9=[+($t2, $t8)], expr#10=[CASE($t5, $t7, $t9)], " +
                         "expr#11=[>($t10, $t6)], proj#0..3=[{exprs}], $condition=[$t11], split=[1])\n" +
-                        "  VoltPhysicalTableSequentialScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n");
+                        "  VoltPhysicalTableSequentialScan(table=[[public, L]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
+                .pass();
     }
 
     public void testPartialIndexNULLPredicate1() {

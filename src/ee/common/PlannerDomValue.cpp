@@ -22,8 +22,7 @@ using namespace voltdb;
 Json::Value PlannerDomRoot::fromJSONString(char const* json) {
    Json::Value document;
    if(! Json::Reader().parse(json, json + strlen(json), document)) {
-      PlannerDomValue::throwTypeException(
-            std::string("JSON parse failure: ").append(json).c_str());
+      throw SerializableEEException(std::string("JSON parse failure: ").append(json).c_str());
    }
    return document;
 }

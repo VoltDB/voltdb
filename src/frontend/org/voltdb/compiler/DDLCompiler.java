@@ -61,12 +61,14 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
+import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
 import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
 import org.voltdb.compiler.statements.DRTable;
+import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
@@ -211,7 +213,9 @@ public class DDLCompiler {
         m_voltStatementProcessor.addNextProcessor(new CreateProcedureFromClass(this))
                                 .addNextProcessor(new CreateProcedureAsScript(this))
                                 .addNextProcessor(new CreateProcedureAsSQL(this))
+                                .addNextProcessor(new CreateAggregateFunctionFromClass(this))
                                 .addNextProcessor(new CreateFunctionFromMethod(this))
+                                .addNextProcessor(new DropAggregateFunction(this))
                                 .addNextProcessor(new DropFunction(this))
                                 .addNextProcessor(new DropProcedure(this))
                                 .addNextProcessor(new PartitionStatement(this))
@@ -313,6 +317,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
+        protected static final String AGGREGATE = "AGGREGATE";
     }
 
     public void loadSchemaWithFiltering(Reader reader, final Database db, final DdlProceduresToLoad whichProcs, SQLParser.FileInfo fileInfo)
@@ -1398,7 +1403,7 @@ public class DDLCompiler {
                 List<String> items= Stream.of(subNode.attributes.get("triggers").split(","))
                         .map(String::trim)
                         .collect(Collectors.toList());
-                int tblType = TableType.getPeristentExportTrigger(items);
+                int tblType = TableType.getPersistentExportTrigger(items);
                 table.setTabletype(tblType);
             }
             if (subNode.name.equals("columns")) {
@@ -2257,7 +2262,8 @@ public class DDLCompiler {
 
         try {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-            // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
+            // CREATE PROCEDURE, CREATE FUNCTION, CREATE ROLE,
+            // and CREATE AGGREGATE FUNCTION.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
         } catch (VoltCompilerException e) {
             // Reformat the message thrown by VoltDB DDL processing to have a line number.
