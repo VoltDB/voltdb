@@ -1558,6 +1558,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         assert(message != null);
         assert(destinationHSIds != null);
+        // FIXME: performance impact if sites-per-host is higher than 32
         final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
             new HashMap<ForeignHost, ArrayList<Long>>(32);
         for (long hsId : destinationHSIds) {
