@@ -505,24 +505,13 @@ public:
         // if this is a worker, we will need to call the assemble method to accumulate
         // the values within this partition
         if (isWorker) {
-            //printf("Advance: funcId = %d, index = %d, NValue = %s\n", functionId, udafIndex, val.debug().c_str());
-            // need to make a deep copy of NValue here (using copy constructor)
-            argVector[currVecSize] = val;
-            printf("Advance: funcId = %d, index = %d, NValue = %s\n", functionId, udafIndex, argVector[currVecSize].debug().c_str());
-            //argVector.push_back(copyVal);
+            argVector[currVecSize] = val; // NValue assignment operator overloading
+            //currVecSize = (currVecSize + 1) / maxVecSize;
             ++currVecSize;
-            printf("[");
-            for (int i = 0; i < currVecSize; i++) {
-                printf("#%d: %s, ", i, argVector[i].debug().c_str());
-            }
-            printf("]\n");
-            printf("vectorSize = %d\n", currVecSize);
             if (currVecSize == maxVecSize) {
-                printf("Call assemble\n");
-                engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, currVecSize, udafIndex);
+                engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, maxVecSize, udafIndex);
                 currVecSize = 0;
             }
-            //engine->callJavaUserDefinedAggregateAssemble(functionId, val, udafIndex);
         }
         // if this is a coordinator (not worker), we will need to call the combine method
         // to deserialize the byte arrays from other partitions and merge them
@@ -533,10 +522,7 @@ public:
 
     virtual NValue finalize(ValueType type)
     {
-        printf("Finalize: funcId = %d, index = %d, ReturnType = %s\n", functionId, udafIndex, getTypeName(type).c_str());
         if (currVecSize > 0) {
-            printf("vectorSize = %d\n", currVecSize);
-            printf("execute advance\n");
             engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, currVecSize, udafIndex);
             currVecSize = 0;
         }
