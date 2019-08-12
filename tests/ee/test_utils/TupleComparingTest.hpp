@@ -118,14 +118,19 @@ bool TupleComparingTest::assertTupleValuesEqualHelper(voltdb::TableTuple* tuple,
                                                       int index,
                                                       T expected,
                                                       Args... args) {
+    if (index == 10 || index == 0) {
+        printf("Entering assertTupleValuesEqualHelper(..., %d)\n", index); fflush(stdout);
+    }
     if (index >= tuple->getSchema()->columnCount()) {
+        if (index == 10) {
+            printf("Exiting 1 assertTupleValuesEqualHelper(..., %d)\n", index); fflush(stdout);
+        }
         FAIL("More values provided than columns in tuple");
         return false;
     }
 
     voltdb::NValue expectedNVal = Tools::nvalueFromNative(expected);
     voltdb::NValue actualNVal = tuple->getNValue(index);
-
     voltdb::ValueType expectedType = voltdb::ValuePeeker::peekValueType(expectedNVal);
     voltdb::ValueType actualType = voltdb::ValuePeeker::peekValueType(actualNVal);
     if (expectedType != actualType) {
@@ -133,6 +138,9 @@ bool TupleComparingTest::assertTupleValuesEqualHelper(voltdb::TableTuple* tuple,
         oss << "Comparing field " << index << ", types do not match : "
             << "expected " << getTypeName(expectedType)
             << ", actual " << getTypeName(actualType);
+        if (index == 10) {
+            printf("Exiting 2 assertTupleValuesEqualHelper(..., %d)\n", index); fflush(stdout);
+        }
         FAIL(oss.str().c_str());
         return false;
     }
@@ -143,8 +151,14 @@ bool TupleComparingTest::assertTupleValuesEqualHelper(voltdb::TableTuple* tuple,
         oss << "Comparing field " << index << ", values do not match: "
             << "expected " << expectedNVal.debug()
             << ", actual " << actualNVal.debug();
+        if (index == 10) {
+            printf("Exiting 3 assertTupleValuesEqualHelper(..., %d)\n", index); fflush(stdout);
+        }
         FAIL(oss.str().c_str());
         return false;
+    }
+    if (index == 10) {
+        printf("Exiting 4 assertTupleValuesEqualHelper(..., %d)\n", index); fflush(stdout);
     }
 
     return assertTupleValuesEqualHelper(tuple, index + 1, args...);
