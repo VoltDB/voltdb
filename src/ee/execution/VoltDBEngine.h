@@ -642,11 +642,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * put buffer size needed, function id, udaf index, and parameters (if there is any)
          * into the buffers, so that the java side would receive them
          */
-        void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
+        void serializeSingleArgumentToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
         /*
          * serialize multiple arguments (used by assemble)
          */
-        void serializeArgumentVectorToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount,
+        void serializeMultipleArgumentsToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount,
                                                         ValueType type, int32_t udafIndex);
         /*
          * if the info related to this functionId is not found, throw an exception
