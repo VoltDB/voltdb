@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.QueryExpression.WithList;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
+import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.store.BitMap;
@@ -3688,9 +3689,9 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, OpTypes.TABLE_SUBQUERY);
+                         getPosition(), queryExpression, OpTypes.TABLE_SUBQUERY);
 
-        sq.prepareTable(session);
+        sq.prepareTable();
 
         compileContext.subQueryDepth--;
 
@@ -3730,7 +3731,7 @@ public class ParserDQL extends ParserBase {
             }
         }
 */
-        sq.prepareTable(session);
+        sq.prepareTable();
 
         return sq;
     }
@@ -3748,10 +3749,16 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, mode);
+                                   getPosition(), queryExpression, mode);
 
+        Iterator it = compileContext.subQueryList.iterator();
+        while (it.hasNext()) {
+            SubQuery lsq = (SubQuery)it.next();
+            if (lsq.pos == sq.pos && lsq.level == sq.level) {
+                it.remove();
+            }
+        }
         compileContext.subQueryList.add(sq);
-
         compileContext.subQueryDepth--;
 
         return sq;
@@ -3774,10 +3781,9 @@ public class ParserDQL extends ParserBase {
         queryExpression.resolve(session);
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, view);
+                                   getPosition(), queryExpression, view);
 
         compileContext.subQueryList.add(sq);
-
         compileContext.subQueryDepth--;
 
         return sq;
@@ -3912,11 +3918,10 @@ public class ParserDQL extends ParserBase {
         compileContext.subQueryDepth++;
 
         Expression e = XreadInValueList(degree);
-        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.IN);
+        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
+                                   getPosition(), e, OpTypes.IN);
 
         compileContext.subQueryList.add(sq);
-
         compileContext.subQueryDepth--;
 
         return e;
@@ -3934,12 +3939,10 @@ public class ParserDQL extends ParserBase {
         e.resolveTypes(session, null);
         e.prepareTable(session, null, e.nodes[0].nodes.length);
 
-        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.TABLE);
+        SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
+                                   getPosition(), e, OpTypes.TABLE);
 
-        sq.prepareTable(session);
         compileContext.subQueryList.add(sq);
-
         compileContext.subQueryDepth--;
 
         return sq;
@@ -5179,7 +5182,7 @@ public class ParserDQL extends ParserBase {
             subQueryList.clear();
 
             for (int i = 0; i < subqueries.length; i++) {
-                subqueries[i].prepareTable(session);
+                subqueries[i].prepareTable();
             }
 
             return subqueries;

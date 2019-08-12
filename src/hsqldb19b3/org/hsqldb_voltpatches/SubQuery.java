@@ -50,6 +50,7 @@ import org.hsqldb_voltpatches.result.Result;
 class SubQuery implements ObjectComparator {
 
     int                  level;
+    int                  pos;
     private boolean      isCorrelated;
     private boolean      isExistsPredicate;
     private boolean      uniqueRows;
@@ -67,10 +68,11 @@ class SubQuery implements ObjectComparator {
     //
     public final static SubQuery[] emptySubqueryArray = new SubQuery[]{};
 
-    SubQuery(Database database, int level, QueryExpression queryExpression,
+    SubQuery(Database database, int level, int pos, QueryExpression queryExpression,
              int mode) {
 
         this.level           = level;
+        this.pos             = pos;
         this.queryExpression = queryExpression;
         this.database        = database;
 
@@ -97,19 +99,21 @@ class SubQuery implements ObjectComparator {
         }
     }
 
-    SubQuery(Database database, int level, QueryExpression queryExpression,
+    SubQuery(Database database, int level, int pos, QueryExpression queryExpression,
              View view) {
 
         this.level           = level;
+        this.pos             = pos;
         this.queryExpression = queryExpression;
         this.database        = database;
         this.view            = view;
     }
 
-    SubQuery(Database database, int level, Expression dataExpression,
+    SubQuery(Database database, int level, int pos, Expression dataExpression,
              int mode) {
 
         this.level              = level;
+        this.pos                = pos;
         this.database           = database;
         this.dataExpression     = dataExpression;
         dataExpression.subQuery = this;
@@ -135,7 +139,7 @@ class SubQuery implements ObjectComparator {
         return table;
     }
 
-    public void prepareTable(Session session) {
+    public void prepareTable() {
 
         if (table != null) {
             return;
@@ -254,7 +258,9 @@ class SubQuery implements ObjectComparator {
         SubQuery sqb = (SubQuery) b;
 
         if (sqa.parentView == null && sqb.parentView == null) {
-            return sqb.level - sqa.level;
+            int diff = sqb.level - sqa.level;
+            return diff == 0 ? sqa.pos - sqb.pos
+                             : diff;
         } else if (sqa.parentView != null && sqb.parentView != null) {
             int ia = database.schemaManager.getTableIndex(sqa.parentView);
             int ib = database.schemaManager.getTableIndex(sqb.parentView);
@@ -284,6 +290,7 @@ class SubQuery implements ObjectComparator {
         final int prime = 31;
         int result = 1;
         result = prime * result + level;
+        result = prime * result + pos;
         result = prime * result + ((queryExpression == null) ? 0 : queryExpression.hashCode());
         result = prime * result + ((database == null) ? 0 : database.hashCode());
         result = prime * result + ((view == null) ? 0 : view.hashCode());
@@ -307,6 +314,7 @@ class SubQuery implements ObjectComparator {
 
         if (other instanceof SubQuery) {
             return ((SubQuery) other).level == level
+                   && ((SubQuery) other).pos == pos
                    && ((SubQuery) other).queryExpression == queryExpression
                    && ((SubQuery) other).database == database
                    && ((SubQuery) other).view == view

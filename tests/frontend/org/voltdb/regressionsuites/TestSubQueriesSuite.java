@@ -319,6 +319,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             " where ID > 4) and exists (select 1 from " + tb + " where ID * T1.DEPT = 10) order by ID;",
                     new long[][] {{5, 2}});
 
+            // subquery before AND + predicate
+            validateTableOfLongs(client,
+                    "select ID from " + tb + " where (ID IN (select ID from " + tb + ") AND -100 <> ID) order by ID;",
+                    new long[][] {{1}, {2}, {3}, {4}, {5}});
+
             // not exists
             validateTableOfLongs(client,
                     "select ID, DEPT from " + tb + " T1 where not exists (select 1 from " + tb +

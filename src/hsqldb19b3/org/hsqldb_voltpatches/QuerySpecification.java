@@ -212,7 +212,7 @@ public class QuerySpecification extends QueryExpression {
         finaliseRangeVariables();
         resolveColumnReferencesForAsterisk();
         finaliseColumns();
-        resolveColumnReferences();
+        resolveColumnReferencesForGroupBy();
 
         unionColumnTypes = new Type[indexLimitVisible];
         unionColumnMap   = new int[indexLimitVisible];
@@ -225,7 +225,7 @@ public class QuerySpecification extends QueryExpression {
      * Replaces any alias column expression in the ORDER BY cluase
      * with the actual select column expression.
      */
-    private void resolveColumnReferences() {
+    private void resolveColumnReferencesForGroupBy() {
 
         if (isDistinctSelect || isGrouped) {
             acceptsSequences = false;
