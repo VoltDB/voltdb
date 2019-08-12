@@ -235,7 +235,6 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
             // Need to set this here for inlined inserts in case there are no inline inserts
             // and finish is called right after this
             s_modifiedTuples = 0;
-            s_errorMessage.clear();
             SynchronizedThreadLock::signalLowestSiteFinished();
     }
     return rslt;
