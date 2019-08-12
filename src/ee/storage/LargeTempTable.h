@@ -61,14 +61,14 @@ class LargeTempTable : public AbstractTempTable {
 public:
 
     /** return the iterator for this table */
-    TableIterator iterator();
+    TableIterator iterator() override;
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
-    TableIterator iteratorDeletingAsWeGo();
+    TableIterator iteratorDeletingAsWeGo() override;
 
     /** Delete all the tuples in this table */
-    void deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
+    void deleteAllTuples(bool freeAllocatedStrings, bool fallible) override {
         return deleteAllTempTuples();
     }
 
@@ -76,7 +76,7 @@ public:
     void deleteAllTempTuples() override;
 
     /** insert a tuple into this table */
-    bool insertTuple(TableTuple& tuple);
+    bool insertTuple(TableTuple& tuple) override;
 
     /** insert a tuple into this table */
     void insertTempTuple(TableTuple &source) override {
@@ -100,29 +100,29 @@ public:
 
     /** Return the number of large temp table blocks used by this
         table */
-    size_t allocatedBlockCount() const {
+    size_t allocatedBlockCount() const override {
         return m_blockIds.size();
     }
 
     /** The type of this table, useful for debugging */
-    std::string tableType() const {
+    std::string tableType() const override {
         return "LargeTempTable";
     }
 
     /** This method seems to be used by some plan nodes, but the
         particulars are unclear. */
-    std::vector<uint64_t> getBlockAddresses() const {
+    std::vector<uint64_t> getBlockAddresses() const override {
         throwSerializableEEException("Invalid call to getBlockAddresses() on LargeTempTable");
     }
 
     /** Return a table stats object for this table (unimplemented) */
-    voltdb::TableStats* getTableStats() {
+    voltdb::TableStats* getTableStats() override {
         throwSerializableEEException("Invalid call to getTableStats() on LargeTempTable");
     }
 
     /** return a tuple object pointing to the address where the next
         tuple should be inserted. */
-    void nextFreeTuple(TableTuple* tuple);
+    void nextFreeTuple(TableTuple* tuple) override;
 
     /** Return the temp table limits object for this table. (Currently none) */
     const TempTableLimits* getTempTableLimits() const override {
