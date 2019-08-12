@@ -808,7 +808,7 @@ public class ExpressionLogical extends Expression {
 
         if (nodes[RIGHT].opType == OpTypes.TABLE) {
             nodes[RIGHT].prepareTable(session, nodes[LEFT], degree);
-            nodes[RIGHT].subQuery.prepareTable();
+            nodes[RIGHT].subQuery.prepareTable(session);
 
             if (nodes[RIGHT].isCorrelated) {
                 nodes[RIGHT].subQuery.setCorrelated();
