@@ -1654,8 +1654,8 @@ public class TestCatalogUtil extends TestCase {
                         "<deployment>\n" +
                         "    <cluster hostcount=\"1\"/>\n" +
                         "    <threadpools>\n" +
-                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
-                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "        <pool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
                         "    </threadpools>\n" +
                         "</deployment>";
 
@@ -1668,15 +1668,15 @@ public class TestCatalogUtil extends TestCase {
                         "<deployment>\n" +
                         "    <cluster hostcount=\"1\"/>\n" +
                         "    <export>\n" +
-                        "        <configuration enabled=\"true\" target=\"log\" type=\"file\" threadpoolname = \"tp2\">\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
                         "            <property name=\"skipinternals\">true</property>\n" +
-                        "            <property name=\"type\">csv</property>\n" +
-                        "            <property name=\"nonce\">MyExport</property>\n" +
                         "        </configuration>\n" +
                         "    </export>\n" +
                         "    <threadpools>\n" +
-                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
-                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "        <pool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
                         "    </threadpools>\n" +
                         "</deployment>";
 
@@ -1684,25 +1684,93 @@ public class TestCatalogUtil extends TestCase {
         msg = CatalogUtil.compileDeployment(catalog, tmpGoodDeploy2.getPath(), false);
         assertNull(msg);
 
+        final String setDefaulThreadPoolSize =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export defaultpoolsize=\"2\">\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <pool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpSetDefaulThreadPoolSize = VoltProjectBuilder.writeStringToTempFile(setDefaulThreadPoolSize);
+        msg = CatalogUtil.compileDeployment(catalog, tmpSetDefaulThreadPoolSize.getPath(), false);
+        assertNull(msg);
+
         final String nameNotExist =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
                         "<deployment>\n" +
                         "    <cluster hostcount=\"1\"/>\n" +
                         "    <export>\n" +
-                        "        <configuration enabled=\"true\" target=\"log\" type=\"file\" threadpoolname = \"tp5\">\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp5\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
                         "            <property name=\"skipinternals\">true</property>\n" +
-                        "            <property name=\"type\">csv</property>\n" +
-                        "            <property name=\"nonce\">MyExport</property>\n" +
                         "        </configuration>\n" +
                         "    </export>\n" +
                         "    <threadpools>\n" +
-                        "        <threadpool name=\"tp1\" size=\"2\"/>\n" +
-                        "        <threadpool name=\"tp2\" size=\"3\"/>\n" +
+                        "        <pool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
                         "    </threadpools>\n" +
                         "</deployment>";
 
         final File tmpNameNotExist = VoltProjectBuilder.writeStringToTempFile(nameNotExist);
         msg = CatalogUtil.compileDeployment(catalog, tmpNameNotExist.getPath(), false);
+        assertTrue(msg.contains("failed to find thread pool name: tp5"));
+
+        final String nameDuplicate =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <pool name=\"tp2\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpNameDuplicate = VoltProjectBuilder.writeStringToTempFile(nameDuplicate);
+        msg = CatalogUtil.compileDeployment(catalog, tmpNameDuplicate.getPath(), false);
+        assertTrue(msg.contains("Thread pool name: tp2 is not unique"));
+
+        final String sharedThreadPool =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test2\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test2</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <pool name=\"tp1\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"3\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpSharedThreadPool = VoltProjectBuilder.writeStringToTempFile(sharedThreadPool);
+        msg = CatalogUtil.compileDeployment(catalog, tmpSharedThreadPool.getPath(), false);
         assertNull(msg);
     }
 }

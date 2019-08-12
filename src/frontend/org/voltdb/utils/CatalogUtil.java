@@ -168,6 +168,7 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
     public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+    public static final String EXPORT_POOL_DEFAULT_SIZE = "__EXPORT_POOL_DEFAULT_SIZE__";
 
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
@@ -1731,9 +1732,9 @@ public abstract class CatalogUtil {
 
     /**
      * Set deployment time settings for export
-     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     * @param exportType A reference to the <exports> element of the deployment.xml file.
      * @param catalog The catalog to be updated.
-     * @param threadpools
+     * @param threadPoolsType
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType, ThreadPoolsType threadPoolsType) {
         final Cluster cluster = catalog.getClusters().get("cluster");
@@ -1745,6 +1746,9 @@ public abstract class CatalogUtil {
 
         if (exportType == null) {
             return;
+        }
+        if (exportType.getDefaultpoolsize() != null) {
+            System.setProperty(EXPORT_POOL_DEFAULT_SIZE, exportType.getDefaultpoolsize().toString());
         }
         List<String> targetList = new ArrayList<>();
 
@@ -1764,6 +1768,8 @@ public abstract class CatalogUtil {
             }
 
             Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+            // Check if the thread pool name set in the export target configuration exists
+            int threadPoolSize = checkExportThreadPoolConfiguration(exportConfiguration, threadPoolsType);
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
@@ -1808,8 +1814,7 @@ public abstract class CatalogUtil {
             // on-server export always uses the guest processor
             catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
             catconn.setEnabled(connectorEnabled);
-            int threadPoolSize = checkExportThreadPoolConfiguration(exportConfiguration, threadPoolsType);
-            catconn.setThreadpoolname(exportConfiguration.getThreadpoolname());
+            catconn.setThreadpoolname(exportConfiguration.getThreadpool());
             catconn.setThreadpoolsize(threadPoolSize);
 
             if (!connectorEnabled) {
@@ -3273,10 +3278,10 @@ public abstract class CatalogUtil {
         if (threadPoolsType == null) {
             return 0;
         }
-        String threadPoolName = exportConfiguration.getThreadpoolname();
+        String threadPoolName = exportConfiguration.getThreadpool();
         // check if the thread-pool-name exists in the deployment file <threadpools> section
         if (!StringUtil.isEmpty(threadPoolName)) {
-            for (ThreadPoolsType.Threadpool threadPool : threadPoolsType.getThreadpool()) {
+            for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
                 if (threadPool.getName().equals(threadPoolName)) {
                     return threadPool.getSize();
                 }
@@ -3298,7 +3303,7 @@ public abstract class CatalogUtil {
             return;
         }
         Set<String> nameSet = new HashSet<>();
-        for (ThreadPoolsType.Threadpool threadPool : threadPoolsType.getThreadpool()) {
+        for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
             if (!nameSet.add(threadPool.getName())) {
                 String msg = "Invalid thread pool configuration. Thread pool name: " + threadPool.getName() + " is not unique.";
                 hostLog.error(msg);

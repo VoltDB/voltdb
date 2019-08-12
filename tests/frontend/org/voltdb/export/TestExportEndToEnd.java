@@ -94,7 +94,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
 
         m_cluster = new LocalCluster("testFlushExportBuffer.jar", SPH, HOST_COUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setNewCli(true);
-        m_cluster.setHasLocalServer(false);
+        m_cluster.setHasLocalServer(true);
         m_cluster.overrideAnyRequestForValgrind();
         // Config custom socket exporter
         boolean success = m_cluster.compile(builder);
