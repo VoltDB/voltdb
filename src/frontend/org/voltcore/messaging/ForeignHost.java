@@ -20,6 +20,7 @@ package org.voltcore.messaging;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -53,14 +54,13 @@ public class ForeignHost {
     private static RateLimitedLogger rateLimitedLogger;
     private static long m_logRate;
 
-//    final PicoNetwork m_network;
-//    final FHInputHandler m_handler;
+    final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
     private final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
     private boolean m_closing;
-    boolean m_isUp;
+    AtomicBoolean m_isUp = new AtomicBoolean(true);
 
     // Each foreign host may have one or many sub-connections, depends if partition
     // group is enabled (k-factor > 0 and hostCount > 3). Each sub-connection has
@@ -69,15 +69,14 @@ public class ForeignHost {
     // reference to the first object of the connection list
     private Subconnection m_firstConn;
 
+    // hold onto the socket so we can kill it
+    private final Socket m_socket;
+
     // Remote site id to sub-connection mapping
     volatile ImmutableMap<Long, Subconnection> m_connByHSIds = ImmutableMap.of();
 
     // A counter used to uniformly bind remote site ids to sub-connections (if any)
     private final AtomicInteger m_nextConnection = new AtomicInteger(0);
-
-
-    // hold onto the socket so we can kill it
-//    private final Socket m_socket;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
@@ -85,9 +84,19 @@ public class ForeignHost {
 
     private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
 
+    // Because the connections other than the first connection are created after cluster mesh network
+    // has established but before the whole cluster has been initialized.
+    // It's possible that some non-transactional iv2 messages to be sent through foreign host when
+    // there is only one connection, So this flag is used to prevent binding all sites to the first
+    // connection.
+    private boolean m_hasMultiConnections;
+
+
     // used to immediately cut off reads from a foreign host
     // great way to trigger a heartbeat timout / simulate a network partition
     private AtomicBoolean m_linkCutForTest = new AtomicBoolean(false);
+
+    private final Object m_connectionLock = new Object();
 
     // STOPNODE_NOTICE is used to prevent split-brain detection caused by POISON_PILL
     public static final int POISON_PILL = -1;
@@ -100,15 +109,6 @@ public class ForeignHost {
     public static final int CRASH_ME = 1;
     public static final int CRASH_SPECIFIED = 2;
     public static final int PRINT_STACKTRACE = 3;
-
-    /**
-     * Because the connections other than the first connection are created after cluster mesh network
-     * has established but before the whole cluster has been initialized.
-     * It's possible that some non-transactional iv2 messages to be sent through foreign host when
-     * there is only one connection, So this flag is used to prevent binding all sites to the first
-     * connection.
-     */
-    private boolean m_hasMultiConnections;
 
     private void setLogRate(long deadHostTimeout) {
         int logRate;
@@ -129,21 +129,46 @@ public class ForeignHost {
         m_handler = new FHInputHandler();
         m_hostId = hostId;
         m_closing = false;
-        m_isUp = true;
-        m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
-        m_network = network;
-        Subconnection conn = null;
-        m_firstConn = conn;
+        m_socket = socket.socket();
+        m_firstConn = new Subconnection(hostId, socket, network);
+        addConnection(m_firstConn);
 
         setLogRate(deadHostTimeout);
     }
 
     public void enableRead(Set<Long> verbotenThreads) {
         for (Subconnection connection : m_connections) {
-            connection.enableRead(verbotenThreads);
+            connection.enableRead(m_handler, verbotenThreads);
         }
+    }
+
+    private void addConnection(Subconnection conn) {
+        synchronized (m_connectionLock) {
+            m_connections = ImmutableList.<Subconnection>builder()
+                                .addAll(m_connections)
+                                .add(conn)
+                                .build();
+        }
+    }
+
+    public void createAndEnableNewConnection(SocketChannel socket, PicoNetwork network, Set<Long> verbotenThreads) {
+        Subconnection conn = new Subconnection(m_hostId, socket, network);
+        addConnection(conn);
+        conn.enableRead(m_handler, verbotenThreads);
+    }
+
+    public int connectionNumber() {
+        return m_connections.size();
+    }
+
+    public ArrayList<PicoNetwork> getPicoNetworks() {
+        ArrayList<PicoNetwork> networks = new ArrayList<>();
+        for (Subconnection conn : m_connections) {
+            networks.add(conn.getPicoNetwork());
+        }
+        return networks;
     }
 
     /** ForeignHost's implementation of InputHandler */
@@ -167,8 +192,7 @@ public class ForeignHost {
         @Override
         public void stopping(Connection c)
         {
-            m_isUp = false;
-            if (!m_closing && isPrimary())
+            if (!m_closing && m_isUp.compareAndSet(true, false))
             {
                 // Log the remote host's action
                 if (!m_hostMessenger.isShuttingDown()) {
@@ -178,7 +202,7 @@ public class ForeignHost {
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
-            m_hostMessenger.piconetworkThreadShutdown(m_hostId, ForeignHost.this);
+            m_hostMessenger.markPicoZombieHost(m_hostId);
         }
 
         @Override
@@ -201,6 +225,10 @@ public class ForeignHost {
         public QueueMonitor writestreamMonitor() {
             return null;
         }
+    }
+
+    public void setHasMultiConnections() {
+        m_hasMultiConnections = true;
     }
 
     /**
@@ -276,7 +304,7 @@ public class ForeignHost {
             deliverMessage( recvDests[i], message);
         }
 
-        m_fh.updateLastMessageTime(EstTime.currentTimeMillis());
+        updateLastMessageTime(EstTime.currentTimeMillis());
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */
@@ -318,13 +346,14 @@ public class ForeignHost {
 
     synchronized void close()
     {
-        m_isUp = false;
+        m_isUp.compareAndSet(true, false);
         if (m_closing) return;
         m_closing = true;
         try {
             for (Subconnection c : m_connections) {
                 c.close();
             }
+            m_connections = null;
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
@@ -354,17 +383,22 @@ public class ForeignHost {
 
     boolean isUp()
     {
-        return m_isUp;
+        return m_isUp.get();
     }
 
     /** Send a message to the network. This public method is re-entrant. */
     void send(final long destinations[], final VoltMessage message) {
-        if (!m_isUp) {
+        if (!m_isUp.get()) {
             hostLog.warn("Failed to send VoltMessage because connection to host " +
                     CoreUtils.getHostIdFromHSId(destinations[0])+ " is closed");
             return;
         }
         if (destinations.length == 0) {
+            return;
+        }
+
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (m_linkCutForTest.get()) {
             return;
         }
 
@@ -412,7 +446,7 @@ public class ForeignHost {
         // NodeFailureFault no longer immediately trips FHInputHandler to
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
-        if ((!m_closing && m_isUp) &&
+        if ((!m_closing && m_isUp.get()) &&
                 current_delta > m_deadHostTimeout)
         {
             if (m_deadReportsCount.getAndIncrement() == 0) {
@@ -427,11 +461,10 @@ public class ForeignHost {
         }
     }
 
-    // No need to have precise dead host timeout.
     // LazySet doesn't guarantee atomic semantic, some threads may hold an older value
     // of the timestamp for a while, eventually the value will converge. Given that
     // heartbeat meassage is sent in every 25ms, the inconsistency window is acceptable.
-    public void updateLastMessageTime(long lastMessageMillis) {
+    private void updateLastMessageTime(long lastMessageMillis) {
         m_lastMessageMillis.lazySet(lastMessageMillis);
     }
 
@@ -444,10 +477,18 @@ public class ForeignHost {
 
     // Poison pill doesn't need remote hsid, remote host handles it immediately.
     public void sendPoisonPill(String err, int cause) {
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (m_linkCutForTest.get()) {
+            return;
+        }
         m_firstConn.sendPoisonPill(err, cause);
     }
 
     public FutureTask<Void> sendStopNodeNotice(int targetHostId) {
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (m_linkCutForTest.get()) {
+            return null;
+        }
         return m_firstConn.sendStopNodeNotice(targetHostId);
     }
 

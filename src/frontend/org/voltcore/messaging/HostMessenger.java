@@ -29,7 +29,6 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -365,12 +364,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
 
-//    /*
-//     * Track dead ForeignHosts that are reported independently by zookeeper and PicoNetwork.
-//     * When both have reported both lists for that hostId should be empty (and removed).
-//     */
-//    Map<Integer, ArrayList<ForeignHost>> m_zkZombieForeignHosts = new HashMap<> ();
-//    Map<Integer, ArrayList<ForeignHost>> m_picoZombieForeignHosts = new HashMap<> ();
+    /*
+     * Track dead hosts that are reported independently by zookeeper and PicoNetwork.
+     * When both have reported both lists for that hostId should be empty (and removed).
+     */
+    Set<Integer> m_zkZombieHosts = new HashSet<> ();
+    Set<Integer> m_picoZombieHosts = new HashSet<> ();
 
     /*
      * References to all the local mailboxes
@@ -804,7 +803,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
                     listeningAddress,
-                    createPicoNetwork(sslEngine, socket, false));
+                    createPicoNetwork(sslEngine, socket));
             putForeignHost(hostId, fhost);
             fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
@@ -813,12 +812,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_acceptor.accrue(hostId, jo);
     }
 
-    private PicoNetwork createPicoNetwork(SSLEngine sslEngine, SocketChannel socket, boolean isSecondary) {
+    private PicoNetwork createPicoNetwork(SSLEngine sslEngine, SocketChannel socket) {
         if (sslEngine == null) {
-            return new PicoNetwork(socket, isSecondary);
+            return new PicoNetwork(socket);
         } else {
             //TODO: Share the same cipher executor threads as the ones used for client connections?
-            return new TLSPicoNetwork(socket, isSecondary, sslEngine, CipherExecutor.SERVER);
+            return new TLSPicoNetwork(socket, sslEngine, CipherExecutor.SERVER);
         }
     }
 
@@ -855,60 +854,43 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         };
     }
 
-
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(final int hostId) {
         ForeignHost fh = m_foreignHosts.get(hostId);
+        if (fh == null) {
+            return;
+        }
         synchronized (m_mapLock) {
             m_foreignHosts = ImmutableMap.<Integer, ForeignHost>builder()
                     .putAll(Maps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
                     .build();
         }
-        assert(Thread.holdsLock(this)); // Make sure m_zombieForeignHosts is protected
-        ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
-        ArrayList<ForeignHost> zookeeperZombies = new ArrayList<>(fhs.size());
-        for (ForeignHost fh : fhs) {
-            if (picoNetworkZombies != null && picoNetworkZombies.contains(fh)) {
-                picoNetworkZombies.remove(fh);
-            }
-            else {
-                zookeeperZombies.add(fh);
-            }
-            fh.close();
-        }
-        if (picoNetworkZombies != null && picoNetworkZombies.isEmpty()) {
-            m_picoZombieForeignHosts.remove(hostId);
-        }
-        if (!zookeeperZombies.isEmpty()) {
-            m_zkZombieForeignHosts.put(hostId, zookeeperZombies);
+        fh.close();
+        markZkZombieHost(hostId);
+    }
+
+    // Called from zk thread
+    public synchronized void markZkZombieHost(int hostId) {
+        boolean removed = m_picoZombieHosts.remove(hostId);
+        if (!removed) {
+            m_zkZombieHosts.add(hostId);
         }
     }
 
-    public synchronized void piconetworkThreadShutdown(int hostId, ForeignHost fh) {
-        ArrayList<ForeignHost> zookeeperZombies = m_zkZombieForeignHosts.get(hostId);
-        if (zookeeperZombies != null) {
-            boolean removed = zookeeperZombies.remove(fh);
-            assert(removed);    // Since a zk notification moves all the ForeignHosts for a hostId at once
-            if (zookeeperZombies.isEmpty()) {
-                m_zkZombieForeignHosts.remove(hostId);
-            }
-        }
-        else {
-            ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
-            if (picoNetworkZombies == null) {
-                picoNetworkZombies = new ArrayList<>(Arrays.asList(fh));
-                m_picoZombieForeignHosts.put(hostId, picoNetworkZombies);
-            }
-            else {
-                picoNetworkZombies.add(fh);
-            }
+    // Called from pico network thread
+    public synchronized void markPicoZombieHost(int hostId) {
+        boolean removed = m_zkZombieHosts.remove(hostId);
+        if (removed) {
+            m_picoZombieHosts.add(hostId);
         }
     }
 
     public synchronized boolean canCompleteRepair(int hostId) {
-        return !m_foreignHosts.containsKey(hostId) && !m_picoZombieForeignHosts.containsKey(hostId) && !m_zkZombieForeignHosts.containsKey(hostId);
+        return !m_foreignHosts.containsKey(hostId) &&
+                !m_picoZombieHosts.contains(hostId) &&
+                !m_zkZombieHosts.contains(hostId);
     }
 
     /**
@@ -967,7 +949,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 /*
                  * Now add the host to the mailbox system
                  */
-                PicoNetwork picoNetwork = createPicoNetwork(sslEngine, socket, false);
+                PicoNetwork picoNetwork = createPicoNetwork(sslEngine, socket);
                 fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, picoNetwork);
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
@@ -1104,7 +1086,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             ForeignHost fhost = null;
             try {
                 fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout,
-                        listeningAddresses[ii], createPicoNetwork(sslEngines[ii], sockets[ii], false));
+                        listeningAddresses[ii], createPicoNetwork(sslEngines[ii], sockets[ii]));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
@@ -1180,24 +1162,24 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             SSLEngine sslEngine,
             InetSocketAddress listeningAddress) throws Exception
     {
-        networkLog.info("Host " + getHostId() + " receives a new connection from host " + hostId);
+        networkLog.info("Host " + getHostId() + " receives a new connection request from host " + hostId);
         prepSocketChannel(socket);
-        // Auxiliary connection never time out
-        ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                listeningAddress,
-                createPicoNetwork(sslEngine, socket, true));
-        putForeignHost(hostId, fhost);
-        fhost.enableRead(VERBOTEN_THREADS);
-        // Do all peers have enough secondary connections?
-        for (int hId : m_peers) {
-            if (m_foreignHosts.get(hId).size() != (m_secondaryConnections + 1)) {
-                return;
-            }
+        ForeignHost fh = m_foreignHosts.get(hostId);
+        if (fh == null) {
+            // highly unlikely
+            fh = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+                        listeningAddress, createPicoNetwork(sslEngine, socket));
+            putForeignHost(hostId, fh);
+            fh.enableRead(VERBOTEN_THREADS);
+            networkLog.info("Host " + getHostId() + " creates a new connection from host " + hostId);
+        } else {
+            fh.createAndEnableNewConnection(socket, createPicoNetwork(sslEngine, socket), VERBOTEN_THREADS);
         }
-        // Now it's time to use secondary pico network, see comments in presend() to know why we can't
-        // do this earlier.
-        m_hasAllSecondaryConnectionCreated = true;
-}
+        // Allow to use the new connections
+        if (fh.connectionNumber() == m_secondaryConnections + 1) {
+            fh.setHasMultiConnections();
+        }
+    }
 
 
     private static int parseHostId(String name) {
@@ -1774,7 +1756,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>();
 
         for (ForeignHost fh : fhosts.values()) {
-            picoNetworks.add(fh.m_network);
+            picoNetworks.addAll(fh.getPicoNetworks());
         }
 
         return m_network.getIOStats(interval, picoNetworks);
@@ -1880,28 +1862,22 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (int ii = 0; ii < m_secondaryConnections; ii++) {
                     try {
                         SocketJoiner.SocketInfo socketInfo = m_joiner.requestForConnection(listeningAddress, hostId);
-                        // Auxiliary connection never time out
-                        ForeignHost fhost = new ForeignHost(this, hostId, socketInfo.m_socket, Integer.MAX_VALUE,
-                                listeningAddress, createPicoNetwork(socketInfo.m_sslEngine, socketInfo.m_socket, true));
-                        putForeignHost(hostId, fhost);
-                        fhost.enableRead(VERBOTEN_THREADS);
+                        fh.createAndEnableNewConnection(
+                                socketInfo.m_socket,
+                                createPicoNetwork(socketInfo.m_sslEngine, socketInfo.m_socket),
+                                VERBOTEN_THREADS);
                     } catch (IOException | JSONException e) {
                         hostLog.error("Failed to connect to peer nodes.", e);
                         throw new RuntimeException("Failed to establish socket connection with " +
                                 listeningAddress.getAddress().getHostAddress(), e);
                     }
                 }
+                if (fh.connectionNumber() == m_secondaryConnections + 1) {
+                    // Allow to use the new connections
+                    fh.setHasMultiConnections();
+                }
             }
         }
-        // Do all peers have enough secondary connections?
-        for (int hostId : m_peers) {
-            if (m_foreignHosts.get(hostId).size() != (m_secondaryConnections + 1)) {
-                return;
-            }
-        }
-        // Now it's time to use secondary pico network, see comments in presend() to know why we can't
-        // do this earlier.
-        m_hasAllSecondaryConnectionCreated = true;
     }
 
     public synchronized void addStopNodeNotice(int targetHostId) {
