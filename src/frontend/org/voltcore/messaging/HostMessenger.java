@@ -882,7 +882,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     // Called from pico network thread
     public synchronized void markPicoZombieHost(int hostId) {
         boolean removed = m_zkZombieHosts.remove(hostId);
-        if (removed) {
+        if (!removed) {
             m_picoZombieHosts.add(hostId);
         }
     }
