@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  * cycle.
  */
 public final class SchedulerResult {
-    private final Status m_status;
+    private final Type m_status;
     private final String m_message;
     private final ScheduledProcedure m_scheduledProcedure;
 
@@ -34,10 +34,10 @@ public final class SchedulerResult {
      * exit.
      *
      * @param message to log indicating the details of the error. May be {@code null}
-     * @return A new {@link Status#ERROR} instance of {@link SchedulerResult}
+     * @return A new {@link Type#ERROR} instance of {@link SchedulerResult}
      */
     public static SchedulerResult createError(String message) {
-        return new SchedulerResult(Status.ERROR, message, null);
+        return new SchedulerResult(Type.ERROR, message, null);
     }
 
     /**
@@ -45,10 +45,10 @@ public final class SchedulerResult {
      * gracefully
      *
      * @param message to log indicating the details of the error. May be {@code null}
-     * @return A new {@link Status#EXIT} instance of {@link SchedulerResult}
+     * @return A new {@link Type#EXIT} instance of {@link SchedulerResult}
      */
     public static SchedulerResult createExit(String message) {
-        return new SchedulerResult(Status.EXIT, message, null);
+        return new SchedulerResult(Type.EXIT, message, null);
     }
 
     /**
@@ -58,11 +58,11 @@ public final class SchedulerResult {
      * @param timeUnit            {#link TimeUnit} of {@code delay}
      * @param procedure           name of procedure to execute
      * @param procedureParameters to pass to procedure during execution
-     * @return A new {@link Status#PROCEDURE} instance of {@link SchedulerResult}
+     * @return A new {@link Type#PROCEDURE} instance of {@link SchedulerResult}
      */
     public static SchedulerResult createScheduledProcedure(long delay, TimeUnit timeUnit, String procedure,
             Object... procedureParameters) {
-        return new SchedulerResult(Status.PROCEDURE, null,
+        return new SchedulerResult(Type.PROCEDURE, null,
                 new ScheduledProcedure(delay, timeUnit, Objects.requireNonNull(procedure), procedureParameters));
     }
 
@@ -73,29 +73,29 @@ public final class SchedulerResult {
      *
      * @param delay    time for the scheduler to be executed
      * @param timeUnit {#link TimeUnit} of {@code delay}
-     * @return A new {@link Status#RERUN} instance of {@link SchedulerResult}
+     * @return A new {@link Type#RERUN} instance of {@link SchedulerResult}
      */
     public static SchedulerResult createRerun(long delay, TimeUnit timeUnit) {
-        return new SchedulerResult(Status.RERUN, null, new ScheduledProcedure(delay, timeUnit, null));
+        return new SchedulerResult(Type.RERUN, null, new ScheduledProcedure(delay, timeUnit, null));
     }
 
-    private SchedulerResult(Status status, String message, ScheduledProcedure scheduledProcedure) {
+    private SchedulerResult(Type status, String message, ScheduledProcedure scheduledProcedure) {
         m_status = status;
         m_message = message;
         m_scheduledProcedure = scheduledProcedure;
     }
 
     /**
-     * @return The {@link Status} of this result
+     * @return The {@link Type} of this result
      */
-    public Status getStatus() {
+    public Type getType() {
         return m_status;
     }
 
     /**
      * Use {@link #hasMessage()} to determine if there is a message attached to this result
      *
-     * @return Optional message provided with a {@link Status#EXIT} or {@link Status#ERROR} result
+     * @return Optional message provided with a {@link Type#EXIT} or {@link Type#ERROR} result
      */
     public String getMessage() {
         return m_message;
@@ -109,8 +109,8 @@ public final class SchedulerResult {
     }
 
     /**
-     * Get the next {@link ScheduledProcedure} to execute when this result is {@link Status#PROCEDURE} or
-     * {@link Status#RERUN}
+     * Get the next {@link ScheduledProcedure} to execute when this result is {@link Type#PROCEDURE} or
+     * {@link Type#RERUN}
      *
      * @return The next {@link ScheduledProcedure} definition
      */
@@ -118,7 +118,10 @@ public final class SchedulerResult {
         return m_scheduledProcedure;
     }
 
-    public enum Status {
+    /**
+     * Enum used to describe the type of the {@link SchedulerResult}.
+     */
+    public enum Type {
         /** Schedule a procedure to be executed */
         PROCEDURE,
         /** Schedule the scheduler to be invoked again without a procedure being executed */

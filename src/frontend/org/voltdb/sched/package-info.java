@@ -15,20 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
-
 /**
- * Helper class for calling in to the volt system to validate parameters being passed to a {@link Scheduler}
+ * Provides classes and interfaces for for supporting in-server scheduling of procedures
  */
-public interface SchedulerValidationHelper {
-    /**
-     * Validate that a procedure with {@code name} exists and {@code parameters} are valid for that procedure.
-     * <p>
-     * Note: parameter validation might not work for system procedures
-     *
-     * @param errors {@link SchedulerValidationErrors} instance to collect errors
-     * @param name   Name of procedure to validate
-     * @param params that will be passed to {@code name}
-     */
-    void validateProcedureAndParams(SchedulerValidationErrors errors, String name, Object[] params);
-}
+package org.voltdb.sched;

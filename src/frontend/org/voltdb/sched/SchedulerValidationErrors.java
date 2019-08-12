@@ -23,7 +23,7 @@ import java.util.List;
 import com.google_voltpatches.common.base.Joiner;
 
 /**
- * Used to collect errors that are encountered while validating the parameters to a {@link Scheduler}
+ * Used to collect errors that are encountered while validating the parameters of a {@link Scheduler}.
  */
 final class SchedulerValidationErrors {
     private List<String> m_errors = null;
