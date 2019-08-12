@@ -51,6 +51,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
@@ -156,7 +157,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     try {
                         newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes,
                             drRole == DrRoleType.XDCR, user);
-                    } catch (IOException | VoltCompilerException e) {
+                    } catch (IOException | VoltCompilerException | PlanningErrorException e) {
                         retval.errorMsg = e.getMessage();
                         return retval;
                     } catch (Exception ex) {
@@ -345,7 +346,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             for (Entry<String, byte[]> e : newJarfile.entrySet()) {
                 final String filename = e.getKey();
                 // Ignore root level, non-class file names
-                if (Paths.get(filename).getNameCount() == 1 || filename.endsWith(".class")) {
+                if (Paths.get(filename).getNameCount() != 1 || filename.endsWith(".class")) {
                     foundClasses = true;
                     jarfile.put(e.getKey(), e.getValue());
                 }

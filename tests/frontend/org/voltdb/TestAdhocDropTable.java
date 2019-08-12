@@ -88,8 +88,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
 
         try {
             m_client.callProcedure("@AdHoc", "drop table DROPME;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             fail("drop table should have succeeded");
         }
         resp = m_client.callProcedure("@SystemCatalog", "TABLES");
@@ -107,8 +106,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         assertTrue(findTableInSystemCatalogResults("DROPME_R"));
         try {
             m_client.callProcedure("@AdHoc", "drop table DROPME_R;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             fail("drop table should have succeeded");
         }
         resp = m_client.callProcedure("@SystemCatalog", "TABLES");
@@ -124,9 +122,10 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         boolean threw = false;
         try {
             m_client.callProcedure("@AdHoc", "drop table DROPME;");
-        }
-        catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("object not found: DROPME"));
+        } catch (ProcCallException pce) {
+            final String msg = pce.getMessage();
+            final String pat = "Table DROPME not found";
+            assertTrue(String.format("Message \"%s\" does not include \"%s: DROPME\"", msg, pat), msg.contains(pat));
             threw = true;
         }
         assertTrue("Dropping bad table should have failed", threw);
@@ -135,8 +134,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         threw = false;
         try {
             m_client.callProcedure("@AdHoc", "drop table DROPME IF EXISTS;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             threw = true;
         }
         assertFalse("Dropping bad table with IF EXISTS should not have failed", threw);
@@ -144,8 +142,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         // ENG-7297, Drop the last table and make sure that the statistics are correct
         try {
             m_client.callProcedure("@AdHoc", "drop table BLAH;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             fail("drop table should have succeeded");
         }
         resp = m_client.callProcedure("@SystemCatalog", "TABLES");
@@ -203,8 +200,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         assertTrue(findIndexInSystemCatalogResults("PKEY_IDX"));
         try {
             m_client.callProcedure("@AdHoc", "drop table DROPME;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             fail("drop table should have succeeded");
         }
         resp = m_client.callProcedure("@SystemCatalog", "TABLES");
@@ -221,8 +217,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         boolean threw = false;
         try {
             m_client.callProcedure("@AdHoc", "drop table BLAH;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             // The error message is really confusing for this case, not sure
             // how to make it better though
             pce.printStackTrace();
@@ -236,8 +231,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         threw = false;
         try {
             m_client.callProcedure("@AdHoc", "drop table VIEWBASE;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             threw = true;
         }
         assertTrue("Shouldn't be able to drop a table used in a view", threw);
@@ -247,8 +241,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
 
         try {
             m_client.callProcedure("@AdHoc", "drop table VIEWBASE cascade;");
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             fail("Should be able to drop table and view with cascade");
         }
         resp = m_client.callProcedure("@SystemCatalog", "TABLES");
@@ -289,9 +282,10 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         try {
             m_client.callProcedure("@AdHoc", "drop table t_eng12816;");
             fail("expected an exception!");
-        }
-        catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("object not found"));
+        } catch (ProcCallException pce) {
+            final String msg = pce.getMessage();
+            final String pat = "Cannot drop table T_ENG12816: stored procedure(s) proc1 depend on it";
+            assertTrue(String.format("Message \"%s\" does not contain \"%s\"", msg, pat), msg.contains(pat));
         }
 
         cr = m_client.callProcedure("@SystemCatalog", "TABLES");
