@@ -291,7 +291,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.worksWithElastic = diff.worksWithElastic();
             retval.hasSecurityUserChange = diff.hasSecurityUserChanges();
         }
-        catch (Exception e) {
+        catch (Throwable e) {
             retval.errorMsg = "Unexpected error in catalog update from " + invocationName + ": " + e.getClass() + ", " +
                     e.getMessage();
         }
