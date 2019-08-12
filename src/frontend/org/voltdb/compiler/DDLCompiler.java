@@ -20,7 +20,13 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
@@ -60,6 +66,7 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.statements.AlterSchedule;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -67,18 +74,20 @@ import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
+import org.voltdb.compiler.statements.CreateSchedule;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
+import org.voltdb.compiler.statements.DropSchedule;
 import org.voltdb.compiler.statements.DropStream;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -187,14 +196,20 @@ public class DDLCompiler {
     };
 
     public static class DDLStatement {
-        public DDLStatement() { }
+        public DDLStatement(boolean newDdl) {
+            this.newDdl = newDdl;
+        }
+
         public DDLStatement(String statement, int lineNo) {
             this.statement = statement;
             this.lineNo = lineNo;
+            newDdl = false;
         }
+
         public String statement = "";
         public int lineNo; // beginning of statement line number
         public int endLineNo; // end of statement line number
+        public final boolean newDdl;
     }
 
     public DDLCompiler(VoltCompiler compiler,
@@ -225,6 +240,9 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropStream(this))
                                 .addNextProcessor(new DRTable(this))
                                 .addNextProcessor(new SetGlobalParam(this))
+                                .addNextProcessor(new CreateSchedule(this))
+                                .addNextProcessor(new DropSchedule(this))
+                                .addNextProcessor(new AlterSchedule(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -317,6 +335,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
+        protected static final String SCHEDULE = "SCHEDULE";
         protected static final String AGGREGATE = "AGGREGATE";
     }
 
@@ -389,16 +408,18 @@ public class DDLCompiler {
 
     /**
      * Compile a DDL schema from an abstract reader
-     * @param reader  abstract DDL reader
-     * @param db  database
-     * @param whichProcs  which type(s) of procedures to load
+     *
+     * @param reader     abstract DDL reader
+     * @param db         database
+     * @param whichProcs which type(s) of procedures to load
+     * @param newDdl     Whether or not this DDL has been compiled before or not
      * @throws VoltCompiler.VoltCompilerException
      */
-    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs)
+    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs, boolean newDdl)
             throws VoltCompilerException {
         int currLineNo = 1;
 
-        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
+        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo, newDdl);
         final StringBuilder ddls = new StringBuilder();
         boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
@@ -413,7 +434,7 @@ public class DDLCompiler {
             } else {        // matched & executed DROP TABLE stmt
                 ddls.append(encodedDropTable);
             }
-            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
+            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo, newDdl);
             isBatch = true;
         }
         m_fullDDL += ddls;
@@ -517,7 +538,7 @@ public class DDLCompiler {
             DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
         Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
-        loadSchema(reader, db, previousDBIfAny, whichProcs);
+        loadSchema(reader, db, previousDBIfAny, whichProcs, false);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
@@ -1210,14 +1231,14 @@ public class DDLCompiler {
         }
     }
 
-    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo)
+    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo, boolean newDdl)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
 
         char[] nchar = new char[1];
         @SuppressWarnings("synthetic-access")
-        DDLStatement retval = new DDLStatement();
+        DDLStatement retval = new DDLStatement(newDdl);
 
         try {
 

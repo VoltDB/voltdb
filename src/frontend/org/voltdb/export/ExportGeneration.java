@@ -54,6 +54,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -621,9 +622,12 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
-        source.setupMigrateRowsDeleter(
-                CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
 
+        // Setup delete for migrate table
+        if (CatalogUtil.isPersistentMigrate(source.getTableName())) {
+            source.setupMigrateRowsDeleter(
+                    CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
+        }
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -688,7 +692,11 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
-                        exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+
+                        // Setup delete for migrate table
+                        if (TableType.isPersistentMigrate(table.getTabletype())) {
+                            exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+                        }
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
