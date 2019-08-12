@@ -113,7 +113,7 @@ public class PlannerRules {
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,
-            VoltLValuesRule.INSTANCE,
+            VoltLValuesRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -137,9 +137,9 @@ public class PlannerRules {
 //            AggregateExpandDistinctAggregatesRule.INSTANCE,
 //            // See comments inside for examples.
 //            AggregateReduceFunctionsRule.INSTANCE,
-              JoinCommuteRule.INSTANCE
+//            JoinCommuteRule.INSTANCE
 //            JoinPushThroughJoinRule.LEFT,
-//            JoinPushThroughJoinRule.RIGHT,
+//            JoinPushThroughJoinRule.RIGHT
 //            SortProjectTransposeRule.INSTANCE,
     );
 
@@ -150,6 +150,8 @@ public class PlannerRules {
     );
 
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
+            CalcMergeRule.INSTANCE,
+
             VoltPCalcRule.INSTANCE,
             VoltPSeqScanRule.INSTANCE,
             VoltPSortConvertRule.INSTANCE_VOLTDB,
@@ -157,7 +159,8 @@ public class PlannerRules {
             VoltPAggregateRule.INSTANCE,
             // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
-            JoinCommuteRule.INSTANCE,
+            VoltPJoinCommuteRule.INSTANCE_OUTER_CALC_SSCAN,
+            VoltPJoinCommuteRule.INSTANCE_OUTER_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
