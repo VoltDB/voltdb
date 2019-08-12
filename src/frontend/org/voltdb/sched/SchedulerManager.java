@@ -1020,7 +1020,7 @@ public class SchedulerManager {
      * Base class which wraps the execution and handling of a single {@link Scheduler} instance.
      * <p>
      * On start {@link Scheduler#nextRun(ScheduledProcedure)} is invoked with a null {@link ScheduledProcedure}
-     * argument. If the result has a status of {@link SchedulerResult.Status#PROCEDURE} then the provided procedure will
+     * argument. If the result has a status of {@link SchedulerResult.Type#PROCEDURE} then the provided procedure will
      * be scheduled and executed after the delay. Once a response is received
      * {@link Scheduler#nextRun(ScheduledProcedure)} will be invoked again with the {@link ScheduledProcedure}
      * previously returned and {@link ScheduledProcedure#getResponse()} updated with response. This repeats until this
@@ -1106,7 +1106,7 @@ public class SchedulerManager {
                 }
 
                 Runnable runnable;
-                switch (result.getStatus()) {
+                switch (result.getType()) {
                 case EXIT:
                     exitRequested(result.getMessage());
                     return;
@@ -1123,7 +1123,7 @@ public class SchedulerManager {
                     runnable = this::executeProcedure;
                     break;
                 default:
-                    throw new IllegalStateException("Unknown status: " + result.getStatus());
+                    throw new IllegalStateException("Unknown status: " + result.getType());
                 }
 
                 m_procedure = result.getScheduledProcedure();

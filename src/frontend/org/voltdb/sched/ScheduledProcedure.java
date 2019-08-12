@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ClientResponse;
 
 /**
- * A class to define a scheduled execution from a {@link Scheduler} and the result of the procedure execution
+ * Defines a procedure scheduled for execution by a {@link Scheduler} instance and the result of the execution.
  */
 public final class ScheduledProcedure {
     private final long m_requestedDelayNs;
