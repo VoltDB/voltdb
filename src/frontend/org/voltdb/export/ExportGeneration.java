@@ -623,8 +623,8 @@ public class ExportGeneration implements Generation {
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
 
-        // No ack delete for the change of data capture (CREATE TBALE <TABLE NAME> EXPORT TO <TARGET>)
-        if (!CatalogUtil.isPersistentExport(source.getTableName())) {
+        // Setup delete for migrate table
+        if (CatalogUtil.isPersistentMigrate(source.getTableName())) {
             source.setupMigrateRowsDeleter(
                     CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
         }
@@ -693,8 +693,8 @@ public class ExportGeneration implements Generation {
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
 
-                        // No ack delete for the change of data capture (CREATE TBALE <TABLE NAME> EXPORT TO <TARGET>)
-                        if (!TableType.isPersistentExport(table.getTabletype())) {
+                        // Setup delete for migrate table
+                        if (TableType.isPersistentMigrate(table.getTabletype())) {
                             exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         }
                         if (exportLog.isDebugEnabled()) {

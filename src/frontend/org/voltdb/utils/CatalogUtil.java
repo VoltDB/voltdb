@@ -3272,10 +3272,10 @@ public abstract class CatalogUtil {
         return false;
     }
 
-    public static boolean isPersistentExport(String tableName) {
+    public static boolean isPersistentMigrate(String tableName) {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null) {
-            return TableType.isPersistentExport(table.getTabletype());
+            return TableType.isPersistentMigrate(table.getTabletype());
         }
         return false;
     }
