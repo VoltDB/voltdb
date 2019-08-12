@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.math.RoundingMode;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,6 +72,7 @@ import org.voltdb.compiler.deploymentfile.SchedulerType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.math.DoubleMath;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -118,12 +120,10 @@ public class SchedulerManager {
     private final ListeningExecutorService m_managerExecutor = MoreExecutors
             .listeningDecorator(CoreUtils.getSingleThreadExecutor(getClass().getSimpleName()));
 
-    // Raw ScheduledThreadPoolExecutor used only to change thread count
-    private final ScheduledThreadPoolExecutor m_rawWrapperExecutor = CoreUtils
-            .getScheduledThreadPoolExecutor("ProcedureScheduler", 1, CoreUtils.SMALL_STACK_SIZE);
-
-    // Used to execute the schedulers and scheduled procedures only used by ScheculerWrappers
-    final ListeningScheduledExecutorService m_wrapperExecutor = MoreExecutors.listeningDecorator(m_rawWrapperExecutor);
+    // Used to execute the schedulers and scheduled procedures for system or host schedules
+    private final ScheduledExecutorHolder m_singleExecutor = new ScheduledExecutorHolder("HOST");
+    // Used to execute the schedulers and scheduled procedures for partitioned schedules
+    private final ScheduledExecutorHolder m_partitionedExecutor = new ScheduledExecutorHolder("PARTITIONED");
 
     final ClientInterface m_clientInterface;
     final StatsAgent m_statsAgent;
@@ -309,10 +309,11 @@ public class SchedulerManager {
      */
     ListenableFuture<?> promotedPartition(int partitionId) {
         return execute(() -> {
+            m_locallyLedPartitions.add(partitionId);
+            updatePartitionedThreadPoolSize();
             for (SchedulerHandler sd : m_handlers.values()) {
                 sd.promotedPartition(partitionId);
             }
-            m_locallyLedPartitions.add(partitionId);
         });
     }
 
@@ -328,11 +329,22 @@ public class SchedulerManager {
             if (!m_locallyLedPartitions.remove(partitionId)) {
                 return false;
             }
+            updatePartitionedThreadPoolSize();
             for (SchedulerHandler sd : m_handlers.values()) {
                 sd.demotedPartition(partitionId);
             }
             return true;
         });
+    }
+
+    private void updatePartitionedThreadPoolSize() {
+        if (m_handlers.values().stream().filter(h -> h instanceof PartitionedScheduleHandler).findAny().isPresent()) {
+            m_partitionedExecutor.setDynamicThreadCount(calculatePartitionedThreadPoolSize());
+        }
+    }
+
+    private int calculatePartitionedThreadPoolSize() {
+        return DoubleMath.roundToInt(m_locallyLedPartitions.size() / 2.0, RoundingMode.UP);
     }
 
     /**
@@ -348,7 +360,8 @@ public class SchedulerManager {
                 Map<String, SchedulerHandler> handlers = m_handlers;
                 m_handlers = Collections.emptyMap();
                 handlers.values().stream().forEach(SchedulerHandler::cancel);
-                m_wrapperExecutor.shutdown();
+                m_singleExecutor.getExecutor().shutdown();
+                m_partitionedExecutor.getExecutor().shutdown();
             });
         } catch (RejectedExecutionException e) {
             return Futures.immediateFuture(null);
@@ -510,9 +523,12 @@ public class SchedulerManager {
         m_maxRunFrequency = configuration.getMaxRunFrequency() / 60.0;
         boolean frequencyChanged = m_maxRunFrequency != originalFrequency;
 
-        if (m_rawWrapperExecutor.getCorePoolSize() != configuration.getThreadCount()) {
-            m_rawWrapperExecutor.setCorePoolSize(configuration.getThreadCount());
-        }
+        // Set the explicitly defined thread counts
+        m_singleExecutor.setThreadCount(configuration.getHostThreadCount());
+        m_partitionedExecutor.setThreadCount(configuration.getPartitionedThreadCount());
+
+        boolean hasNonPartitionedSchedule = false;
+        boolean hasPartitionedSchedule = false;
 
         for (ProcedureSchedule procedureSchedule : procedureSchedules) {
             SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
@@ -525,6 +541,11 @@ public class SchedulerManager {
                     handler.setEnabled(procedureSchedule.getEnabled());
                     if (frequencyChanged) {
                         handler.setMaxRunFrequency(m_maxRunFrequency);
+                    }
+                    if (RUN_LOCATION_PARTITIONS.equalsIgnoreCase(procedureSchedule.getRunlocation())) {
+                        hasPartitionedSchedule = true;
+                    } else {
+                        hasNonPartitionedSchedule = true;
                     }
                     continue;
                 }
@@ -544,11 +565,15 @@ public class SchedulerManager {
                 switch (runLocation) {
                 case RUN_LOCATION_HOSTS:
                 case RUN_LOCATION_SYSTEM:
-                    definition = new SingleSchedulerHandler(procedureSchedule, runLocation, result.m_factory);
+                    definition = new SingleSchedulerHandler(procedureSchedule, runLocation, result.m_factory,
+                            m_singleExecutor.getExecutor());
+                    hasNonPartitionedSchedule = true;
                     break;
                 case RUN_LOCATION_PARTITIONS:
-                    definition = new PartitionedScheduleHandler(procedureSchedule, result.m_factory);
+                    definition = new PartitionedScheduleHandler(procedureSchedule, result.m_factory,
+                            m_partitionedExecutor.getExecutor());
                     m_locallyLedPartitions.forEach(definition::promotedPartition);
+                    hasPartitionedSchedule = true;
                     break;
                 default:
                     throw new IllegalArgumentException(
@@ -562,6 +587,10 @@ public class SchedulerManager {
         for (SchedulerHandler handler : m_handlers.values()) {
             handler.cancel();
         }
+
+        // Set the dynamic thread counts based on whether or not schedules exist and partition counts
+        m_singleExecutor.setDynamicThreadCount(hasNonPartitionedSchedule ? 1 : 0);
+        m_partitionedExecutor.setDynamicThreadCount(hasPartitionedSchedule ? calculatePartitionedThreadPoolSize() : 0);
 
         // Start all current schedules. This is a no-op for already started schedules
         for (SchedulerHandler handler : newHandlers.values()) {
@@ -672,6 +701,20 @@ public class SchedulerManager {
         }
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
+
+        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
+            if (procedure.getPartitionparameter() != 0) {
+                errors.addErrorMessage(String.format(
+                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
+                        procedureName));
+                return;
+            }
+
+            Object[] newParameters = new Object[parameters.length + 1];
+            newParameters[0] = 0;
+            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
+            parameters = newParameters;
+        }
 
         if (parameterTypes.size() != parameters.length) {
             errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,
@@ -837,15 +880,16 @@ public class SchedulerManager {
     private class SingleSchedulerHandler extends SchedulerHandler {
         private final SchedulerWrapper<? extends SingleSchedulerHandler> m_wrapper;
 
-        SingleSchedulerHandler(ProcedureSchedule definition, String runLocation, SchedulerFactory factory) {
+        SingleSchedulerHandler(ProcedureSchedule definition, String runLocation, SchedulerFactory factory,
+                ListeningScheduledExecutorService executor) {
             super(definition, factory);
 
             switch (runLocation) {
             case RUN_LOCATION_HOSTS:
-                m_wrapper = new HostSchedulerWrapper(this);
+                m_wrapper = new HostSchedulerWrapper(this, executor);
                 break;
             case RUN_LOCATION_SYSTEM:
-                m_wrapper = new SystemSchedulerWrapper(this);
+                m_wrapper = new SystemSchedulerWrapper(this, executor);
                 break;
             default:
                 throw new IllegalArgumentException("Invalid run location: " + runLocation);
@@ -886,10 +930,13 @@ public class SchedulerManager {
      */
     private class PartitionedScheduleHandler extends SchedulerHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
+        private final ListeningScheduledExecutorService m_executor;
         private boolean m_handlerStarted = false;
 
-        PartitionedScheduleHandler(ProcedureSchedule definition, SchedulerFactory factory) {
+        PartitionedScheduleHandler(ProcedureSchedule definition, SchedulerFactory factory,
+                ListeningScheduledExecutorService executor) {
             super(definition, factory);
+            m_executor = executor;
         }
 
         @Override
@@ -914,7 +961,7 @@ public class SchedulerManager {
         @Override
         void promotedPartition(int partitionId) {
             assert !m_wrappers.containsKey(partitionId);
-            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId);
+            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
 
             m_wrappers.put(partitionId, wrapper);
 
@@ -980,7 +1027,7 @@ public class SchedulerManager {
      * wrapper is cancelled or {@link Scheduler#nextRun(ScheduledProcedure)} returns a non schedule result.
      * <p>
      * This class needs to be thread safe since it's execution is split between the
-     * {@link SchedulerManager#m_managerExecutor} and the {@link SchedulerManager#m_wrapperExecutor}
+     * {@link SchedulerManager#m_managerExecutor} and the schedule executors
      *
      * @param <H> Type of {@link SchedulerHandler} which created this wrapper
      */
@@ -989,6 +1036,7 @@ public class SchedulerManager {
 
         final H m_handler;
 
+        private final ListeningScheduledExecutorService m_executor;
         private Scheduler m_scheduler;
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
@@ -998,8 +1046,9 @@ public class SchedulerManager {
         // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
         private volatile long m_expectedExecutionTime;
 
-        SchedulerWrapper(H handler) {
+        SchedulerWrapper(H handler, ListeningScheduledExecutorService executor) {
             m_handler = handler;
+            m_executor = executor;
         }
 
         /**
@@ -1084,7 +1133,7 @@ public class SchedulerManager {
                     m_expectedExecutionTime = System.nanoTime() + delay;
                     m_procedure.expectedExecutionTime(m_expectedExecutionTime);
                     m_scheduledFuture = addExceptionListener(
-                            m_wrapperExecutor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
+                            m_executor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
                     if (log.isDebugEnabled()) {
                         log.debug(generateLogMessage(
@@ -1136,7 +1185,7 @@ public class SchedulerManager {
         private synchronized void submitHandleNextRun() {
             try {
                 m_expectedExecutionTime = System.nanoTime();
-                addExceptionListener(m_wrapperExecutor.submit(this::handleNextRun));
+                addExceptionListener(m_executor.submit(this::handleNextRun));
             } catch (RejectedExecutionException e) {
                 if (log.isDebugEnabled()) {
                     log.debug(generateLogMessage("Execution of response handler rejected"), e);
@@ -1298,8 +1347,8 @@ public class SchedulerManager {
      * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_SYSTEM}
      */
     private class SystemSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        SystemSchedulerWrapper(SingleSchedulerHandler definition) {
-            super(definition);
+        SystemSchedulerWrapper(SingleSchedulerHandler definition, ListeningScheduledExecutorService executor) {
+            super(definition, executor);
         }
 
         @Override
@@ -1322,8 +1371,8 @@ public class SchedulerManager {
      * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_HOSTS}
      */
     private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        HostSchedulerWrapper(SingleSchedulerHandler handler) {
-            super(handler);
+        HostSchedulerWrapper(SingleSchedulerHandler handler, ListeningScheduledExecutorService executor) {
+            super(handler, executor);
         }
 
         /**
@@ -1356,8 +1405,9 @@ public class SchedulerManager {
     private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedScheduleHandler> {
         private final int m_partition;
 
-        PartitionSchedulerWrapper(PartitionedScheduleHandler handler, int partition) {
-            super(handler);
+        PartitionSchedulerWrapper(PartitionedScheduleHandler handler, int partition,
+                ListeningScheduledExecutorService executor) {
+            super(handler, executor);
             m_partition = partition;
         }
 
@@ -1434,7 +1484,11 @@ public class SchedulerManager {
         }
     }
 
-    private static class SchedulerFactory {
+    /**
+     * Factory which is used to construct a {@link Scheduler} with a fixed set of parameters. Also, is used to track the
+     * hash of the {@Link Scheduler} class and any explicitly declared dependencies.
+     */
+    private static final class SchedulerFactory {
         private final Constructor<Scheduler> m_constructor;
         private final Object[] m_parameters;
         private final byte[] m_classHash;
@@ -1490,6 +1544,63 @@ public class SchedulerManager {
                 return jarFile.getClassesHash(deps, HASH_ALGO);
             }
             return null;
+        }
+    }
+
+    /**
+     * Utility class to wrap a {@link ListeningScheduledExecutorService} so that it can have either an explicit thread
+     * count or a dynamic thread count.
+     */
+    static private final class ScheduledExecutorHolder {
+        private final ScheduledThreadPoolExecutor m_rawExecutor;
+        private final ListeningScheduledExecutorService m_executor;
+        private boolean m_dynamicThreadCount = true;
+
+        ScheduledExecutorHolder(String name) {
+            super();
+            m_rawExecutor = CoreUtils.getScheduledThreadPoolExecutor("Scheduler-" + name, 0,
+                    CoreUtils.SMALL_STACK_SIZE);
+            m_executor = MoreExecutors.listeningDecorator(m_rawExecutor);
+        }
+
+        /**
+         * @return {@link ListeningScheduledExecutorService} instance
+         */
+        ListeningScheduledExecutorService getExecutor() {
+            return m_executor;
+        }
+
+        /**
+         * Set the thread count for this executor. If {@code threadCount <= 0} the thread count is considered dynamic
+         * and not applied.
+         *
+         * @param threadCount to apply
+         */
+        void setThreadCount(int threadCount) {
+            if (threadCount > 0) {
+                m_dynamicThreadCount = false;
+                setCorePoolSize(threadCount);
+            } else {
+                m_dynamicThreadCount = true;
+            }
+        }
+
+        /**
+         * If this executor is in dynamic mode set the thread count to {@code threadCount}
+         *
+         * @param threadCount to apply
+         * @see #setThreadCount(int)
+         */
+        void setDynamicThreadCount(int threadCount) {
+            if (m_dynamicThreadCount) {
+                setCorePoolSize(threadCount);
+            }
+        }
+
+        private void setCorePoolSize(int threadCount) {
+            if (threadCount != m_rawExecutor.getCorePoolSize()) {
+                m_rawExecutor.setCorePoolSize(threadCount);
+            }
         }
     }
 }
