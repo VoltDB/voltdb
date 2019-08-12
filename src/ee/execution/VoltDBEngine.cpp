@@ -672,8 +672,8 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
 // * udafIndex represents the index for the same user-defined aggregate function in a query.
 // For example, for "SELECT udf(b), avg(c), udf(a) FROM t", udf(b) has an udafIndex of 1,
 // udf(a) has an udafIndex of 1
-void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument,
-                                                ValueType type, int32_t udafIndex) {
+void VoltDBEngine::serializeSingleArgumentToUDFOutputBuffer(int32_t functionId, const NValue& argument,
+                                                            ValueType type, int32_t udafIndex) {
     // Estimate the size of the buffer we need. We will put:
     //   * buffer size needed
     //   * function id (int32_t)
@@ -708,7 +708,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     assert(bufferSizeNeeded == m_udfOutput.position());
 }
 
-void VoltDBEngine::serializeArgumentVectorToUDFOutputBuffer(int32_t functionId, vector<NValue>& argVector, int32_t argCount,
+void VoltDBEngine::serializeMultipleArgumentsToUDFOutputBuffer(int32_t functionId, vector<NValue>& argVector, int32_t argCount,
                                                             ValueType type, int32_t udafIndex) {
     // Determined the buffer size needed.
     // Information put in the buffer (sequentially)
@@ -802,7 +802,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, vector<NValue>& argVector, int32_t argCount, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeArgumentVectorToUDFOutputBuffer(functionId, argVector, argCount, info->paramTypes.front(), udafIndex);
+    serializeMultipleArgumentsToUDFOutputBuffer(functionId, argVector, argCount, info->paramTypes.front(), udafIndex);
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
@@ -814,7 +814,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const
     checkUserDefinedFunctionInfo(info, functionId);
     // the argument here is of the type varbinary because this is the serialized byte
     // array after the worker end method
-    serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, udafIndex);
+    serializeSingleArgumentToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, udafIndex);
     // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
@@ -824,7 +824,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
+    serializeSingleArgumentToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
@@ -834,7 +834,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, i
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
+    serializeSingleArgumentToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
     // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();

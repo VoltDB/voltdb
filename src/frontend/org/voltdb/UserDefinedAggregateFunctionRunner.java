@@ -113,11 +113,12 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
     }
 
     public void assemble(ByteBuffer udfBuffer, int udafIndex) throws Throwable {
+        // assemble method has only one argument, which is defined in the voltUDAggregate interface
+        assert(m_paramCount == 1);
+        // retrieve the argument count from udfbuffer
         int argNum = udfBuffer.getInt();
         while (argNum-- > 0) {
             // read the buffer multiple times for each argument and pass it to assmble method
-            // make sure for assmble method the parameter count is one, as deined in the voltUDAggregate interface
-            assert(m_paramCount == 1);
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
