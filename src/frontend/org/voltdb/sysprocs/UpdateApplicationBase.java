@@ -52,6 +52,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
@@ -155,7 +156,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     // work.adhocDDLStmts should be applied to the current catalog
                     try {
                         newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes, drRole == DrRoleType.XDCR);
-                    } catch (IOException | VoltCompilerException e) {
+                    } catch (IOException | VoltCompilerException | PlanningErrorException e) {
                         retval.errorMsg = e.getMessage();
                         return retval;
                     } catch (Exception ex) {
