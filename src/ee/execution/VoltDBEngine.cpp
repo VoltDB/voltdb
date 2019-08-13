@@ -650,7 +650,7 @@ void VoltDBEngine::serializeSingleArgumentToUDFOutputBuffer(
     //   * buffer size needed
     //   * function id (int32_t)
     //   * udaf index (int32_t)
-    //   * parameters.
+    //   * a single parameter (NValue).
 
     // three int32_t: size of the buffer, function id, and udaf index
     int32_t bufferSizeNeeded = 3 * sizeof(int32_t);
@@ -688,7 +688,7 @@ void VoltDBEngine::serializeMultipleArgumentsToUDFOutputBuffer(int32_t functionI
     // * function id (int32_t)
     // * udaf index (int32_t)
     // * parameter count (int32_t)
-    // * parameters
+    // * a list of parameters (NValue)
 
     int32_t bufferSizeNeeded = 4 * sizeof(int32_t);
     vector<NValue> cast_argument(argCount);
