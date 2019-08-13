@@ -228,13 +228,12 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
         AbstractTempTable *newOutputTable, TableTuple &temp_tuple) {
     bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
-    if (m_replicatedTableOperation) {
-        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
-            // Need to set this here for inlined inserts in case there are no inline inserts
-            // and finish is called right after this
-            s_modifiedTuples = 0;
-            SynchronizedThreadLock::signalLowestSiteFinished();
-        }
+    if (m_replicatedTableOperation &&
+            SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+        // Need to set this here for inlined inserts in case there are no inline inserts
+        // and finish is called right after this
+        s_modifiedTuples = 0;
+        SynchronizedThreadLock::signalLowestSiteFinished();
     }
     return rslt;
 }
@@ -294,7 +293,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
                 throw ConstraintFailureException(m_targetTable, m_templateTuple,
-                                                 "Mispartitioned tuple in single-partition insert statement.");
+                        "Mispartitioned tuple in single-partition insert statement.");
             }
         }
     }
@@ -315,11 +314,10 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             m_upsertTuple.move(m_templateTuple.address());
             TableTuple &tempTuple = m_persistentTable->copyIntoTempTuple(existsTuple);
             for (int i = 0; i < mapSize; ++i) {
-                tempTuple.setNValue(fieldMap[i],
-                                    m_templateTuple.getNValue(fieldMap[i]));
+                tempTuple.setNValue(fieldMap[i], m_templateTuple.getNValue(fieldMap[i]));
             }
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                                                              m_persistentTable->allIndexes());
+                    m_persistentTable->allIndexes());
             // successfully updated
             ++m_modifiedTuples;
             return;
@@ -351,16 +349,14 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         if (m_replicatedTableOperation) {
             s_modifiedTuples = m_modifiedTuples;
         }
-    } else {
-        if (s_modifiedTuples == -1) {
-            // An exception was thrown on the lowest site thread and we need to throw here as well so
-            // all threads are in the same state
-            char msg[1024];
-            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
-                    m_targetTable->name().c_str());
-            VOLT_DEBUG("%s", msg);
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-        }
+    } else if (s_modifiedTuples == -1) {
+        // An exception was thrown on the lowest site thread and we need to throw here as well so
+        // all threads are in the same state
+        char msg[1024];
+        snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                m_targetTable->name().c_str());
+        VOLT_DEBUG("%s", msg);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
     }
 }
 
