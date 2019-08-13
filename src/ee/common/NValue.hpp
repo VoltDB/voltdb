@@ -2496,7 +2496,7 @@ inline NValue::NValue() {
 
 inline NValue& NValue::operator=(const NValue& val) {
     if (this != &val) {
-        ::memcpy(m_data, val.m_data, 16);
+        ::memcpy(m_data, val.m_data, sizeof(m_data));
         m_valueType = val.m_valueType;
         m_attributes = val.m_attributes;
     }

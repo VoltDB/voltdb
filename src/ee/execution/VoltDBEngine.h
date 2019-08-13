@@ -641,14 +641,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // user defined aggregate functions helper functions
         /*
-         * put buffer size needed, function id, udaf index, and parameters (if there is any)
-         * into the buffers, so that the java side would receive them
+         * put buffer size needed, function id, udaf index, row count and a list of rows (if there is any)
+         * into the buffer, so that the java side would receive them
          */
-        void serializeSingleArgumentToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
-        /*
-         * serialize multiple arguments (used by assemble)
-         */
-        void serializeMultipleArgumentsToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount,
+        void serializeRowsToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount,
                                                         ValueType type, int32_t udafIndex);
         /*
          * if the info related to this functionId is not found, throw an exception
