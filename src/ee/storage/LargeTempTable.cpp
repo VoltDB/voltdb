@@ -27,10 +27,15 @@
 
 namespace voltdb {
 
-LargeTempTable::LargeTempTable() : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES) { }
+LargeTempTable::LargeTempTable()
+    : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES)
+    , m_blockIds()
+    , m_blockForWriting(NULL)
+{
+}
 
 void LargeTempTable::getEmptyBlock() {
-    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     // Mark the current block we're writing to as unpinned so it can
     // be stored if needed to make space for the next block.
@@ -40,7 +45,7 @@ void LargeTempTable::getEmptyBlock() {
 
     // Try to get an empty block (this will invoke I/O via topend, and
     // could throw for any number of reasons)
-    LargeTempTableBlock* newBlock = lttBlockCache.getEmptyBlock(m_schema);
+    LargeTempTableBlock* newBlock = lttBlockCache->getEmptyBlock(m_schema);
 
     m_blockForWriting = newBlock;
     m_blockIds.push_back(m_blockForWriting->id());
@@ -109,26 +114,25 @@ TableIterator LargeTempTable::iteratorDeletingAsWeGo() {
 void LargeTempTable::deleteAllTempTuples() {
     finishInserts();
 
-    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    for(auto blockId : m_blockIds) {
-        lttBlockCache.releaseBlock(blockId);
+    BOOST_FOREACH(auto blockId, m_blockIds) {
+        lttBlockCache->releaseBlock(blockId);
     }
 
     m_blockIds.clear();
     m_tupleCount = 0;
 }
 
-std::vector<LargeTempTableBlockId>::iterator LargeTempTable::releaseBlock(
-        std::vector<LargeTempTableBlockId>::iterator it) {
+std::vector<LargeTempTableBlockId>::iterator LargeTempTable::releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
     if (it == m_blockIds.end()) {
         // block may have already been deleted
         return it;
     }
 
-    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    m_tupleCount -= lttBlockCache.getBlockTupleCount(*it);
-    lttBlockCache.releaseBlock(*it);
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    m_tupleCount -= lttBlockCache->getBlockTupleCount(*it);
+    lttBlockCache->releaseBlock(*it);
 
     return m_blockIds.erase(it);
 }
@@ -154,24 +158,26 @@ void LargeTempTable::nextFreeTuple(TableTuple*) {
 }
 
 std::string LargeTempTable::debug(const std::string& spacer) const {
-    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     std::ostringstream oss;
     oss << Table::debug(spacer);
     std::string infoSpacer = spacer + "  |";
     oss << infoSpacer << "\tLTT BLOCK IDS (" << m_blockIds.size() << " blocks):\n";
     if (m_blockIds.size() > 0) {
-        for(auto id : m_blockIds) {
+        BOOST_FOREACH(auto id, m_blockIds) {
             oss << infoSpacer;
-            LargeTempTableBlock *block = lttBlockCache.getBlockForDebug(id);
+            LargeTempTableBlock *block = lttBlockCache->getBlockForDebug(id);
             if (block != NULL) {
                 oss << "   " << block->debug();
-            } else {
+            }
+            else {
                 oss << "   block " << id << " is not in LTT block cache?!";
             }
 
             oss << "\n";
         }
-    } else {
+    }
+    else {
         oss << infoSpacer << "  <no blocks>\n";
     }
 
@@ -209,11 +215,21 @@ public:
     typedef LargeTempTableBlock::iterator iterator;
     typedef iterator::difference_type difference_type;
 
-    BlockSorter(LargeTempTableBlockCache& lttBlockCache, ProgressMonitorProxy* pmp,
-            const TupleSchema* schema, const AbstractExecutor::TupleComparer& lessThan,
-                int limit, int offset) : m_lttBlockCache(lttBlockCache), m_pmp(pmp), m_schema(schema)
-        , m_tempStorage(schema), m_tempTuple(m_tempStorage.tuple())
-        , m_lessThan(lessThan), m_limit(limit == -1 ? -1 : (limit + offset)) { }
+    BlockSorter(LargeTempTableBlockCache* lttBlockCache,
+                ProgressMonitorProxy* pmp,
+                const TupleSchema* schema,
+                const AbstractExecutor::TupleComparer& lessThan,
+                int limit,
+                int offset)
+        : m_lttBlockCache(lttBlockCache)
+        , m_pmp(pmp)
+        , m_schema(schema)
+        , m_tempStorage(schema)
+        , m_tempTuple(m_tempStorage.tuple())
+        , m_lessThan(lessThan)
+        , m_limit(limit == -1 ? -1 : (limit + offset))
+    {
+    }
 
     void sort(LargeTempTableBlock* block) {
         int limit = m_limit;
@@ -228,11 +244,12 @@ public:
         if (m_schema->getUninlinedObjectColumnCount() > 0) {
             // Do an in-place quicksort
             quicksort(block->begin(), block->end(), limit);
-        } else {
+        }
+        else {
             // There's no non-inlined data in this block, so
             // do a faster out-of-place sort.
             std::vector<TableTuple> ttVector;
-            for (auto& tuple : *block) {
+            BOOST_FOREACH (auto& tuple, *block) {
                 if (m_pmp != NULL) {
                     m_pmp->countdownProgress();
                 }
@@ -243,15 +260,16 @@ public:
             // Sort the vector of TableTuples.
             if (limit == -1 || limit > ttVector.size()) {
                 std::sort(ttVector.begin(), ttVector.end(), m_lessThan);
-            } else {
+            }
+            else {
                 std::partial_sort(ttVector.begin(), ttVector.begin() + limit, ttVector.end(), m_lessThan);
             }
 
-            LargeTempTableBlock *outputBlock = m_lttBlockCache.getEmptyBlock(m_schema);
+            LargeTempTableBlock *outputBlock = m_lttBlockCache->getEmptyBlock(m_schema);
 
             // Copy each tuple in the input block to the output block
             int tupleCount = 0;
-            for (TableTuple& tuple : ttVector) {
+            BOOST_FOREACH (TableTuple& tuple, ttVector) {
                 if (m_pmp != NULL) {
                     m_pmp->countdownProgress();
                 }
@@ -271,43 +289,32 @@ public:
             block->swap(outputBlock);
 
             outputBlock->unpin();
-            m_lttBlockCache.releaseBlock(outputBlock->id());
+            m_lttBlockCache->releaseBlock(outputBlock->id());
         }
     }
 
 private:
-    LargeTempTableBlockCache& m_lttBlockCache;
-    ProgressMonitorProxy* m_pmp;
-    const TupleSchema* m_schema;
-    StandAloneTupleStorage m_tempStorage;
-    TableTuple m_tempTuple;
-    const AbstractExecutor::TupleComparer& m_lessThan;
-    const int m_limit;
 
     // It turns out the be difficult to use std::sort on objects whose
     // size is unknown at compile time, so here is an implementation
     // of quicksort that is similar to those used in the system libraries.
-    void quicksort(LargeTempTableBlock::iterator beginIt, LargeTempTableBlock::iterator endIt, int limit) {
+    void quicksort(LargeTempTableBlock::iterator beginIt,
+                   LargeTempTableBlock::iterator endIt,
+                   int limit) {
         while (true) {
             difference_type numElems = endIt - beginIt;
             switch (numElems) {
-                case 0:
-                case 1:
-                    return;
-                    // For small numbers of records, use insertion sort, using
-                    // a template parameter so the number of records is known
-                    // at compile time.
-                case 2:
-                    insertionSort<2>(beginIt);
-                    return;
-                case 3:
-                    insertionSort<3>(beginIt);
-                    return;
-                case 4:
-                    insertionSort<4>(beginIt);
-                    return;
-                default:
-                    break;
+            case 0:
+            case 1:
+                return;
+            // For small numbers of records, use insertion sort, using
+            // a template parameter so the number of records is known
+            // at compile time.
+            case 2: insertionSort<2>(beginIt); return;
+            case 3: insertionSort<3>(beginIt); return;
+            case 4: insertionSort<4>(beginIt); return;
+            default:
+                break;
             }
 
             // choose a pivot randomly to avoid worst-case behavior
@@ -346,14 +353,16 @@ private:
                 // partition.
                 endIt = pivot;
                 // limit stays the same
-            } else if (numElemsLeft > numElemsRight)  {
+            }
+            else if (numElemsLeft > numElemsRight)  {
                 // Make recursive call for smaller partition,
                 // and use tail recursion elimination for larger one.
                 int rightLimit = (limit == -1) ? -1 : (limit - (numElemsLeft + 1));
                 quicksort(pivot + 1, endIt, rightLimit);
                 endIt = pivot;
                 // limit stays the same
-            } else {
+            }
+            else {
                 quicksort(beginIt, pivot, limit);
                 beginIt = pivot + 1;
                 if (limit != -1) {
@@ -368,6 +377,7 @@ private:
     template<int N>
     void insertionSort(LargeTempTableBlock::iterator beginIt) {
         vassert(N > 1);
+
         for (difference_type i = 0; i < N; ++i) {
             int j = i;
             while (j > 0 && m_lessThan(beginIt[j].toTableTuple(m_schema),
@@ -378,7 +388,8 @@ private:
         }
     }
 
-    void swap(LargeTempTableBlock::Tuple& t0, LargeTempTableBlock::Tuple& t1) {
+    void swap(LargeTempTableBlock::Tuple& t0,
+              LargeTempTableBlock::Tuple& t1) {
         if (&t0 != &t1) {
             int tupleLength = m_tempTuple.tupleLength();
             char* tempBuffer = m_tempTuple.address();
@@ -389,6 +400,14 @@ private:
             ::memcpy(buf1, tempBuffer, tupleLength);
         }
     }
+
+    LargeTempTableBlockCache* m_lttBlockCache;
+    ProgressMonitorProxy* m_pmp;
+    const TupleSchema* m_schema;
+    StandAloneTupleStorage m_tempStorage;
+    TableTuple m_tempTuple;
+    const AbstractExecutor::TupleComparer& m_lessThan;
+    const int m_limit;
 };
 
 /**
@@ -397,12 +416,12 @@ private:
  * sorted into a new, large table.
  */
 class SortRun {
-    LargeTempTable* m_table;
-    TableIterator m_iterator;
-    TableTuple m_curTuple;
 public:
-    SortRun(LargeTempTable* table) : m_table(table), m_iterator(m_table->iteratorDeletingAsWeGo()),
-    m_curTuple(m_table->schema()) {
+    SortRun(LargeTempTable* table)
+        : m_table(table)
+        , m_iterator(m_table->iteratorDeletingAsWeGo())
+        , m_curTuple(m_table->schema())
+    {
         m_table->incrementRefcount();
     }
 
@@ -445,7 +464,7 @@ public:
     std::string debug() const {
         std::ostringstream oss;
         oss << "sort run with blocks: ";
-        for(auto id : m_table->getBlockIds()) {
+        BOOST_FOREACH(auto id, m_table->getBlockIds()) {
             oss << id << " ";
         }
 
@@ -459,19 +478,23 @@ public:
     LargeTempTable* peekTable() {
         return m_table;
     }
+
+private:
+    LargeTempTable* m_table;
+    TableIterator m_iterator;
+    TableTuple m_curTuple;
 };
 
-using SortRunPtr = std::shared_ptr<SortRun>;
+typedef std::shared_ptr<SortRun> SortRunPtr;
 
 /**
  * Compares two sort runs, based on the value of their current tuple.
  */
 struct SortRunComparer {
-private:
-    const AbstractExecutor::TupleComparer& m_tupleComparer;
-public:
     SortRunComparer(const AbstractExecutor::TupleComparer& tupleComparer)
-        : m_tupleComparer(tupleComparer) { }
+        : m_tupleComparer(tupleComparer)
+    {
+    }
 
     bool operator()(const SortRunPtr& run0, const SortRunPtr& run1) {
         const TableTuple& tuple0 = run0->currentTuple();
@@ -481,25 +504,32 @@ public:
         // less-than, since std::priority_queue is really a max heap.
         return m_tupleComparer(tuple1, tuple0);
     }
+
+private:
+    const AbstractExecutor::TupleComparer& m_tupleComparer;
 };
 
 }
 
 void LargeTempTable::sort(ProgressMonitorProxy* pmp,
-        const AbstractExecutor::TupleComparer& comparer, int limit, int offset) {
+                          const AbstractExecutor::TupleComparer& comparer,
+                          int limit,
+                          int offset) {
 
     if (activeTupleCount() == 0) {
         return;
-    } else if (limit == 0 || offset >= activeTupleCount()) {
+    }
+
+    if (limit == 0 || offset >= activeTupleCount()) {
         deleteAllTempTuples();
         return;
     }
 
-    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     // Let's merge as much as we can, reserving one slot in the block
     // cache for the output of the merge.
-    const int MERGE_FACTOR = lttBlockCache.maxCacheSizeInBlocks() - 1;
+    const int MERGE_FACTOR = lttBlockCache->maxCacheSizeInBlocks() - 1;
 
     // Sort each block and create a bunch of 1-block sort runs to be merged below
     std::queue<SortRunPtr> sortRunQueue;
@@ -508,13 +538,14 @@ void LargeTempTable::sort(ProgressMonitorProxy* pmp,
     while (it != getBlockIds().end()) {
         auto blockId = *it;
         it = disownBlock(it);
-        LargeTempTableBlock* block = lttBlockCache.fetchBlock(blockId);
+        LargeTempTableBlock* block = lttBlockCache->fetchBlock(blockId);
         sorter.sort(block);
-        lttBlockCache.invalidateStoredCopy(block);
+        lttBlockCache->invalidateStoredCopy(block);
         block->unpin();
         LargeTempTable* table = TableFactory::buildCopiedLargeTempTable("largesort", this);
         table->inheritBlock(blockId);
-        sortRunQueue.emplace(SortRunPtr{new SortRun(table)});
+        SortRunPtr sortRun{new SortRun(table)};
+        sortRunQueue.push(sortRun);
     }
 
     do {
@@ -537,7 +568,8 @@ void LargeTempTable::sort(ProgressMonitorProxy* pmp,
         if (sortRunQueue.size() != 0) {
             limitThisPass = (limit == -1 ? -1 : limit + offset);
             offsetThisPass = 0;
-        } else {
+        }
+        else {
             limitThisPass = limit;
             offsetThisPass = offset;
         }
@@ -564,7 +596,8 @@ void LargeTempTable::sort(ProgressMonitorProxy* pmp,
                 }
 
                 --offsetThisPass;
-            } else {
+            }
+            else {
                 outputSortRun->insertTuple(run->currentTuple());
                 ++outputTupleCount;
                 if (run->advance()) {
@@ -575,7 +608,8 @@ void LargeTempTable::sort(ProgressMonitorProxy* pmp,
 
         outputSortRun->finishInserts();
         sortRunQueue.push(outputSortRun);
-    } while (sortRunQueue.size() > 1);
+    }
+    while (sortRunQueue.size() > 1);
 
     swapContents(sortRunQueue.front()->peekTable());
 }

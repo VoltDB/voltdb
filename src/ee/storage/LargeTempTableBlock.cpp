@@ -23,12 +23,19 @@
 
 namespace voltdb {
 
-LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema) :
-    m_id(id), m_schema(schema), m_tupleInsertionPoint(tupleStorage()),
-    m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES) {
+LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema)
+    : m_id(id)
+    , m_schema(schema)
+    , m_storage(new char [BLOCK_SIZE_IN_BYTES])
+    , m_tupleInsertionPoint(tupleStorage())
+    , m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES)
+    , m_isPinned(false)
+    , m_isStored(false)
+    , m_activeTupleCount(0)
+{
     // Initialize the metadata in the header of the block:
-    *getStorageAddressPointer() = &m_storage[0];
-    *getStorageTupleCount() = 0;
+    *(getStorageAddressPointer()) = &(m_storage[0]);
+    *(getStorageTupleCount()) = 0;
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
@@ -58,7 +65,7 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     target.setNonInlinedDataIsVolatileTrue();
 
     ++m_activeTupleCount;
-    ++*getStorageTupleCount();
+    ++(*getStorageTupleCount());
     vassert(m_activeTupleCount == *getStorageTupleCount());
     m_tupleInsertionPoint += target.tupleLength();
 
@@ -80,30 +87,30 @@ void* LargeTempTableBlock::allocate(std::size_t size) {
 int64_t LargeTempTableBlock::getAllocatedMemory() const {
     if (! isResident()) {
         return 0;
-    } else {
-        vassert(getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
-        return BLOCK_SIZE_IN_BYTES;
     }
+
+    vassert(getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
+    return BLOCK_SIZE_IN_BYTES;
 }
 
 int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
     if (isResident()) {
         return m_tupleInsertionPoint - m_storage.get();
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
     if (isResident()) {
-        return m_storage.get() + BLOCK_SIZE_IN_BYTES - m_nonInlinedInsertionPoint;
-    } else {
-        return 0;
+        return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_nonInlinedInsertionPoint;
     }
+
+    return 0;
 }
 
 void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
-    vassert(m_storage.get() == nullptr);
+    vassert(m_storage.get() == NULL);
     storage.swap(m_storage);
 
     vassert(m_activeTupleCount == *getStorageTupleCount());
@@ -111,16 +118,16 @@ void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
     char* origAddress = *(getStorageAddressPointer());
 
     // Update the insertion points to reflect the relocation
-    std::ptrdiff_t oldNewOffset = m_storage.get() - origAddress;
+    std::ptrdiff_t oldNewOffset = (m_storage.get() - origAddress);
     m_tupleInsertionPoint += oldNewOffset;
     m_nonInlinedInsertionPoint += oldNewOffset;
 
     // Need to update all the string ref pointers in the tuples...
-    for(auto& tuple : *this) {
+    BOOST_FOREACH(auto& tuple, *this) {
         tuple.toTableTuple(m_schema).relocateNonInlinedFields(oldNewOffset);
     }
 
-    *getStorageAddressPointer() = m_storage.get();
+    *(getStorageAddressPointer()) = m_storage.get();
 }
 
 std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
@@ -137,7 +144,8 @@ std::string LargeTempTableBlock::debug() const {
 
     if (! isResident()) {
         oss << "(not resident)";
-    } else {
+    }
+    else {
         oss << "\n";
         TableTuple tuple{m_storage.get(), m_schema};
         if (m_activeTupleCount >= 1) {
@@ -160,7 +168,8 @@ std::string LargeTempTableBlock::debugUnsafe() const {
 
     if (! isResident()) {
         oss << "not resident";
-    } else {
+    }
+    else {
         TableTuple tuple{m_storage.get(), m_schema};
         oss << "first tuple: " << tuple.debug();
     }
@@ -168,34 +177,34 @@ std::string LargeTempTableBlock::debugUnsafe() const {
     return oss.str();
 }
 
-LargeTempTableBlock::iterator LargeTempTableBlock::begin() {
-    return iterator(m_schema, tupleStorage());
-}
+    LargeTempTableBlock::iterator LargeTempTableBlock::begin() {
+        return iterator(m_schema, tupleStorage());
+    }
 
-LargeTempTableBlock::const_iterator LargeTempTableBlock::begin() const {
-    return const_iterator(m_schema, tupleStorage());
-}
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::begin() const {
+        return const_iterator(m_schema, tupleStorage());
+    }
 
-LargeTempTableBlock::const_iterator LargeTempTableBlock::cbegin() const {
-    return const_iterator(m_schema, tupleStorage());
-}
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::cbegin() const {
+        return const_iterator(m_schema, tupleStorage());
+    }
 
-LargeTempTableBlock::iterator LargeTempTableBlock::end() {
-    TableTuple tuple(tupleStorage(), m_schema);
-    char *endAddress = tupleStorage() + (tuple.tupleLength() * m_activeTupleCount);
-    return iterator(m_schema, endAddress);
-}
+    LargeTempTableBlock::iterator LargeTempTableBlock::end() {
+        TableTuple tuple(tupleStorage(), m_schema);
+        char *endAddress = tupleStorage() + (tuple.tupleLength() * m_activeTupleCount);
+        return iterator(m_schema, endAddress);
+    }
 
-LargeTempTableBlock::const_iterator LargeTempTableBlock::end() const {
-    TableTuple tuple(tupleStorage(), m_schema);
-    char *endAddress = tupleStorage() + (tuple.tupleLength() * m_activeTupleCount);
-    return const_iterator(m_schema, endAddress);
-}
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::end() const {
+        TableTuple tuple(tupleStorage(), m_schema);
+        char *endAddress = tupleStorage() + (tuple.tupleLength() * m_activeTupleCount);
+        return const_iterator(m_schema, endAddress);
+    }
 
-LargeTempTableBlock::const_iterator LargeTempTableBlock::cend() const {
-    TableTuple tuple(tupleStorage(), m_schema);
-    char *endAddress = m_storage.get() + (tuple.tupleLength() * m_activeTupleCount);
-    return const_iterator(m_schema, endAddress);
-}
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::cend() const {
+        TableTuple tuple(tupleStorage(), m_schema);
+        char *endAddress = m_storage.get() + (tuple.tupleLength() * m_activeTupleCount);
+        return const_iterator(m_schema, endAddress);
+    }
 
 } // end namespace voltdb

@@ -37,7 +37,7 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 SERVERS="localhost"
 
-PYTHON=/usr/bin/python2
+PYTHON=/usr/bin/python2.6
 
 # remove build artifacts
 function clean() {
