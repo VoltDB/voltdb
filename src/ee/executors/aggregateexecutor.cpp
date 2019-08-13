@@ -505,12 +505,10 @@ public:
         // if this is a worker, we will need to call the assemble method to accumulate
         // the values within this partition
         if (isWorker) {
-            argVector[currVecSize] = val; // NValue assignment operator overloading
-            //currVecSize = (currVecSize + 1) / maxVecSize;
-            ++currVecSize;
-            if (currVecSize == maxVecSize) {
+            argVector[currVecSize++] = val; // NValue assignment operator overloading
+            currVecSize %= maxVecSize;
+            if (currVecSize == 0) {
                 engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, maxVecSize, udafIndex);
-                currVecSize = 0;
             }
         }
         // if this is a coordinator (not worker), we will need to call the combine method
