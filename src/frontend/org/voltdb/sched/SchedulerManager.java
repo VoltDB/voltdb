@@ -165,7 +165,8 @@ public class SchedulerManager {
             @Override
             public void leaderMigrationFailed(int partitionId, long initiatorHSId) {
                 try {
-                    if (m_migratingPartitions.remove(partitionId).get().booleanValue()) {
+                    Future<Boolean> demoteFuture = m_migratingPartitions.remove(partitionId);
+                    if (demoteFuture != null && demoteFuture.get().booleanValue()) {
                         promotedPartition(partitionId);
                     }
                 } catch (InterruptedException | ExecutionException e) {
@@ -309,10 +310,11 @@ public class SchedulerManager {
      */
     ListenableFuture<?> promotedPartition(int partitionId) {
         return execute(() -> {
-            m_locallyLedPartitions.add(partitionId);
-            updatePartitionedThreadPoolSize();
-            for (SchedulerHandler sd : m_handlers.values()) {
-                sd.promotedPartition(partitionId);
+            if (m_locallyLedPartitions.add(partitionId)) {
+                updatePartitionedThreadPoolSize();
+                for (SchedulerHandler sd : m_handlers.values()) {
+                    sd.promotedPartition(partitionId);
+                }
             }
         });
     }
