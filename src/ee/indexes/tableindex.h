@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETABLEINDEX_H
-#define HSTORETABLEINDEX_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -447,8 +446,7 @@ public:
      * @Return less than rank value as "m_entries.size()"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const
-    {
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const {
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
     }
 
@@ -575,4 +573,3 @@ private:
 
 }
 
-#endif
