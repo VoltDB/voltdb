@@ -62,7 +62,7 @@ protected:
     UniqueTable<LargeTempTable> createAndFillLargeTempTable(int32_t varcharLengthBytes,
                                                             int32_t inlinePadding,
                                                             int32_t numBlocks) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         TupleSchema *schema = getSchemaOfLength(varcharLengthBytes, inlinePadding);
         std::vector<std::string> names;
         names.push_back("strfld");
@@ -74,7 +74,7 @@ protected:
 
         int expectedTuples = 0;
         for (int i = 0; i < numBlocks; ++i) {
-            LargeTempTableBlock* block = lttBlockCache->getEmptyBlock(schema);
+            LargeTempTableBlock* block = lttBlockCache.getEmptyBlock(schema);
             fillBlock(block);
             expectedTuples += block->activeTupleCount();
             block->unpin();
@@ -360,7 +360,7 @@ typedef std::tuple<int, int> SortConfig;
 
 #ifndef MEMCHECK
 std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     std::vector<SortConfig> configs;
 
@@ -376,7 +376,7 @@ std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
     // Add some interesting numbers:
     int totalTuples = static_cast<int>(ltt->activeTupleCount());
     if (totalTuples > 0) {
-        LargeTempTableBlock *block = lttBlockCache->getBlockForDebug(ltt->getBlockIds()[0]);
+        LargeTempTableBlock *block = lttBlockCache.getBlockForDebug(ltt->getBlockIds()[0]);
         int tuplesPerBlock = static_cast<int>(block->activeTupleCount());
 
         std::vector<int> interestingValues {

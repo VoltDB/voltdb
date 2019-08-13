@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef _STORAGE_ABSTRACTTEMPTABLE_HPP
-#define _STORAGE_ABSTRACTTEMPTABLE_HPP
+#pragma once
 
 #include "storage/table.h"
 
@@ -91,4 +90,3 @@ protected:
 
 }
 
-#endif // _STORAGE_ABSTRACTTEMPTABLE_HPP

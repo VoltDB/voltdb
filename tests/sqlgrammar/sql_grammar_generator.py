@@ -423,6 +423,8 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
                                 'ClassCastException',
                                 'SAXParseException',
                                 'RuntimeException',
+                                'IllegalStateException',
+                                'JSONException',
                                 'VoltTypeException']},
                     {'type':'ERROR', 'title':"'ERROR'",
                     'subtypes':['Error compiling query',
@@ -1068,12 +1070,15 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
 
 
-def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000,
+def generate_sql_statements(sql_statement_type, num_sql_statements=0,
+                            max_save_sql_statements=1000, max_save_sqlcmd_outputs=1000,
                             delete_statement_type='truncate-statement', delete_statement_number=10):
     """Generate and print the specified number of SQL statements (num_sql_statements),
-    of the specified type (sql_statement_type); the output file(s) should contain
-    a maximum of the specified number of SQL statements (max_save_statements), meaning
-    that each time we reach that number, the output file(s) are deleted and begun again.
+    of the specified type (sql_statement_type); the (sql and sqlcmd) output files
+    should each contain a maximum of the specified number of SQL statements
+    (max_save_sql_statements and max_save_sqlcmd_outputs, respectively), meaning
+    that each time we reach one of those numbers, the respective output file is
+    deleted and begun again (with 0 meaning no limit).
     """
     global max_time, debug, grammar
     global count_sql_statements, sql_output_file, sqlcmd_output_file
@@ -1095,25 +1100,30 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
             break
         print_sql_statement(get_one_sql_statement(grammar, sql_statement_type))
 
-        # After every 'max_save_statements' statements, delete the output file(s)
-        # and start over, to avoid the file(s) becoming too large; at the same
-        # time, issue TRUNCATE (or DELETE) statements, in order to avoid the
-        # VoltDB server's memory growing too large
+        # After every 'max_save_sql_statements' statements, delete the SQL output
+        # file and start over with a new file, to avoid the file becoming too large
         if (count_sql_statements and count_sql_statements.get('total')
-                and count_sql_statements['total'].get('total') and max_save_statements
-                and not count_sql_statements['total']['total'] % max_save_statements):
-            if sql_output_file and sql_output_file is not sys.stdout:
-                filename = sql_output_file.name
-                sql_output_file.close()
-                sql_output_file = open(filename, 'w', 0)
-            if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
-                filename = sqlcmd_output_file.name
-                sqlcmd_output_file.close()
-                sqlcmd_output_file = open(filename, 'w', 0)
-            for i in range(delete_statement_number):
-                # Include TRUNCATE (or DELETE) statements in the total count
-                count += 1
-                print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
+                and count_sql_statements['total'].get('total') ):
+            if (max_save_sql_statements and not
+                    count_sql_statements['total']['total'] % max_save_sql_statements):
+                if sql_output_file and sql_output_file is not sys.stdout:
+                    filename = sql_output_file.name
+                    sql_output_file.close()
+                    sql_output_file = open(filename, 'w', 0)
+            # Similarly, after every 'max_save_sqlcmd_outputs' statements, delete
+            # the sqlcmd output file and start over, to avoid the file becoming
+            # too large; at the same time, issue TRUNCATE (or DELETE) statements,
+            # in order to avoid the VoltDB server's memory growing too large
+            if (max_save_sqlcmd_outputs and not
+                    count_sql_statements['total']['total'] % max_save_sqlcmd_outputs):
+                if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
+                    filename = sqlcmd_output_file.name
+                    sqlcmd_output_file.close()
+                    sqlcmd_output_file = open(filename, 'w', 0)
+                for i in range(delete_statement_number):
+                    # Include TRUNCATE (or DELETE) statements in the total count
+                    count += 1
+                    print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
 
 
 if __name__ == "__main__":
@@ -1152,16 +1162,23 @@ if __name__ == "__main__":
                          + "server's memory does not grow too large [default: truncate-statement]")
     parser.add_option("-T", "--delete_number", dest="delete_number", default=10,
                       help="the number of DELETE_TYPE SQL statements to generate, each time [default: 10]")
-    parser.add_option("-x", "--max_save", dest="max_save", default=1000,
-                      help="the maximum number of SQL statements (and their results, if sqlcmd is called) to save "
-                         + "in the output files; after this many SQL statements, the output files are erased, and "
-                         + "DELETE_TYPE statements are called, to clear the database and start fresh [default: 1000]")
     parser.add_option("-o", "--output", dest="sql_output", default="sqlcmd.in",
                       help="an output file path/name, to which to send all generated SQL statements; "
                          + "if not specified, output goes to STDOUT [default: sqlcmd.in]")
     parser.add_option("-O", "--sqlcmd", dest="sqlcmd_output", default="sqlcmd.out",
-                      help="an output file path/name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
-                         + "generated SQL statements are only passed to sqlcmd if this value exists [default: sqlcmd.out]")
+                      help="an output file path/name, to which sqlcmd output is sent, or STDOUT to send the output "
+                         + "there; the generated SQL statements are only passed to sqlcmd if this value exists "
+                         + "[default: sqlcmd.out]")
+    parser.add_option("-x", "--max_save_sql", dest="max_save_sql", default=1000,
+                      help="the maximum number of SQL statements to save in the SQL output file (SQL_OUTPUT); "
+                         + "after this many SQL statements, the SQL output file is erased and begun again; "
+                         + "a zero (0) value means no limit [default: 1000]")
+    parser.add_option("-X", "--max_save_sqlcmd", dest="max_save_sqlcmd", default=1000,
+                      help="the maximum number of SQL statements and their results (assuming sqlcmd is called) "
+                         + "to save in the sqlcmd output file (SQLCMD_OUTPUT); after this many SQL statements, "
+                         + "the sqlcmd output file is erased, and DELETE_NUUMBER DELETE_TYPE statements are "
+                         + "called, to (mostly) clear the database and start fresh; a zero (0) value means no "
+                         + "limit [default: 1000]")
     parser.add_option("-s", "--summary", dest="sqlcmd_summary", default="summary.out",
                       help="an output file path/name, to which a summary of all sqlcmd output is sent; a brief "
                          + "summary also goes to STDOUT, assuming that 'sqlcmd' exists [default: summary.out]")
@@ -1205,7 +1222,7 @@ if __name__ == "__main__":
                       help="a boolean value (True or False), specifying whether to include, in the ECHO_FILE, "
                          + "the list of grammar symbols, and how many times each one was used, for each of the "
                          + "SQL statements that is echoed [default: False]")
-    parser.add_option("-X", "--suffix", dest="suffix", default=None,
+    parser.add_option("-u", "--suffix", dest="suffix", default=None,
                       help="a suffix to be appended to the various output file names (but before their extensions); "
                          + "e.g., if SQLCMD_OUTPUT has its default value of 'sqlcmd.out', and SUFFIX is '123', then "
                          + "the actual sqlcmd output file will be named 'sqlcmd123.out' [default: None]")
@@ -1224,32 +1241,33 @@ if __name__ == "__main__":
     if debug > 1:
         print "DEBUG: all arguments:", " ".join(sys.argv)
         print "DEBUG: options (all):\n", options
-        print "DEBUG: args (all)            :", args
-        print "DEBUG: options.path          :", options.path
-        print "DEBUG: options.grammar_files :", options.grammar_files
-        print "DEBUG: options.seed          :", options.seed
-        print "DEBUG: options.initial_type  :", options.initial_type
-        print "DEBUG: options.initial_number:", options.initial_number
-        print "DEBUG: options.type          :", options.type
-        print "DEBUG: options.number        :", options.number
-        print "DEBUG: options.minutes       :", options.minutes
-        print "DEBUG: options.delete_type   :", options.delete_type
-        print "DEBUG: options.delete_number :", options.delete_number
-        print "DEBUG: options.max_save      :", options.max_save
-        print "DEBUG: options.sql_output    :", options.sql_output
-        print "DEBUG: options.sqlcmd_output :", options.sqlcmd_output
-        print "DEBUG: options.sqlcmd_summary:", options.sqlcmd_summary
-        print "DEBUG: options.summary_number:", options.summary_number
-        print "DEBUG: options.log_files     :", options.log_files
-        print "DEBUG: options.log_number    :", options.log_number
-        print "DEBUG: options.find_in_log   :", options.find_in_log
-        print "DEBUG: options.find_files    :", options.find_files
-        print "DEBUG: options.find_number   :", options.find_number
-        print "DEBUG: options.echo          :", options.echo
-        print "DEBUG: options.echo_file     :", options.echo_file
-        print "DEBUG: options.echo_grammar  :", options.echo_grammar
-        print "DEBUG: options.suffix        :", options.suffix
-        print "DEBUG: options.debug         :", options.debug
+        print "DEBUG: args (all)             :", args
+        print "DEBUG: options.path           :", options.path
+        print "DEBUG: options.grammar_files  :", options.grammar_files
+        print "DEBUG: options.seed           :", options.seed
+        print "DEBUG: options.initial_type   :", options.initial_type
+        print "DEBUG: options.initial_number :", options.initial_number
+        print "DEBUG: options.type           :", options.type
+        print "DEBUG: options.number         :", options.number
+        print "DEBUG: options.minutes        :", options.minutes
+        print "DEBUG: options.delete_type    :", options.delete_type
+        print "DEBUG: options.delete_number  :", options.delete_number
+        print "DEBUG: options.sql_output     :", options.sql_output
+        print "DEBUG: options.sqlcmd_output  :", options.sqlcmd_output
+        print "DEBUG: options.max_save_sql   :", options.max_save_sql
+        print "DEBUG: options.max_save_sqlcmd:", options.max_save_sqlcmd
+        print "DEBUG: options.sqlcmd_summary :", options.sqlcmd_summary
+        print "DEBUG: options.summary_number :", options.summary_number
+        print "DEBUG: options.log_files      :", options.log_files
+        print "DEBUG: options.log_number     :", options.log_number
+        print "DEBUG: options.find_in_log    :", options.find_in_log
+        print "DEBUG: options.find_files     :", options.find_files
+        print "DEBUG: options.find_number    :", options.find_number
+        print "DEBUG: options.echo           :", options.echo
+        print "DEBUG: options.echo_file      :", options.echo_file
+        print "DEBUG: options.echo_grammar   :", options.echo_grammar
+        print "DEBUG: options.suffix         :", options.suffix
+        print "DEBUG: options.debug          :", options.debug
 
     if options.seed:
         seed_type   = 'supplied'
@@ -1394,6 +1412,9 @@ if __name__ == "__main__":
                             ['PARTITION has unknown COLUMN'],
                             ['Invalid use of PRIMARY KEY'],
                             ['Invalid use of UNIQUE'],
+                            ['Stream configured with materialized view without partitioned column'],
+                            ['Invalid parameter count for procedure'],
+                            ['Schema file ended mid-statement'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
@@ -1416,8 +1437,8 @@ if __name__ == "__main__":
             total_initial_statement_count += int(options.initial_number)
             generate_sql_statements(sql_statement_type, int(total_initial_statement_count))
     for sql_statement_type in options.type.split(','):
-        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
-                                options.delete_type, options.delete_number)
+        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save_sql),
+                                int(options.max_save_sqlcmd), options.delete_type, options.delete_number)
 
     if debug > 5:
         print_sql_statement('select * from P1;')

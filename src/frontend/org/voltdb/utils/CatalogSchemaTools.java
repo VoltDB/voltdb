@@ -49,6 +49,8 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
@@ -93,12 +95,12 @@ public abstract class CatalogSchemaTools {
      * @param sb - the schema being built
      * @param catalog_tbl - object to be analyzed
      * @param viewQuery - the Query if this Table is a View
-     * @param isExportOnly Is this a export table.
+     * @param isStream Is this a export table.
      * @param streamPartitionColumn stream partition column
      * @param streamTarget - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportOnly, String streamPartitionColumn, String streamTarget) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isStream, String streamPartitionColumn, String streamTarget) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -203,7 +205,9 @@ public abstract class CatalogSchemaTools {
                 // If there is, then we need to add it to the end of the table definition
                 boolean found = false;
                 for (Column catalog_other_col : catalog_tbl.getColumns()) {
-                    if (catalog_other_col.equals(catalog_col)) continue;
+                    if (catalog_other_col.equals(catalog_col)) {
+                        continue;
+                    }
                     if (catalog_other_col.getConstraints().getIgnoreCase(catalog_const.getTypeName()) != null) {
                         found = true;
                         break;
@@ -235,7 +239,9 @@ public abstract class CatalogSchemaTools {
 
         // Constraints
         for (Constraint catalog_const : catalog_tbl.getConstraints()) {
-            if (skip_constraints.contains(catalog_const)) continue;
+            if (skip_constraints.contains(catalog_const)) {
+                continue;
+            }
             ConstraintType const_type = ConstraintType.get(catalog_const.getType());
 
             // Primary Keys / Unique Constraints
@@ -351,13 +357,15 @@ public abstract class CatalogSchemaTools {
         sb.append(table_sb.toString());
 
         // Partition Table for regular tables (non-streams)
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isStream) {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
         }
 
         // All other Indexes
         for (Index catalog_idx : catalog_tbl.getIndexes()) {
-            if (skip_indexes.contains(catalog_idx)) continue;
+            if (skip_indexes.contains(catalog_idx)) {
+                continue;
+            }
 
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
@@ -447,8 +455,32 @@ public abstract class CatalogSchemaTools {
 
     public static void toSchema(StringBuilder sb, Function func)
     {
-        String functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
-        sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
+        String functionDDLTemplate;
+        if (func.getMethodname() == null ) {
+            functionDDLTemplate = "CREATE AGGREGATE FUNCTION %s FROM CLASS %s;\n\n";
+            sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname()));
+        } else {
+            functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
+            sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
+        }
+    }
+
+    public static void toSchema(StringBuilder sb, ProcedureSchedule schedule) {
+        sb.append("CREATE SCHEDULE ").append(schedule.getName()).append(" ON ").append(schedule.getRunlocation())
+                .append(" USING ").append(schedule.getSchedulerclass());
+        if (schedule.getUser() != null) {
+            sb.append(" AS USER ").append(schedule.getUser());
+        }
+        if (!schedule.getEnabled()) {
+            sb.append(" DISABLED");
+        }
+        CatalogMap<SchedulerParam> params = schedule.getParameters();
+        String delimiter = " WITH ";
+        for (int i = 0; i < params.size(); ++i) {
+            sb.append(delimiter).append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+            delimiter = ", ";
+        }
+        sb.append(";\n");
     }
 
     /**
@@ -619,6 +651,13 @@ public abstract class CatalogSchemaTools {
                 if (! functions.isEmpty()) {
                     for (Function func : functions) {
                         toSchema(sb, func);
+                    }
+                }
+
+                CatalogMap<ProcedureSchedule> schedules = db.getProcedureschedules();
+                if (!schedules.isEmpty()) {
+                    for (ProcedureSchedule schedule : schedules) {
+                        toSchema(sb, schedule);
                     }
                 }
 

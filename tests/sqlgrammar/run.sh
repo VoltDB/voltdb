@@ -67,9 +67,9 @@ function build() {
 # Build VoltDB: 'pro' version
 function build-pro() {
     echo -e "\n$0 performing: build-pro $BUILD_ARGS"
-    test-tools-build-pro $BUILD_ARGS
-    # For now, the same deployment file is used for 'community' and 'pro'
+    # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
+    test-tools-build-pro $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
@@ -173,6 +173,8 @@ function jars-if-needed() {
 
 # Start the VoltDB server: 'community', open-source version
 function server() {
+    find-directories-if-needed
+    build-if-needed
     echo -e "\n$0 performing: server"
     test-tools-server
     code[3]=${code_tt_server}
@@ -180,10 +182,12 @@ function server() {
 
 # Start the VoltDB server: 'pro' version
 function server-pro() {
+    find-directories-if-needed
+    build-pro-if-needed
     echo -e "\n$0 performing: server-pro"
-    test-tools-server-pro
-    # For now, the same deployment file is used for 'community' and 'pro'
+    # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
+    test-tools-server-pro
     code[3]=${code_tt_server}
 }
 
@@ -237,7 +241,7 @@ function ddl-if-needed() {
 function ddl-pro() {
     ddl-if-needed
 
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
+    echo -e "\n$0 performing: ddl-pro; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
     $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL-pro.sql
     code4e=$?
 
@@ -357,7 +361,7 @@ function all() {
 function all-pro() {
     echo -e "\n$0 performing: all-pro$ARGS"
     prepare-pro
-    tests
+    tests-pro
     shutdown
 }
 
@@ -386,15 +390,17 @@ function help() {
     echo -e "    ddl-pro         : runs (in sqlcmd) the DDL (.sql) files needed by the ('pro') tests"
     echo -e "    prepare         : runs (almost) all of the above, except the '-pro' options"
     echo -e "    prepare-pro     : runs (almost) all of the above, using the '-pro' options"
-    echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare' has been run"
-    echo -e "    tests           : runs the tests, preceded by whatever other options are needed"
+    echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare[-pro]' has been run"
+    echo -e "    tests           : runs the tests, preceded by whatever other (community) options are needed"
+    echo -e "    tests-pro       : runs the tests, preceded by whatever other (pro) options are needed"
     echo -e "    shutdown        : stops a VoltDB server that is currently running"
     echo -e "    all             : runs 'prepare', 'tests', 'shutdown', effectively calling everything (non-pro)"
-    echo -e "    all-pro         : runs 'prepare-pro', 'tests', 'shutdown', effectively calling everything (-pro)"
+    echo -e "    all-pro         : runs 'prepare-pro', 'tests-pro', 'shutdown', effectively calling everything (-pro)"
     echo -e "    tests-help      : prints a help message for the SQL-grammar-generator Python program"
     echo -e "    test-tools-help : prints a help message for the test-tools.sh script, which is used by this one"
     echo -e "    help            : prints this message"
-    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details."
+    echo -e "The 'tests-only', 'tests[-pro]', and 'all[-pro]' options accept test arguments: see the 'tests-help'"
+    echo -e "  option for details."
     echo -e "The 'build[-pro]', options accept VoltDB build arguments, e.g. '-Dbuild=debug'."
     echo -e "Some options (build[-pro], init, jars, server[-pro], ddl[-pro]) may have '-if-needed' appended,"
     echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
@@ -428,7 +434,7 @@ function exit-with-code() {
             echo -e "\ncode3a code3b: $code_voltdb_init $code_voltdb_start (server-init, server-start)"
         fi
         if [[ "${code[4]}" -ne "0" ]]; then
-            echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d $code4e (grammar-ddl, UDF-drop, UDF-load, UDF-ddl, grammar-pro)"
+            echo -e "\ncode4a code4b code4c code4d code4e: $code4a $code4b $code4c $code4d $code4e (grammar-ddl, UDF-drop, UDF-load, UDF-ddl; grammar-pro)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
     fi

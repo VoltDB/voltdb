@@ -659,4 +659,6 @@ public interface ErrorCode {
 
     // CLI-specific condition - 200x
     int X_HY093 = 6800;                                   // CLI-specific condition: invalid datalink value
+    
+    int X_UDAF01 = 6900;                                  // user-defined aggregate functions are not allowed to have "distinct" keyword
 }

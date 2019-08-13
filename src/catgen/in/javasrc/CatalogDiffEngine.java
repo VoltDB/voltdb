@@ -504,7 +504,8 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint)
+            suspect instanceof Constraint ||
+            suspect instanceof ProcedureSchedule)
         {
             return null;
         }
@@ -516,7 +517,7 @@ public class CatalogDiffEngine {
                 return "May not dynamically add TTl on materialized view's columns.";
             }
             // stream table can not have ttl columns
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table) ) {
+            if (CatalogUtil.isStream((Database)table.getParent(), table) ) {
                 return "May not dynamically add TTL on stream table's columns.";
             }
             return null;
@@ -613,7 +614,7 @@ public class CatalogDiffEngine {
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
             }
-            boolean isStreamOrStreamView = CatalogUtil.isTableExportOnly((Database)table.getParent(), table)
+            boolean isStreamOrStreamView = CatalogUtil.isStream((Database)table.getParent(), table)
                     || TableType.needsShadowStream(table.getTabletype());
             if (isStreamOrStreamView) {
                 m_requiresNewExportGeneration = true;
@@ -1042,6 +1043,10 @@ public class CatalogDiffEngine {
             }
         }
 
+        if (suspect instanceof ProcedureSchedule && field.equals("enabled")) {
+            return null;
+        }
+
         // whitelist certain column changes
         if (suspect instanceof Column) {
             CatalogType parent = suspect.getParent();
@@ -1055,9 +1060,10 @@ public class CatalogDiffEngine {
 
             // now assume parent is a Table
             Table table = (Table) parent;
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table) ||
-                    TableType.needsShadowStream(table.getTabletype())) {
+            if (TableType.needsExportDataSource(table.getTabletype())) {
                 m_requiresNewExportGeneration = true;
+                return null;
+            } else if (TableType.isConnectorLessStream(table.getTabletype())) {
                 return null;
             }
 

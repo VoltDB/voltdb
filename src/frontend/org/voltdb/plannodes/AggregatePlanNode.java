@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -51,7 +52,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         AGGREGATE_OUTPUT_COLUMN,
         AGGREGATE_EXPRESSION,
         GROUPBY_EXPRESSIONS,
-        PARTIAL_GROUPBY_COLUMNS
+        PARTIAL_GROUPBY_COLUMNS,
+        USER_AGGREGATE_ID,
+        IS_WORKER,
+        IS_PARTITION
         ;
     }
 
@@ -61,6 +65,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Integer> m_aggregateDistinct = new ArrayList<>();
     // a list of column offsets/indexes not plan column guids.
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
+    // a list of IDs for user define aggregate functions
+    protected List<Integer> m_userAggregateId = new ArrayList<>();
+    // a list of booleans that represent whether it is a worker or a coordinator
+    protected List<Boolean> m_isWorker = new ArrayList<>();
+    // a list of booleans that represent whether it is a partioned table or a replicated table
+    protected List<Boolean> m_isPartition = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
@@ -250,6 +260,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
+    public int getUserAggregateId(int index) {
+        return m_userAggregateId.get(index);
+    }
+
     public void setOutputSchema(NodeSchema schema) {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
@@ -343,6 +357,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    public void addUserDefineAggregateId(int id) {
+        m_userAggregateId.add(id);
+    }
+
     /**
      * Add an aggregate to this plan node.
      * @param aggType
@@ -373,6 +391,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add(aggInputExpr.clone());
         }
+        m_isWorker.add(true);
+        m_isPartition.add(true);
     }
 
     public void updateAggregate(
@@ -393,6 +413,28 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_aggregateTypes.set(index, aggType);
     }
 
+    // This method updates the return type of the distNode to be varbinary
+    // and size to be 1048576 (which is the maximum)
+    public void updateUserDefinedAggregate(int index) {
+        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
+        AbstractExpression schemaExpr = schemaCol.getExpression();
+        schemaExpr.setValueType(VoltType.VARBINARY);
+        schemaExpr.setValueSize(1048576);
+    }
+
+    // This method updates m_isWorker at a given index
+    // to be false which means it is a coordinator, not a worker
+    public void updateWorkerOrCoordinator(int index) {
+        m_isWorker.set(index, false);
+    }
+
+    // This method updates m_isPartition at a given index
+    // to be false which means it is a replicated table, not a partitioned table
+    public void updatePartitionOrReplicate(int index) {
+        m_isPartition.set(index, false);
+    }
+
     public void addGroupByExpression(AbstractExpression expr)
     {
         if (expr == null) {
@@ -409,6 +451,19 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
+            // UDFTODO: You only put in the id, is_worker, is_partition when the id is not -1
+            /*
+            if (m_userAggregateId.get(ii) != -1) {
+                stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
+                stringer.keySymbolValuePair(Members.IS_WORKER.name(), m_isWorker.get(ii));
+                stringer.keySymbolValuePair(Members.IS_PARTITION.name(), m_isPartition.get(ii));
+            }
+            */
+            if (m_userAggregateId.size() > ii) {
+                stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
+            }
+            stringer.keySymbolValuePair(Members.IS_WORKER.name(), m_isWorker.get(ii));
+            stringer.keySymbolValuePair(Members.IS_PARTITION.name(), m_isPartition.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));

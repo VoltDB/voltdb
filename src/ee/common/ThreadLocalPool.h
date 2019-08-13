@@ -51,7 +51,7 @@ struct PoolLocals {
 
     PoolPairType* poolData = nullptr;
     CompactingStringStorage* stringData = nullptr;
-    std::size_t allocated;
+    std::size_t* allocated;
     int32_t* enginePartitionId = nullptr;
 };
 

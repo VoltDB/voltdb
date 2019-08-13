@@ -1068,8 +1068,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(
             }
             indexRequiresUpdate[i] = true;
             if (!index->deleteEntry(&targetTupleToUpdate)) {
-                throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
+                // TODO: ENG-17091; (undeterminstic reproducer: TestAdHocQueries.java)
+                //throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
+                throwSerializableEEException(
+                        "Failed to remove tuple (%s) from index (during update) in Table: %s Index %s:\n%s",
+                        targetTupleToUpdate.debug().c_str(), m_name.c_str(), index->getName().c_str(),
+                        index->debug().c_str());
             }
         }
     }
@@ -1691,8 +1695,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
             message << "column " << i << ": " << names[i]
                     << ", type = " << getTypeName(types[i]) << std::endl;
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message.str().c_str());
+        throw SerializableEEException(message.str().c_str());
     }
 
     int tupleCount = serialInput.readInt();

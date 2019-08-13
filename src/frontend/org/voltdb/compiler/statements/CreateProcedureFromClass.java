@@ -25,6 +25,7 @@ import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -75,7 +76,7 @@ public class CreateProcedureFromClass extends CreateProcedure {
             }
         }
 
-        ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+        ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
                 new ArrayList<String>(), null, clazz);
 
         // Parse the ALLOW and PARTITION clauses.
