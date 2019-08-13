@@ -27,6 +27,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.sched.ScheduleStatsSource;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -50,8 +51,12 @@ public class StatsAgent extends OpsAgent
     }
 
     @Override
-    protected void dispatchFinalAggregations(PendingOpsRequest request)
-    {
+    protected void dispatchFinalAggregations(PendingOpsRequest request) {
+        if (request.aggregateTables == null || request.aggregateTables.length == 0) {
+            // Skip aggregation when there are no stats
+            return;
+        }
+
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
         case PROCEDUREDETAIL:
@@ -77,17 +82,15 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
             break;
-        case TTL:
-            request.aggregateTables = aggregateTTLStats(request.aggregateTables);
+        case SCHEDULED_PROCEDURES:
+        case SCHEDULERS:
+            ScheduleStatsSource.convert(subselector, request.aggregateTables);
             break;
         default:
         }
     }
 
     private VoltTable[] sortProcedureDetailStats(VoltTable[] baseStats) {
-        if (baseStats == null || baseStats.length != 1) {
-            return baseStats;
-        }
         ProcedureDetailResultTable result = new ProcedureDetailResultTable(baseStats[0]);
         return result.getSortedResultTable();
     }
@@ -128,10 +131,6 @@ public class StatsAgent extends OpsAgent
      */
     private VoltTable[] aggregateProcedureStats(VoltTable[] baseStats)
     {
-        if (baseStats == null || baseStats.length != 1) {
-            return baseStats;
-        }
-
         VoltTable result = new VoltTable(
             new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
             new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
@@ -187,10 +186,6 @@ public class StatsAgent extends OpsAgent
      */
     private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
     {
-        if (baseStats == null || baseStats.length != 1) {
-            return baseStats;
-        }
-
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
@@ -225,10 +220,6 @@ public class StatsAgent extends OpsAgent
      */
     private VoltTable[] aggregateProcedureInputStats(VoltTable[] baseStats)
     {
-        if (baseStats == null || baseStats.length != 1) {
-            return baseStats;
-        }
-
         StatsProcInputTable timeTable = new StatsProcInputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
@@ -263,10 +254,6 @@ public class StatsAgent extends OpsAgent
 
     private VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats)
     {
-        if (baseStats == null || baseStats.length != 1) {
-            return baseStats;
-        }
-
         StatsProcOutputTable timeTable = new StatsProcOutputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
@@ -471,14 +458,7 @@ public class StatsAgent extends OpsAgent
     }
 
     private VoltTable[] aggregateDRRoleStats(VoltTable[] stats) {
-        if (stats != null && stats.length == 1) {
-            stats = new VoltTable[] {DRRoleStats.aggregateStats(stats[0])};
-        }
-        return stats;
-    }
-
-    private VoltTable[] aggregateTTLStats(VoltTable[] stats) {
-        return stats;
+        return new VoltTable[] { DRRoleStats.aggregateStats(stats[0]) };
     }
 
     public void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {

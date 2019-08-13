@@ -425,7 +425,7 @@ public class TestSchedulerManager {
         VoltTable table = getScheduleStats();
         Map<String, Long> invocationCounts = new HashMap<>();
         while (table.advanceRow()) {
-            invocationCounts.put(table.getString(0), table.getLong(5));
+            invocationCounts.put(table.getString("NAME"), table.getLong("SCHEDULER_INVOCATIONS"));
         }
 
         // No schedules should restart since class and deps did not change
@@ -434,8 +434,8 @@ public class TestSchedulerManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString(0);
-            long currentCount = table.getLong(5);
+            String scheduleName = table.getString("NAME");
+            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue("Count decreased for " + scheduleName,
                     invocationCounts.put(scheduleName, currentCount) < currentCount);
         }
@@ -448,8 +448,8 @@ public class TestSchedulerManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString(0);
-            long currentCount = table.getLong(5);
+            String scheduleName = table.getString("NAME");
+            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             long previousCount = invocationCounts.put(scheduleName, currentCount);
             if (scheduleName.equals("TestScheduler")) {
                 assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
@@ -471,8 +471,8 @@ public class TestSchedulerManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString(0);
-            long currentCount = table.getLong(5);
+            String scheduleName = table.getString("NAME");
+            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             long previousCount = invocationCounts.put(scheduleName, currentCount);
             assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
                     previousCount * 3 / 2 > currentCount);
