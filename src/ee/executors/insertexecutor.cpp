@@ -181,7 +181,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 
     // Note that we need to clear static trackers: ENG-17091
     // https://issues.voltdb.com/browse/ENG-17091?focusedCommentId=50362&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-50362
-    s_modifiedTuples = m_modifiedTuples = 0;
+    // count the number of successful inserts
+    m_modifiedTuples = 0;
     s_errorMessage.clear();
 
     m_tmpOutputTable = newOutputTable;
@@ -209,8 +210,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     }
 
     VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
-               static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
-               m_targetTable->name().c_str());
+            static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
+            m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
             m_node->isInline() ? "inline"
             : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
@@ -232,10 +233,10 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
     bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
     if (m_replicatedTableOperation &&
             SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
-            // Need to set this here for inlined inserts in case there are no inline inserts
-            // and finish is called right after this
-            s_modifiedTuples = 0;
-            SynchronizedThreadLock::signalLowestSiteFinished();
+        // Need to set this here for inlined inserts in case there are no inline inserts
+        // and finish is called right after this
+        s_modifiedTuples = 0;
+        SynchronizedThreadLock::signalLowestSiteFinished();
     }
     return rslt;
 }
