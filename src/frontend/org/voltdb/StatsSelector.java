@@ -68,7 +68,9 @@ public enum StatsSelector {
     IMPORTER,       // synonym as IMPORT for backward compatibility
     IMPORT(IMPORTER),
     EXPORT,
-    SCHEDULES(false);
+    SCHEDULES(false),
+    SCHEDULERS(SCHEDULES),
+    SCHEDULED_PROCEDURES(SCHEDULES);
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

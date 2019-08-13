@@ -54,7 +54,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
             VoltTable table = client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
             StringBuilder sb = new StringBuilder();
             while (table.advanceRow()) {
-                sb.append("DROP SCHEDULE ").append(table.getString(0)).append(';');
+                sb.append("DROP SCHEDULE ").append(table.getString("SCHEDULE_NAME")).append(';');
             }
             if (sb.length() != 0) {
                 client.callProcedure("@AdHoc", sb.toString());
@@ -113,7 +113,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         VoltTable table = getScheduleStats(client);
         assertEquals(2, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
 
         client.callProcedure("@AdHoc",
@@ -124,7 +124,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(2, table.getRowCount());
         while (table.advanceRow()) {
-            String scheduleName = table.getString(0);
+            String scheduleName = table.getString("NAME");
             int id = -1;
             if (schedule1.equalsIgnoreCase(scheduleName)) {
                 id = 1;
@@ -134,13 +134,13 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                 fail("Unknown schedule " + scheduleName);
             }
 
-            assertEquals("DISABLED", table.getString(1));
+            assertEquals("DISABLED", table.getString("STATE"));
 
             long summaryCount = client
                     .callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + summaryTable + " WHERE id = " + id + ";")
                     .getResults()[0].asScalarLong();
-            long procedureInvocations = table.getLong(10);
-            long successfulProcedureInvocations = procedureInvocations - table.getLong(15);
+            long procedureInvocations = table.getLong("PROCEDURE_INVOCATIONS");
+            long successfulProcedureInvocations = procedureInvocations - table.getLong("PROCEDURE_FAILURES");
 
             /*
              * There can be one extra invocation since stats are done when the result comes back and a schedule can be
@@ -152,7 +152,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                     summaryCount == successfulProcedureInvocations
                             || summaryCount == successfulProcedureInvocations + 1);
 
-            long schedulerInvocations = table.getLong(5);
+            long schedulerInvocations = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue(
                     schedulerInvocations == procedureInvocations || schedulerInvocations == procedureInvocations + 1);
         }
@@ -208,7 +208,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         VoltTable table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
 
         Thread.sleep(15);
@@ -220,11 +220,11 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("DISABLED", table.getString(1));
-            assertTrue("Scheduler invocation count is lower than expected: " + table.getLong(5),
-                    table.getLong(5) >= 50);
-            assertTrue("Procedure invocation count is lower than expected: " + table.getLong(10),
-                    table.getLong(10) >= 50);
+            assertEquals("DISABLED", table.getString("STATE"));
+            assertTrue("Scheduler invocation count is lower than expected: " + table.getLong("SCHEDULER_INVOCATIONS"),
+                    table.getLong("SCHEDULER_INVOCATIONS") >= 50);
+            assertTrue("Procedure invocation count is lower than expected: " + table.getLong("PROCEDURE_INVOCATIONS"),
+                    table.getLong("PROCEDURE_INVOCATIONS") >= 50);
         }
 
         assertEquals(60,
@@ -236,7 +236,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(4, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("DISABLED", table.getString(1));
+            assertEquals("DISABLED", table.getString("STATE"));
         }
 
         client.callProcedure("@AdHoc", "ALTER SCHEDULE " + schedule + " ENABLE;");
@@ -244,7 +244,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
     }
 

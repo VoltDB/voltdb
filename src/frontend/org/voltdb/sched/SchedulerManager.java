@@ -24,13 +24,11 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.math.RoundingMode;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -53,12 +51,9 @@ import org.voltdb.ParameterConverter;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsAgent;
-import org.voltdb.StatsSelector;
-import org.voltdb.StatsSource;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ProcParameter;
@@ -228,18 +223,8 @@ public class SchedulerManager {
             m_started = true;
 
             // Create a dummy stats source so something is always reported
-            m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, -1,
-                    new StatsSource(false) {
-                        @Override
-                        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-                            return Collections.emptyIterator();
-                        }
+            ScheduleStatsSource.createDummy().register(m_statsAgent);
 
-                        @Override
-                        protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-                            columns.addAll(ScheduleStatsSource.s_columns);
-                        }
-                    });
             processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
         });
     }
@@ -1062,8 +1047,8 @@ public class SchedulerManager {
             }
             m_scheduler = m_handler.constructScheduler();
             if (m_stats == null) {
-                m_stats = new ScheduleStatsSource(m_handler.getName(), getScope(), m_hostId, getSiteId());
-                m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
+                m_stats = ScheduleStatsSource.create(m_handler.getName(), getScope(), getSiteId());
+                m_stats.register(m_statsAgent);
             }
             setMaxRunFrequency(m_maxRunFrequency);
             setState(SchedulerWrapperState.RUNNING);
@@ -1208,7 +1193,7 @@ public class SchedulerManager {
          */
         void cancel() {
             shutdown(SchedulerWrapperState.CANCELED);
-            m_statsAgent.deregisterStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
+            m_stats.deregister(m_statsAgent);
         }
 
         synchronized void setEnabled(boolean enabled) {
