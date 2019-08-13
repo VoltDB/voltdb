@@ -167,8 +167,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     // Update target table reference from table delegate
     m_targetTable = m_node->getTargetTable();
     vassert(m_targetTable);
-    vassert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
-            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
+    vassert(nullptr != dynamic_cast<PersistentTable*>(m_targetTable) ||
+            nullptr != dynamic_cast<StreamedTable*>(m_targetTable));
 
     m_persistentTable = m_isStreamed ?
             NULL : static_cast<PersistentTable*>(m_targetTable);
@@ -202,8 +202,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_templateTuple = m_templateTupleStorage.tuple();
 
     std::vector<int>::iterator it;
-    for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
-        m_templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+    for (auto& iter : m_nowFields) {
+        m_templateTuple.setNValue(iter, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
     VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
