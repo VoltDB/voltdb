@@ -489,72 +489,80 @@ public:
     }
 };
 
-
+// User-defined aggregate function
 class UserDefineAgg : public Agg {
 public:
-    UserDefineAgg(int id, bool isWorkerIn, bool isPartitionIn, int udafIndexIn)
-        : functionId(id), isWorker(isWorkerIn), engine(ExecutorContext::getExecutorContext()->getEngine()),
-            udafIndex(udafIndexIn), isPartition(isPartitionIn), maxVecSize(4), currVecSize(0)
+    UserDefineAgg(int id, bool isWorker, bool isPartition, int udafIndex)
+        : m_engine(ExecutorContext::getExecutorContext()->getEngine()),
+            m_functionId(id), m_udafIndex(udafIndex),
+            m_isWorker(isWorker), m_isPartition(isPartition)
     {
-        argVector.resize(maxVecSize, NValue());
-        engine->callJavaUserDefinedAggregateStart(functionId);
+        m_argCount = 0;
+        m_argVector.resize(s_maxSize, NValue());
+        m_engine->callJavaUserDefinedAggregateStart(m_functionId);
     }
 
     virtual void advance(const NValue& val)
     {
         // if this is a worker, we will need to call the assemble method to accumulate
         // the values within this partition
-        if (isWorker) {
-            argVector[currVecSize++] = val; // NValue assignment operator overloading
-            currVecSize %= maxVecSize;
-            if (currVecSize == 0) {
-                engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, maxVecSize, udafIndex);
+        if (m_isWorker) {
+            // Add the argument (val) to the argument vector
+            // When the argument vector is full (i.e., argument size equals max size),
+            // call the assmble method in udaf, and pass the argument vector and argument count to it
+            m_argVector[m_argCount++] = val; // NValue assignment operator overloading
+            m_argCount %= s_maxSize;
+            if (m_argCount == 0) {
+                m_engine->callJavaUserDefinedAggregateAssemble(m_functionId, m_argVector, s_maxSize, m_udafIndex);
             }
         }
         // if this is a coordinator (not worker), we will need to call the combine method
         // to deserialize the byte arrays from other partitions and merge them
         else {
-            engine->callJavaUserDefinedAggregateCombine(functionId, val, udafIndex);
+            m_engine->callJavaUserDefinedAggregateCombine(m_functionId, val, m_udafIndex);
         }
     }
 
     virtual NValue finalize(ValueType type)
     {
-        if (currVecSize > 0) {
-            engine->callJavaUserDefinedAggregateAssemble(functionId, argVector, currVecSize, udafIndex);
-            currVecSize = 0;
+        // Check whether there are arguments stored in argument vector while the argument is not full
+        // If so, call the assemble method in udaf, and pass the argument vector and actual argument count to it
+        if (m_argCount > 0) {
+            m_engine->callJavaUserDefinedAggregateAssemble(m_functionId, m_argVector, m_argCount, m_udafIndex);
+            m_argCount = 0;
         }
         // if this is a partitioned table and a worker, we will call the worker end method
         // to serialize the instance to a byte array and send it to the coordinator
-        if (isPartition && isWorker) {
-            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, udafIndex);
+        if (m_isPartition && m_isWorker) {
+            return m_engine->callJavaUserDefinedAggregateWorkerEnd(m_functionId, m_udafIndex);
         }
         // if this is not a partitioned table which means this is a replicated table, or this is
         // a coordinator (not worker), we are ready to return the final result by calling the
         // coordinator end method
         else {
-            return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId, udafIndex);
+            return m_engine->callJavaUserDefinedAggregateCoordinatorEnd(m_functionId, m_udafIndex);
         }
     }
 
     virtual void resetAgg()
     {
-        engine->callJavaUserDefinedAggregateStart(functionId);
+        m_engine->callJavaUserDefinedAggregateStart(m_functionId);
     }
 
 private:
-    int functionId;
-    // worker or coordinator
-    bool isWorker;
-    VoltDBEngine* engine;
-    int udafIndex;
-    // partitioned or replicated
-    bool isPartition;
+    VoltDBEngine* m_engine;
+    int m_functionId;
+    int m_udafIndex;
+    bool m_isWorker;      // worker or coordinator
+    bool m_isPartition;   // partitioned table or replicated table
 
-    // Used for vectorization
-    const int maxVecSize; // maybe set by the used
-    vector<NValue> argVector;
-    int currVecSize;
+    // Used for vectorization of assemble method
+    std::vector<NValue> m_argVector;
+    int m_argCount;
+
+    // maximum size of of argument vector
+    // declared as static variable shared by all instances of the class
+    static const int s_maxSize = 4;
 };
 
 /*
@@ -604,9 +612,8 @@ inline Agg* getUDAFAggInstance(Pool& memoryPool, int functionId, bool isWorker, 
 
 
 /**
- * Aggregate Executor Base: protected methods
+ * Aggregate Executor Base
  */
-
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
@@ -820,9 +827,6 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
     return nextGroupByKeyTuple;
 }
 
-/**
- * AggretaExecutorBase: public methods
- */
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
                                                  ProgressMonitorProxy* pmp,
                                                  const TupleSchema * schema,
