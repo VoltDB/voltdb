@@ -323,6 +323,6 @@ begin ProcedureSchedule javaonly "Defined schedules for procedures"
   string name                   "Name of the schedule"
   string schedulerClass         "Class which defines the schedule"
   SchedulerParam* parameters    "The set of parameters to this scheduler"
-  string runLocation            "Where this scheduler should be executed"
+  string scope                  "Where this scheduler should be executed"
   string user                   "User to be used when executing this procedure"
 end

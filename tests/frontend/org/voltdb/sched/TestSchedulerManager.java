@@ -132,7 +132,7 @@ public class TestSchedulerManager {
      */
     @Test
     public void systemScheduleCreateDrop() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
 
         startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
@@ -155,7 +155,7 @@ public class TestSchedulerManager {
      */
     @Test
     public void hostScheduleCreateDrop() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_HOSTS);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_HOSTS);
 
         m_procedure.setTransactional(false);
 
@@ -181,7 +181,7 @@ public class TestSchedulerManager {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
         ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class,
-                SchedulerManager.RUN_LOCATION_PARTITIONS);
+                SchedulerManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -222,7 +222,7 @@ public class TestSchedulerManager {
     @Test
     public void schedulerWithParameters() throws Exception {
         ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM, 5, "TESTING", "AFFA47");
+                SchedulerManager.SCOPE_SYSTEM, 5, "TESTING", "AFFA47");
 
         startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
@@ -246,7 +246,7 @@ public class TestSchedulerManager {
     @Test
     public void schedulerWithBadParameters() throws Exception {
         ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM, 5, "TESTING", "ZZZ");
+                SchedulerManager.SCOPE_SYSTEM, 5, "TESTING", "ZZZ");
 
         startSync();
         assertEquals(0, s_firstSchedulerCallCount.get());
@@ -270,9 +270,9 @@ public class TestSchedulerManager {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
         ProcedureSchedule schedule1 = createProcedureSchedule(TestScheduler.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM);
+                SchedulerManager.SCOPE_SYSTEM);
         ProcedureSchedule schedule2 = createProcedureSchedule(name.getMethodName() + "_p", TestScheduler.class,
-                SchedulerManager.RUN_LOCATION_PARTITIONS);
+                SchedulerManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -295,7 +295,7 @@ public class TestSchedulerManager {
     @Test
     public void rerunScheduler() throws Exception {
         ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerRerun.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM, 5);
+                SchedulerManager.SCOPE_SYSTEM, 5);
 
         startSync(schedule);
         promoteToLeaderSync(schedule);
@@ -311,7 +311,7 @@ public class TestSchedulerManager {
      */
     @Test
     public void disableReenableScheduler() throws Exception {
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
 
         startSync();
         promoteToLeaderSync(schedule);
@@ -335,7 +335,7 @@ public class TestSchedulerManager {
     @Test
     public void partitionPromotionAndDisabledSchedules() throws Exception {
         ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerRerun.class,
-                SchedulerManager.RUN_LOCATION_PARTITIONS, 5);
+                SchedulerManager.SCOPE_PARTITIONS, 5);
 
         startSync(schedule);
 
@@ -378,7 +378,7 @@ public class TestSchedulerManager {
     @Test
     public void minDelay() throws Exception {
         m_schedulesConfig.setMinDelayMs(10000);
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
         startSync();
         promoteToLeaderSync(schedule);
         Thread.sleep(100);
@@ -392,7 +392,7 @@ public class TestSchedulerManager {
     @Test
     public void maxRunFrequency() throws Exception {
         m_schedulesConfig.setMaxRunFrequency(1.0);
-        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.RUN_LOCATION_SYSTEM);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
         startSync();
         promoteToLeaderSync(schedule);
         Thread.sleep(100);
@@ -412,9 +412,9 @@ public class TestSchedulerManager {
         vc.addClassToJar(jarFile, TestSchedulerManager.class);
 
         ProcedureSchedule schedule1 = createProcedureSchedule("TestScheduler", TestScheduler.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM);
+                SchedulerManager.SCOPE_SYSTEM);
         ProcedureSchedule schedule2 = createProcedureSchedule("TestSchedulerRerun", TestSchedulerRerun.class,
-                SchedulerManager.RUN_LOCATION_SYSTEM, Integer.MAX_VALUE);
+                SchedulerManager.SCOPE_SYSTEM, Integer.MAX_VALUE);
 
         startSync();
         promoteToLeaderSync();
@@ -504,17 +504,17 @@ public class TestSchedulerManager {
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
-    private ProcedureSchedule createProcedureSchedule(Class<? extends Scheduler> clazz, String runLocation,
+    private ProcedureSchedule createProcedureSchedule(Class<? extends Scheduler> clazz, String scope,
             Object... params) {
-        return createProcedureSchedule(name.getMethodName(), clazz, runLocation, params);
+        return createProcedureSchedule(name.getMethodName(), clazz, scope, params);
     }
 
-    private ProcedureSchedule createProcedureSchedule(String scheduleName, Class<? extends Scheduler> clazz, String runLocation,
+    private ProcedureSchedule createProcedureSchedule(String scheduleName, Class<? extends Scheduler> clazz, String scope,
             Object... params) {
         ProcedureSchedule ps = m_database.getProcedureschedules().add(scheduleName);
         ps.setEnabled(true);
         ps.setName(scheduleName);
-        ps.setRunlocation(runLocation);
+        ps.setScope(scope);
         ps.setSchedulerclass(clazz.getName());
         ps.setUser("user");
         CatalogMap<SchedulerParam> paramMap = ps.getParameters();

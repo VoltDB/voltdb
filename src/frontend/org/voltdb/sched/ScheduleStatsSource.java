@@ -36,7 +36,7 @@ import com.google.common.collect.Iterators;
 class ScheduleStatsSource extends StatsSource {
     static final Collection<ColumnInfo> s_columns = ImmutableList.of(new ColumnInfo("NAME", VoltType.STRING),
             new ColumnInfo("STATE", VoltType.STRING),
-            new ColumnInfo("RUN_LOCATION", VoltType.STRING),
+            new ColumnInfo("SCOPE", VoltType.STRING),
             new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
             new ColumnInfo("PARTITION_ID", VoltType.INTEGER),
             new ColumnInfo("SCHEDULER_INVOCATIONS", VoltType.BIGINT),
@@ -52,7 +52,7 @@ class ScheduleStatsSource extends StatsSource {
             new ColumnInfo("PROCEDURE_ERRORS", VoltType.BIGINT));
 
     private final String m_name;
-    private final String m_runLocation;
+    private final String m_scope;
     private final int m_hostId;
     private final int m_partitionId;
 
@@ -75,10 +75,10 @@ class ScheduleStatsSource extends StatsSource {
     private long m_procedureTotalWaitNs = 0;
     private long m_procedureErrors = 0;
 
-    ScheduleStatsSource(String name, String runLocation, int hostId, int partitionId) {
+    ScheduleStatsSource(String name, String scope, int hostId, int partitionId) {
         super(false);
         m_name = name;
-        m_runLocation = runLocation;
+        m_scope = scope;
         m_hostId = hostId;
         m_partitionId = partitionId;
     }
@@ -95,7 +95,7 @@ class ScheduleStatsSource extends StatsSource {
         // Header state info
         rowValues[column++] = m_name;
         rowValues[column++] = m_state;
-        rowValues[column++] = m_runLocation;
+        rowValues[column++] = m_scope;
         rowValues[column++] = m_hostId;
         rowValues[column++] = m_partitionId;
 

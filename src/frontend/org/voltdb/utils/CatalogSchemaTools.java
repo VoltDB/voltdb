@@ -466,7 +466,7 @@ public abstract class CatalogSchemaTools {
     }
 
     public static void toSchema(StringBuilder sb, ProcedureSchedule schedule) {
-        sb.append("CREATE SCHEDULE ").append(schedule.getName()).append(" ON ").append(schedule.getRunlocation())
+        sb.append("CREATE SCHEDULE ").append(schedule.getName()).append(" ON ").append(schedule.getScope())
                 .append(" USING ").append(schedule.getSchedulerclass());
         if (schedule.getUser() != null) {
             sb.append(" AS USER ").append(schedule.getUser());

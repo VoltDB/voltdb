@@ -435,7 +435,7 @@ public class SQLParser extends SQLPatternFactory
             SPF.statement(
                 SPF.token("create"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.optional(SPF.clause(SPF.token("on"),
-                        SPF.capture("runLocation", SPF.oneOf("system", "hosts", "partitions")))),
+                        SPF.capture("scope", SPF.oneOf("system", "hosts", "partitions")))),
                 SPF.oneOf(
                     SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
                     SPF.clause(SPF.oneOf(
@@ -1058,15 +1058,16 @@ public class SQLParser extends SQLPatternFactory
      * <td>Name of schedule</td>
      * </tr>
      * <tr>
-     * <td>runLocation</td>
+     * <td>scope</td>
      * <td>Optional</td>
-     * <td>Name of schedule</td>
+     * <td>Scope of the schedule. IE system, hosts, partitions</td>
      * </tr>
      * <tr>
-     * <td>class</td>
+     * <td>class|delay|cron</td>
      * <td>Required</td>
-     * <td>Scheduler class to be used</td>
+     * <td>Scheduler class, fixed delay or cron expression to be used</td>
      * </tr>
+     * <tr>
      * <td>asUser</td>
      * <td>Optional</td>
      * <td>Which user to use to execute the procedures run by the scheduler</td>
@@ -1075,10 +1076,15 @@ public class SQLParser extends SQLPatternFactory
      * <td>Optional</td>
      * <td>If present this schedule is part of the catalog but not executed</td>
      * </tr>
-     * </tr>
+     * <tr>
      * <td>parameters</td>
      * <td>Optional</td>
      * <td>Comma separated list of parameters to pass to the scheduler</td>
+     * </tr>
+     * <tr>
+     * <td>procedure</td>
+     * <td>Required for cron or delay</td>
+     * <td>Procedure name with comma separated list of parameters to pass to the procedure</td>
      * </tr>
      * </table>
      *
