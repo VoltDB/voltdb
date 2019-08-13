@@ -25,7 +25,6 @@ package genqa.procedures;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Random;
-import java.util.Date;
 
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -54,12 +53,7 @@ public class SampleRecord
     public final Object type_not_null_varchar128;
     public final Object type_null_varchar1024;
     public final Object type_not_null_varchar1024;
-
-    public SampleRecord(long rowid, Random rand) {
-        this(rowid, rand, ((TimestampType)nextTimestamp(rand)).asExactJavaDate());
-    }
-
-    public SampleRecord(long rowid, Random rand, Date tsNotNull)
+    public SampleRecord(long rowid, Random rand)
     {
         this.rowid = rowid;
         this.rowid_group = (byte)((rowid % 255) - 127);
@@ -72,7 +66,7 @@ public class SampleRecord
         this.type_null_bigint           = nextBigint(rand, true);
         this.type_not_null_bigint       = nextBigint(rand);
         this.type_null_timestamp        = nextTimestamp(rand, true);
-        this.type_not_null_timestamp    = tsNotNull;
+        this.type_not_null_timestamp    = nextTimestamp(rand); // typically set to NOW at INSERT, but left as random here in case other Sample class users still depend on it
         this.type_null_float            = nextFloat(rand, true);
         this.type_not_null_float        = nextFloat(rand);
         this.type_null_decimal          = nextDecimal(rand, true);
@@ -83,6 +77,32 @@ public class SampleRecord
         this.type_not_null_varchar128   = nextVarchar(rand, 25, 128);
         this.type_null_varchar1024      = nextVarchar(rand, true, 128, 1024);
         this.type_not_null_varchar1024  = nextVarchar(rand, 128, 1024);
+    }
+
+    public String toString() {
+        return
+            rowid                      + ", " +
+            rowid_group                + ", " +
+            type_null_tinyint          + ", " +
+            type_not_null_tinyint      + ", " +
+            type_null_smallint         + ", " +
+            type_not_null_smallint     + ", " +
+            type_null_integer          + ", " +
+            type_not_null_integer      + ", " +
+            type_null_bigint           + ", " +
+            type_not_null_bigint       + ", " +
+            type_null_timestamp        + ", " +
+            type_not_null_timestamp    + ", " +
+            type_null_float            + ", " +
+            type_not_null_float        + ", " +
+            type_null_decimal          + ", " +
+            type_not_null_decimal      + ", " +
+            type_null_varchar25        + ", " +
+            type_not_null_varchar25    + ", " +
+            type_null_varchar128       + ", " +
+            type_not_null_varchar128   + ", " +
+            type_null_varchar1024      + ", " +
+            type_not_null_varchar1024;
     }
 
     private static Object nextTinyint(Random rand)

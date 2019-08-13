@@ -199,8 +199,7 @@ void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple) {
     addEntryDo(tuple, conflictTuple);
 }
 
-bool TableIndex::deleteEntry(const TableTuple *tuple)
-{
+bool TableIndex::deleteEntry(const TableTuple *tuple) {
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Nothing to delete
         return true;
@@ -208,8 +207,8 @@ bool TableIndex::deleteEntry(const TableTuple *tuple)
     return deleteEntryDo(tuple);
 }
 
-bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
-{
+bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+        const TableTuple &originalTuple) {
     vassert(originalTuple.address() != destinationTuple.address());
 
     if (isPartialIndex()) {

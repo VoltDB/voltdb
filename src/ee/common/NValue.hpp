@@ -3086,8 +3086,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             if (type != VALUE_TYPE_GEOGRAPHY) {
                const char *str = (const char*) input.getRawPointer(length);
                createObjectPointer(length, str, tempPool);
-            }
-            else {
+            } else {
                StringRef* sref = createObjectPointer(length, NULL, tempPool);
                GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
             }

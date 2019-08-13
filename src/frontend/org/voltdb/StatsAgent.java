@@ -16,9 +16,8 @@
  */
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.NoSuchElementException;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
@@ -577,6 +576,9 @@ public class StatsAgent extends OpsAgent
         case EXPORT:
             stats = collectStats(StatsSelector.EXPORT, interval);
             break;
+        case SCHEDULES:
+            stats = collectStats(subselector, false);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -743,63 +745,13 @@ public class StatsAgent extends OpsAgent
             return null;
         }
 
-        // Just need a random site's list to do some things
-        NonBlockingHashSet<StatsSource> sSources = null;
-        try {
-            sSources = siteIdToStatsSources.values().iterator().next();
-        } catch (NoSuchElementException e) {
-            // entries of this site id to sources set map may be removed in another thread
-            sSources = null;
-        }
+        VoltTable resultTable = null;
 
-        //There is a window registering the first source where the empty set is visible, don't panic it's coming
-        while (sSources == null || sSources.isEmpty()) {
-            Thread.yield();
-            // retrieve the latest StatsSource set since a new set may be registered in place of an old empty set
-            try {
-                sSources = siteIdToStatsSources.values().iterator().next();
-            } catch (NoSuchElementException e) {
-                // entries of this site id to sources set map may be removed in another thread
-                sSources = null;
+        for (NonBlockingHashSet<StatsSource> statsSources : siteIdToStatsSources.values()) {
+            if (statsSources == null || statsSources.isEmpty()) {
+                continue;
             }
-        }
 
-        /*
-         * Some sources like TableStats use VoltTable to keep track of
-         * statistics. We need to use the table schema the VoltTable has in this
-         * case.
-         */
-        VoltTable.ColumnInfo columns[] = null;
-        StatsSource firstSource = null;
-        try {
-            firstSource = sSources.iterator().next();
-        } catch (NoSuchElementException e) {
-            // elements of this sources set may be removed in another thread
-            return null;
-        }
-        if (!firstSource.isEEStats()) {
-            columns = firstSource.getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
-        } else {
-            final VoltTable table = firstSource.getStatsTable();
-            if (table == null) {
-                return null;
-            }
-            columns = new VoltTable.ColumnInfo[table.getColumnCount()];
-            for (int i = 0; i < columns.length; i++) {
-                columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
-                        table.getColumnType(i));
-            }
-        }
-
-        final VoltTable resultTable = new VoltTable(columns);
-
-        for (Entry<Long, NonBlockingHashSet<StatsSource>> entry : siteIdToStatsSources.entrySet()) {
-            NonBlockingHashSet<StatsSource> statsSources = entry.getValue();
-            // entries of this site id to sources set map may be removed in another thread
-            while (statsSources == null || statsSources.isEmpty()) {
-                Thread.yield();
-                statsSources = siteIdToStatsSources.get(entry.getKey());
-            }
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
                 /*
@@ -810,12 +762,16 @@ public class StatsAgent extends OpsAgent
                     final VoltTable table = ss.getStatsTable();
                     // this table can be null during recovery, at least
                     if (table != null) {
-                        while (table.advanceRow()) {
-                            resultTable.add(table);
+                        if (resultTable == null) {
+                            resultTable = new VoltTable(table.getTableSchema());
                         }
-                        table.resetRowPosition();
+                        resultTable.addTable(table);
                     }
                 } else {
+                    if (resultTable == null) {
+                        ArrayList<ColumnInfo> columns = ss.getColumnSchema();
+                        resultTable = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
+                    }
                     Object statsRows[][] = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {
                         resultTable.addRow(row);

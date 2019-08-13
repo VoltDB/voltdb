@@ -159,6 +159,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
     public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
     public static final long MIGRATE_ROWS_DELETE_CID    = Long.MIN_VALUE + 11;
+    public static final long SCHEDULER_MANAGER_CID      = Long.MIN_VALUE + 12;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
@@ -209,12 +210,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ZooKeeper m_zk;
 
     /**
-     * The CIHM is unique to the connection and the ACG is shared by all connections
-     * serviced by the associated network thread. They are paired so as to only do a single
-     * lookup.
+     * The CIHM is unique to the connection and the ACG is shared by all connections serviced by the associated network
+     * thread. They are paired so as to only do a single lookup.
+     * <p>
+     * Note: An initialSize of 1024 actually creates an array of 2048 in the map
      */
-    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
+    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm = new ConcurrentHashMap<>(1024);
 
     private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
 
@@ -1190,7 +1191,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void deliver(final VoltMessage message) {
                 if (message instanceof InitiateResponseMessage) {
-                    final CatalogContext catalogContext = m_catalogContext.get();
                     // forward response; copy is annoying. want slice of response.
                     InitiateResponseMessage response = (InitiateResponseMessage)message;
                     StoredProcedureInvocation invocation = response.getInvocation();
@@ -1206,7 +1206,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     Procedure procedure = null;
 
                     if (invocation != null) {
-                        procedure = getProcedureFromName(invocation.getProcName(), catalogContext);
+                        procedure = getProcedureFromName(invocation.getProcName());
                         assert (procedure != null);
                     }
 
@@ -1532,8 +1532,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return errResp;
     }
 
-    public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
-        return InvocationDispatcher.getProcedureFromName(procName, catalogContext);
+    public Procedure getProcedureFromName(String procName) {
+        return InvocationDispatcher.getProcedureFromName(procName, m_catalogContext.get());
     }
 
     private ScheduledFuture<?> m_deadConnectionFuture;

@@ -42,16 +42,14 @@ public class Promote extends UpdateApplicationBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-
         return updateApplication("@UpdateApplicationCatalog",
                                 null,
                                 null,
                                 new String[0],
                                 Collections.emptyList(),
                                 null,
-                                true, /* isPromotion */
-                                useDDLSchema);
+                                true /* isPromotion */
+                                );
     }
 
 }

@@ -551,9 +551,9 @@ TEST_F(ExecutorVectorTest, Large) {
     // Again send node has no output table.
     ASSERT_EQ(NULL, tbl.get());
 
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
+    ASSERT_EQ(0, lttBlockCache.allocatedMemory());
 }
 
 int main() {
