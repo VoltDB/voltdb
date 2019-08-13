@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -50,7 +49,6 @@ public class ForeignHost {
     private final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
-    private boolean m_closing;
     boolean m_isUp;
 
     // Each foreign host may have one or many sub-connections, depends if partition
@@ -71,9 +69,10 @@ public class ForeignHost {
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
-    private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
+    private long m_lastMessageMillis = Long.MAX_VALUE;
 
     private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+    private final AtomicInteger m_connectionStoppingCount = new AtomicInteger(0);
 
     // Because the connections other than the first connection are created after cluster mesh network
     // has established but before the whole cluster has been initialized.
@@ -114,7 +113,6 @@ public class ForeignHost {
     {
         m_hostMessenger = host;
         m_hostId = hostId;
-        m_closing = false;
         m_isUp = true;
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
@@ -163,9 +161,10 @@ public class ForeignHost {
 
     synchronized void close()
     {
+        if (!m_isUp) {
+            return;
+        }
         m_isUp = false;
-        if (m_closing) return;
-        m_closing = true;
         try {
             for (Subconnection c : m_connections) {
                 c.close();
@@ -180,7 +179,7 @@ public class ForeignHost {
      * Used only for test code to kill this FH
      */
     void killSocket() {
-        m_closing = true;
+        m_isUp = true;
         for (Subconnection c : m_connections) {
             c.killSocket();
         }
@@ -193,7 +192,6 @@ public class ForeignHost {
     @Override
     protected void finalize() throws Throwable
     {
-        if (m_closing) return;
         close();
         super.finalize();
     }
@@ -239,7 +237,7 @@ public class ForeignHost {
 
     private void detectDeadHost() {
         long current_time = EstTime.currentTimeMillis();
-        long current_delta = current_time - m_lastMessageMillis.get();
+        long current_delta = current_time - m_lastMessageMillis;
         /*
          * Try and give some warning when a connection is timing out.
          * Allows you to observe the liveness of the host receiving the heartbeats
@@ -253,8 +251,7 @@ public class ForeignHost {
         // NodeFailureFault no longer immediately trips FHInputHandler to
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
-        if ((!m_closing && m_isUp) &&
-                current_delta > m_deadHostTimeout)
+        if (m_isUp && current_delta > m_deadHostTimeout)
         {
             if (m_deadReportsCount.getAndIncrement() == 0) {
                 hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
@@ -268,20 +265,16 @@ public class ForeignHost {
         }
     }
 
-    // LazySet doesn't guarantee atomic semantic, some threads may hold an older value
-    // of the timestamp for a while, eventually the value will converge. Given that
-    // heartbeat meassage is sent in every 25ms, the inconsistency window is acceptable.
     public void updateLastMessageTime(long lastMessageMillis) {
-        m_lastMessageMillis.lazySet(lastMessageMillis);
+        if (lastMessageMillis > m_lastMessageMillis || m_lastMessageMillis == Long.MAX_VALUE) {
+            m_lastMessageMillis = lastMessageMillis;
+        }
     }
 
     // First report of connection hangup will kick-off fault resolution
-    public synchronized void connectionStopping(Subconnection conn) {
-        if (m_isUp) {
-            m_isUp = false;
-            if (m_closing) {
-                return;
-            }
+    public void connectionStopping(Subconnection conn) {
+        m_isUp = false;
+        if (m_connectionStoppingCount.getAndIncrement() == 0) {
             // Log the remote host's action
             if (!m_hostMessenger.isShuttingDown()) {
                 String msg = "Received remote hangup from foreign host " + conn.getHostnameAndIPAndPort();
@@ -289,9 +282,7 @@ public class ForeignHost {
                 CoreUtils.printAsciiArtLog(hostLog, msg, Level.INFO);
             }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
-        }
-        if (!m_isUp) {
-             m_hostMessenger.markPicoZombieHost(m_hostId);
+            m_hostMessenger.markPicoZombieHost(m_hostId);
         }
     }
 
