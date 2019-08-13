@@ -74,11 +74,6 @@ public class VoltPJoinCommuteRule extends JoinCommuteRule {
         Preconditions.checkArgument(scan.getVoltTable() != null &&
                 scan.getVoltTable().getCatalogTable() != null);
         CatalogMap<Index> indexMap = scan.getVoltTable().getCatalogTable().getIndexes();
-        return (indexMap != null && !indexMap.isEmpty()) ?
-                true : false;
-    }
-    @Override
-    public void onMatch(final RelOptRuleCall call) {
-        super.onMatch(call);
+        return indexMap != null && !indexMap.isEmpty();
     }
 }

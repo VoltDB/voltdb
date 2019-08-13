@@ -126,6 +126,36 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
     }
 
     public void testReplicatedMergeJoin6() {
+        m_tester.sql("select RI2.I from RI2 inner join RI1 on RI2.I = RI1.BI and RI2.BI = RI1.SI")
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], I=[$t0], split=[1])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[AND(=($2, $3), =($1, $4))], joinType=[inner], " +
+                        "split=[1], outerIndex=[RI2_IND2], innerIndex=[RI1_IND2])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], I=[$t0], BI=[$t2], " +
+                        "I0=[$t4], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
+                        "proj#0..3=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):BIGINT], BI=[$t2], SI0=[$t4], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
+                        "proj#0..3=[{exprs}], index=[RI1_IND2_ASCEQ0_0])\n")
+                .pass();
+    }
+
+    public void testReplicatedMergeJoin7() {
+        // MJ  RI2_IND2 ON RI2 (i, bi) covers RI1.BI = RI2.I
+        m_tester.sql("SELECT RI2.BI FROM RI1 INNER JOIN RI2  ON RI1.BI = RI2.I")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], BI0=[$t1], split=[1])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($0, $2)], joinType=[inner], split=[1], " +
+                        "outerIndex=[RI1_IND2], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], BI=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
+                        "proj#0..3=[{exprs}], index=[RI1_IND2_ASCEQ0_0])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], BI=[$t2], I0=[$t4], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
+                        "proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI2_I_ASCEQ0_0])\n")
+                .pass();
+    }
+
+    public void testReplicatedMergeJoinNotAplicable() {
         // NLIJ because  RI1.TI > RI3.PK gets pushed to the ON condition and the join is not an equi one anymore.
         m_tester.sql("select RI1.ti from RI1 inner join RI3 on RI1.I = RI3.II where RI1.TI > RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t1], split=[1])\n" +
@@ -137,7 +167,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testReplicatedMergeJoin7() {
+    public void testReplicatedMergeJoinNotAplicable1() {
         // Not an equi join.
         m_tester.sql("select RI1.ti from RI1 inner join RI3 on RI1.I = RI3.II and RI1.TI > RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t1], split=[1])\n" +
@@ -152,7 +182,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testReplicatedMergeJoin8() {
+    public void testReplicatedMergeJoinNotAplicable2() {
         // NLIJ because non of the indexes covers the whole predicate
         m_tester.sql("select RI2.I from RI2 inner join RI3 on RI2.I = RI3.II and RI2.BI = RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
@@ -168,22 +198,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testReplicatedMergeJoin9() {
-        m_tester.sql("select RI2.I from RI2 inner join RI1 on RI2.I = RI1.BI and RI2.BI = RI1.SI")
-                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[AND(=($2, $3), =($1, $4))], joinType=[inner], " +
-                        "split=[1], outerIndex=[RI2_IND2], innerIndex=[RI1_IND2])\n" +
-                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], I=[$t0], BI=[$t2], " +
-                        "I0=[$t4], split=[1])\n" +
-                        "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
-                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):BIGINT], BI=[$t2], SI0=[$t4], split=[1])\n" +
-                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI1_IND2_ASCEQ0_0])\n")
-                .pass();
-    }
-
-    public void testReplicatedMergeJoin10() {
+    public void testReplicatedMergeJoinNotAplicable3() {
         // NLIJ. RI1 and RI2 index collations do not match
         // RI1_IND2 ON RI1 (bi, si);
         // RI2_IND2 ON RI2 (i, bi); --- the order is reversed BI and I
@@ -197,22 +212,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testReplicatedMergeJoin13() {
-        // MJ  RI2_IND2 ON RI2 (i, bi) covers RI1.BI = RI2.I
-        m_tester.sql("SELECT RI2.BI FROM RI1 INNER JOIN RI2  ON RI1.BI = RI2.I")
-                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], BI0=[$t1], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($0, $2)], joinType=[inner], split=[1], " +
-                        "outerIndex=[RI1_IND2], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
-                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], BI=[$t2], split=[1])\n" +
-                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI1_IND2_ASCEQ0_0])\n" +
-                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], BI=[$t2], I0=[$t4], split=[1])\n" +
-                        "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI2_I_ASCEQ0_0])\n")
-                .pass();
-    }
-
-    public void testReplicatedMergeJoin14() {
+    public void testReplicatedMergeJoinNotAplicable4() {
         // NLIJ. RI2_IND2 ON RI2 (i, bi) does not cover RI1.BI = RI2.I
         m_tester.sql("SELECT RI2.BI FROM RI1 INNER JOIN RI2  ON RI1.BI = RI2.BI")
                 .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], BI=[$t0], split=[1])\n" +

@@ -34,11 +34,7 @@ public class VoltPRelBuilder extends RelBuilder{
     /** Creates a {@link RelBuilderFactory}, a partially-created VoltPRelBuilder.
      * Just add a {@link RelOptCluster} and a {@link RelOptSchema} */
     public static RelBuilderFactory proto(final Context context) {
-      return new RelBuilderFactory() {
-        public RelBuilder create(RelOptCluster cluster, RelOptSchema schema) {
-          return new VoltPRelBuilder(context, cluster, schema);
-        }
-      };
+      return (cluster, schema) -> new VoltPRelBuilder(context, cluster, schema);
     }
 
     /** Creates a {@link RelBuilderFactory} that uses a given set of factories. */
