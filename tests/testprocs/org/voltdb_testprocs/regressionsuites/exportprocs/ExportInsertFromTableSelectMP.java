@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 
 public class ExportInsertFromTableSelectMP extends VoltProcedure {
 
-    // This statement currently fails to compile. So it is commented out for now.
+    // This statement currently fails to compile. So it is commented out for now. See ENG-16980
     //private final SQLStmt i_insert_select_repl = new SQLStmt
     //("INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS_REPL;");
 
@@ -48,7 +48,6 @@ public class ExportInsertFromTableSelectMP extends VoltProcedure {
             voltQueueSQL(i_insert_select_part);
         }
         else {
-            assert(false);
             throw new RuntimeException("Don't call this.");
         }
         return voltExecuteSQL();

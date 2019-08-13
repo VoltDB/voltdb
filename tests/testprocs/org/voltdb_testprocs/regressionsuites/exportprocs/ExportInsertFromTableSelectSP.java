@@ -47,7 +47,6 @@ public class ExportInsertFromTableSelectSP extends VoltProcedure {
             voltQueueSQL(i_insert_select_part);
         }
         else {
-            assert(false);
             throw new RuntimeException("Don't call this.");
         }
         return voltExecuteSQL();

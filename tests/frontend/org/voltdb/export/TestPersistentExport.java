@@ -56,7 +56,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     @Before
     public void setUp() throws Exception {
-        streamNames.addAll(Arrays.asList("T1", "T2"));
+        streamNames.addAll(Arrays.asList("T1", "T3"));
     }
 
     @After
@@ -77,9 +77,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     @Test
     public void testInsertDeleteUpdate() throws Exception {
-        if (!MiscUtils.isPro()) {
-            return;
-        }
         resetDir();
         VoltFile.resetSubrootForThisProcess();
 

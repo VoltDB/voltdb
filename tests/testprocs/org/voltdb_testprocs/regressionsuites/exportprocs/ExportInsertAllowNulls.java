@@ -58,37 +58,10 @@ public class ExportInsertAllowNulls extends VoltProcedure {
             )
     {
         assert(tablename.equals("S_ALLOW_NULLS"));
-        if (tablename.equals("S_ALLOW_NULLS")) {
-            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("S_ALLOW_NULLS and use sql.Timestamp")) {
-            java.sql.Timestamp a_sqltimestamp = new java.sql.Timestamp(a_timestamp.getTime()/1000);
-            a_sqltimestamp.setNanos(((int) (a_timestamp.getTime() % 1000000)) * 1000);
-            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_sqltimestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("S_ALLOW_NULLS and use sql.Date")) {
-            java.sql.Date a_sqldate = new java.sql.Date(a_timestamp.getTime()/1000);
-            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_sqldate, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("S_ALLOW_NULLS and use util.Date")) {
-            java.util.Date a_utildate = new java.util.Date(a_timestamp.getTime()/1000);
-            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_utildate, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else {
-            assert(false);
-        }
+        voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
+                     a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
+                     a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
+                     a_geography_point, a_geography);
 
         return voltExecuteSQL();
     }
