@@ -51,6 +51,7 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -669,7 +670,13 @@ public class Inits {
             // Let the Export system read its configuration from the catalog.
             try {
                 String exportMgrName = "org.voltdb.export.ExportManager";
-                if (m_config.m_isEnterprise) {
+                // UNDEFINED is the default value for m_exporterVersion
+                if (m_config.m_exporterVersion == ExporterVersion.UNDEFINED) {
+                    // if we don't explicitly specify the exporter version, we use E2 in community and E3 in pro.
+                    if (m_config.m_isEnterprise) {
+                        exportMgrName = "org.voltdb.e3.E3ExportManager";
+                    }
+                } else if (m_config.m_exporterVersion == ExporterVersion.E3) {
                     exportMgrName = "org.voltdb.e3.E3ExportManager";
                 }
                 Class<?> exportMgrClass = Class.forName(exportMgrName);
