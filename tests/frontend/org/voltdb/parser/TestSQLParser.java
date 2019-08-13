@@ -757,7 +757,7 @@ public class TestSQLParser extends TestCase {
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS USING a.b.c.D;",
-                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "runLocation", "PARTITIONS"));
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "scope", "PARTITIONS"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D AS USER me;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D", "asUser", "me"));
@@ -776,7 +776,7 @@ public class TestSQLParser extends TestCase {
                 ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "onError", "ABORT"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS DELAY 5999 AS proc;",
-                ImmutableMap.of("name", "blah", "runLocation", "PARTITIONS", "procedure", "proc", "delay", "5999"));
+                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "delay", "5999"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS USER me AS proc;",
                 ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "asUser", "me"));
@@ -796,7 +796,7 @@ public class TestSQLParser extends TestCase {
                         "ABORT"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS CRON */5 ? 1-4,7 L W 1,3# AS proc;",
-                ImmutableMap.of("name", "blah", "runLocation", "PARTITIONS", "procedure", "proc", "cron",
+                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "cron",
                         "*/5 ? 1-4,7 L W 1,3#"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS USER me AS proc;",
@@ -811,7 +811,7 @@ public class TestSQLParser extends TestCase {
                         "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
     }
 
-    private static final Set<String> s_allCreateScheduleGroups = ImmutableSet.of("name", "runLocation", "class",
+    private static final Set<String> s_allCreateScheduleGroups = ImmutableSet.of("name", "scope", "class",
             "asUser", "disabled", "parameters", "procedure", "delay", "cron", "onError");
 
     private static void validateCreateScheduleMatcher(String statement, Map<String, String> expectedGroupValues) {

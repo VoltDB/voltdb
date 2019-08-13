@@ -75,8 +75,8 @@ public class CreateSchedule extends StatementProcessor {
     private ProcedureSchedule configureScheduler(ProcedureSchedule schedule, Matcher matcher, boolean newDdl)
             throws VoltCompilerException {
         schedule.setName(matcher.group("name"));
-        schedule.setRunlocation(
-                MoreObjects.firstNonNull(matcher.group("runLocation"), SchedulerManager.RUN_LOCATION_DEFAULT));
+        schedule.setScope(
+                MoreObjects.firstNonNull(matcher.group("scope"), SchedulerManager.SCOPE_DEFAULT));
         if (matcher.group("class") != null) {
             schedule.setSchedulerclass(matcher.group("class"));
             fillOutParams(schedule.getParameters(), matcher.group("parameters"), 0);

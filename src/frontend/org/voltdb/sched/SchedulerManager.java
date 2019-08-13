@@ -95,11 +95,11 @@ import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
  */
 public class SchedulerManager {
     static final VoltLogger log = new VoltLogger("HOST");
-    static final String RUN_LOCATION_SYSTEM = "SYSTEM";
-    static final String RUN_LOCATION_HOSTS = "HOSTS";
-    static final String RUN_LOCATION_PARTITIONS = "PARTITIONS";
+    static final String SCOPE_SYSTEM = "SYSTEM";
+    static final String SCOPE_HOSTS = "HOSTS";
+    static final String SCOPE_PARTITIONS = "PARTITIONS";
     static final String HASH_ALGO = "SHA-512";
-    public static final String RUN_LOCATION_DEFAULT = RUN_LOCATION_SYSTEM;
+    public static final String SCOPE_DEFAULT = SCOPE_SYSTEM;
 
     private Map<String, SchedulerHandler> m_handlers = Collections.emptyMap();
     private volatile boolean m_leader = false;
@@ -544,7 +544,7 @@ public class SchedulerManager {
                     if (frequencyChanged) {
                         handler.setMaxRunFrequency(m_maxRunFrequency);
                     }
-                    if (RUN_LOCATION_PARTITIONS.equalsIgnoreCase(procedureSchedule.getRunlocation())) {
+                    if (SCOPE_PARTITIONS.equalsIgnoreCase(procedureSchedule.getScope())) {
                         hasPartitionedSchedule = true;
                     } else {
                         hasNonPartitionedSchedule = true;
@@ -554,9 +554,9 @@ public class SchedulerManager {
                 handler.cancel();
             }
 
-            String runLocation = procedureSchedule.getRunlocation().toUpperCase();
+            String scope = procedureSchedule.getScope().toUpperCase();
             if (procedureSchedule.getEnabled()
-                    && (m_leader || !RUN_LOCATION_SYSTEM.equals(runLocation))) {
+                    && (m_leader || !SCOPE_SYSTEM.equals(scope))) {
                 if (!result.isValid()) {
                     log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
                             result.getException());
@@ -564,14 +564,14 @@ public class SchedulerManager {
                 }
 
                 SchedulerHandler definition;
-                switch (runLocation) {
-                case RUN_LOCATION_HOSTS:
-                case RUN_LOCATION_SYSTEM:
-                    definition = new SingleSchedulerHandler(procedureSchedule, runLocation, result.m_factory,
+                switch (scope) {
+                case SCOPE_HOSTS:
+                case SCOPE_SYSTEM:
+                    definition = new SingleSchedulerHandler(procedureSchedule, scope, result.m_factory,
                             m_singleExecutor.getExecutor());
                     hasNonPartitionedSchedule = true;
                     break;
-                case RUN_LOCATION_PARTITIONS:
+                case SCOPE_PARTITIONS:
                     definition = new PartitionedScheduleHandler(procedureSchedule, result.m_factory,
                             m_partitionedExecutor.getExecutor());
                     m_locallyLedPartitions.forEach(definition::promotedPartition);
@@ -579,7 +579,7 @@ public class SchedulerManager {
                     break;
                 default:
                     throw new IllegalArgumentException(
-                            "Unsupported run location: " + procedureSchedule.getRunlocation());
+                            "Unsupported run location: " + procedureSchedule.getScope());
                 }
                 newHandlers.put(procedureSchedule.getName(), definition);
             }
@@ -806,7 +806,7 @@ public class SchedulerManager {
          */
         boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory, boolean checkHashes) {
             return Objects.equals(m_definition.getName(), definition.getName())
-                    && Objects.equals(m_definition.getRunlocation(), definition.getRunlocation())
+                    && Objects.equals(m_definition.getScope(), definition.getScope())
                     && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
                     && Objects.equals(m_definition.getUser(), definition.getUser())
                     && Objects.equals(m_definition.getParameters(), definition.getParameters())
@@ -876,25 +876,25 @@ public class SchedulerManager {
 
     /**
      * An instance of {@link SchedulerHandler} which contains a single {@link SchedulerWrapper}. This is used for
-     * schedules which are configured for {@link SchedulerManager#RUN_LOCATION_SYSTEM} or
-     * {@link SchedulerManager#RUN_LOCATION_HOSTS}.
+     * schedules which are configured for {@link SchedulerManager#SCOPE_SYSTEM} or
+     * {@link SchedulerManager#SCOPE_HOSTS}.
      */
     private class SingleSchedulerHandler extends SchedulerHandler {
         private final SchedulerWrapper<? extends SingleSchedulerHandler> m_wrapper;
 
-        SingleSchedulerHandler(ProcedureSchedule definition, String runLocation, SchedulerFactory factory,
+        SingleSchedulerHandler(ProcedureSchedule definition, String scope, SchedulerFactory factory,
                 ListeningScheduledExecutorService executor) {
             super(definition, factory);
 
-            switch (runLocation) {
-            case RUN_LOCATION_HOSTS:
+            switch (scope) {
+            case SCOPE_HOSTS:
                 m_wrapper = new HostSchedulerWrapper(this, executor);
                 break;
-            case RUN_LOCATION_SYSTEM:
+            case SCOPE_SYSTEM:
                 m_wrapper = new SystemSchedulerWrapper(this, executor);
                 break;
             default:
-                throw new IllegalArgumentException("Invalid run location: " + runLocation);
+                throw new IllegalArgumentException("Invalid run location: " + scope);
             }
         }
 
@@ -928,7 +928,7 @@ public class SchedulerManager {
 
     /**
      * An instance of {@link SchedulerHandler} which contains a {@link SchedulerWrapper} for each locally led partition.
-     * This is used for schedules which are configured for {@link SchedulerManager#RUN_LOCATION_PARTITIONS}.
+     * This is used for schedules which are configured for {@link SchedulerManager#SCOPE_PARTITIONS}.
      */
     private class PartitionedScheduleHandler extends SchedulerHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
@@ -1062,7 +1062,7 @@ public class SchedulerManager {
             }
             m_scheduler = m_handler.constructScheduler();
             if (m_stats == null) {
-                m_stats = new ScheduleStatsSource(m_handler.getName(), getRunLocation(), m_hostId, getSiteId());
+                m_stats = new ScheduleStatsSource(m_handler.getName(), getScope(), m_hostId, getSiteId());
                 m_statsAgent.registerStatsSource(StatsSelector.SCHEDULES, getSiteId(), m_stats);
             }
             setMaxRunFrequency(m_maxRunFrequency);
@@ -1335,7 +1335,7 @@ public class SchedulerManager {
             return m_handler.generateLogMessage(body);
         }
 
-        abstract String getRunLocation();
+        abstract String getScope();
 
         abstract int getSiteId();
 
@@ -1346,7 +1346,7 @@ public class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_SYSTEM}
+     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_SYSTEM}
      */
     private class SystemSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
         SystemSchedulerWrapper(SingleSchedulerHandler definition, ListeningScheduledExecutorService executor) {
@@ -1359,8 +1359,8 @@ public class SchedulerManager {
         }
 
         @Override
-        String getRunLocation() {
-            return RUN_LOCATION_SYSTEM;
+        String getScope() {
+            return SCOPE_SYSTEM;
         }
 
         @Override
@@ -1370,7 +1370,7 @@ public class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_HOSTS}
+     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_HOSTS}
      */
     private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
         HostSchedulerWrapper(SingleSchedulerHandler handler, ListeningScheduledExecutorService executor) {
@@ -1391,8 +1391,8 @@ public class SchedulerManager {
         }
 
         @Override
-        String getRunLocation() {
-            return RUN_LOCATION_HOSTS;
+        String getScope() {
+            return SCOPE_HOSTS;
         }
 
         @Override
@@ -1402,7 +1402,7 @@ public class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#RUN_LOCATION_PARTITIONS}
+     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_PARTITIONS}
      */
     private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedScheduleHandler> {
         private final int m_partition;
@@ -1476,8 +1476,8 @@ public class SchedulerManager {
         }
 
         @Override
-        String getRunLocation() {
-            return RUN_LOCATION_PARTITIONS;
+        String getScope() {
+            return SCOPE_PARTITIONS;
         }
 
         @Override
