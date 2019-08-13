@@ -179,8 +179,11 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_node->isInline() ? "INLINE" : m_inputTable->debug().c_str());
 
+    // Note that we need to clear static trackers: ENG-17091
+    // https://issues.voltdb.com/browse/ENG-17091?focusedCommentId=50362&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-50362
     // count the number of successful inserts
     m_modifiedTuples = 0;
+    s_errorMessage.clear();
 
     m_tmpOutputTable = newOutputTable;
     vassert(m_tmpOutputTable);
@@ -202,18 +205,18 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_templateTuple = m_templateTupleStorage.tuple();
 
     std::vector<int>::iterator it;
-    for (auto& iter : m_nowFields) {
+    for (auto iter: m_nowFields) {
         m_templateTuple.setNValue(iter, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
     VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
-               static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
-               m_targetTable->name().c_str());
+            static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
+            m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
-               m_node->isInline() ? "inline"
-                       : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
-                               "single-row" : "multi-row"),
-               m_engine->getPartitionId());
+            m_node->isInline() ? "inline"
+            : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+                "single-row" : "multi-row"),
+            m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
     //
     // Return a tuple whose schema we can use as an
@@ -316,8 +319,8 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             for (int i = 0; i < mapSize; ++i) {
                 tempTuple.setNValue(fieldMap[i], m_templateTuple.getNValue(fieldMap[i]));
             }
-            m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                    m_persistentTable->allIndexes());
+            m_persistentTable->updateTupleWithSpecificIndexes(
+                    existsTuple, tempTuple, m_persistentTable->allIndexes());
             // successfully updated
             ++m_modifiedTuples;
             return;
