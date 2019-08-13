@@ -38,7 +38,6 @@ public class InsertBase extends VoltProcedure {
     ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
 
     public long run() {
-        assert(false);
         throw new RuntimeException("Don't call this.");
     }
 

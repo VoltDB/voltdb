@@ -470,7 +470,9 @@ public class TestVoltCompiler extends TestCase {
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
         if (! MiscUtils.isPro()) {
-            return; // not supported in community
+            // This test creates 6 streams with various permutations of upper and lower case naming
+            // It can only be tested where stream limits are not enforced.
+            return;
         }
 
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -491,11 +493,11 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
-            assertNotNull(connector.getTableinfo().getIgnoreCase("b"));
-            assertNotNull(connector.getTableinfo().getIgnoreCase("c"));
-            assertNotNull(connector.getTableinfo().getIgnoreCase("d"));
-            assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
-            assertNull(connector.getTableinfo().getIgnoreCase("f"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("B"));
+            assertNull(connector.getTableinfo().getIgnoreCase("c"));
+            assertNull(connector.getTableinfo().getIgnoreCase("D"));
+            assertNull(connector.getTableinfo().getIgnoreCase("e"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
         }
         finally {
             File jar = new File("/tmp/exportsettingstest.jar");
