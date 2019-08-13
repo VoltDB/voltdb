@@ -60,16 +60,35 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * This class is thread-safe.
  */
 public class VoltTrace implements Runnable {
+
+    /***********************************
+     *   Static Variables of VoltTrace
+     ***********************************/
     private static final VoltLogger s_logger = new VoltLogger("TRACER");
-
-    // This is a singleton class, created through start() method below
-    private VoltTrace() {}
-
+    private static volatile VoltTrace s_tracer;
+    private static volatile TraceEventFilter s_tracingFilter = null;
     // Current process id. Used by all trace events.
     private static final int s_pid;
     static {
         s_pid = Integer.parseInt(CoreUtils.getPID());
     }
+
+    /***********************************
+     *   Member Variables of VoltTrace
+     ***********************************/
+    // Events from trace producers are put into this queue.
+    // TraceFileWriter takes events from this queue and writes them to files.
+    static final int QUEUE_SIZE = Integer.getInteger("VOLTTRACE_QUEUE_SIZE", 4096);
+    private EvictingQueue<TraceEventBatch> m_traceEvents = EvictingQueue.create(QUEUE_SIZE);
+    private EvictingQueue<TraceEventBatch> m_emptyQueue = EvictingQueue.create(QUEUE_SIZE);
+    private final ListeningExecutorService m_writerThread = CoreUtils.getCachedSingleThreadExecutor("VoltTrace Writer", 1000);
+    private volatile boolean m_shutdown = false;
+    private volatile Runnable m_shutdownCallback = null;
+    private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
+    private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
+
+    // This is a singleton class, created through start() method below
+    private VoltTrace() {}
 
     public enum Category {
         CI, MPI, MPSITE, SPI, SPSITE, EE, DRPRODUCER, DRCONSUMER
@@ -317,10 +336,15 @@ public class VoltTrace implements Runnable {
         // whose latencies are larger than the m_filterTime.
         private double m_filterTime;
 
-        // Thread safe dta structures
+        // Thread safe data structures
         // Hash map and linked deque (used as stack) to temporarily store the begin of a trace event
         private final static int INIT_CAPACITY = Integer.getInteger("VOLTTRACE_INIT_CAPACITY", 1024);
         private ConcurrentHashMap<String, Pair<TraceEventWrapper, Long>> m_asyncEvents = new ConcurrentHashMap<>(INIT_CAPACITY);
+        // The concurrentLinkedDeque is used as stack to deal with nested duration begin and end events
+        // The end events always match the nearest begin event
+        // For example, we have a serias of nested duration events: B1, B2, E2, B3, E3, E1
+        // We push begin events in the stack
+        // When there comes an end event, the top event on the stack is the matched begin event and we pop it from stack
         private ConcurrentLinkedDeque<Pair<TraceEventWrapper, Long>> m_durationEvents = new ConcurrentLinkedDeque<>();
 
         public void setThreshold(double time) {
@@ -373,13 +397,10 @@ public class VoltTrace implements Runnable {
         }
     }
 
-    private static volatile TraceEventFilter s_tracingFilter = null;
-
     /**
      * Creates and starts a filter. If one already exists, this is a no-op.
      * Synchronized to prevent multiple threads enabling it at the same time.
      */
-
     private static synchronized void createFilter() throws IOException {
         if (s_tracingFilter == null) {
             final TraceEventFilter filter = TraceEventFilter.getFilterInstance();
@@ -504,21 +525,6 @@ public class VoltTrace implements Runnable {
             return event;
         }
     }
-
-    static final int QUEUE_SIZE = Integer.getInteger("VOLTTRACE_QUEUE_SIZE", 4096);
-    private static volatile VoltTrace s_tracer;
-
-    // Events from trace producers are put into this queue.
-    // TraceFileWriter takes events from this queue and writes them to files.
-    private EvictingQueue<TraceEventBatch> m_traceEvents = EvictingQueue.create(QUEUE_SIZE);
-    private EvictingQueue<TraceEventBatch> m_emptyQueue = EvictingQueue.create(QUEUE_SIZE);
-    private final ListeningExecutorService m_writerThread = CoreUtils.getCachedSingleThreadExecutor("VoltTrace Writer", 1000);
-
-    private volatile boolean m_shutdown = false;
-    private volatile Runnable m_shutdownCallback = null;
-
-    private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
-    private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
 
     private boolean isCategoryEnabled(Category cat) {
         return m_enabledCategories.contains(cat);
