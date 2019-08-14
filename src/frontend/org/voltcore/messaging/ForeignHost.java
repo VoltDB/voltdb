@@ -58,14 +58,18 @@ public class ForeignHost {
     // reference to the first object of the connection list
     private Subconnection m_firstConn;
 
-//    // hold onto the socket so we can kill it
-//    private final Socket m_socket;
-
     // Remote site id to sub-connection mapping
     volatile ImmutableMap<Long, Subconnection> m_connByHSIds = ImmutableMap.of();
+    // Some site ids are resevered for special purposes, e.g. stats, snapshot, DR,
+    // elastic expand/shrink etc., see comments in HostMessenger. Data traffic to those
+    // special site ids is small related to normal transactional data. To avoid the disruption
+    // of hsid-to-piconetwork binding of the normal data, use a separate map to evenly
+    // distribute special site ids.
+    volatile ImmutableMap<Long, Subconnection> m_connBySpecialHSIds = ImmutableMap.of();
 
     // A counter used to uniformly bind remote site ids to sub-connections (if any)
     private final AtomicInteger m_nextConnection = new AtomicInteger(0);
+    private final AtomicInteger m_nextConnectionForSpecialHSId = new AtomicInteger(0);
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
@@ -211,11 +215,21 @@ public class ForeignHost {
                 new HashMap<Subconnection, ArrayList<Long>>();
         if (m_hasMultiConnections) {
             for (long remoteHsId : destinations) {
+                Subconnection c = null;
                 // fast path
-                Subconnection c = m_connByHSIds.get(remoteHsId);
+                // Negative site id is reserved for special purposes, deal them separately.
+                if (remoteHsId < 0) {
+                    c = m_connBySpecialHSIds.get(remoteHsId);
+                } else {
+                    c = m_connByHSIds.get(remoteHsId);
+                }
                 if (c == null) {
                     // slow path, invoked when this host sends the first message for the destination
-                    c = m_connections.get(m_nextConnection.getAndIncrement() % m_connections.size());
+                    if (remoteHsId < 0) {
+                        c = m_connections.get(m_nextConnectionForSpecialHSId.getAndIncrement() % m_connections.size());
+                    } else {
+                        c = m_connections.get(m_nextConnection.getAndIncrement() % m_connections.size());
+                    }
                     bindConnection(remoteHsId, c);
                 }
                 ArrayList<Long> bundle = destinationsPerConn.get(c);
@@ -288,13 +302,23 @@ public class ForeignHost {
 
     private void bindConnection(Long hsId, Subconnection conn) {
         synchronized (m_connectionLock) {
-            if (m_connByHSIds.containsKey(hsId)) {
-                return;
+            if (hsId < 0) {
+                if (m_connBySpecialHSIds.containsKey(hsId)) {
+                    return;
+                }
+                ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
+                m_connBySpecialHSIds = b.putAll(m_connBySpecialHSIds)
+                                         .put(hsId, conn)
+                                         .build();
+            } else {
+                if (m_connByHSIds.containsKey(hsId)) {
+                    return;
+                }
+                ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
+                m_connByHSIds = b.putAll(m_connByHSIds)
+                                 .put(hsId, conn)
+                                 .build();
             }
-            ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
-            m_connByHSIds = b.putAll(m_connByHSIds)
-                             .put(hsId, conn)
-                             .build();
         }
     }
 

@@ -1397,12 +1397,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-//    private ForeignHost getPrimary(ImmutableList<ForeignHost> fhosts, int hostId) {
-//        ForeignHost fhost = fhosts.get(0);
-//        assert fhost.isPrimary();
-//        return fhost;
-//    }
-
     /*
      * Generate a slot for the mailbox and put a noop box there. Can also
      * supply a value
