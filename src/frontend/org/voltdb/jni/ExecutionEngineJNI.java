@@ -962,8 +962,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateCombine() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
-        int argCount = m_udfBuffer.getInt();
-        assert argCount == 1;
         Object workerObject = null;
         try {
             assert(udafRunner != null);
@@ -999,8 +997,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateWorkerEnd() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
-        int argCount = m_udfBuffer.getInt();
-        assert argCount == 1;
         // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
         Object returnValue = null;
         VoltType returnType = null;
@@ -1040,8 +1036,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateCoordinatorEnd() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
-        int argCount = m_udfBuffer.getInt();
-        assert argCount == 1;
         Object returnValue = null;
         try {
             assert(udafRunner != null);
