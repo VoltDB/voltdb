@@ -54,26 +54,20 @@ public:
      * write an insert or delete record to the stream
      * for active-active conflict detection purpose, write full row image for delete records.
      * */
-    virtual size_t appendTuple(char *tableHandle,
-                               int partitionColumn,
-                               int64_t spHandle,
-                               int64_t uniqueId,
-                               TableTuple &tuple,
-                               DRRecordType type);
+    virtual size_t appendTuple(char *tableHandle, int partitionColumn,
+            int64_t spHandle, int64_t uniqueId,
+            TableTuple &tuple, DRRecordType type);
 
     /**
      * write an update record to the stream
      * for active-active conflict detection purpose, write full before image for update records.
      * */
-    virtual size_t appendUpdateRecord(char *tableHandle,
-                                      int partitionColumn,
-                                      int64_t spHandle,
-                                      int64_t uniqueId,
-                                      TableTuple &oldTuple,
-                                      TableTuple &newTuple);
+    virtual size_t appendUpdateRecord(char *tableHandle, int partitionColumn,
+            int64_t spHandle, int64_t uniqueId,
+            TableTuple &oldTuple, TableTuple &newTuple);
 
     virtual size_t truncateTable(char *tableHandle,
-                                 std::string tableName,
+                                 std::string const& tableName,
                                  int partitionColumn,
                                  int64_t spHandle,
                                  int64_t uniqueId);
@@ -96,12 +90,9 @@ public:
 
     static int getDRLogHeaderSize();
 
-    static int32_t getTestDRBuffer(uint8_t drProtocolVersion,
-                                   int32_t partitionId,
-                                   std::vector<int32_t> partitionKeyValueList,
-                                   std::vector<int32_t> flagList,
-                                   long startSequenceNumber,
-                                   char *out);
+    static int32_t getTestDRBuffer(uint8_t drProtocolVersion, int32_t partitionId,
+            std::vector<int32_t> partitionKeyValueList, std::vector<int32_t> flagList,
+            long startSequenceNumber, char *out);
 
     const uint64_t getOpenUniqueIdForTest() const {
         return m_openUniqueId;
@@ -110,14 +101,10 @@ public:
 private:
     bool transactionChecks(int64_t spHandle, int64_t uniqueId);
 
-    void writeRowTuple(TableTuple& tuple,
-            size_t rowHeaderSz,
-            size_t rowMetadataSz,
+    void writeRowTuple(TableTuple& tuple, size_t rowHeaderSz, size_t rowMetadataSz,
             ExportSerializeOutput &io);
 
-    size_t computeOffsets(DRRecordType &type,
-            TableTuple &tuple,
-            size_t &rowHeaderSz,
+    size_t computeOffsets(DRRecordType &type, TableTuple &tuple, size_t &rowHeaderSz,
             size_t &rowMetadataSz);
 
     /**
@@ -150,13 +137,8 @@ private:
 class MockDRTupleStream : public DRTupleStream {
 public:
     MockDRTupleStream(int partitionId) : DRTupleStream(partitionId, 1024) {}
-    size_t appendTuple(char *tableHandle,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId,
-                       TableTuple &tuple,
-                       DRRecordType type)
-    {
+    size_t appendTuple(char *tableHandle, int partitionColumn, int64_t spHandle,
+                       int64_t uniqueId, TableTuple &tuple, DRRecordType type) {
         return 0;
     }
 
@@ -165,12 +147,8 @@ public:
 
     void rollbackDrTo(size_t mark, size_t drRowCost) {}
 
-    size_t truncateTable(char *tableHandle,
-                         std::string tableName,
-                         int partitionColumn,
-                         int64_t spHandle,
-                         int64_t uniqueId)
-    {
+    size_t truncateTable(char *tableHandle, std::string const& tableName,
+                         int partitionColumn, int64_t spHandle, int64_t uniqueId) {
         return 0;
     }
 };
