@@ -161,6 +161,8 @@ public class PlannerRules {
             VoltPJoinRule.INSTANCE,
             VoltPJoinCommuteRule.INSTANCE_OUTER_CALC_SSCAN,
             VoltPJoinCommuteRule.INSTANCE_OUTER_SSCAN,
+            VoltPJoinPushThroughJoinRule.LEFT_JOIN_JOIN,
+            VoltPJoinPushThroughJoinRule.RIGHT_JOIN_JOIN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
