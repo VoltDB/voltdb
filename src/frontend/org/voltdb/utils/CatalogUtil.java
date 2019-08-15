@@ -715,7 +715,8 @@ public abstract class CatalogUtil {
                                             org.voltdb.catalog.Table table) {
         int type = table.getTabletype();
         // Starting from V9.2 we should not read pre-9.0 snapshots
-        assert(!TableType.isInvalidType(type));
+        // However, many JUnit tests mock the environment with invalid table types
+        // assert(!TableType.isInvalidType(type));
         if (TableType.isInvalidType(type)) {
             // This implementation uses connectors instead of just looking at the tableType
             // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
@@ -3267,6 +3268,14 @@ public abstract class CatalogUtil {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null) {
             return table.getIsreplicated();
+        }
+        return false;
+    }
+
+    public static boolean isPersistentMigrate(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return TableType.isPersistentMigrate(table.getTabletype());
         }
         return false;
     }

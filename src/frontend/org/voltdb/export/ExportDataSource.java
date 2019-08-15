@@ -872,7 +872,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     if (sequenceNumber < 0) {
-                        if (sequenceNumber == -1L && generationIdCreated == 0 && m_partitionId != 0 && m_gapTracker.isEmpty()) {
+                        if (sequenceNumber == -1L && m_partitionId != 0 && m_gapTracker.isEmpty()) {
                             // ENG-17199: we are creating EDS instances for all partitions on replicated tables
                             // but only partition 0 is used and can be truncated
                             if (exportLog.isDebugEnabled()) {

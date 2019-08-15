@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;

@@ -43,6 +43,7 @@ begin Database                       "A set of schema, procedures and other meta
   Function*  functions               "The set of user-defined functions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  ProcedureSchedule* procedureSchedules "Schedule definitions for procedures"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
   string securityprovider            "The security provider used to authenticate users"
 end
@@ -310,4 +311,18 @@ begin SnapshotSchedule javaonly "A schedule for the database to follow when crea
   int frequencyValue            "Frequency in some unit"
   int retain                    "How many snapshots to retain"
   string prefix                 "Prefix for snapshot filenames"
+end
+
+begin SchedulerParam javaonly
+  int index                     "Index of this parameter in the set of parameters to pass to the scheduler"
+  string parameter              "Parameter to be passed to the scheduler constructor"
+end
+
+begin ProcedureSchedule javaonly "Defined schedules for procedures"
+  bool enabled                  "Whether or not this schedule is enabled"
+  string name                   "Name of the schedule"
+  string schedulerClass         "Class which defines the schedule"
+  SchedulerParam* parameters    "The set of parameters to this scheduler"
+  string runLocation            "Where this scheduler should be executed"
+  string user                   "User to be used when executing this procedure"
 end
