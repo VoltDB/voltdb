@@ -60,8 +60,10 @@ static inline std::string const enrich(std::string const& a) noexcept {
     return a;
 }
 #else   // On DEBUG build, enrich our exception message with stack trace of the place it is thrown.
+constexpr auto max_len = 1000;
 static inline std::string enrich(std::string src) {
     return src.append("\nSTACK TRACE:").append(voltdb::StackTrace::stringStackTrace("\t"));
+    //return src.size() > max_len ? src.substr(0, max_len).append("...(truncated)") : src;
 }
 #endif
 
@@ -75,8 +77,7 @@ SerializableEEException::SerializableEEException(std::string const& message) :
     std::runtime_error(enrich(message)),
     m_exceptionType(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION),
     m_message(what()) {
-    VOLT_DEBUG("Created SerializableEEException: default type, %s",
-               message.c_str());
+    VOLT_DEBUG("Created SerializableEEException: default type, %s", message.c_str());
 }
 
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
@@ -84,13 +85,12 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeInt(static_cast<int32_t>(messageLength));
+    output->writeInt(messageLength);
     output->writeBytes(messageBytes, messageLength);
     p_serialize(output);
     if (m_exceptionType == VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
         output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
+    output->writeIntAt(lengthPosition, output->position() - (lengthPosition + sizeof(int32_t)));
 }
 
 }

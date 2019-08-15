@@ -578,11 +578,9 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     default:
-        {
-            char message[128];
-            snprintf(message, sizeof(message), "Unknown aggregate type %d", aggType);
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
+        throwSerializableTypedEEException(
+                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                "Unknown aggregate type %d", aggType);
     }
 }
 

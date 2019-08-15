@@ -27,26 +27,21 @@
 
 namespace voltdb {
 
-ElasticContext::ElasticContext(PersistentTable &table,
-                               PersistentTableSurgeon &surgeon,
-                               int32_t partitionId,
-                               const std::vector<std::string> &predicateStrings,
-                               size_t nTuplesPerCall) :
+ElasticContext::ElasticContext(
+        PersistentTable &table, PersistentTableSurgeon &surgeon, int32_t partitionId,
+        const std::vector<std::string> &predicateStrings, size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, predicateStrings),
     m_predicateStrings(predicateStrings), // retained for cloning here, not in TableStreamerContext.
     m_nTuplesPerCall(nTuplesPerCall),
-    m_indexActive(false)
-{
+    m_indexActive(false) {
     if (predicateStrings.size() != 1) {
         throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
     }
 }
 
-ElasticContext::~ElasticContext()
-{}
+ElasticContext::~ElasticContext() {}
 
-TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
-{
+TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon) {
     if ( ! m_indexActive) {
         return NULL;
     }
@@ -82,8 +77,7 @@ TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurg
  * Activation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticContext::handleActivation(TableStreamType streamType)
-{
+ElasticContext::handleActivation(TableStreamType streamType) {
     // Create the index?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
         // Can't activate an indexing stream during a snapshot.
@@ -149,16 +143,14 @@ ElasticContext::handleActivation(TableStreamType streamType)
  * Reactivation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticContext::handleReactivation(TableStreamType streamType)
-{
+ElasticContext::handleReactivation(TableStreamType streamType) {
     return handleActivation(streamType);
 }
 
 /**
  * Deactivation handler.
  */
-bool ElasticContext::handleDeactivation(TableStreamType streamType)
-{
+bool ElasticContext::handleDeactivation(TableStreamType streamType) {
     // Keep this context around to maintain the index.
     return true;
 }
@@ -168,14 +160,12 @@ bool ElasticContext::handleDeactivation(TableStreamType streamType)
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
-                                         std::vector<int> &retPositions)
-{
+        std::vector<int> &retPositions) {
     if (!m_surgeon.hasIndex()) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
             "Elastic streaming was invoked without proper activation.");
         return TABLE_STREAM_SERIALIZATION_ERROR;
-    }
-    if (m_surgeon.isIndexingComplete()) {
+    } else if (m_surgeon.isIndexingComplete()) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,
             "Indexing was already complete.");
         return 0;
@@ -206,8 +196,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
 /**
  * Tuple insert handler lets us add late arriving tuples to the index.
  */
-bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
-{
+bool ElasticContext::notifyTupleInsert(TableTuple &tuple) {
     if (m_indexActive) {
         StreamPredicateList &predicates = getPredicates();
         vassert(predicates.size() > 0);
@@ -221,16 +210,14 @@ bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 /**
  * Tuple update handler is not currently needed.
  */
-bool ElasticContext::notifyTupleUpdate(TableTuple &tuple)
-{
+bool ElasticContext::notifyTupleUpdate(TableTuple &tuple) {
     return true;
 }
 
 /**
  * Tuple delete handler lets us erase tuples from the index.
  */
-bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
-{
+bool ElasticContext::notifyTupleDelete(TableTuple &tuple) {
     if (m_indexActive) {
         if (m_surgeon.indexHas(tuple)) {
             m_surgeon.indexRemove(tuple);
@@ -242,11 +229,8 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 /**
  * Tuple compaction handler lets us reindex when a tuple's address changes.
  */
-void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
-                                         TBPtr targetBlock,
-                                         TableTuple &sourceTuple,
-                                         TableTuple &targetTuple)
-{
+void ElasticContext::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+        TableTuple &sourceTuple, TableTuple &targetTuple) {
     if (m_indexActive) {
         if (m_surgeon.indexHas(sourceTuple)) {
             m_surgeon.indexRemove(sourceTuple);
@@ -266,7 +250,7 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
 void ElasticContext::updatePredicates(const std::vector<std::string> &predicateStrings) {
     //If there is already a predicate and thus presumably an index, make sure the request is a subset of what exists
     //That should always be the case, but wrong answers will follow if we are wrong
-    if (m_predicates.size() > 0 && dynamic_cast<HashRangeExpression*>(&m_predicates[0]) != NULL && predicateStrings.size() > 0) {
+    if (m_predicates.size() > 0 && dynamic_cast<HashRangeExpression*>(&m_predicates[0]) != NULL && !predicateStrings.empty()) {
         PlannerDomRoot domRoot(predicateStrings[0].c_str());
         if (!domRoot.isNull()) {
             PlannerDomValue predicateObject = domRoot();
@@ -279,10 +263,12 @@ void ElasticContext::updatePredicates(const std::vector<std::string> &predicateS
                     PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
                     PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
                     if (!expression->binarySearch(rangeStartValue.asInt()).isTrue()) {
-                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range start is %d", rangeStartValue.asInt());
+                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range start is %d",
+                                rangeStartValue.asInt());
                     }
                     if (!expression->binarySearch(rangeEndValue.asInt()).isTrue()) {
-                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range end is %d", rangeStartValue.asInt());
+                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range end is %d",
+                                rangeStartValue.asInt());
                     }
                 }
             }

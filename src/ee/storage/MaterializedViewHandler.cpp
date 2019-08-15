@@ -348,8 +348,10 @@ namespace voltdb {
                  it != m_sourceTables.end(); ++it) {
                 if (! it->first->isPersistentTableEmpty()) {
                     char msg[256];
-                    snprintf(msg, sizeof(msg), "The maintenance of the materialized view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
+                    snprintf(msg, sizeof(msg),
+                            "The maintenance of the materialized view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
                              m_destTable->name().c_str(), it->first->name().c_str());
+                    msg[sizeof msg - 1] = '\0';
                     LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
                     return;
                 }

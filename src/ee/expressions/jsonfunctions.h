@@ -288,21 +288,15 @@ private:
     }
 
     void throwInvalidPathError(const char* err) const {
-        char msg[1024];
-        snprintf(msg, sizeof(msg), "Invalid JSON path: %s [position %d]", err, m_pos);
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON path: %s [position %d]", err, m_pos);
     }
 
     void throwJsonFormattingError() const {
-        char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", m_reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", m_reader.getFormatedErrorMessages().c_str());
     }
 };
 
@@ -365,14 +359,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     Json::Value root;
     Json::Reader reader;
 
-    if ( ! reader.parse(doc, root)) {
-        char msg[1024];
+    if (! reader.parse(doc, root)) {
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
     }
 
     // only array type contains elements. objects, primitives do not
@@ -424,13 +415,10 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     Json::Reader reader;
 
     if ( ! reader.parse(doc, root)) {
-        char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
     }
 
     // only array type contains indexed elements. objects, primitives do not
