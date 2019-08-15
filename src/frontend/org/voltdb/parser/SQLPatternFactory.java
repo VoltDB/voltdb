@@ -17,7 +17,6 @@
 
 package org.voltdb.parser;
 
-
 /**
  * Inherit from this class in order to use the static methods without the class name
  * to build patterns.
@@ -216,6 +215,10 @@ public class SQLPatternFactory
         public static SQLPatternPart integer()
         {
             return new SQLPatternPartElement("\\d+");
+        }
+
+        public static SQLPatternPart ifExisits() {
+            return SPF.optional(SPF.capture("ifExists", SPF.clause(SPF.token("if"), SPF.token("exists"))));
         }
 
         /**

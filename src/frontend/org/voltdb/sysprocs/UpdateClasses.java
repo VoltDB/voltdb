@@ -53,7 +53,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                                 new String[0],
                                 Collections.emptyList(),
                                 null,
-                                false, /* isPromotion */
-                                useDDLSchema);
+                                false /* isPromotion */
+                                );
     }
 }

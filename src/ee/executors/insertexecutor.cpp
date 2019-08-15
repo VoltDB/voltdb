@@ -167,8 +167,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     // Update target table reference from table delegate
     m_targetTable = m_node->getTargetTable();
     vassert(m_targetTable);
-    vassert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
-            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
+    vassert(nullptr != dynamic_cast<PersistentTable*>(m_targetTable) ||
+            nullptr != dynamic_cast<StreamedTable*>(m_targetTable));
 
     m_persistentTable = m_isStreamed ?
             NULL : static_cast<PersistentTable*>(m_targetTable);
@@ -179,8 +179,11 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_node->isInline() ? "INLINE" : m_inputTable->debug().c_str());
 
+    // Note that we need to clear static trackers: ENG-17091
+    // https://issues.voltdb.com/browse/ENG-17091?focusedCommentId=50362&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-50362
     // count the number of successful inserts
     m_modifiedTuples = 0;
+    s_errorMessage.clear();
 
     m_tmpOutputTable = newOutputTable;
     vassert(m_tmpOutputTable);
@@ -202,18 +205,18 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_templateTuple = m_templateTupleStorage.tuple();
 
     std::vector<int>::iterator it;
-    for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
-        m_templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+    for (auto iter: m_nowFields) {
+        m_templateTuple.setNValue(iter, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
     VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
-               static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
-               m_targetTable->name().c_str());
+            static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
+            m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
-               m_node->isInline() ? "inline"
-                       : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
-                               "single-row" : "multi-row"),
-               m_engine->getPartitionId());
+            m_node->isInline() ? "inline"
+            : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+                "single-row" : "multi-row"),
+            m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
     //
     // Return a tuple whose schema we can use as an
@@ -228,13 +231,12 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
         AbstractTempTable *newOutputTable, TableTuple &temp_tuple) {
     bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
-    if (m_replicatedTableOperation) {
-        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
-            // Need to set this here for inlined inserts in case there are no inline inserts
-            // and finish is called right after this
-            s_modifiedTuples = 0;
-            SynchronizedThreadLock::signalLowestSiteFinished();
-        }
+    if (m_replicatedTableOperation &&
+            SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+        // Need to set this here for inlined inserts in case there are no inline inserts
+        // and finish is called right after this
+        s_modifiedTuples = 0;
+        SynchronizedThreadLock::signalLowestSiteFinished();
     }
     return rslt;
 }
@@ -294,7 +296,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
                 throw ConstraintFailureException(m_targetTable, m_templateTuple,
-                                                 "Mispartitioned tuple in single-partition insert statement.");
+                        "Mispartitioned tuple in single-partition insert statement.");
             }
         }
     }
@@ -315,11 +317,10 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             m_upsertTuple.move(m_templateTuple.address());
             TableTuple &tempTuple = m_persistentTable->copyIntoTempTuple(existsTuple);
             for (int i = 0; i < mapSize; ++i) {
-                tempTuple.setNValue(fieldMap[i],
-                                    m_templateTuple.getNValue(fieldMap[i]));
+                tempTuple.setNValue(fieldMap[i], m_templateTuple.getNValue(fieldMap[i]));
             }
-            m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                                                              m_persistentTable->allIndexes());
+            m_persistentTable->updateTupleWithSpecificIndexes(
+                    existsTuple, tempTuple, m_persistentTable->allIndexes());
             // successfully updated
             ++m_modifiedTuples;
             return;
@@ -351,16 +352,14 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         if (m_replicatedTableOperation) {
             s_modifiedTuples = m_modifiedTuples;
         }
-    } else {
-        if (s_modifiedTuples == -1) {
-            // An exception was thrown on the lowest site thread and we need to throw here as well so
-            // all threads are in the same state
-            char msg[1024];
-            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
-                    m_targetTable->name().c_str());
-            VOLT_DEBUG("%s", msg);
-            throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-        }
+    } else if (s_modifiedTuples == -1) {
+        // An exception was thrown on the lowest site thread and we need to throw here as well so
+        // all threads are in the same state
+        char msg[1024];
+        snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                m_targetTable->name().c_str());
+        VOLT_DEBUG("%s", msg);
+        throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
     }
 }
 
