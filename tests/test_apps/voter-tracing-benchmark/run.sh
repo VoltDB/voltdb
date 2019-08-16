@@ -163,7 +163,7 @@ function tracing-benchmark() {
 
 function tracing-benchmark-showAll() {
     tracing-benchmark 1
-    voltadmin shutdown
+    #voltadmin shutdown
 }
 
 function tracing-benchmark-figurePlot() {
@@ -270,6 +270,22 @@ function tracing-benchmark-showBenchmark() {
 function help() {
     echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|simple-benchmark}"
+}
+
+function test-volt-trace() {
+    sqlcmd < ddl.sql
+    sqlcmd --query="exec @Trace status"
+    sqlcmd --query="exec @Trace filter 800"
+    sqlcmd --query="exec @Trace enable SPI"
+    sqlcmd --query="exec @Trace enable CI"
+    sqlcmd --query="exec @Trace status"
+    tracing-benchmark-showAll
+    sqlcmd --query="exec @Trace dump"
+    sqlcmd --query="exec @Trace filter 0"
+    sqlcmd --query="exec @Trace status"
+    sqlcmd --query="exec @Trace disable ALL"
+    #sqlcmd --query="exec @Statistics procedureprofile 0"
+    voltadmin shutdown
 }
 
 # Run the targets pass on the command line
