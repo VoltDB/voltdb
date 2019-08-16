@@ -562,7 +562,7 @@ private:
 
     // maximum size of of argument vector
     // declared as static variable shared by all instances of the class
-    static const int s_maxSize = 4;
+    static const int s_maxSize = 32;
 };
 
 /*
