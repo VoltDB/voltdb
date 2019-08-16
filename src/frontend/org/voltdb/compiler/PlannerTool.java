@@ -86,7 +86,7 @@ public class PlannerTool {
     // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
     // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
     // we should ignore.
-    private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
+    private final double m_largeModeRatio = Double.parseDouble((System.getenv("LARGE_MODE_RATIO") == null ||
             System.getenv("LARGE_MODE_RATIO").equals("-1")) ?
             System.getProperty("LARGE_MODE_RATIO", "0") :
             System.getenv("LARGE_MODE_RATIO"));
@@ -143,7 +143,6 @@ public class PlannerTool {
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
         m_schemaPlus = VoltSchemaPlus.from(m_database);
-
         return this;
     }
 
@@ -294,7 +293,12 @@ public class PlannerTool {
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException, PlannerFallbackException {
-        CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
+        CompiledPlan plan = getCompiledPlanCalcite(
+                // TODO: we need a reliable way to sync Calcite's SchemaPlus from VoltDB's Catalog,
+                // esp. since we start relying on Calcite to operate on 'CREATE TABLE' statements.
+                // See VoltCompiler#compileDatabase().
+                VoltSchemaPlus.from(m_database)/*m_schemaPlus*/,
+                task.getParsedQuery());
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO Calcite ready: enable when we are ready

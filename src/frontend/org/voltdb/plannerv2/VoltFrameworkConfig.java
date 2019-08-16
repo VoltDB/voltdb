@@ -89,7 +89,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
      * @param schema the converted {@code SchemaPlus} from VoltDB catalog.
      */
     public VoltFrameworkConfig(SchemaPlus schema) {
-        m_schema = Objects.requireNonNull(schema);
+        m_schema = Objects.requireNonNull(schema, "SchemaPlus is null");
         m_typeFactory = new SqlTypeFactoryImpl(getTypeSystem());
         CalciteSchema calciteSchema = CalciteSchema.from(m_schema);
         m_catalogReader = new CalciteCatalogReader(

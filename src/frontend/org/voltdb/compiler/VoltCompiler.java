@@ -645,15 +645,13 @@ public class VoltCompiler {
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
         StringBuilder buildinfo = new StringBuilder();
-        String info[] = RealVoltDB.extractBuildInfo(compilerLog);
+        String[] info = RealVoltDB.extractBuildInfo(compilerLog);
         buildinfo.append(info[0]).append('\n');
         buildinfo.append(info[1]).append('\n');
         buildinfo.append(System.getProperty("user.name")).append('\n');
         buildinfo.append(System.getProperty("user.dir")).append('\n');
-        buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
-
-        byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
-        jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
+        buildinfo.append(System.currentTimeMillis()).append('\n');
+        jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfo.toString().getBytes(Constants.UTF8ENCODING));
     }
 
     /**
@@ -1011,8 +1009,7 @@ public class VoltCompiler {
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
-    public static enum DdlProceduresToLoad
-    {
+    public static enum DdlProceduresToLoad {
         NO_DDL_PROCEDURES, ALL_DDL_PROCEDURES
     }
 
@@ -1128,7 +1125,7 @@ public class VoltCompiler {
 
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
-            /*sqlNodes.forEach(node -> {
+            sqlNodes.forEach(node -> {
                 final Pair<SchemaPlus, Pair<Statement, VoltXMLElement>> r = CreateTableUtils.addTable(node, hsql, db);
                 if (r.getSecond() != null) {
                     final Statement stmt = r.getSecond().getFirst();
@@ -1138,7 +1135,7 @@ public class VoltCompiler {
 //                  // First, need to make tests/testprocs/org/voltdb_testprocs/regressionsuites/matviewprocs/matviewsuite-ddl.sql work.
 //                    final SchemaPlus sc = CreateIndexUtils.run(node, previousDBIfAny, db);
                 }
-            });*/
+            });
             ddlcompiler.compileToCatalog(db, m_isXDCR); // NOTE: this is the place catalog gets added for create table.
 
             // add database estimates info

@@ -99,6 +99,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1336,10 +1337,12 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-        // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
-        if (StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
-                .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
-            return;       // Code below this point is not executed any more.
+        if (AdHocNTBase.USING_CALCITE &&    // Skip "CREATE TABLE" if we have already added it using Calcite parser.
+                StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                        .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
+            // Code below this point is not executed any more. See VoltCompiler#compileDatabase() for
+            // how CREATE TABLE statement is processed by Calcite.
+            return;
         }
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
