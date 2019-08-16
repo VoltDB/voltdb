@@ -2007,8 +2007,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param uniqueId
      * @param partitionId
      */
-    public void sendSentinel(long uniqueId, int partitionId, long txnId) {
-        m_dispatcher.sendSentinel(uniqueId, partitionId, txnId);
+    public void sendSentinel(long uniqueId, int partitionId) {
+        m_dispatcher.sendSentinel(uniqueId, partitionId);
     }
 
     /**

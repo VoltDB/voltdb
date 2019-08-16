@@ -1096,13 +1096,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            if (TxnEgo.getPartitionId(msg.getTxnId()) == MpInitiator.MP_INIT_PID) {
-                hostLog.info("In replay. doLocalFragmentOffer write invocation txnId " + msg.getTxnId() +
-                        "(" + TxnEgo.txnIdToString(msg.getTxnId()) +
-                        ") uniqueId " + msg.getUniqueId() + "(" + UniqueIdGenerator.toShortString(msg.getUniqueId()) +
-                        ") partitionId " + m_partitionId +
-                        "  name " + msg.getProcedureName());
-            }
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);

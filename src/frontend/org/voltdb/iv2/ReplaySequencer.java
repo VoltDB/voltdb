@@ -294,10 +294,6 @@ public class ReplaySequencer
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
-            MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) in;
-            hostLog.info("sequencer receives sentinel in replay ciHandle " + mppm.getClientInterfaceHandle() +
-                    " inUniqueId " + inUniqueId + " (" + UniqueIdGenerator.toShortString(inUniqueId) + ")");
-
             //--------------------------------------------
             // DRv1 path, mark for future removal
             /*
