@@ -95,7 +95,10 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     public void promoteSinglePartitionInfo(
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets) {
-        assert(getScanPartitioning() != null);
+        if (getScanPartitioning() == null) {
+            throw new Error("Unsupported statement, subquery expressions are only supported for " +
+                    "single partition procedures and AdHoc replicated tables.");
+        }
         if (getScanPartitioning().getCountOfPartitionedTables() == 0 ||
                 getScanPartitioning().requiresTwoFragments()) {
             return;
