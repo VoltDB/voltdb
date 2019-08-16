@@ -60,10 +60,8 @@ static inline std::string const enrich(std::string const& a) noexcept {
     return a;
 }
 #else   // On DEBUG build, enrich our exception message with stack trace of the place it is thrown.
-constexpr auto max_len = 1000;
 static inline std::string enrich(std::string src) {
     return src.append("\nSTACK TRACE:").append(voltdb::StackTrace::stringStackTrace("\t"));
-    //return src.size() > max_len ? src.substr(0, max_len).append("...(truncated)") : src;
 }
 #endif
 

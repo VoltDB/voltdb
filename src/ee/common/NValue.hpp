@@ -58,7 +58,7 @@ namespace voltdb {
  */
 constexpr int SHORT_OBJECT_LENGTHLENGTH = 1;
 constexpr char OBJECT_NULL_BIT = 1 << 6;
-constexpr char OBJECT_CONTINUATION_BIT = 1 << 7;
+constexpr char OBJECT_CONTINUATION_BIT = static_cast<char>(1 << 7);
 constexpr auto OBJECT_MAX_LENGTH_SHORT_LENGTH = 63;
 
 constexpr auto FULL_STRING_IN_MESSAGE_THRESHOLD = 100;

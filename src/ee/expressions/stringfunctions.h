@@ -475,7 +475,8 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     int64_t length = lengthArg.castAsBigIntAndGetValue();
     if (length < 0) {
         throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "data exception -- substring error, negative length argument %ld", length);
+                "data exception -- substring error, negative length argument %ld",
+                static_cast<long>(length));
     }
     if (start < 1) {
         // According to the standard, START < 1 effectively
@@ -542,7 +543,8 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     int64_t start = startArg.castAsBigIntAndGetValue();
     if (start <= 0) {
         throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "data exception -- OVERLAY error, not positive start argument %ld", start);
+                "data exception -- OVERLAY error, not positive start argument %ld",
+                static_cast<long>(start));
     }
 
     int64_t length = 0;
@@ -551,7 +553,8 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         length = lengthArg.castAsBigIntAndGetValue();
         if (length < 0) {
             throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "data exception -- OVERLAY error, negative length argument %ld", length);
+                    "data exception -- OVERLAY error, negative length argument %ld",
+                    static_cast<long>(length));
         }
     }
     else {

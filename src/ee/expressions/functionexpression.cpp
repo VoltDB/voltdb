@@ -69,7 +69,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (intValue == 0) {
             return codeArg;
         }
-        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", intValue);
+        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", 
+                 static_cast<long>(intValue));
         state_format_buffer[sizeof state_format_buffer - 1] = '\0';
         sqlstatecode = state_format_buffer;
     }
