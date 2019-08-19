@@ -61,6 +61,8 @@
 namespace voltdb {
 std::atomic_int64_t UpdateExecutor::s_modifiedTuples;
 
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
+
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Update Executor");
 
@@ -138,7 +140,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(),
                 s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {

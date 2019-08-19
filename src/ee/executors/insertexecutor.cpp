@@ -55,6 +55,7 @@ namespace voltdb {
 std::atomic_int64_t InsertExecutor::s_modifiedTuples{0};
 std::string InsertExecutor::s_errorMessage{};
 std::mutex InsertExecutor::s_errorMessageUpdateLocker{};
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Insert Executor");
@@ -345,7 +346,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
 
 void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
     // This should only be called from inlined insert executors because we have to change contexts every time
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+    ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
             m_replicatedTableOperation, m_engine->isLowestSite(),
             s_modifiedTuples, -1l, s_errorMessage, std::string{});
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -391,7 +392,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
    TableTuple inputTuple;
    const TupleSchema *inputSchema = m_inputTable->schema();
    if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
-      ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+      ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
             m_replicatedTableOperation, m_engine->isLowestSite(),
             s_modifiedTuples, -1l);
       if (possiblySynchronizedUseMpMemory.okToExecute()) {

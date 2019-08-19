@@ -55,9 +55,9 @@
 #include "storage/tableutil.h"
 #include "storage/ConstraintFailureException.h"
 
-
 namespace voltdb {
 std::atomic_int64_t MigrateExecutor::s_modifiedTuples;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
 
 bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Migrate Executor");
@@ -105,7 +105,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     int64_t migrated_tuples = 0;
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(),
                 s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -131,7 +131,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 if (targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
                     TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
                     targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                                indexesToUpdate, true, false, true);
+                            indexesToUpdate, true, false, true);
                     migrated_tuples++;
                 }
             }

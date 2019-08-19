@@ -44,12 +44,12 @@ public:
     ~ConditionalExecuteOutsideMpMemory();
 };
 
+template<class T>
 class ConditionalSynchronizedExecuteWithMpMemory {
     bool m_usingMpMemoryOnLowestThread;
     bool m_okToExecute;
 public:
-    template<typename T>
-    inline ConditionalSynchronizedExecuteWithMpMemory(
+    ConditionalSynchronizedExecuteWithMpMemory(
             bool needMpMemoryOnLowestThread, bool isLowestSite,
             std::atomic<T>& tracker, const T& initValue) :
         m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite),
@@ -63,9 +63,9 @@ public:
             }
         }
 
-    template<typename T1, typename T2>
+    template<typename T2>
     ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread, bool isLowestSite,
-            std::atomic<T1>& val1, const T1& initValue1, T2& val2, const T2& initValue2)
+            std::atomic<T>& val1, const T& initValue1, T2& val2, const T2& initValue2)
     : m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite)
     , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread) {
         if (needMpMemoryOnLowestThread) {
@@ -79,8 +79,14 @@ public:
         }
     }
 
-    ~ConditionalSynchronizedExecuteWithMpMemory();
-    bool okToExecute() const {
+    ~ConditionalSynchronizedExecuteWithMpMemory() {
+        if (m_usingMpMemoryOnLowestThread) {
+            VOLT_DEBUG("Switching to local site context and waking other threads...");
+            SynchronizedThreadLock::assumeLocalSiteContext();
+            SynchronizedThreadLock::signalLowestSiteFinished();
+        }
+    }
+    inline bool okToExecute() const {
         return m_okToExecute;
     }
 };

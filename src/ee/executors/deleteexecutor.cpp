@@ -52,6 +52,7 @@
 
 namespace voltdb {
 std::atomic_int64_t DeleteExecutor::s_modifiedTuples;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
 
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Delete Executor");
@@ -92,7 +93,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     {
         vassert(targetTable->isReplicatedTable() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(),
                 s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {

@@ -73,6 +73,7 @@ const static int DR_TUPLE_COLUMN_INDEX = 11;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<bool>;
 
 // a c++ style way to limit access from outside this file
 namespace {
@@ -852,7 +853,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
 
 int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables,
         Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId) {
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(true, engine->isLowestSite(),
+    ConditionalSynchronizedExecuteWithMpMemory<bool> possiblySynchronizedUseMpMemory(true, engine->isLowestSite(),
             s_replicatedApplySuccess, false);
 
     long rowCount = 0;

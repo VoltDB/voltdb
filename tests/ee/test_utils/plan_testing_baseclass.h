@@ -254,7 +254,7 @@ public:
         }
         assert(pTable != NULL);
         std::atomic_int dummyExceptionTracker;
-        voltdb::ConditionalSynchronizedExecuteWithMpMemory setMpMemoryIfNeeded(
+        voltdb::ConditionalSynchronizedExecuteWithMpMemory<int> setMpMemoryIfNeeded(
                 pTable->isReplicatedTable(), true, dummyExceptionTracker, -1);
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {

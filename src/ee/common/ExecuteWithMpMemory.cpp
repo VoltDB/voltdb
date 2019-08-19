@@ -61,13 +61,9 @@ ConditionalExecuteOutsideMpMemory::~ConditionalExecuteOutsideMpMemory() {
     }
 }
 
-ConditionalSynchronizedExecuteWithMpMemory::~ConditionalSynchronizedExecuteWithMpMemory() {
-    if (m_usingMpMemoryOnLowestThread) {
-        VOLT_DEBUG("Switching to local site context and waking other threads...");
-        SynchronizedThreadLock::assumeLocalSiteContext();
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    }
-}
+template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
+template class ConditionalSynchronizedExecuteWithMpMemory<bool>;
+template class ConditionalSynchronizedExecuteWithMpMemory<VoltEEExceptionType>;
 
 ExecuteWithAllSitesMemory::ExecuteWithAllSitesMemory()
         : m_engineLocals()
@@ -79,8 +75,7 @@ ExecuteWithAllSitesMemory::ExecuteWithAllSitesMemory()
     vassert(SynchronizedThreadLock::isLowestSiteContext());
 }
 
-ExecuteWithAllSitesMemory::~ExecuteWithAllSitesMemory()
-{
+ExecuteWithAllSitesMemory::~ExecuteWithAllSitesMemory() {
     ExecutorContext::assignThreadLocals(m_engineLocals);
 #ifndef NDEBUG
     SynchronizedThreadLock::setUsingMpMemory(m_wasUsingMpMemory);

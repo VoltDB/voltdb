@@ -51,6 +51,7 @@
 using namespace std;
 using namespace voltdb;
 std::atomic_int64_t SwapTablesExecutor::s_modifiedTuples;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
 
 bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init SwapTable Executor");
@@ -83,7 +84,7 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     VOLT_TRACE("swap tables %s and %s", theTargetTable->name().c_str(), otherTargetTable->name().c_str());
     {
         vassert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(),
                 s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {

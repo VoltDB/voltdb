@@ -143,6 +143,8 @@ typedef boost::multi_index::multi_index_container<
         boost::multi_index::sequenced<>,
         boost::multi_index::hashed_unique<
             boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>>>> PlanSet;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
+extern template class ConditionalSynchronizedExecuteWithMpMemory<VoltEEExceptionType>;
 
 int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
 
@@ -1749,7 +1751,7 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+    ConditionalSynchronizedExecuteWithMpMemory<VoltEEExceptionType> possiblySynchronizedUseMpMemory(
             table->isReplicatedTable(), isLowestSite(),
             s_loadTableException, VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -2650,7 +2652,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
                 spHandle, -1, uniqueId, false);
 
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<VoltEEExceptionType> possiblySynchronizedUseMpMemory(
                 table->isReplicatedTable(), isLowestSite(),
                 s_loadTableException, VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -2940,7 +2942,7 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
         std::atomic_int64_t dummyExceptionTracker = 0;
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+        ConditionalSynchronizedExecuteWithMpMemory<int64_t> possiblySynchronizedUseMpMemory(
                 updateReplicated, m_isLowestSite, dummyExceptionTracker, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
