@@ -26,9 +26,12 @@ public interface SchedulerValidationHelper {
      * <p>
      * Note: parameter validation might not work for system procedures
      *
-     * @param errors {@link SchedulerValidationErrors} instance to collect errors
-     * @param name   Name of procedure to validate
-     * @param params that will be passed to {@code name}
+     * @param errors                   {@link SchedulerValidationErrors} instance to collect errors
+     * @param restrictProcedureByScope If true type of procedures will be restricted. See
+     *                                 {@link Scheduler#restrictProcedureByScope()}
+     * @param name                     Name of procedure to validate
+     * @param params                   that will be passed to {@code name}
      */
-    void validateProcedureAndParams(SchedulerValidationErrors errors, String name, Object[] params);
+    void validateProcedureAndParams(SchedulerValidationErrors errors, boolean restrictProcedureByScope, String name,
+            Object[] params);
 }

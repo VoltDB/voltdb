@@ -31,13 +31,18 @@ abstract class SingleProcScheduler extends ErrorHandlerScheduler {
     static void validateParameters(SchedulerValidationErrors errors, SchedulerValidationHelper helper, String errorHandler, String procedure,
             String... procedureParameters) {
         ErrorHandlerScheduler.validateParameters(errors, errorHandler);
-        helper.validateProcedureAndParams(errors, procedure, procedureParameters);
+        helper.validateProcedureAndParams(errors, true, procedure, procedureParameters);
     }
 
     SingleProcScheduler(String name, String errorHandler, String procedure, String... procedureParameters) {
         super(name, errorHandler);
         m_procedure = procedure;
         m_procedureParameters = procedureParameters;
+    }
+
+    @Override
+    public boolean restrictProcedureByScope() {
+        return true;
     }
 
     @Override
