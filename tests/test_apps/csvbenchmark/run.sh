@@ -44,30 +44,39 @@ function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    return
-    mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
-        src/${APPNAME}/procedures/*.java
+# compile the source code for procedures into jarfiles
+function jars() {
+    # compile java source
+    javac -classpath $CLASSPATH src/${APPNAME}/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+    # build the jar file
+    jar cf $APPNAME.jar -C src $APPNAME
+    # remove compiled .class files
+    rm -rf src/$APPDIR/*.class
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e $APPNAME.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 function benchmark-help() {
@@ -81,7 +90,7 @@ function benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|benchmark}"
+    echo "Usage: ./run.sh {clean|jars|server|benchmark}"
 }
 
 # Run the target passed as the first arg on the command line
