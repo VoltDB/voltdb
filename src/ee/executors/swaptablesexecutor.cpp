@@ -50,11 +50,9 @@
 
 using namespace std;
 using namespace voltdb;
-int64_t SwapTablesExecutor::s_modifiedTuples;
+std::atomic_int64_t SwapTablesExecutor::s_modifiedTuples;
 
-bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
-                                const ExecutorVector& executorVector)
-{
+bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init SwapTable Executor");
     SwapTablesPlanNode* node = dynamic_cast<SwapTablesPlanNode*>(m_abstractNode);
 #ifndef NDEBUG
@@ -82,13 +80,12 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
 
     int64_t modified_tuples = 0;
 
-    VOLT_TRACE("swap tables %s and %s",
-               theTargetTable->name().c_str(),
-               otherTargetTable->name().c_str());
+    VOLT_TRACE("swap tables %s and %s", theTargetTable->name().c_str(), otherTargetTable->name().c_str());
     {
         vassert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // count the active tuples in both tables as modified
             modified_tuples = theTargetTable->visibleTupleCount() +
@@ -106,19 +103,14 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                        (int)otherTargetTable->allocatedTupleCount());
 
             // Swap the table catalog delegates and corresponding indexes and views.
-            theTargetTable->swapTable(otherTargetTable,
-                                      node->theIndexes(),
-                                      node->otherIndexes());
+            theTargetTable->swapTable(otherTargetTable, node->theIndexes(), node->otherIndexes());
             s_modifiedTuples = modified_tuples;
-        }
-        else {
-            if (s_modifiedTuples == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
-                        "Replicated table swap threw an unknown exception on other thread for table %s",
-                        theTargetTable->name().c_str());
-            }
+        } else if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+                    "Replicated table swap threw an unknown exception on other thread for table %s",
+                    theTargetTable->name().c_str());
         }
     }
     if (m_replicatedTableOperation) {

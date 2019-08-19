@@ -31,7 +31,8 @@ ExecuteWithMpMemory::~ExecuteWithMpMemory() {
     SynchronizedThreadLock::assumeLocalSiteContext();
 }
 
-ConditionalExecuteWithMpMemory::ConditionalExecuteWithMpMemory(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
+ConditionalExecuteWithMpMemory::ConditionalExecuteWithMpMemory(bool needMpMemory) :
+    m_usingMpMemory(needMpMemory) {
     if (m_usingMpMemory) {
         VOLT_DEBUG("Entering UseMPmemory");
         SynchronizedThreadLock::assumeMpMemoryContext();
@@ -45,7 +46,8 @@ ConditionalExecuteWithMpMemory::~ConditionalExecuteWithMpMemory() {
     }
 }
 
-ConditionalExecuteOutsideMpMemory::ConditionalExecuteOutsideMpMemory(bool haveMpMemory) : m_notUsingMpMemory(haveMpMemory) {
+ConditionalExecuteOutsideMpMemory::ConditionalExecuteOutsideMpMemory(bool haveMpMemory) :
+    m_notUsingMpMemory(haveMpMemory) {
     if (m_notUsingMpMemory) {
         VOLT_DEBUG("Breaking out of UseMPmemory");
         SynchronizedThreadLock::assumeLocalSiteContext();

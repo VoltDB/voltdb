@@ -44,8 +44,6 @@
  */
 
 #include <common/debuglog.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
 #include <set>
 
 #include "updateexecutor.h"
@@ -61,7 +59,7 @@
 
 
 namespace voltdb {
-int64_t UpdateExecutor::s_modifiedTuples;
+std::atomic_int64_t UpdateExecutor::s_modifiedTuples;
 
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Update Executor");
@@ -141,7 +139,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // determine which indices are updated by this executor
             // iterate through all target table indices and see if they contain
@@ -212,14 +211,12 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = modified_tuples;
             }
-        } else {
-            if (s_modifiedTuples == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
-                        "Replicated table update threw an unknown exception on other thread for table %s",
-                        targetTable->name().c_str());
-            }
+        } else if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+                    "Replicated table update threw an unknown exception on other thread for table %s",
+                    targetTable->name().c_str());
         }
     }
     if (m_replicatedTableOperation) {

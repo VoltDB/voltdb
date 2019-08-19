@@ -149,7 +149,7 @@ int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
 
-VoltEEExceptionType VoltDBEngine::s_loadTableException =
+std::atomic<VoltEEExceptionType> VoltDBEngine::s_loadTableException =
     VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE;
 int VoltDBEngine::s_drHiddenColumnSize = 0;
 
@@ -1749,9 +1749,9 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-            (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-             VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+            table->isReplicatedTable(), isLowestSite(),
+            s_loadTableException, VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         // Joined views are special. If any of the source table(s) are not empty, we cannot restore the view content
         // from a snapshot. The Java top-end has no way to know this so it still tries to tell the EE
@@ -2114,7 +2114,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
         TABLE* storageTable, bool updateReplicated) {
     // walk views
     VOLT_DEBUG("Processing views for table %s", storageTable->name().c_str());
-    BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
+    for (LabeledView labeledView : catalogTable->views()) {
         auto catalogView = labeledView.second;
         catalog::Table const* destCatalogTable = catalogView->dest();
         int32_t catalogIndex = destCatalogTable->relativeIndex();
@@ -2128,8 +2128,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
         // OR create a new materialized view link to connect the tables
         // if there is not one already with a matching target table name.
         ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
-        if ( ! updateMaterializedViewDestTable(
-                    storageTable->views(), destTable, catalogView)) {
+        if (! updateMaterializedViewDestTable(storageTable->views(), destTable, catalogView)) {
             // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
             TABLE::MatViewType::build(storageTable, destTable, catalogView);
         }
@@ -2142,7 +2141,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
     // Further code refactoring saved for future.
     if (mvHandlerInfo) {
         auto destTable = static_cast<PersistentTable*>(m_tables[catalogTable->relativeIndex()]);
-        if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
+        if (! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
             VOLT_DEBUG("Creating view handler for table %s", destTable->name().c_str());
@@ -2165,7 +2164,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
  */
 void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicated) {
     // walk tables
-    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+    for(LabeledTable labeledTable : m_database->tables()) {
         auto catalogTable = labeledTable.second;
         // When updateReplicated flag is set, only replicated table work allowed, and vice versa.
         if (catalogTable->isreplicated() != updateReplicated) {
@@ -2351,7 +2350,7 @@ std::string VoltDBEngine::debug(void) const {
     PlanSet& plans = *m_plans;
     std::ostringstream output;
 
-    for (boost::shared_ptr<ExecutorVector> ev_guard : plans) {
+    for (auto ev_guard : plans) {
         ev_guard->debug();
     }
 
@@ -2374,8 +2373,7 @@ std::string VoltDBEngine::debug(void) const {
  * @param Timestamp to embed in each row
  * @return Number of result tables, 0 on no results, -1 on failure.
  */
-int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
-                           bool interval, int64_t now) {
+int VoltDBEngine::getStats(int selector, int locators[], int numLocators, bool interval, int64_t now) {
     Table* resultTable = NULL;
     std::vector<CatalogId> locatorIds;
 
@@ -2527,10 +2525,8 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(
-        const CatalogId tableId,
-        const TableStreamType streamType,
-        ReferenceSerializeInputBE &serializeIn,
-        std::vector<int> &retPositions) {
+        const CatalogId tableId, const TableStreamType streamType,
+        ReferenceSerializeInputBE &serializeIn, std::vector<int> &retPositions) {
     // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
     int nBuffers = serializeIn.readInt();
     if (nBuffers <= 0) {
@@ -2623,8 +2619,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
 
 int64_t VoltDBEngine::exportAction(bool syncAction, int64_t uso,
         int64_t seqNo, int64_t generationIdCreated, std::string streamName) {
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
-
+    auto const pos = m_exportingTables.find(streamName);
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
         // ignore trying to sync a non-exported table
@@ -2638,13 +2633,13 @@ int64_t VoltDBEngine::exportAction(bool syncAction, int64_t uso,
         } else {
             return uso;
         }
+    } else {
+        Table *table_for_el = pos->second;
+        if (syncAction) {
+            table_for_el->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
+        }
+        return 0;
     }
-
-    Table *table_for_el = pos->second;
-    if (syncAction) {
-        table_for_el->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
-    }
-    return 0;
 }
 
 bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
@@ -2655,9 +2650,9 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
                 spHandle, -1, uniqueId, false);
 
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-                (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-                 VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                table->isReplicatedTable(), isLowestSite(),
+                s_loadTableException, VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             bool rowsToBeDeleted;
             try {
@@ -2944,8 +2939,9 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     do {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
-        int64_t dummyExceptionTracker = 0;
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
+        std::atomic_int64_t dummyExceptionTracker = 0;
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                updateReplicated, m_isLowestSite, dummyExceptionTracker, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {

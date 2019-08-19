@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
@@ -54,30 +55,27 @@
 namespace voltdb {
 
 class MigrateExecutor : public AbstractExecutor {
-public:
-    MigrateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node) {
-         m_inputTable = NULL;
-         m_engine = engine;
-         m_partitionColumn = -1;
-    }
-
 protected:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-    AbstractTempTable* m_inputTable;
+    AbstractTempTable* m_inputTable = nullptr;
 
     MigratePlanNode* m_node;
     TableTuple m_inputTuple;
 
-    int m_partitionColumn;
+    int m_partitionColumn = -1;
     bool m_partitionColumnIsString;
 
-    static int64_t s_modifiedTuples;
+    static std::atomic_int64_t s_modifiedTuples;
 
     /** reference to the engine/context to store the number of modified tuples */
     VoltDBEngine* m_engine;
+public:
+    MigrateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node), m_engine(engine) {
+         m_engine = engine;
+    }
 };
 
 }

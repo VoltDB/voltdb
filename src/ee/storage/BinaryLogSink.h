@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BINARYLOGSINK_H
-#define BINARYLOGSINK_H
+#pragma once
 
 #include "common/serializeio.h"
 
@@ -85,4 +84,3 @@ private:
 
 
 }
-#endif

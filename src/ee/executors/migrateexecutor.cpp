@@ -44,8 +44,6 @@
  */
 
 #include <common/debuglog.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
 
 #include "migrateexecutor.h"
 
@@ -59,11 +57,9 @@
 
 
 namespace voltdb {
-int64_t MigrateExecutor::s_modifiedTuples;
+std::atomic_int64_t MigrateExecutor::s_modifiedTuples;
 
-bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
-                            const ExecutorVector& executorVector)
-{
+bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Migrate Executor");
 
     m_node = dynamic_cast<MigratePlanNode*>(abstract_node);
@@ -110,13 +106,14 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                s_modifiedTuples, -1l);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             std::vector<TableIndex*> indexesToUpdate;
             const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
 
             // Only care about the indexes associated with the hidden column for migrate
-            BOOST_FOREACH(TableIndex *index, allIndexes) {
+            for(TableIndex *index : allIndexes) {
                 if (index->isMigratingIndex()) {
                     indexesToUpdate.push_back(index);
                 }
@@ -141,15 +138,12 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;
             }
-        }
-        else {
-            if (s_modifiedTuples == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
-                        "Replicated table update threw an unknown exception on other thread for table %s",
-                        targetTable->name().c_str());
-            }
+        } else if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+                    "Replicated table update threw an unknown exception on other thread for table %s",
+                    targetTable->name().c_str());
         }
     }
     if (m_replicatedTableOperation) {
@@ -165,7 +159,6 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug("").c_str());
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
-
     return true;
 }
 

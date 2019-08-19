@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -53,24 +54,10 @@
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb {
-
-class TableIndex;
-
 class DeletePlanNode;
 class AbstractTempTable;
-class PersistentTable;
 
 class DeleteExecutor : public AbstractExecutor {
-public:
-    DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node) {}
-
-protected:
-    bool p_init(AbstractPlanNode*,
-                const ExecutorVector& executorVector);
-    bool p_execute(const NValueArray &params);
-
-private:
     DeletePlanNode* m_node = nullptr;
 
     /** true if all tuples are deleted, truncate is the only case we
@@ -79,7 +66,15 @@ private:
     AbstractTempTable* m_inputTable = nullptr;
     TableTuple m_inputTuple{};
 
-    static int64_t s_modifiedTuples;
+    static std::atomic_int64_t s_modifiedTuples;
+public:
+    DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+        AbstractExecutor(engine, abstract_node) {}
+
+protected:
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
+    bool p_execute(const NValueArray &params);
+
 };
 
 }

@@ -43,9 +43,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREUPDATEEXECUTOR_H
-#define HSTOREUPDATEEXECUTOR_H
+#pragma once
 
+#include <atomic>
 #include <vector>
 
 #include "common/common.h"
@@ -56,21 +56,12 @@
 
 namespace voltdb {
 
-class TableIndex;
-
 class UpdatePlanNode;
 class AbstractTempTable;
-class PersistentTable;
 
-class UpdateExecutor : public AbstractExecutor
-{
-public:
-    UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node) { }
-
+class UpdateExecutor : public AbstractExecutor {
 protected:
-    bool p_init(AbstractPlanNode*,
-                const ExecutorVector& executorVector);
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
     UpdatePlanNode* m_node = nullptr;
@@ -84,9 +75,11 @@ protected:
     int m_partitionColumn = -1;
     bool m_partitionColumnIsString = false;
 
-    static int64_t s_modifiedTuples;
+    static std::atomic_int64_t s_modifiedTuples;
+public:
+    UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node) { }
 };
 
 }
 
-#endif

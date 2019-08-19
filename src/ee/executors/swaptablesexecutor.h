@@ -43,26 +43,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESWAPTABLESEXECUTOR_H
-#define HSTORESWAPTABLESEXECUTOR_H
-
+#pragma once
+#include <atomic>
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
 
 class SwapTablesExecutor : public AbstractExecutor {
-public:
-    SwapTablesExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-      : AbstractExecutor(engine, abstractNode)
-    { }
-
-private:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-    static int64_t s_modifiedTuples;
+    static std::atomic_int64_t s_modifiedTuples;
+public:
+    SwapTablesExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+      : AbstractExecutor(engine, abstractNode) { }
 };
 
 }
 
-#endif

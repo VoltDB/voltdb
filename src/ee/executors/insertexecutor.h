@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "common/Pool.hpp"
 #include "common/common.h"
 #include "common/SerializableEEException.h"
@@ -155,14 +156,17 @@ class InsertExecutor : public AbstractExecutor {
      */
     Table* m_targetTable = nullptr;
     int64_t m_modifiedTuples = 0;
-    static int64_t s_modifiedTuples;                // TODO: need to be atomic
-    static std::string s_errorMessage;
-    static std::mutex s_errorMessageUpdateLocker;   // needed to lock writes to s_errorMessage
     TableTuple m_count_tuple{};
     PersistentTable* m_persistentTable = nullptr;
     TableTuple m_upsertTuple{};
     TableTuple m_templateTuple{};
     Pool* m_tempPool = nullptr;
+    // These static members are used as a means for communication
+    // between sites. Great care need to be taken to clear them
+    // between transactions.
+    static std::atomic_int64_t s_modifiedTuples;                // TODO: need to be atomic
+    static std::string s_errorMessage;
+    static std::mutex s_errorMessageUpdateLocker;   // needed to lock writes to s_errorMessage
 };
 
 /**

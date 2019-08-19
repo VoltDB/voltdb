@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/LoadTableCaller.h"
@@ -89,8 +90,6 @@ class Table;
 namespace voltdb {
 
 class AbstractDRTupleStream;
-class AbstractExecutor;
-class AbstractPlanNode;
 class AbstractTempTable;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
@@ -99,7 +98,6 @@ class PersistentTable;
 class StreamedTable;
 class Table;
 class TableCatalogDelegate;
-class TempTableLimits;
 class Topend;
 class TheHashinator;
 class ExportTupleStream;
@@ -868,7 +866,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ThreadLocalPool m_tlPool;
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
-        static VoltEEExceptionType s_loadTableException;
+        static std::atomic<VoltEEExceptionType> s_loadTableException;
 
         static int s_drHiddenColumnSize;
 };
