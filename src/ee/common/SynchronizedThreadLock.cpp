@@ -322,7 +322,9 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
 #ifdef NDEBUG
 bool SynchronizedThreadLock::usingMpMemory() { return false; }
 void SynchronizedThreadLock::setUsingMpMemory(bool) {}
-bool SynchronizedThreadLock::isHoldingResourceLock() { return false; }
+bool SynchronizedThreadLock::isHoldingResourceLock() {
+    return false;
+}
 #else
 bool SynchronizedThreadLock::usingMpMemory() {
     return s_usingMpMemory;
