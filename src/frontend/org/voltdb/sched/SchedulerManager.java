@@ -88,7 +88,7 @@ import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
  * {@link #m_wrapperExecutor}. Pure management calls will be executed in the {@link #m_managerExecutor} while
  * scheduled procedures, results and calls to {@link Scheduler}s will be handled in the {@link #m_wrapperExecutor}
  */
-public class SchedulerManager {
+public final class SchedulerManager {
     static final VoltLogger log = new VoltLogger("HOST");
     static final String SCOPE_SYSTEM = "SYSTEM";
     static final String SCOPE_HOSTS = "HOSTS";
@@ -425,7 +425,7 @@ public class SchedulerManager {
                 }
             }
 
-            String parameterErrors = validateSchedulerParameters(definition.getName(), constructor, parameters);
+            String parameterErrors = validateSchedulerParameters(definition, constructor, parameters);
             if (parameterErrors != null) {
                 return new SchedulerValidationResult("Error validating scheduler parameters: " + parameterErrors);
             }
@@ -539,7 +539,7 @@ public class SchedulerManager {
                 handler.cancel();
             }
 
-            String scope = procedureSchedule.getScope().toUpperCase();
+            String scope = procedureSchedule.getScope();
             if (procedureSchedule.getEnabled()
                     && (m_leader || !SCOPE_SYSTEM.equals(scope))) {
                 if (!result.isValid()) {
@@ -591,12 +591,13 @@ public class SchedulerManager {
      * Try to find the optional static method {@code validateParameters} and call it if it is compatible to see if the
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
-     * @param name        of the schedule
+     * @param definition  Instance of {@link ProcedureSchedule} defining the schedule
      * @param constructor {@link Constructor} instance for the {@link Scheduler}
      * @param parameters  that are going to be passed to the constructor
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private String validateSchedulerParameters(String name, Constructor<Scheduler> constructor, Object[] parameters) {
+    private String validateSchedulerParameters(ProcedureSchedule definition, Constructor<Scheduler> constructor,
+            Object[] parameters) {
         Class<Scheduler> schedulerClass = constructor.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
@@ -606,7 +607,7 @@ public class SchedulerManager {
             }
 
             if (m.getReturnType() != String.class) {
-                log.warn(generateLogMessage(name,
+                log.warn(generateLogMessage(definition.getName(),
                         schedulerClass.getName()
                                 + " defines a 'validateParameters' method but it does not return a String"));
             }
@@ -618,7 +619,7 @@ public class SchedulerManager {
              * second parameter may be a SchedulerValidationHelper or the first parameter of the constructor
              */
             if (!SchedulerValidationErrors.class.isAssignableFrom(methodParameterTypes[0])) {
-                log.warn(generateLogMessage(name,
+                log.warn(generateLogMessage(definition.getName(),
                         schedulerClass.getName()
                                 + " defines a 'validateParameters' method but first parameter is not of type "
                                 + SchedulerValidationErrors.class.getName()));
@@ -630,7 +631,7 @@ public class SchedulerManager {
             int expectedParameterCount = constructorParameterTypes.length + (takesHelper ? 1 : 0);
 
             if (methodParameterTypes.length != expectedParameterCount) {
-                log.warn(generateLogMessage(name, schedulerClass.getName()
+                log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
                         + " defines a 'validateParameters' method but parameter count is not correct. It should be the same as constructor with possibly an optional "
                         + SchedulerValidationHelper.class.getSimpleName() + " first"));
                 continue;
@@ -643,7 +644,7 @@ public class SchedulerManager {
             }
 
             if (!Arrays.equals(validatorParameterTypes, methodParameterTypes)) {
-                log.warn(generateLogMessage(name, schedulerClass.getName()
+                log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
                         + " defines a 'validateParameters' method but parameters do not match constructor parameters"));
                 continue;
             }
@@ -654,13 +655,15 @@ public class SchedulerManager {
                     parameters.length);
 
             if (takesHelper) {
-                validatorParameters[0] = (SchedulerValidationHelper) this::validateProcedureWithParameters;
+                validatorParameters[0] = (SchedulerValidationHelper) (errors, restrictProcedureByScope, procedureName,
+                        procedureParameters) -> validateProcedureWithParameters(errors, definition.getScope(),
+                                restrictProcedureByScope, procedureName, procedureParameters);
             }
 
             try {
                 return (String) m.invoke(null, validatorParameters);
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                log.warn(generateLogMessage(name, ""), e);
+                log.warn(generateLogMessage(definition.getName(), ""), e);
                 return null;
             }
         }
@@ -674,7 +677,8 @@ public class SchedulerManager {
      * @param procedureName Name of procedure to validate
      * @param parameters    that will be passed to {@code procedureName}
      */
-    private void validateProcedureWithParameters(SchedulerValidationErrors errors, String procedureName,
+    private void validateProcedureWithParameters(SchedulerValidationErrors errors, String scope,
+            boolean restrictProcedureByScope, String procedureName,
             Object[] parameters) {
         Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
         if (procedure == null) {
@@ -685,6 +689,14 @@ public class SchedulerManager {
         if (procedure.getSystemproc()) {
             // System procedures do not have parameter types in the procedure definition
             return;
+        }
+
+        if (restrictProcedureByScope) {
+            String error = isProcedureValidForScope(scope, procedure);
+            if (error != null) {
+                errors.addErrorMessage(error);
+                return;
+            }
         }
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
@@ -719,6 +731,40 @@ public class SchedulerManager {
                                 pp.getIndex(), parameters[pp.getIndex()], parameterClass.getName(), e.getMessage()));
             }
         }
+    }
+
+    /**
+     * When procedure is being restricted by the scope validate that the procedure can be executed within that scope.
+     *
+     * @see Scheduler#restrictProcedureByScope()
+     * @param scope     of the schedule being validated
+     * @param procedure {@link Procedure} instance to validate
+     * @return {@code null} if procedure is valid for scope otherwise a detailed error message will be returned
+     */
+    static String isProcedureValidForScope(String scope, Procedure procedure) {
+        switch (scope) {
+        case SCOPE_SYSTEM:
+            break;
+        case SCOPE_HOSTS:
+            if (procedure.getTransactional()) {
+                return String.format("Procedure %s is a transactional procedure. Cannot be scheduled on a host.",
+                        procedure.getTypeName());
+            }
+            break;
+        case SCOPE_PARTITIONS:
+            if (!procedure.getSinglepartition()) {
+                return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
+                        procedure.getTypeName());
+            }
+            if (procedure.getPartitionparameter() != 0) {
+                return String.format("Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
+                        procedure.getTypeName());
+            }
+            break;
+        default:
+            throw new IllegalArgumentException("Unknown scope: " + scope);
+        }
+        return null;
     }
 
     /**
@@ -1181,14 +1227,6 @@ public class SchedulerManager {
         }
 
         /**
-         * Test if the procedure is valid to be run by this wrapper
-         *
-         * @param procedure to be run
-         * @return {@code true} if the procedure can be run
-         */
-        abstract boolean isValidProcedure(Procedure procedure);
-
-        /**
          * Shutdown the scheduler with a cancel state
          */
         void cancel() {
@@ -1242,7 +1280,15 @@ public class SchedulerManager {
                 return null;
             }
 
-            return isValidProcedure(procedure) ? procedure : null;
+            if (m_scheduler.restrictProcedureByScope()) {
+                String error = isProcedureValidForScope(getScope(), procedure);
+                if (error != null) {
+                    errorOccurred(error);
+                    return null;
+                }
+            }
+
+            return procedure;
         }
 
         /**
@@ -1339,11 +1385,6 @@ public class SchedulerManager {
         }
 
         @Override
-        boolean isValidProcedure(Procedure procedure) {
-            return true;
-        }
-
-        @Override
         String getScope() {
             return SCOPE_SYSTEM;
         }
@@ -1360,19 +1401,6 @@ public class SchedulerManager {
     private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
         HostSchedulerWrapper(SingleSchedulerHandler handler, ListeningScheduledExecutorService executor) {
             super(handler, executor);
-        }
-
-        /**
-         * Procedure must be an NT procedure
-         */
-        @Override
-        boolean isValidProcedure(Procedure procedure) {
-            if (procedure.getTransactional()) {
-                errorOccurred("Procedure %s is a transactional procedure. Cannot be scheduled on a host.",
-                        procedure.getTypeName());
-                return false;
-            }
-            return true;
         }
 
         @Override
@@ -1399,32 +1427,22 @@ public class SchedulerManager {
         }
 
         /**
-         * Procedure must be a single partition procedure with the first parameter as the partition parameter
-         */
-        @Override
-        boolean isValidProcedure(Procedure procedure) {
-            if (!procedure.getSinglepartition()) {
-                errorOccurred("Procedure %s is not single partitioned. Cannot be scheduled on a partition.",
-                        procedure.getTypeName());
-                return false;
-            }
-
-            if (procedure.getPartitionparameter() != 0) {
-                errorOccurred(
-                        "Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
-                        procedure.getTypeName());
-                return false;
-            }
-            return true;
-        }
-
-        /**
          * Behaves like run {@link Client#callAllPartitionProcedure(String, Object...)} where the first argument to the
          * procedure is just there to route the procedure call to the desired partition.
          */
         @Override
         Object[] getProcedureParameters(Procedure procedure) {
+            if (!procedure.getSinglepartition()) {
+                return super.getProcedureParameters(procedure);
+            }
+
             Object[] baseParams = super.getProcedureParameters(procedure);
+            CatalogMap<ProcParameter> procParams = procedure.getParameters();
+            if (procParams == null
+                    || !(procParams.size() == baseParams.length + 1 && procedure.getPartitionparameter() == 0)) {
+                return baseParams;
+            }
+
             Object[] partitionedParams = new Object[baseParams.length + 1];
 
             VoltType keyType = VoltType.get((byte) procedure.getPartitioncolumn().getType());

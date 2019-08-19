@@ -76,7 +76,7 @@ public class CreateSchedule extends StatementProcessor {
             throws VoltCompilerException {
         schedule.setName(matcher.group("name"));
         schedule.setScope(
-                MoreObjects.firstNonNull(matcher.group("scope"), SchedulerManager.SCOPE_DEFAULT));
+                MoreObjects.firstNonNull(matcher.group("scope"), SchedulerManager.SCOPE_DEFAULT).toUpperCase());
         if (matcher.group("class") != null) {
             schedule.setSchedulerclass(matcher.group("class"));
             fillOutParams(schedule.getParameters(), matcher.group("parameters"), 0);
