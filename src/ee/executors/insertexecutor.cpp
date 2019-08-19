@@ -54,6 +54,7 @@
 namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;
 std::string InsertExecutor::s_errorMessage{};
+std::mutex InsertExecutor::s_errorMessageUpdateLocker{};
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Insert Executor");
@@ -183,7 +184,10 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     // https://issues.voltdb.com/browse/ENG-17091?focusedCommentId=50362&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-50362
     // count the number of successful inserts
     m_modifiedTuples = 0;
-    s_errorMessage.resize(0);   // ENG-17469: using clear() method causes problems.
+    {
+        std::lock_guard<std::mutex> g(s_errorMessageUpdateLocker);
+        s_errorMessage.clear();   // ENG-17469: using clear() method causes problems.
+    }
 
     m_tmpOutputTable = newOutputTable;
     vassert(m_tmpOutputTable);
@@ -403,7 +407,10 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                p_execute_tuple_internal(inputTuple);
             }
          } catch (ConstraintFailureException const& e) {
-            s_errorMessage = e.what();
+            {
+               std::lock_guard<std::mutex> g(s_errorMessageUpdateLocker);
+               s_errorMessage = e.what();
+            }
             throw;
          }
          if (m_replicatedTableOperation) {
@@ -414,6 +421,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
          // all threads are in the same state
          char msg[4096];
          if (!s_errorMessage.empty()) {
+            std::lock_guard<std::mutex> g(s_errorMessageUpdateLocker);
             strcpy(msg, s_errorMessage.c_str());
          } else {
             snprintf(msg, sizeof msg,
