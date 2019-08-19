@@ -99,29 +99,18 @@ public:
      * write an insert or delete record to the stream
      * for active-active conflict detection purpose, write full row image for delete records.
      * */
-    virtual size_t appendTuple(char *tableHandle,
-                               int partitionColumn,
-                               int64_t spHandle,
-                               int64_t uniqueId,
-                               TableTuple &tuple,
-                               DRRecordType type) = 0;
+    virtual size_t appendTuple(char *tableHandle, int partitionColumn, int64_t spHandle,
+            int64_t uniqueId, TableTuple &tuple, DRRecordType type) = 0;
 
     /**
      * write an update record to the stream
      * for active-active conflict detection purpose, write full before image for update records.
      * */
-    virtual size_t appendUpdateRecord(char *tableHandle,
-                                      int partitionColumn,
-                                      int64_t spHandle,
-                                      int64_t uniqueId,
-                                      TableTuple &oldTuple,
-                                      TableTuple &newTuple) = 0;
+    virtual size_t appendUpdateRecord(char *tableHandle, int partitionColumn, int64_t spHandle,
+            int64_t uniqueId, TableTuple &oldTuple, TableTuple &newTuple) = 0;
 
-    virtual size_t truncateTable(char *tableHandle,
-                                 std::string tableName,
-                                 int partitionColumn,
-                                 int64_t spHandle,
-                                 int64_t uniqueId) = 0;
+    virtual size_t truncateTable(char *tableHandle, std::string const& tableName,
+            int partitionColumn, int64_t spHandle, int64_t uniqueId) = 0;
 
     virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId) = 0;
     // If a transaction didn't generate any binary log data, calling this
@@ -136,8 +125,8 @@ public:
     virtual void generateDREvent(DREventType type, int64_t spHandle,
                                  int64_t uniqueId, ByteArray payloads) = 0;
 
-    bool drStreamStarted() {
-        return (m_committedSequenceNumber >= 0);
+    bool drStreamStarted() const {
+        return m_committedSequenceNumber >= 0;
     }
 
     void setDrProtocolVersion(uint8_t drProtocolVersion) {

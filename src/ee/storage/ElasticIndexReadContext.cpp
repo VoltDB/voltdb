@@ -24,8 +24,7 @@
 #include "storage/persistenttable.h"
 #include "logging/LogManager.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 /**
  * Constructor.
@@ -39,38 +38,34 @@ ElasticIndexReadContext::ElasticIndexReadContext(
     TableStreamerContext(table, surgeon, partitionId),
     m_predicateStrings(predicateStrings),
     m_materialized(false),
-    m_filter(HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, table.schema()))
-{}
+    m_filter(HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, table.schema())) {}
 
 /**
  * Destructor.
  */
-ElasticIndexReadContext::~ElasticIndexReadContext()
-{}
+ElasticIndexReadContext::~ElasticIndexReadContext() {}
 
 /**
  * Activation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticIndexReadContext::handleActivation(TableStreamType streamType)
-{
+ElasticIndexReadContext::handleActivation(TableStreamType streamType) {
     if (streamType != TABLE_STREAM_ELASTIC_INDEX_READ) {
         return ACTIVATION_UNSUPPORTED;
-    }
-
-    if (!m_surgeon.hasIndex()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "Activation of elastic index for read did not occur because the table reports no index exists yet.");
+    } else if (!m_surgeon.hasIndex()) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,
+                "Activation of elastic index for read did not occur because the table reports no index exists yet.");
         return ACTIVATION_FAILED;
-    }
-
-    if (!m_surgeon.isIndexingComplete()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation of elastic index for read failed because index generation is not complete yet.");
+    } else if (!m_surgeon.isIndexingComplete()) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                "Activation of elastic index for read failed because index generation is not complete yet.");
         return ACTIVATION_FAILED;
     }
 
     ElasticIndexHashRange range;
     if (!parseHashRange(m_predicateStrings, range)) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation failed because parsing the hash range showed a conflict.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                "Activation failed because parsing the hash range showed a conflict.");
         return ACTIVATION_FAILED;
     }
 
@@ -81,8 +76,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
 /**
  * Deactivation handler.
  */
-bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
-{
+bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType) {
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_READ) {
         // This context is no longer needed.
         return false;
@@ -98,9 +92,7 @@ bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
  * Return 1 if tuples remain, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticIndexReadContext::handleStreamMore(
-        TupleOutputStreamProcessor &outputStreams,
-        std::vector<int> &retPositions)
-{
+        TupleOutputStreamProcessor &outputStreams, std::vector<int> &retPositions) {
     // Default to success.
     int64_t remaining = 1;
 
@@ -109,16 +101,11 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
             "Attempted to begin serialization without activating the context.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
-    }
-
-    // Need to initialize the output stream list.
-    else if (outputStreams.size() != 1) {
+    } else if (outputStreams.size() != 1) { // Need to initialize the output stream list.
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
             "serializeMore() expects exactly one output stream.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
-    }
-
-    else {
+    } else {
         // Anything left?
         TableTuple tuple;
         if (!m_iter->next(tuple)) {
@@ -147,11 +134,9 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                     throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }
 
-                if (!yield) {
-                    if (!m_iter->next(tuple)) {
-                        yield = true;
-                        remaining = 0;
-                    }
+                if (!yield && !m_iter->next(tuple)) {
+                    yield = true;
+                    remaining = 0;
                 }
             }
 
@@ -190,31 +175,29 @@ int64_t ElasticIndexReadContext::handleStreamMore(
 /**
  * Parse and validate the hash range.
  */
-bool ElasticIndexReadContext::parseHashRange(
-        const std::vector<std::string> &predicateStrings,
-        ElasticIndexHashRange &rangeOut)
-{
+bool ElasticIndexReadContext::parseHashRange(const std::vector<std::string> &predicateStrings,
+        ElasticIndexHashRange &rangeOut) {
     bool success = false;
     if (predicateStrings.size() != 1) {
         char errMsg[1024 * 16];
-        snprintf(errMsg, 1024 * 16,
+        snprintf(errMsg, sizeof errMsg,
                  "Too many ElasticIndexReadContext predicates (>1): %ld",
                  predicateStrings.size());
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-    }
-    else {
+    } else {
         std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
         if (rangeStrings.size() == 2) {
             try {
                 rangeOut = ElasticIndexHashRange(boost::lexical_cast<int32_t>(rangeStrings[0]),
                                                  boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
-            }
-            catch(const boost::bad_lexical_cast&) {
+            } catch(const boost::bad_lexical_cast&) {
                 char errMsg[1024 * 16];
-                snprintf(errMsg, 1024 * 16,
+                snprintf(errMsg, sizeof errMsg,
                          "Unable to parse ElasticIndexReadContext predicate \"%s\".",
                          predicateStrings.at(0).c_str());
+                errMsg[sizeof errMsg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
             }
         } else {
@@ -227,8 +210,7 @@ bool ElasticIndexReadContext::parseHashRange(
 /**
  * Clean up after consuming indexed tuples.
  */
-void ElasticIndexReadContext::deleteStreamedTuples()
-{
+void ElasticIndexReadContext::deleteStreamedTuples() {
     // Delete the indexed tuples that were streamed.
     // Undo token release will cause the index to delete the corresponding items
     // via notifications.

@@ -26,10 +26,11 @@
 
 #include "common/debuglog.h"
 
-#define throwFatalException(...) {                                                    \
-    char reallysuperbig_nonce_message[8192];                                          \
-    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__);                        \
-    throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__);  \
+#define throwFatalException(...) {                           \
+    char msg[8192];                                          \
+    snprintf(msg, sizeof msg, __VA_ARGS__);                  \
+    msg[sizeof msg - 1] = '\0';                              \
+    throw voltdb::FatalException( msg, __FILE__, __LINE__);  \
 }
 
 #define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"
@@ -89,17 +90,20 @@ inline std::ostream& operator<<(std::ostream& out, const FatalException& fe) {
 class FatalLogicError : public FatalLogicErrorBase {
 public:
 // ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of printf-like __VARARGS__ arguments
-#define throwFatalLogicErrorFormatted(...) { \
-    char reallysuperbig_nonce_message[8192]; \
-    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); \
-    throw voltdb::FatalLogicError(reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define throwFatalLogicErrorFormatted(...) {                \
+    char msg[8192];                                         \
+    snprintf(msg, 8192, __VA_ARGS__);                       \
+    msg[sizeof msg - 1] = '\0';                             \
+    throw voltdb::FatalLogicError(msg, __FILE__, __LINE__); \
+}
 
     FatalLogicError(const char* buffer, const char *filename, unsigned long lineno);
 
 // ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of STREAMABLES separated by '<<'
-#define throwFatalLogicErrorStreamed(STREAMABLES) { \
+#define throwFatalLogicErrorStreamed(STREAMABLES) {                          \
     std::ostringstream tFLESbuffer; tFLESbuffer << STREAMABLES << std::endl; \
-    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__); }
+    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__);    \
+}
 
     FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno);
 
@@ -107,9 +111,10 @@ public:
 
 // member function wrapper macro supports any number of STREAMABLES separated by '<<'
 #define appendAnnotationToFatalLogicError(ERROR_AS_CAUGHT, STREAMABLES) { \
-    std::ostringstream aATFLEbuffer; \
+    std::ostringstream aATFLEbuffer;                                      \
     aATFLEbuffer << "rethrown from " << __FILE__ << ':' << __LINE__ << ':' << STREAMABLES << std::endl; \
-    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str()); }
+    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str());                 \
+}
 
     void appendAnnotation(const std::string& buffer);
 

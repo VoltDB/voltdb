@@ -609,14 +609,16 @@ static bool hasNameIntegrity(std::string const& tableName, std::vector<std::stri
         snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
                  "catalog name %s resolved to table named %s.",
                  tableName.c_str(), table->name().c_str());
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
         return false;
     }
     BOOST_FOREACH (std::string const& iName, indexNames) {
-        if ( ! table->index(iName)) {
+        if (! table->index(iName)) {
             snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
                      "table named %s failed to resolve index name %s.",
                      tableName.c_str(), iName.c_str());
+            errMsg[sizeof errMsg - 1] = '\0';
             LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
             return false;
         }
@@ -1828,11 +1830,8 @@ bool PersistentTable::activateStream(
  * Return true on success or false if it was already active.
  */
 bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
-        HiddenColumnFilter::Type hiddenColumnFilterType,
-        boost::shared_ptr<TableStreamerInterface> tableStreamer,
-        CatalogId tableId,
-        std::vector<std::string>& predicateStrings,
-        bool skipInternalActivation) {
+        HiddenColumnFilter::Type hiddenColumnFilterType, boost::shared_ptr<TableStreamerInterface> tableStreamer,
+        CatalogId tableId, std::vector<std::string>& predicateStrings, bool skipInternalActivation) {
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
     vassert(m_tableStreamer == NULL);
     m_tableStreamer = tableStreamer;
@@ -1849,12 +1848,12 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor& outputStreams,
-                                    TableStreamType streamType,
-                                    std::vector<int>& retPositions) {
+        TableStreamType streamType, std::vector<int>& retPositions) {
     if (m_tableStreamer.get() == NULL) {
         char errMsg[1024];
-        snprintf(errMsg, 1024, "No table streamer of Type %s for table %s.",
+        snprintf(errMsg, sizeof errMsg, "No table streamer of Type %s for table %s.",
                 tableStreamTypeToString(streamType).c_str(), name().c_str());
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
 
         return TABLE_STREAM_SERIALIZATION_ERROR;
@@ -2072,6 +2071,7 @@ bool PersistentTable::doForcedCompaction() {
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
                          "occurred %d times.", m_failedCompactionCount);
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
             }
             if (m_failedCompactionCount == 0) {
@@ -2097,6 +2097,7 @@ bool PersistentTable::doForcedCompaction() {
         snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
                 "and compacted to the point that the compaction predicate was "
                 "satisfied after %d failed attempts", failedCompactionCountBefore);
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
         m_failedCompactionCount = 0;
     }
@@ -2105,7 +2106,9 @@ bool PersistentTable::doForcedCompaction() {
     boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
     boost::posix_time::time_duration duration = endTime - startTime;
     snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms on table %s",
-            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()), m_name.c_str());
+            (intmax_t)notPendingCompactions, (intmax_t)pendingCompactions, (intmax_t)allocatedTupleCount(),
+            (intmax_t)duration.total_milliseconds(), m_name.c_str());
+    msg[sizeof msg - 1] = '\0';
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     return (notPendingCompactions + pendingCompactions) > 0;
 }

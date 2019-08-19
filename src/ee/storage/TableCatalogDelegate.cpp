@@ -231,6 +231,7 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
     for (size_t i = 0; i < columnIndexes.size(); i++) {
         char buf[128];
         snprintf(buf, 128, "-%d", columnIndexes[i]);
+        buf[sizeof buf - 1] = '\0';
         retval += buf;
     }
 

@@ -75,8 +75,7 @@ SerializableEEException::SerializableEEException(std::string const& message) :
     std::runtime_error(enrich(message)),
     m_exceptionType(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION),
     m_message(what()) {
-    VOLT_DEBUG("Created SerializableEEException: default type, %s",
-               message.c_str());
+    VOLT_DEBUG("Created SerializableEEException: default type, %s", message.c_str());
 }
 
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
@@ -84,13 +83,12 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeInt(static_cast<int32_t>(messageLength));
+    output->writeInt(messageLength);
     output->writeBytes(messageBytes, messageLength);
     p_serialize(output);
     if (m_exceptionType == VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
         output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
+    output->writeIntAt(lengthPosition, output->position() - (lengthPosition + sizeof(int32_t)));
 }
 
 }

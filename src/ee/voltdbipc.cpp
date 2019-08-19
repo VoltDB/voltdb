@@ -1638,6 +1638,7 @@ void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {
     snprintf(err_msg, 128, "SIGSEGV caught: signal number %d, error value %d,"
              " signal code %d\n\n", info->si_signo, info->si_errno,
              info->si_code);
+    err_msg[sizeof err_msg - 1] = '\0';
     std::string message = err_msg;
     message.append(m_engine->debug());
     crashVoltDB(SegvException(message.c_str(), context, __FILE__, __LINE__));

@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CONSTRAINTFAILUREEXCEPTION_H_
-#define CONSTRAINTFAILUREEXCEPTION_H_
+#pragma once
 
 #include "common/SQLException.h"
 #include "common/types.h"
@@ -43,7 +42,8 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type, PersistentTableSurgeon *surgeon =  NULL);
+    ConstraintFailureException(Table *table, TableTuple tuple,
+            TableTuple otherTuple, ConstraintType type, PersistentTableSurgeon *surgeon =  NULL);
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -52,7 +52,8 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
+    ConstraintFailureException(Table *table, TableTuple tuple,
+            std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
 
     virtual std::string message() const;
     virtual ~ConstraintFailureException() throw();
@@ -71,4 +72,3 @@ protected:
 
 }
 
-#endif /* CONSTRAINTFAILUREEXCEPTION_H_ */

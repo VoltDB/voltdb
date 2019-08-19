@@ -717,10 +717,7 @@ void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, i
 
 void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
     if (returnCode != 0) {
-        char buf[128];
-        snprintf(buf, 128, "%s failed", name);
-        throw SQLException(SQLException::volt_user_defined_function_error,
-            buf);
+        throwSQLException(SQLException::volt_user_defined_function_error, "%s failed", name);
     }
 }
 
@@ -1381,6 +1378,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
@@ -1397,7 +1395,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 }
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
-                         catalogTable->name().c_str());
+                        catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
@@ -1762,8 +1761,10 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
         auto handler = table->materializedViewHandler();
         if (handler && handler->snapshotable() && handler->isEnabled()) {
             char msg[256];
-            snprintf(msg, sizeof(msg), "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
-                     table->name().c_str());
+            snprintf(msg, sizeof(msg),
+                    "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
+                    table->name().c_str());
+            msg[sizeof msg - 1] = '\0';
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
             return true;
         }
@@ -2694,8 +2695,10 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
     }
     if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
         char msg[512];
-        snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+        snprintf(msg, sizeof(msg),
+                "Attempted to delete migrated rows for a Table (%s) that has been removed.",
                 tableName.c_str());
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 

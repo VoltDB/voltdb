@@ -239,6 +239,7 @@ extern char __assert_failure_msg__[4096];
        snprintf(__assert_failure_msg__, sizeof __assert_failure_msg__,                         \
                "%s\n(STACK TRACE:\n%s)\n", #expr,                                              \
                voltdb::StackTrace::stringStackTrace("\t").c_str());                            \
+       __assert_failure_msg__[sizeof __assert_failure_msg__ - 1] = '\0';                       \
        __assert_fail(__assert_failure_msg__, __FILE__, __LINE__, __ASSERT_FUNCTION);           \
    }
 #endif
