@@ -53,7 +53,7 @@
 
 namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;
-std::string InsertExecutor::s_errorMessage;
+std::string InsertExecutor::s_errorMessage{};
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Insert Executor");
@@ -183,7 +183,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     // https://issues.voltdb.com/browse/ENG-17091?focusedCommentId=50362&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-50362
     // count the number of successful inserts
     m_modifiedTuples = 0;
-    s_errorMessage.clear();
+    s_errorMessage.resize(0);   // ENG-17469: using clear() method causes problems.
 
     m_tmpOutputTable = newOutputTable;
     vassert(m_tmpOutputTable);
