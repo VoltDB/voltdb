@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem;
@@ -89,7 +90,7 @@ import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
  * scheduled procedures, results and calls to {@link Scheduler}s will be handled in the {@link #m_wrapperExecutor}
  */
 public final class SchedulerManager {
-    static final VoltLogger log = new VoltLogger("HOST");
+    static final VoltLogger log = new VoltLogger("SCHEDULE");
     static final String SCOPE_SYSTEM = "SYSTEM";
     static final String SCOPE_HOSTS = "HOSTS";
     static final String SCOPE_PARTITIONS = "PARTITIONS";
@@ -124,7 +125,7 @@ public final class SchedulerManager {
     final StatsAgent m_statsAgent;
 
     static String generateLogMessage(String name, String body) {
-        return String.format("Schedule (%s): %s", name, body);
+        return String.format("%s: %s", name, body);
     }
 
     private static boolean isLastParamaterVarArgs(Constructor<Scheduler> constructor) {
@@ -1052,12 +1053,12 @@ public final class SchedulerManager {
     /**
      * Base class which wraps the execution and handling of a single {@link Scheduler} instance.
      * <p>
-     * On start {@link Scheduler#nextRun(ScheduledProcedure)} is invoked with a null {@link ScheduledProcedure}
-     * argument. If the result has a status of {@link SchedulerResult.Type#PROCEDURE} then the provided procedure will
-     * be scheduled and executed after the delay. Once a response is received
-     * {@link Scheduler#nextRun(ScheduledProcedure)} will be invoked again with the {@link ScheduledProcedure}
-     * previously returned and {@link ScheduledProcedure#getResponse()} updated with response. This repeats until this
-     * wrapper is cancelled or {@link Scheduler#nextRun(ScheduledProcedure)} returns a non schedule result.
+     * On start {@link Scheduler#getNextAction(ScheduledAction)} is invoked with a null {@link ScheduledAction}
+     * argument. If the result has a status of {@link Action.Type#PROCEDURE} then the provided procedure will be
+     * scheduled and executed after the delay. Once a response is received
+     * {@link Scheduler#getNextAction(ScheduledAction)} will be invoked again with the {@link ScheduledAction}
+     * previously returned and {@link ScheduledAction#getResponse()} updated with response. This repeats until this
+     * wrapper is cancelled or {@link Scheduler#getNextAction(ScheduledAction)} returns a non schedule result.
      * <p>
      * This class needs to be thread safe since it's execution is split between the
      * {@link SchedulerManager#m_managerExecutor} and the schedule executors
@@ -1065,7 +1066,7 @@ public final class SchedulerManager {
      * @param <H> Type of {@link SchedulerHandler} which created this wrapper
      */
     private abstract class SchedulerWrapper<H extends SchedulerHandler> {
-        ScheduledProcedure m_procedure;
+        ScheduledAction m_procedure;
 
         final H m_handler;
 
@@ -1102,7 +1103,7 @@ public final class SchedulerManager {
         }
 
         /**
-         * Call {@link Scheduler#nextRun(ScheduledProcedure)} and process the result including scheduling the next
+         * Call {@link Scheduler#getNextAction(ScheduledAction)} and process the result including scheduling the next
          * procedure to run
          * <p>
          * NOTE: method is not synchronized so the lock is not held during the scheduler execution
@@ -1118,20 +1119,20 @@ public final class SchedulerManager {
             long startTime = System.nanoTime();
             long waitTime = startTime - m_expectedExecutionTime;
 
-            SchedulerResult result;
+            Action action;
             try {
-                result = scheduler.nextRun(m_procedure);
+                action = m_procedure == null ? scheduler.getFirstAction() : scheduler.getNextAction(m_procedure);
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
-            } finally {
-                m_stats.addSchedulerCall(System.nanoTime() - startTime, waitTime);
             }
 
-            if (result == null) {
+            if (action == null) {
                 errorOccurred("Scheduler returned a null result");
                 return;
             }
+
+            m_stats.addSchedulerCall(System.nanoTime() - startTime, waitTime, action.getStatusMessage());
 
             synchronized (this) {
                 if (m_state != SchedulerWrapperState.RUNNING) {
@@ -1139,15 +1140,12 @@ public final class SchedulerManager {
                 }
 
                 Runnable runnable;
-                switch (result.getType()) {
+                switch (action.getType()) {
                 case EXIT:
-                    exitRequested(result.getMessage());
+                    exitRequested(action.getStatusMessage());
                     return;
                 case ERROR:
-                    if (result.hasMessage()) {
-                        log.warn(generateLogMessage(result.getMessage()));
-                    }
-                    errorOccurred(null);
+                    errorOccurred(Level.WARN, action.getStatusMessage(), null);
                     return;
                 case RERUN:
                     runnable = this::handleNextRun;
@@ -1156,15 +1154,15 @@ public final class SchedulerManager {
                     runnable = this::executeProcedure;
                     break;
                 default:
-                    throw new IllegalStateException("Unknown status: " + result.getType());
+                    throw new IllegalStateException("Unknown status: " + action.getType());
                 }
 
-                m_procedure = result.getScheduledProcedure();
+                m_procedure = action.getScheduledAction();
 
                 try {
                     long delay = calculateDelay();
                     m_expectedExecutionTime = System.nanoTime() + delay;
-                    m_procedure.expectedExecutionTime(m_expectedExecutionTime);
+                    m_procedure.setExpectedExecutionTime(m_expectedExecutionTime);
                     m_scheduledFuture = addExceptionListener(
                             m_executor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
@@ -1309,9 +1307,24 @@ public final class SchedulerManager {
          * @param args         to pass to the string formatter
          */
         void errorOccurred(String errorMessage, Throwable t, Object... args) {
+            errorOccurred(Level.ERROR, errorMessage, t, args);
+        }
+
+        /**
+         * Log an error message and shutdown the scheduler with the error state
+         *
+         * @param level        Log level at which to log {@code errorMessage}
+         * @param errorMessage Format string error message to log
+         * @param t            Throwable to log with the error message
+         * @param args         to pass to the string formatter
+         */
+        private void errorOccurred(Level level, String errorMessage, Throwable t, Object... args) {
+            String message = null;
             if (errorMessage != null) {
-                log.error(generateLogMessage(args.length == 0 ? errorMessage : String.format(errorMessage, args)), t);
+                message = args.length == 0 ? errorMessage : String.format(errorMessage, args);
+                log.log(level, generateLogMessage(message), t);
             }
+            m_stats.setSchedulerStatus(message);
             log.info(generateLogMessage(
                     "Schedule is terminating because of an error. "
                             + "Please resolve the error and either drop and recreate the schedule "
@@ -1328,6 +1341,7 @@ public final class SchedulerManager {
             if (message != null) {
                 log.info(generateLogMessage(message));
             }
+            m_stats.setSchedulerStatus(message);
             shutdown(SchedulerWrapperState.EXITED);
         }
 

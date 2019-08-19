@@ -56,6 +56,7 @@ public class ScheduleStatsSource extends StatsSource {
             new ColumnInfo(PREFIX_SCHEDULER + "MIN_WAIT_TIME", VoltType.BIGINT),
             new ColumnInfo(PREFIX_SCHEDULER + "MAX_WAIT_TIME", VoltType.BIGINT),
             new ColumnInfo(PREFIX_SCHEDULER + "AVG_WAIT_TIME", VoltType.BIGINT),
+            new ColumnInfo(PREFIX_SCHEDULER + "STATUS", VoltType.STRING),
             new ColumnInfo(PREFIX_PROCEDURE + "INVOCATIONS", VoltType.BIGINT),
             new ColumnInfo(PREFIX_PROCEDURE + "TOTAL_EXECUTION", VoltType.BIGINT),
             new ColumnInfo(PREFIX_PROCEDURE + "MIN_EXECUTION", VoltType.BIGINT),
@@ -79,6 +80,7 @@ public class ScheduleStatsSource extends StatsSource {
 
     // Stats for scheduler execution
     private final TimingStats m_schedulerStats;
+    private String m_schedulerStatus;
 
     // Stats for procedure executions
     private final TimingStats m_procedureStats;
@@ -214,6 +216,7 @@ public class ScheduleStatsSource extends StatsSource {
 
         // Scheduler stats
         column = m_schedulerStats.pupulateStats(rowValues, column);
+        rowValues[column++] = m_schedulerStatus;
 
         // Procedure stats
         column = m_procedureStats.pupulateStats(rowValues, column);
@@ -235,8 +238,9 @@ public class ScheduleStatsSource extends StatsSource {
      * @param schedulerExecutionNs Time in NS which it took the scheduler to execute
      * @param schedulerWaitNs      Time in NS which the scheduler waited to be started
      */
-    synchronized void addSchedulerCall(long schedulerExecutionNs, long schedulerWaitNs) {
+    synchronized void addSchedulerCall(long schedulerExecutionNs, long schedulerWaitNs, String status) {
         m_schedulerStats.addCall(schedulerExecutionNs, schedulerWaitNs);
+        m_schedulerStatus = status;
     }
 
     /**
@@ -251,6 +255,10 @@ public class ScheduleStatsSource extends StatsSource {
         if (failed) {
             ++m_procedureFailures;
         }
+    }
+
+    synchronized void setSchedulerStatus(String status) {
+        m_schedulerStatus = status;
     }
 
     /**
