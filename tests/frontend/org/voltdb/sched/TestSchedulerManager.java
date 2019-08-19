@@ -583,13 +583,15 @@ public class TestSchedulerManager {
 
     public static class TestScheduler implements Scheduler {
         @Override
-        public SchedulerResult nextRun(ScheduledProcedure previousProcedureRun) {
-            if (previousProcedureRun == null) {
-                s_firstSchedulerCallCount.getAndIncrement();
-            } else {
+        public Action getFirstAction() {
+            s_firstSchedulerCallCount.getAndIncrement();
+            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        }
+
+        @Override
+        public Action getNextAction(ActionResult previousProcedureRun) {
                 s_postRunSchedulerCallCount.getAndIncrement();
-            }
-            return SchedulerResult.createScheduledProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
         }
 
         @Override
@@ -602,13 +604,15 @@ public class TestSchedulerManager {
         public TestSchedulerParams(int arg1, String arg2, byte[] arg3) {}
 
         @Override
-        public SchedulerResult nextRun(ScheduledProcedure previousProcedureRun) {
-            if (previousProcedureRun == null) {
-                s_firstSchedulerCallCount.getAndIncrement();
-            } else {
-                s_postRunSchedulerCallCount.getAndIncrement();
-            }
-            return SchedulerResult.createScheduledProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        public Action getFirstAction() {
+            s_firstSchedulerCallCount.getAndIncrement();
+            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        }
+
+        @Override
+        public Action getNextAction(ActionResult previousProcedureRun) {
+            s_postRunSchedulerCallCount.getAndIncrement();
+            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
         }
     }
 
@@ -620,17 +624,21 @@ public class TestSchedulerManager {
             m_maxRunCount = maxRunCount;
         }
 
-        @Override
-        public SchedulerResult nextRun(ScheduledProcedure previousProcedureRun) {
-            if (previousProcedureRun == null) {
-                s_firstSchedulerCallCount.getAndIncrement();
-            } else {
-                assertNull(previousProcedureRun.getProcedure());
-                s_postRunSchedulerCallCount.getAndIncrement();
-            }
 
-            return ++m_runCount < m_maxRunCount ? SchedulerResult.createRerun(100, TimeUnit.MICROSECONDS)
-                    : SchedulerResult.createExit(null);
+        @Override
+        public Action getFirstAction() {
+            s_firstSchedulerCallCount.getAndIncrement();
+            return ++m_runCount < m_maxRunCount ? Action.createRerun(100, TimeUnit.MICROSECONDS)
+                    : Action.createExit(null);
+        }
+
+        @Override
+        public Action getNextAction(ActionResult previousProcedureRun) {
+            assertNull(previousProcedureRun.getProcedure());
+            s_postRunSchedulerCallCount.getAndIncrement();
+
+            return ++m_runCount < m_maxRunCount ? Action.createRerun(100, TimeUnit.MICROSECONDS)
+                    : Action.createExit(null);
         }
     }
 }

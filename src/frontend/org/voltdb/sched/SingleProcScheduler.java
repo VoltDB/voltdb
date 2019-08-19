@@ -51,8 +51,8 @@ abstract class SingleProcScheduler extends ErrorHandlerScheduler {
     }
 
     @Override
-    final SchedulerResult nextRunImpl(ScheduledProcedure previousProcedureRun) {
-        return SchedulerResult.createScheduledProcedure(getNextDelayNs(), TimeUnit.NANOSECONDS, m_procedure,
+    final Action nextRunImpl(ActionResult previousProcedureRun) {
+        return Action.createProcedure(getNextDelayNs(), TimeUnit.NANOSECONDS, m_procedure,
                 m_procedureParameters);
     }
 }

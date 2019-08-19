@@ -30,26 +30,26 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
  * schedulers which extend this class.
  */
 abstract class ErrorHandlerScheduler implements Scheduler {
-    private static final VoltLogger log = new VoltLogger("HOST");
+    private static final VoltLogger log = new VoltLogger("SCHEDULE");
 
     /** Map of error handler name to error handler implementation */
     private static final Map<String, ErrorHandler> s_errorHandlers = ImmutableSortedMap
             .<String, ErrorHandler>orderedBy(String.CASE_INSENSITIVE_ORDER).put("ABORT", new ErrorHandler() {
                 @Override
-                public SchedulerResult procedureFailed(ErrorHandlerScheduler scheduler, ScheduledProcedure procedure) {
-                    return SchedulerResult.createError(generateProcedureFailedMessage(procedure));
+                public Action procedureFailed(ErrorHandlerScheduler scheduler, ActionResult result) {
+                    return Action.createError(generateProcedureFailedMessage(result));
                 }
             }).put("LOG", new ErrorHandler() {
                 @Override
-                public SchedulerResult procedureFailed(ErrorHandlerScheduler scheduler, ScheduledProcedure procedure) {
-                    log.info(scheduler.generateLogMessage(generateProcedureFailedMessage(procedure)));
+                public Action procedureFailed(ErrorHandlerScheduler scheduler, ActionResult result) {
+                    log.info(scheduler.generateLogMessage(generateProcedureFailedMessage(result)));
                     return null;
                 }
             }).put("IGNORE", new ErrorHandler() {
                 @Override
-                public SchedulerResult procedureFailed(ErrorHandlerScheduler scheduler, ScheduledProcedure procedure) {
+                public Action procedureFailed(ErrorHandlerScheduler scheduler, ActionResult result) {
                     if (log.isDebugEnabled()) {
-                        log.debug(scheduler.generateLogMessage(generateProcedureFailedMessage(procedure)));
+                        log.debug(scheduler.generateLogMessage(generateProcedureFailedMessage(result)));
                     }
                     return null;
                 }
@@ -58,7 +58,7 @@ abstract class ErrorHandlerScheduler implements Scheduler {
     private final String m_name;
     private final ErrorHandler m_errorHandler;
 
-    static String generateProcedureFailedMessage(ScheduledProcedure procedure) {
+    static String generateProcedureFailedMessage(ActionResult procedure) {
         return "Procedure " + procedure.getProcedure() + " with parameters "
                 + Arrays.toString(procedure.getProcedureParameters()) + " failed: "
                 + procedure.getResponse().getStatusString();
@@ -84,14 +84,17 @@ abstract class ErrorHandlerScheduler implements Scheduler {
     }
 
     @Override
-    public final SchedulerResult nextRun(ScheduledProcedure previousProcedureRun) {
-        if (previousProcedureRun != null) {
-            ClientResponse response = previousProcedureRun.getResponse();
-            if (response != null && response.getStatus() != ClientResponse.SUCCESS) {
-                SchedulerResult result = m_errorHandler.procedureFailed(this, previousProcedureRun);
-                if (result != null) {
-                    return result;
-                }
+    public Action getFirstAction() {
+        return nextRunImpl(null);
+    }
+
+    @Override
+    public final Action getNextAction(ActionResult previousProcedureRun) {
+        ClientResponse response = previousProcedureRun.getResponse();
+        if (response != null && response.getStatus() != ClientResponse.SUCCESS) {
+            Action result = m_errorHandler.procedureFailed(this, previousProcedureRun);
+            if (result != null) {
+                return result;
             }
         }
 
@@ -99,9 +102,9 @@ abstract class ErrorHandlerScheduler implements Scheduler {
     }
 
     /**
-     * @see Scheduler#nextRun(ScheduledProcedure)
+     * @see Scheduler#getNextAction(ActionResult)
      */
-    abstract SchedulerResult nextRunImpl(ScheduledProcedure previousProcedureRun);
+    abstract Action nextRunImpl(ActionResult previousProcedureRun);
 
     /**
      * @return The delay for the next execution in nanoseconds
@@ -120,9 +123,9 @@ abstract class ErrorHandlerScheduler implements Scheduler {
          * Handle when an executed procedure fails
          *
          * @param scheduler the {@link ErrorHandlerScheduler} instance which caused the error
-         * @param procedure {@link ScheduledProcedure} which failed
-         * @return {@link SchedulerResult} if a result should be returned or {@code null} if execution should continue
+         * @param result    {@link ActionResult} which failed
+         * @return {@link Action} if a result should be returned or {@code null} if execution should continue
          */
-        SchedulerResult procedureFailed(ErrorHandlerScheduler scheduler, ScheduledProcedure procedure);
+        Action procedureFailed(ErrorHandlerScheduler scheduler, ActionResult result);
     }
 }
