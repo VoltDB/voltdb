@@ -32,7 +32,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     if (type == VALUE_TYPE_VARCHAR) {
         if (isNull()) {
              throw SQLException(SQLException::dynamic_sql_error,
-                                "Must not ask for object length on sql null object.");
+                     "Must not ask for object length on sql null object.");
         }
         int32_t length;
         const char* buf = getObject_withoutNull(length);
@@ -69,7 +69,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (intValue == 0) {
             return codeArg;
         }
-        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", 
+        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld",
                  static_cast<long>(intValue));
         state_format_buffer[sizeof state_format_buffer - 1] = '\0';
         sqlstatecode = state_format_buffer;
