@@ -135,9 +135,8 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     /**
      * Create a pico network thread
      * @param sc  SocketChannel
-     * @param isSecondary  Is this a secondary thread?
      */
-    public PicoNetwork(SocketChannel sc, boolean isSecondary) {
+    public PicoNetwork(SocketChannel sc) {
         m_sc = sc;
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
         m_remoteSocketAddress = remoteAddress;
@@ -148,11 +147,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_remoteHostname = remoteHost;
             m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
         }
-        if (isSecondary) {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
-        } else {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort;
-        }
+        m_threadName = remoteHost;
 
         m_thread = new Thread(this, "Pico Network - " + m_threadName);
         m_thread.setDaemon(true);

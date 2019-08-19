@@ -80,9 +80,8 @@ public class TLSPicoNetwork extends PicoNetwork
     private final SSLEngine m_sslEngine;
     private final CipherExecutor m_cipherExecutor;
 
-    public TLSPicoNetwork(SocketChannel sc, boolean isSecondary,
-            SSLEngine sslEngine, CipherExecutor cipherExecutor) {
-        super(sc, isSecondary);
+    public TLSPicoNetwork(SocketChannel sc, SSLEngine sslEngine, CipherExecutor cipherExecutor) {
+        super(sc);
         m_sslEngine = sslEngine;
         m_cipherExecutor = cipherExecutor;
     }
