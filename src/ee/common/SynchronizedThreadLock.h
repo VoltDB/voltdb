@@ -26,17 +26,16 @@
 #include <cstdatomic>
 #endif
 
-#include "debuglog.h"
-#include "executorcontext.hpp"
-#include "UndoQuantumReleaseInterest.h"
+#include "common/debuglog.h"
+#include "common/UndoQuantumReleaseInterest.h"
 
 class DRBinaryLogTest;
 
 namespace voltdb {
+struct EngineLocals;
 class UndoQuantum;
 class UndoReleaseAction;
-class PersistentTable;
-using SharedEngineLocalsType = std::map<int32_t, EngineLocals>;
+typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
@@ -58,61 +57,80 @@ public:
     void notifyQuantumRelease();
 };
 
-namespace SynchronizedThreadLock {
+class PersistentTable;
+class SynchronizedThreadLock {
+    friend class ExecuteWithAllSitesMemory;
+    friend class ReplicatedMaterializedViewHandler;
+    friend class ScopedReplicatedResourceLock;
+    friend class VoltDBEngine;
+    friend class ::DRBinaryLogTest;
+
+    static bool s_inSingleThreadMode;
+#ifndef  NDEBUG
+    static bool s_usingMpMemory;
+#endif
+    static bool s_holdingReplicatedTableLock;
+    static std::mutex s_sharedEngineMutex;
+    static std::condition_variable s_sharedEngineCondition;
+    static std::condition_variable s_wakeLowestEngineCondition;
+    static int32_t s_globalTxnStartCountdownLatch;
+    static int32_t s_SITES_PER_HOST;
+    static EngineLocals s_mpEngine;
+    static SharedEngineLocalsType s_enginesByPartitionId;
 
     // For use only by friends:
-    void lockReplicatedResource();
-    void unlockReplicatedResource();
+    static void lockReplicatedResource();
+    static void unlockReplicatedResource();
 
     // These methods are like the ones above, but are only
     // used during initialization and have fewer asserts.
-    void lockReplicatedResourceForInit();
-    void unlockReplicatedResourceForInit();
+    static void lockReplicatedResourceForInit();
+    static void unlockReplicatedResourceForInit();
 
-    // public:
-    const int32_t s_mpMemoryPartitionId = 65535;
-    static SharedEngineLocalsType s_enginesByPartitionId;
+public:
+    static const int32_t s_mpMemoryPartitionId;
 
-    void create();
-    void destroy();
-    void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
-    void resetMemory(int32_t partitionId);
+    static void create();
+    static void destroy();
+    static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
+    static void resetMemory(int32_t partitionId);
 
     /**
      * Cross-site synchronization functions
      */
-    bool countDownGlobalTxnStartCount(bool lowestSite);
-    void signalLowestSiteFinished();
+    static bool countDownGlobalTxnStartCount(bool lowestSite);
+    static void signalLowestSiteFinished();
 
     /**
      * Add a new undo action possibly in a synchronized manner.
      *
      * Wrapper around calling UndoQuantum::registerUndoAction
      */
-    void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+    static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *interest = nullptr);
-    void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+    static void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *deletedTable);
 
-    bool isInSingleThreadMode();
-    void setIsInSingleThreadMode(bool value);
-    bool isInLocalEngineContext();
-    bool usingMpMemory();
-    void setUsingMpMemory(bool isUsingMpMemory);
-    bool isHoldingResourceLock();
-    void debugSimulateSingleThreadMode(bool inSingleThreadMode);
+    static bool isInSingleThreadMode();
+    static void setIsInSingleThreadMode(bool value);
+    static bool isInLocalEngineContext();
+    static bool usingMpMemory();
+    static void setUsingMpMemory(bool isUsingMpMemory);
+    static bool isHoldingResourceLock();
+    static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
+        s_inSingleThreadMode = inSingleThreadMode;
+    }
 
-    void assumeMpMemoryContext();
-    void assumeLowestSiteContext();
-    void assumeLocalSiteContext();
-    bool isLowestSiteContext();
-    void assumeSpecificSiteContext(EngineLocals& eng);
+    static void assumeMpMemoryContext();
+    static void assumeLowestSiteContext();
+    static void assumeLocalSiteContext();
+    static bool isLowestSiteContext();
+    static void assumeSpecificSiteContext(EngineLocals& eng);
 
-    long int getThreadId();
-    void resetEngineLocalsForTest();
-    void setEngineLocalsForTest(int32_t partitionId, EngineLocals const& mpEngine,
-            SharedEngineLocalsType const& enginesByPartitionId);
-    EngineLocals getMpEngine();
+    static long int getThreadId();
+    static void resetEngineLocalsForTest();
+    static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
+    static EngineLocals getMpEngine();
 };
 
 }
