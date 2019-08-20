@@ -95,7 +95,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             // We need the Replicated table memory before the MP Site is initialized so
             // Just track it in s_mpEngine.
             VOLT_DEBUG("Initializing memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
-            vassert(s_mpEngine.context == NULL);
+            vassert(s_mpEngine.context == nullptr);
             s_mpEngine.context = newEngineLocals.context;
 
             delete s_mpEngine.enginePartitionId;
@@ -120,19 +120,19 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         // when the MP Sites Engine goes away but we use the first opportunity to
         // remove the Replicated table memory pools allocated on the lowest site
         // thread before the MP Site was initialized.
-        if (s_mpEngine.context != NULL) {
+        if (s_mpEngine.context != nullptr) {
             VOLT_DEBUG("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             vassert(s_mpEngine.poolData->first == 1);
             delete s_mpEngine.poolData->second;
             delete s_mpEngine.poolData;
-            s_mpEngine.poolData = NULL;
+            s_mpEngine.poolData = nullptr;
             delete s_mpEngine.stringData;
-            s_mpEngine.stringData = NULL;
+            s_mpEngine.stringData = nullptr;
             delete s_mpEngine.enginePartitionId;
-            s_mpEngine.enginePartitionId = NULL;
+            s_mpEngine.enginePartitionId = nullptr;
             delete s_mpEngine.allocated;
             s_mpEngine.allocated = nullptr;
-            s_mpEngine.context = NULL;
+            s_mpEngine.context = nullptr;
 #ifdef VOLT_POOL_CHECKING
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
             auto mapForAdd = mapBySize.begin();
@@ -159,10 +159,10 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         }
     } else {
         EngineLocals& engine = s_enginesByPartitionId[partitionId];
-        engine.poolData = NULL;
-        engine.stringData = NULL;
-        engine.enginePartitionId = NULL;
-        engine.context = NULL;
+        engine.poolData = nullptr;
+        engine.stringData = nullptr;
+        engine.enginePartitionId = nullptr;
+        engine.context = nullptr;
         s_enginesByPartitionId.erase(partitionId);
         if (s_enginesByPartitionId.empty()) {
             // Junit Tests that use ServerThread (or LocalCluster.setHasLocalServer(true)) will use the same
@@ -236,8 +236,8 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
             if (table) {
                 vassert(table->isReplicatedTable());
             }
-            dummyReleaseInterest = NULL;
-            realReleaseInterest = NULL;
+            dummyReleaseInterest = nullptr;
+            realReleaseInterest = nullptr;
         }
         uq->registerSynchronizedUndoAction(realUndoAction, realReleaseInterest);
         for (const SharedEngineLocalsType::value_type& enginePair : s_enginesByPartitionId) {
@@ -267,7 +267,7 @@ void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantu
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             UndoReleaseAction* undoAction;
-            UndoQuantumReleaseInterest *removeReleaseInterest = NULL;
+            UndoQuantumReleaseInterest *removeReleaseInterest = nullptr;
             if (uq == currUQ) {
                 undoAction = action->getSynchronizedUndoAction(currUQ);
                 removeReleaseInterest = deletedTable->getReplicatedInterest();
@@ -387,7 +387,8 @@ void SynchronizedThreadLock::assumeLocalSiteContext() {
     vassert(usingMpMemory());
     setUsingMpMemory(false);
 #endif
-    ExecutorContext::assignThreadLocals(s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
+    ExecutorContext::assignThreadLocals(
+            s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
 
 void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
@@ -399,7 +400,8 @@ void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
 }
 
 bool SynchronizedThreadLock::isLowestSiteContext() {
-    return ExecutorContext::getExecutorContext() == s_enginesByPartitionId.begin()->second.context;
+    return ExecutorContext::getExecutorContext() ==
+        s_enginesByPartitionId.begin()->second.context;
 }
 
 long int SynchronizedThreadLock::getThreadId() {
@@ -410,7 +412,9 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
-EngineLocals SynchronizedThreadLock::getMpEngine() {return s_mpEngine;}
+EngineLocals SynchronizedThreadLock::getMpEngine() {
+    return s_mpEngine;
+}
 
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);
