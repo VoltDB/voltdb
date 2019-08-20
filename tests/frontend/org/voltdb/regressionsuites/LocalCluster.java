@@ -2311,6 +2311,16 @@ public class LocalCluster extends VoltServerConfig {
         return lc;
     }
 
+    private ClientConfig createClientConfig() {
+        ClientConfig cc = new ClientConfig();
+        cc.setProcedureCallTimeout(30 * 1000);
+        return cc;
+    }
+
+    public Client createClient() throws IOException {
+        return createClient(createClientConfig());
+    }
+
     public Client createClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
         for (String address : getListenerAddresses()) {
