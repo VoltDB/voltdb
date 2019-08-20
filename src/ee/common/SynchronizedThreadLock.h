@@ -20,11 +20,7 @@
 #include <condition_variable>
 #include <map>
 #include <mutex>
-#if __cplusplus >= 201103L
 #include <atomic>
-#else
-#include <cstdatomic>
-#endif
 
 #include "common/debuglog.h"
 #include "common/UndoQuantumReleaseInterest.h"
