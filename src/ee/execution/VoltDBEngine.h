@@ -115,11 +115,10 @@ struct UserDefinedFunctionInfo {
 // UniqueTempTableResult is a smart pointer wrapper around a temp
 // table.  It doesn't delete the temp table, but it will delete the
 // contents of the table when it goes out of scope.
-typedef std::unique_ptr<AbstractTempTable, TempTableTupleDeleter> UniqueTempTableResult;
+using UniqueTempTableResult = std::unique_ptr<AbstractTempTable, TempTableTupleDeleter>;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
-
- extern int32_t s_exportFlushTimeout;
+extern int32_t s_exportFlushTimeout;
 
 
 /**
@@ -129,45 +128,41 @@ const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
  */
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
+    protected:
+        void setHashinator(TheHashinator* hashinator);
     public:
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
-        VoltDBEngine(Topend* topend = NULL, LogProxy* logProxy = new StdoutLogProxy());
+        VoltDBEngine(Topend* topend = nullptr, LogProxy* logProxy = new StdoutLogProxy());
 
-        void initialize(int32_t clusterIndex,
-                        int64_t siteId,
-                        int32_t partitionId,
-                        int32_t sitesPerHost,
-                        int32_t hostId,
-                        std::string hostname,
-                        int32_t drClusterId,
-                        int32_t defaultDrBufferSize,
-                        int64_t tempTableMemoryLimit,
-                        bool createDrReplicatedStream,
-                        int32_t compactionThreshold = 95,
-                        int32_t exportFlushTimeout = 4*1000);
+        void initialize(int32_t clusterIndex, int64_t siteId, int32_t partitionId, int32_t sitesPerHost,
+                int32_t hostId, std::string const& hostname, int32_t drClusterId,
+                int32_t defaultDrBufferSize, int64_t tempTableMemoryLimit, bool createDrReplicatedStream,
+                int32_t compactionThreshold = 95, int32_t exportFlushTimeout = 4*1000);
         virtual ~VoltDBEngine();
 
         // ------------------------------------------------------------------
         // OBJECT ACCESS FUNCTIONS
         // ------------------------------------------------------------------
+
         catalog::Catalog* getCatalog() const; // Only used in tests.
-
+        catalog::Database* getDatabase() const {
+            return m_database;
+        }
+        catalog::Table* getCatalogTable(std::string const& name) const;
         Table* getTableById(int32_t tableId) const;
-
         Table* getTableByName(std::string const& name) const;
+        TableCatalogDelegate* getTableDelegate(std::string const& name) const;
 
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 
-        TableCatalogDelegate* getTableDelegate(std::string const& name) const;
+        bool getIsActiveActiveDREnabled() const {
+            return m_isActiveActiveDREnabled;
+        }
 
-        catalog::Database* getDatabase() const { return m_database; }
-
-        catalog::Table* getCatalogTable(std::string const& name) const;
-
-        bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
-
-        static int getDRHiddenColumnSize() { return s_drHiddenColumnSize; }
+        static int getDRHiddenColumnSize() {
+            return s_drHiddenColumnSize;
+        }
 
         StreamedTable* getPartitionedDRConflictStreamedTable() const {
             return m_drPartitionedConflictStreamedTable;
@@ -297,18 +292,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void resetReusedResultOutputBuffer(const size_t startingPosition = 0, const int batchIndex = 1) {
             if (batchIndex == 0) {
-                m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
-                                                      m_firstReusedResultCapacity,
-                                                      startingPosition);
+                m_resultOutput.initializeWithPosition(
+                        m_firstReusedResultBuffer, m_firstReusedResultCapacity, startingPosition);
+            } else {
+                m_resultOutput.initializeWithPosition(
+                        m_nextReusedResultBuffer, m_nextReusedResultCapacity, startingPosition);
             }
-            else {
-                m_resultOutput.initializeWithPosition(m_nextReusedResultBuffer,
-                                                      m_nextReusedResultCapacity,
-                                                      startingPosition);
-            }
-            m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
-                                                     m_exceptionBufferCapacity,
-                                                     startingPosition);
+            m_exceptionOutput.initializeWithPosition(
+                    m_exceptionBuffer, m_exceptionBufferCapacity, startingPosition);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
                     static_cast<int32_t>(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE);
 
@@ -324,9 +315,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             // We have to write this byte in EE. This function will help to do that as well.
             // IPC calls will pass 0 or 1 into here instead of sticking with the default -1.
             int headerSize = perFragmentTimingEnabled > -1 ? 0 : sizeof(int8_t);
-            m_perFragmentStatsOutput.initializeWithPosition(m_perFragmentStatsBuffer,
-                                                            m_perFragmentStatsBufferCapacity,
-                                                            headerSize);
+            m_perFragmentStatsOutput.initializeWithPosition(
+                    m_perFragmentStatsBuffer, m_perFragmentStatsBufferCapacity, headerSize);
             if (perFragmentTimingEnabled > -1) {
                 m_perFragmentStatsOutput.writeByte(perFragmentTimingEnabled);
             }
@@ -367,21 +357,37 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int getResultsSize() const;
 
         /** Returns the buffer for receiving result tables from EE. */
-        char* getReusedResultBuffer() const { return m_nextReusedResultBuffer; }
+        char* getReusedResultBuffer() const {
+            return m_nextReusedResultBuffer;
+        }
 
         /** Returns the size of buffer for receiving result tables from EE. */
-        int getReusedResultBufferCapacity() const { return m_nextReusedResultCapacity; }
+        int getReusedResultBufferCapacity() const {
+            return m_nextReusedResultCapacity;
+        }
 
         int getPerFragmentStatsSize() const;
-        char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
-        int getPerFragmentStatsBufferCapacity() const { return m_perFragmentStatsBufferCapacity; }
+        char* getPerFragmentStatsBuffer() const {
+            return m_perFragmentStatsBuffer;
+        }
+        int getPerFragmentStatsBufferCapacity() const {
+            return m_perFragmentStatsBufferCapacity;
+        }
 
-        char* getUDFBuffer() const { return m_udfBuffer; }
-        int getUDFBufferCapacity() const { return m_udfBufferCapacity; }
+        char* getUDFBuffer() const {
+            return m_udfBuffer;
+        }
+        int getUDFBufferCapacity() const {
+            return m_udfBufferCapacity;
+        }
 
-        int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
+        int64_t* getBatchFragmentIdsContainer() {
+            return m_batchFragmentIdsContainer;
+        }
 
-        int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
+        int64_t* getBatchDepIdsContainer() {
+            return m_batchDepIdsContainer;
+        }
 
         /** check if this value hashes to the local partition */
         bool isLocalSite(NValue const& value) const;
@@ -417,7 +423,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Statistics functions
         // -------------------------------------------------
-        voltdb::StatsAgent& getStatsManager() { return m_statsManager; }
+        voltdb::StatsAgent& getStatsManager() {
+            return m_statsManager;
+        }
 
         /**
          * Retrieve a set of statistics and place them into the result buffer as a set of VoltTables.
@@ -430,12 +438,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param Timestamp to embed in each row
          * @return Number of result tables, 0 on no results, -1 on failure.
          */
-        int getStats(
-                int selector,
-                int locators[],
-                int numLocators,
-                bool interval,
-                int64_t now);
+        int getStats(int selector, int locators[], int numLocators, bool interval, int64_t now);
 
         Pool* getStringPool() { return &m_stringPool; }
 
@@ -444,9 +447,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setUndoToken(int64_t nextUndoToken) {
             if (nextUndoToken == INT64_MAX) {
                 return;
-            }
-
-            if (m_currentUndoQuantum != NULL) {
+            } else if (m_currentUndoQuantum != nullptr) {
                 if (m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
                     return;
                 }
@@ -460,23 +461,28 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void undoUndoToken(int64_t undoToken);
 
-        voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
+        voltdb::UndoQuantum* getCurrentUndoQuantum() const {
+            return m_currentUndoQuantum;
+        }
 
-        Topend* getTopend() { return m_topend; }
+        Topend* getTopend() const {
+            return m_topend;
+        }
 
-        bool isLowestSite() const { return m_isLowestSite; }
+        bool isLowestSite() const {
+            return m_isLowestSite;
+        }
 
-        void setLowestSiteForTest() { m_isLowestSite = true; }
+        void setLowestSiteForTest() {
+            m_isLowestSite = true;
+        }
 
         /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        bool activateTableStream(
-                CatalogId tableId,
-                TableStreamType streamType,
-                HiddenColumnFilter::Type hiddenColumnFilterType,
-                int64_t undoToken,
+        bool activateTableStream(CatalogId tableId, TableStreamType streamType,
+                HiddenColumnFilter::Type hiddenColumnFilterType, int64_t undoToken,
                 ReferenceSerializeInputBE& serializeIn);
 
         /**
@@ -485,18 +491,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
         int64_t tableStreamSerializeMore(CatalogId tableId,
-                                         TableStreamType streamType,
-                                         ReferenceSerializeInputBE& serializeIn);
+                TableStreamType streamType, ReferenceSerializeInputBE& serializeIn);
 
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Overload that populates a position vector provided by the caller.
          * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
-        int64_t tableStreamSerializeMore(CatalogId tableId,
-                                         TableStreamType streamType,
-                                         ReferenceSerializeInputBE& serializeIn,
-                                         std::vector<int>& retPositions);
+        int64_t tableStreamSerializeMore(CatalogId tableId, TableStreamType streamType,
+                ReferenceSerializeInputBE& serializeIn, std::vector<int>& retPositions);
 
         /**
          * Perform an action on behalf of Export.
@@ -510,7 +513,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * (results returned separately via QueryResults buffer)
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                             int64_t generationIdCreated, std::string streamName);
+                int64_t generationIdCreated, std::string streamName);
 
         /**
          * Complete the deletion of the Migrated Table rows.
@@ -526,27 +529,21 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
                 std::string tableName, int64_t deletableTxnId, int64_t undoToken);
 
-        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, int64_t &genId, std::string streamName);
+        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, int64_t &genId, std::string const& streamName);
 
         /**
          * Retrieve a hash code for the specified table
          */
         size_t tableHashCode(int32_t tableId);
 
-        void updateHashinator(char const* config,
-                              int32_t* configPtr, uint32_t numTokens);
+        void updateHashinator(char const* config, int32_t* configPtr, uint32_t numTokens);
 
         /**
          * Apply multiple binary logs which can either be one log with multiple transactions to one partition or
          * multiple logs which are one multi-partition transaction
          */
-        int64_t applyBinaryLog(int64_t txnId,
-                            int64_t spHandle,
-                            int64_t lastCommittedSpHandle,
-                            int64_t uniqueId,
-                            int32_t remoteClusterId,
-                            int64_t undoToken,
-                            char const* logs);
+        int64_t applyBinaryLog(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId,
+                int32_t remoteClusterId, int64_t undoToken, char const* logs);
 
         /*
          * Execute an arbitrary task represented by the task id and serialized parameters.
@@ -565,8 +562,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return (m_tempTableMemoryLimit * 3) / 4;
         }
 
-        void setPartitionIdForTest(int32_t partitionId) { m_partitionId = partitionId; }
-        int32_t getPartitionId() const { return m_partitionId; }
+        void setPartitionIdForTest(int32_t partitionId) {
+            m_partitionId = partitionId;
+        }
+        int32_t getPartitionId() const {
+            return m_partitionId;
+        }
 
         void setViewsEnabled(const std::string& viewNames, bool value);
 
@@ -581,9 +582,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void disableExternalStreams();
 
         bool externalStreamsEnabled();
-
-    protected:
-        void setHashinator(TheHashinator* hashinator);
 
     private:
         /*
@@ -609,8 +607,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             initMaterializedViewsAndLimitDeletePlans(true);
         }
 
-        template<class TABLE> void initMaterializedViews(catalog::Table* catalogTable,
-                                                         TABLE* storageTable, bool updateReplicated);
+        template<class TABLE>
+        void initMaterializedViews(catalog::Table* catalogTable, TABLE* storageTable, bool updateReplicated);
 
         bool updateCatalogDatabaseReference();
 
@@ -619,9 +617,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Execute a single plan fragment.
          */
-        int executePlanFragment(int64_t planfragmentId,
-                                int64_t inputDependencyId,
-                                bool traceOn);
+        int executePlanFragment(int64_t planfragmentId, int64_t inputDependencyId, bool traceOn);
 
         /**
          * Set up the vector of executors for a given fragment id.
@@ -635,10 +631,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void loadBuiltInJavaFunctions();
 
-        void attachTupleStream(StreamedTable* streamedTable,
-                               const std::string& streamName,
-                               std::map<std::string, ExportTupleStream*> & purgedStreams,
-                               int64_t timestamp);
+        void attachTupleStream(StreamedTable* streamedTable, const std::string& streamName,
+                std::map<std::string, ExportTupleStream*> & purgedStreams, int64_t timestamp);
 
         // user defined aggregate functions helper functions
         /*
@@ -733,7 +727,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Only includes non-materialized tables
          */
-        boost::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;
+        std::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;
 
         /**
          * System Catalog.
@@ -871,7 +865,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static std::atomic<VoltEEExceptionType> s_loadTableException;
-
         static int s_drHiddenColumnSize;
 };
 

@@ -137,12 +137,12 @@ typedef std::pair<std::string, ExportTupleStream*> LabeledStreamWrapper;
  * The set of plan bytes is explicitly maintained in MRU-first order,
  * while also indexed by the plans' bytes. Here lie boost-related dragons.
  */
-typedef boost::multi_index::multi_index_container<
+using PlanSet = boost::multi_index::multi_index_container<
     boost::shared_ptr<ExecutorVector>,
     boost::multi_index::indexed_by<
         boost::multi_index::sequenced<>,
         boost::multi_index::hashed_unique<
-            boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>>>> PlanSet;
+            boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>>>>;
 extern template class ConditionalSynchronizedExecuteWithMpMemory<int64_t>;
 extern template class ConditionalSynchronizedExecuteWithMpMemory<VoltEEExceptionType>;
 
@@ -160,18 +160,9 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(lo
 }
 
 void
-VoltDBEngine::initialize(int32_t clusterIndex,
-                         int64_t siteId,
-                         int32_t partitionId,
-                         int32_t sitesPerHost,
-                         int32_t hostId,
-                         std::string hostname,
-                         int32_t drClusterId,
-                         int32_t defaultDrBufferSize,
-                         int64_t tempTableMemoryLimit,
-                         bool isLowestSiteId,
-                         int32_t compactionThreshold,
-                         int32_t exportFlushTimeout) {
+VoltDBEngine::initialize(int32_t clusterIndex, int64_t siteId, int32_t partitionId, int32_t sitesPerHost,
+        int32_t hostId, std::string const& hostname, int32_t drClusterId, int32_t defaultDrBufferSize,
+        int64_t tempTableMemoryLimit, bool isLowestSiteId, int32_t compactionThreshold, int32_t exportFlushTimeout) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_isLowestSite = isLowestSiteId;
@@ -237,7 +228,6 @@ VoltDBEngine::~VoltDBEngine() {
     delete[] m_templateSingleLongTable;
 
     // Delete table delegates and release any table reference counts.
-    typedef std::pair<int64_t, Table*> TID;
 
     if (m_partitionId != 16383) {
         for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
@@ -270,7 +260,7 @@ VoltDBEngine::~VoltDBEngine() {
         if (m_isLowestSite) {
             SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
         }
-        for (TID tid : m_snapshottingTables) {
+        for (auto tid : m_snapshottingTables) {
             tid.second->decrementRefcount();
         }
 
@@ -282,8 +272,7 @@ VoltDBEngine::~VoltDBEngine() {
 
         delete m_drReplicatedStream;
         delete m_drStream;
-    }
-    else {
+    } else {
         delete m_executorContext;
     }
     VOLT_DEBUG("finished deallocate for partition %d", m_partitionId);
@@ -2645,7 +2634,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, int64_t &genId,
-        std::string streamName) {
+        std::string const& streamName) {
 
     // defaults mean failure
     ackOffset = 0;

@@ -37,10 +37,8 @@ class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest
 public:
     SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) :
         m_realInterest(realInterest) {}
-    virtual ~SynchronizedUndoQuantumReleaseInterest() { }
-
+    virtual ~SynchronizedUndoQuantumReleaseInterest() {}
     void notifyQuantumRelease();
-
 private:
     UndoQuantumReleaseInterest *m_realInterest;
 };
@@ -49,7 +47,6 @@ class SynchronizedDummyUndoQuantumReleaseInterest : public UndoQuantumReleaseInt
 public:
     SynchronizedDummyUndoQuantumReleaseInterest() { }
     virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
-
     void notifyQuantumRelease();
 };
 
