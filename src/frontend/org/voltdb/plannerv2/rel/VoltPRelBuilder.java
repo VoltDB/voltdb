@@ -46,6 +46,12 @@ public class VoltPRelBuilder extends RelBuilder{
      * create Volt Physical relational expressions for everything. */
     public static final RelBuilderFactory PHYSICAL_BUILDER =
             VoltPRelBuilder.proto(
-            Contexts.of(VoltPRelFactories.VOLT_PHYSICAL_PROJECT_FACTORY));
+            Contexts.of(VoltPRelFactories.VOLT_PHYSICAL_PROJECT_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_FILTER_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_AGGREGATE_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_JOIN_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_SET_OP_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_SORT_FACTORY,
+                    VoltPRelFactories.VOLT_PHYSICAL_VALUES_FACTORY));
 
 }
