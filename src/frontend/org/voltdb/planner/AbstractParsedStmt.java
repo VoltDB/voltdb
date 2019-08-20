@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -1749,10 +1748,6 @@ public abstract class AbstractParsedStmt {
             assert(condExpr != null);
             ExpressionUtil.finalizeValueTypes(condExpr);
             condExpr = ExpressionUtil.evaluateExpression(condExpr);
-            // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
-            if (ConstantValueExpression.isBooleanTrue(condExpr)) {
-                condExpr = null;
-            }
         }
         return condExpr;
     }
