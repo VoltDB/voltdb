@@ -148,4 +148,8 @@ public interface ExportManagerInterface {
 
     public void clientInterfaceStarted(ClientInterface clientInterface);
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb);
+
+    default public void onDrainedSource(String tableName, int partition) {
+        // No-op
+    }
 }
