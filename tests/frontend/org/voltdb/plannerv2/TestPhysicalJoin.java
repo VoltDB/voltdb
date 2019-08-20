@@ -89,12 +89,44 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
     }
 
     public void testMultiTableNLIJ1() {
-        m_tester.sql("SELECT R1.si, R2.bi, RI1.ti FROM R1 INNER JOIN RI1 ON R1.i = RI1.si "
-                + "INNER JOIN R2 ON R2.I = R1.I")
-        .transform("");
+        m_tester.sql("SELECT R1.si, R2.bi, RI1.ti FROM R1 INNER JOIN RI1 ON R1.si = RI1.si "
+                + "INNER JOIN R2 ON R2.I = RI1.I")
+        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t5], BI=[$t1], TI=[$t4], split=[1])\n" +
+                    "  VoltPhysicalNestLoopJoin(condition=[=($5, $3)], joinType=[inner], split=[1])\n" +
+                    "    VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                    "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
+                    "        VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "      VoltPhysicalCalc(expr#0..3=[{inputs}], proj#0..1=[{exprs}], TI=[$t3], split=[1])\n" +
+                    "        VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
     }
 
-    public void testMultiTableNLIJ2() {
+    // There test case differs from the previous one that the first join condition
+    // R1.i = RI1.si require a CAST expression (SMALL INT = (CAST) INT)
+    // and that forces a Project node in between the Joins
+    //              Join 2
+    //        Project  Scan
+    //          Join 1
+    // and the VoltPJoinPushThroughJoinRule is not firing
+    public void testNoMultiTableNLIJ() {
+        m_tester.sql("SELECT R1.si, R2.bi, RI1.ti FROM R1 INNER JOIN RI1 ON R1.i = RI1.si "
+                + "INNER JOIN R2 ON R2.I = RI1.I")
+        .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], SI=[$t0], BI=[$t4], TI=[$t2], split=[1])\n" +
+                    "  VoltPhysicalNestLoopJoin(condition=[=($3, $1)], joinType=[inner], split=[1])\n" +
+                    "    VoltPhysicalCalc(expr#0..4=[{inputs}], SI=[$t1], I0=[$t2], TI0=[$t3], split=[1])\n" +
+                    "      VoltPhysicalNestLoopJoin(condition=[=($0, $4)], joinType=[inner], split=[1])\n" +
+                    "        VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
+                    "          VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "        VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):INTEGER], I=[$t0], TI=[$t3], SI0=[$t4], split=[1])\n" +
+                    "          VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
+    public void testMultiTableNLIJ3() {
         m_tester.sql("SELECT * FROM R1 INNER JOIN R2 ON R1.i = R2.i "
                 + "INNER JOIN RI1 ON RI1.I = R1.I")
         .transform("VoltPhysicalCalc(expr#0..15=[{inputs}], proj#0..15=[{exprs}], split=[1])\n" +

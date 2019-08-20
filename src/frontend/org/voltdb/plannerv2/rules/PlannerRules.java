@@ -106,8 +106,6 @@ public class PlannerRules {
             VoltLAggregateRule.INSTANCE,
             // Joins
             VoltLJoinRule.INSTANCE,
-            FilterJoinRule.FILTER_ON_JOIN,
-            FilterJoinRule.JOIN,
 
             // Setops
             VoltLSetOpsRule.INSTANCE_UNION,
