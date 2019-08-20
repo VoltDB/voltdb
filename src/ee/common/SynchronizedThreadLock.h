@@ -17,18 +17,16 @@
 
 #pragma once
 
-#include <common/debuglog.h>
+#include <condition_variable>
 #include <map>
-#include <stack>
-#include <string>
-#include <vector>
-#include <pthread.h>
+#include <mutex>
 #if __cplusplus >= 201103L
 #include <atomic>
 #else
 #include <cstdatomic>
 #endif
 
+#include "common/debuglog.h"
 #include "common/UndoQuantumReleaseInterest.h"
 
 class DRBinaryLogTest;
@@ -72,9 +70,9 @@ class SynchronizedThreadLock {
     static bool s_usingMpMemory;
 #endif
     static bool s_holdingReplicatedTableLock;
-    static pthread_mutex_t s_sharedEngineMutex;
-    static pthread_cond_t s_sharedEngineCondition;
-    static pthread_cond_t s_wakeLowestEngineCondition;
+    static std::mutex s_sharedEngineMutex;
+    static std::condition_variable s_sharedEngineCondition;
+    static std::condition_variable s_wakeLowestEngineCondition;
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
     static EngineLocals s_mpEngine;
