@@ -1682,8 +1682,9 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-            (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-             VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+            (table->isReplicatedTable(), isLowestSite(), []() {
+             s_loadTableException = VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE;
+             });
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         // Joined views are special. If any of the source table(s) are not empty, we cannot restore the view content
         // from a snapshot. The Java top-end has no way to know this so it still tries to tell the EE
@@ -2587,8 +2588,9 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
                 spHandle, -1, uniqueId, false);
 
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-                (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-                 VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+                (table->isReplicatedTable(), isLowestSite(), []() {
+                 s_loadTableException = VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE;
+                 });
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             bool rowsToBeDeleted;
             try {
@@ -2868,8 +2870,8 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     do {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
-        int64_t dummyExceptionTracker = 0;
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                updateReplicated, m_isLowestSite, [](){});
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
