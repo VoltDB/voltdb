@@ -55,6 +55,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     // This timestamp is only used for restarted transactions
     protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
+    // Last generate sp unique ID or 0 if not set
+    public final long m_lastSpUniqueId;
+
     /**
      * Set up the final member variables from the parameters. This will
      * be called exclusively by subclasses.
@@ -85,6 +88,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         m_isReadOnly = readOnly;
         m_beginUndoToken = Site.kInvalidUndoToken;
         m_isForReplay = notice.isForReplay();
+        m_lastSpUniqueId = notice.getLastSpUniqueId();
     }
 
 

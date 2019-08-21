@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltcore.messaging.VoltMessage;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -45,7 +45,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            VoltMessage message)
+            TransactionInfoBaseMessage message)
     {
         super(destinationHSId, realTxnId, expectedHSIds, message);
     }

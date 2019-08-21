@@ -35,6 +35,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -248,15 +249,15 @@ public class InitiatorMailbox implements Mailbox
 
     // Change the replica set configuration (during or after promotion)
     public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters) {
-        return updateReplicasInternal(replicas, partitionMasters, -1L);
+        return updateReplicasInternal(replicas, partitionMasters, null);
     }
 
-    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId)
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, TransactionState snapshotTransactionState)
     {
-        return updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
+        return updateReplicasInternal(replicas, partitionMasters, snapshotTransactionState);
     }
 
-    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
+    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters, TransactionState snapshotTransactionState) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -264,7 +265,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        return m_scheduler.updateReplicas(replicas, partitionMasters, snapshotSaveTxnId);
+        return m_scheduler.updateReplicas(replicas, partitionMasters, snapshotTransactionState);
     }
 
     public long getMasterHsId(int partitionId)

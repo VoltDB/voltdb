@@ -23,6 +23,7 @@ import java.util.Map;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
+import org.voltdb.dtxn.TransactionState;
 
 /**
  * InitiatorMessageHandler delivers messages to internal Initiator components.
@@ -32,7 +33,7 @@ import org.voltdb.CommandLog;
  */
 public interface InitiatorMessageHandler
 {
-    long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
+    long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, TransactionState snapshotTransactionState);
 
     void setCommandLog(CommandLog cl);
     void setMailbox(Mailbox mailbox);
