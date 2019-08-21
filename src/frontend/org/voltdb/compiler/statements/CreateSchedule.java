@@ -101,8 +101,6 @@ public class CreateSchedule extends StatementProcessor {
             }
             CatalogMap<SchedulerParam> params = schedule.getParameters();
             int index = 0;
-            addParameter(params, index++, schedule.getName());
-            addParameter(params, index++, MoreObjects.firstNonNull(matcher.group("onError"), "ABORT"));
             addParameter(params, index++, config);
             fillOutParams(params, matcher.group("procedure"), index);
         }
@@ -110,6 +108,7 @@ public class CreateSchedule extends StatementProcessor {
         // If no user is set and this is new DDL use the user which is creating the schedule
         schedule.setUser(user == null && newDdl ? m_compiler.getUser() : user);
         schedule.setEnabled(matcher.group("disabled") == null);
+        schedule.setOnerror(MoreObjects.firstNonNull(matcher.group("onError"), "ABORT"));
 
         return schedule;
     }

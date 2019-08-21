@@ -24,18 +24,16 @@ import java.util.concurrent.TimeUnit;
  * Base class for a {@link ErrorHandlerScheduler} instance which continuously executes the same procedure with the same
  * parameters repeatedly.
  */
-abstract class SingleProcScheduler extends ErrorHandlerScheduler {
+abstract class SingleProcScheduler implements Scheduler {
     final String m_procedure;
     final Object[] m_procedureParameters;
 
-    static void validateParameters(SchedulerValidationErrors errors, SchedulerValidationHelper helper, String errorHandler, String procedure,
+    static void validateParameters(SchedulerValidationErrors errors, SchedulerValidationHelper helper, String procedure,
             String... procedureParameters) {
-        ErrorHandlerScheduler.validateParameters(errors, errorHandler);
         helper.validateProcedureAndParams(errors, true, procedure, procedureParameters);
     }
 
-    SingleProcScheduler(String name, String errorHandler, String procedure, String... procedureParameters) {
-        super(name, errorHandler);
+    SingleProcScheduler(String procedure, String... procedureParameters) {
         m_procedure = procedure;
         m_procedureParameters = procedureParameters;
     }
@@ -51,8 +49,17 @@ abstract class SingleProcScheduler extends ErrorHandlerScheduler {
     }
 
     @Override
-    final Action nextRunImpl(ActionResult previousProcedureRun) {
-        return Action.createProcedure(getNextDelayNs(), TimeUnit.NANOSECONDS, m_procedure,
-                m_procedureParameters);
+    public Action getFirstAction() {
+        return getNextAction(null);
     }
+
+    @Override
+    public final Action getNextAction(ActionResult result) {
+        return Action.createProcedure(getNextDelayNs(), TimeUnit.NANOSECONDS, m_procedure, m_procedureParameters);
+    }
+
+    /**
+     * @return The delay for the next execution in nanoseconds
+     */
+    abstract long getNextDelayNs();
 }

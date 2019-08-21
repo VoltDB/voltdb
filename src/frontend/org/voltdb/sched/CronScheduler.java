@@ -29,10 +29,10 @@ import fc.cron.CronExpression;
 public class CronScheduler extends SingleProcScheduler {
     private final CronExpression m_cronExpression;
 
-    public static String validateParameters(SchedulerValidationHelper helper, String name, String errorHandler,
-            String cronConfiguration, String procedure, String... procedureParameters) {
+    public static String validateParameters(SchedulerValidationHelper helper, String cronConfiguration,
+            String procedure, String... procedureParameters) {
         SchedulerValidationErrors errors = new SchedulerValidationErrors();
-        SingleProcScheduler.validateParameters(errors, helper, errorHandler, procedure, procedureParameters);
+        SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
         try {
             new CronExpression(cronConfiguration, true);
         } catch (RuntimeException e) {
@@ -41,9 +41,8 @@ public class CronScheduler extends SingleProcScheduler {
         return errors.getErrorMessage();
     }
 
-    public CronScheduler(String name, String errorHandler, String cronConfiguration, String procedure,
-            String... procedureParameters) {
-        super(name, errorHandler, procedure, procedureParameters);
+    public CronScheduler(String cronConfiguration, String procedure, String... procedureParameters) {
+        super(procedure, procedureParameters);
         m_cronExpression = new CronExpression(cronConfiguration, true);
     }
 
