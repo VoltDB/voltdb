@@ -67,7 +67,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
     /*
      * Test schedules running on the system.
      *
-     * Create 2 schedules which both insert a summary row into a table at different intervals
+     * Create 3 schedules which insert a summary row into a table at different intervals
      */
     @Test
     public void systemSchedules() throws Exception {
@@ -97,6 +97,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         String schedule1 = getMethodName() + "_1";
         String schedule2 = getMethodName() + "_2";
+        String schedule3 = getMethodName() + "_3";
 
         String summaryFormat = "CREATE SCHEDULE %s %s ON ERROR IGNORE AS '@AdHoc', 'INSERT INTO " + summaryTable
                 + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
@@ -104,6 +105,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY PT0.05S", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 MILLISECONDS", 3));
 
         // Give everything some time to run
         Thread.sleep(1000);
@@ -111,18 +113,19 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         producer.join();
 
         VoltTable table = getScheduleStats(client);
-        assertEquals(2, table.getRowCount());
+        assertEquals(3, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
         }
 
         client.callProcedure("@AdHoc",
-                "ALTER SCHEDULE " + schedule1 + " DISABLE; ALTER SCHEDULE " + schedule2 + " DISABLE;");
+                "ALTER SCHEDULE " + schedule1 + " DISABLE; ALTER SCHEDULE " + schedule2 + " DISABLE; ALTER SCHEDULE "
+                        + schedule3 + " DISABLE;");
 
         Thread.sleep(5);
 
         table = getScheduleStats(client);
-        assertEquals(2, table.getRowCount());
+        assertEquals(3, table.getRowCount());
         while (table.advanceRow()) {
             String scheduleName = table.getString("NAME");
             int id = -1;
@@ -130,6 +133,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                 id = 1;
             } else if (schedule2.equalsIgnoreCase(scheduleName)) {
                 id = 2;
+            } else if (schedule3.equalsIgnoreCase(scheduleName)) {
+                id = 3;
             } else {
                 fail("Unknown schedule " + scheduleName);
             }
@@ -148,7 +153,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
              */
             assertTrue(
                     "Summary table has " + summaryCount + " rows. Invocation count is " + successfulProcedureInvocations
-                            + " for schedule_" + id,
+                            + " for " + scheduleName,
                     summaryCount == successfulProcedureInvocations
                             || summaryCount == successfulProcedureInvocations + 1);
 

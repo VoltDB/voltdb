@@ -382,8 +382,8 @@ public final class SchedulerManager {
             Constructor<?>[] constructors = schedulerClass.getConstructors();
             if (constructors.length != 1) {
                 return new SchedulerValidationResult(
-                        String.format("Scheduler class should have 1 constructor %s has %d", schedulerClassString,
-                                constructors.length));
+                        String.format("Scheduler class should have 1 public constructor %s has %d",
+                                schedulerClassString, constructors.length));
             }
 
             @SuppressWarnings("unchecked")
