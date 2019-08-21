@@ -1448,7 +1448,8 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
                     || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "TUPLE_PENDING"
-                    || columnInfo["name"] == "SOURCE" || columnInfo["name"] == "TARGET")
+                    || columnInfo["name"] == "SOURCE" || columnInfo["name"] == "TARGET"
+                    || columnInfo["name"] == "ACTIVE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1476,6 +1477,10 @@ function alertNodeClicked(obj) {
                     if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
                         exporterDetails["TUPLE_PENDING"] = {};
                     }
+                    if (!exporterDetails.hasOwnProperty("ACTIVE")) {
+                        exporterDetails["ACTIVE"] = {};
+                    }
+                    
                     
                     tuple_count[target] += info[colIndex["TUPLE_COUNT"]];
                     tuple_pending[target] += info[colIndex["TUPLE_PENDING"]];
@@ -1484,6 +1489,7 @@ function alertNodeClicked(obj) {
                     exporterDetails["TUPLE_PENDING"][target] = tuple_pending[target];
                     exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                    exporterDetails["ACTIVE"][target] = info[colIndex["ACTIVE"]];
                 });
             }
         };

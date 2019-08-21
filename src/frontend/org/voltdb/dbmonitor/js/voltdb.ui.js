@@ -1203,11 +1203,12 @@ var loadPage = function (serverName, portid) {
             if(!$.isEmptyObject(exporterDetails)){
                 Object.keys(exporterDetails["TUPLE_COUNT"]).forEach(key => {
                     var tupleCountDetails = exporterDetails["TUPLE_COUNT"]
-
-                    if($('#'+key).length == 0 && key != "TIMESTAMP"){
-                        var newRow = '<tr id=' + key + '>' + 
+                    var sources = exporterDetails["SOURCE"]
+                    
+                    if($('#'+sources[key]).length == 0 && key != "TIMESTAMP"){
+                        var newRow = '<tr id=' + sources[key] + '>' + 
                         '<td>' + key + 
-                        '</td><td>' + key +
+                        '</td><td>' + exporterDetails["SOURCE"][key] +
 //                        '</td><td>' + 'NA' + // Not working yet
                         '</td><td>' + 0 +
                         '</td><td>' + exporterDetails["TUPLE_PENDING"][key] +
@@ -1225,8 +1226,15 @@ var loadPage = function (serverName, portid) {
                         }
                     }
                     
-                    $('#'+key+' td:nth-child(4)').html(tupleCountDetails[key])
-                    $('#'+key+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key])
+                    $('#'+sources[key]+' td:nth-child(4)').html(tupleCountDetails[key])
+                    $('#'+sources[key]+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key])
+                    
+                    if(exporterDetails["ACTIVE"][key] == "FALSE"){
+                        $('#'+sources[key]).css('color', 'red')
+                    }
+                    else{
+                        $('#'+sources[key]).css('color', 'black')
+                    }
                     
                 })
             } else {
