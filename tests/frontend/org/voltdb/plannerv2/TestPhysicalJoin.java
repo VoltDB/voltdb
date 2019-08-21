@@ -138,4 +138,36 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
         .pass();
     }
 
+    // Too many JOINS ( > 5) to apply Join commute rules
+    public void testTooManyMultiTableNLJ() {
+        m_tester.sql("SELECT R1.si, R2.bi, RI1.ti FROM RI1 "
+                + "INNER JOIN R1 ON R1.i = RI1.i "
+                + "INNER JOIN R2 ON R2.I = RI1.I "
+                + "INNER JOIN R3 ON R3.PK = R2.I "
+                + "INNER JOIN R4 ON R4.PK = R3.PK "
+                + "INNER JOIN R5 ON R5.PK = R4.PK "
+                + "INNER JOIN RI3 ON RI3.PK = R4.PK ")
+        .transform("VoltPhysicalCalc(expr#0..9=[{inputs}], SI=[$t3], BI=[$t5], TI=[$t1], split=[1])\n" +
+                "  VoltPhysicalNestLoopJoin(condition=[=($9, $7)], joinType=[inner], split=[1])\n" +
+                "    VoltPhysicalNestLoopJoin(condition=[=($8, $7)], joinType=[inner], split=[1])\n" +
+                "      VoltPhysicalNestLoopJoin(condition=[=($7, $6)], joinType=[inner], split=[1])\n" +
+                "        VoltPhysicalNestLoopJoin(condition=[=($6, $4)], joinType=[inner], split=[1])\n" +
+                "          VoltPhysicalNestLoopJoin(condition=[=($4, $0)], joinType=[inner], split=[1])\n" +
+                "            VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[inner], split=[1])\n" +
+                "              VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
+                "                VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
+                "              VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
+                "                VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                "            VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
+                "              VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                "          VoltPhysicalCalc(expr#0..2=[{inputs}], PK=[$t0], split=[1])\n" +
+                "            VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                "        VoltPhysicalCalc(expr#0..3=[{inputs}], PK=[$t0], split=[1])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, R4]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
+                "      VoltPhysicalCalc(expr#0..4=[{inputs}], PK=[$t0], split=[1])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n" +
+                "    VoltPhysicalCalc(expr#0..3=[{inputs}], PK=[$t0], split=[1])\n" +
+                "      VoltPhysicalTableSequentialScan(table=[[public, RI3]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
+        .pass();
+    }
 }
