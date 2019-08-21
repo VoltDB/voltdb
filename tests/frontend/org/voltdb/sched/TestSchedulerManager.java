@@ -643,7 +643,7 @@ public class TestSchedulerManager {
     }
 
     public static class TestSchedulerParams implements Scheduler {
-        public TestSchedulerParams(int arg1, String arg2, byte[] arg3) {}
+        public void initialize(int arg1, String arg2, byte[] arg3) {}
 
         @Override
         public Action getFirstAction() {
@@ -659,10 +659,10 @@ public class TestSchedulerManager {
     }
 
     public static class TestSchedulerRerun implements Scheduler {
-        private final int m_maxRunCount;
+        private int m_maxRunCount;
         private int m_runCount = 0;
 
-        public TestSchedulerRerun(int maxRunCount) {
+        public void initialize(int maxRunCount) {
             m_maxRunCount = maxRunCount;
         }
 

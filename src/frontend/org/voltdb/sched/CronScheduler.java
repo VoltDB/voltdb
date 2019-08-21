@@ -27,9 +27,9 @@ import fc.cron.CronExpression;
  * style configuration schedule
  */
 public class CronScheduler extends SingleProcScheduler {
-    private final CronExpression m_cronExpression;
+    private CronExpression m_cronExpression;
 
-    public static String validateParameters(SchedulerValidationHelper helper, String cronConfiguration,
+    public static String validateParameters(SchedulerHelper helper, String cronConfiguration,
             String procedure, String... procedureParameters) {
         SchedulerValidationErrors errors = new SchedulerValidationErrors();
         SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
@@ -41,8 +41,9 @@ public class CronScheduler extends SingleProcScheduler {
         return errors.getErrorMessage();
     }
 
-    public CronScheduler(String cronConfiguration, String procedure, String... procedureParameters) {
-        super(procedure, procedureParameters);
+    public void initialize(SchedulerHelper helper, String cronConfiguration, String procedure,
+            String... procedureParameters) {
+        super.initialize(helper, procedure, procedureParameters);
         m_cronExpression = new CronExpression(cronConfiguration, true);
     }
 
