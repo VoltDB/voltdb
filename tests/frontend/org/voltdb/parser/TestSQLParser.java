@@ -23,6 +23,13 @@
 
 package org.voltdb.parser;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,15 +51,14 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
-import junit.framework.TestCase;
-
-public class TestSQLParser extends TestCase {
+public class TestSQLParser extends JUnit4LocalClusterTest {
 
     public void testAppearsToBeValidDDLBatchPositive() {
 
