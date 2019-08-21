@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
  * between execution times. Delay can either be a number of seconds or {@link Duration} string representation
  */
 public class DelayScheduler extends SingleProcScheduler {
-    private final long m_delayNs;
+    private long m_delayNs;
 
-    public static String validateParameters(SchedulerValidationHelper helper, String delay, String procedure,
+    public static String validateParameters(SchedulerHelper helper, String delay, String procedure,
             String... procedureParameters) {
         SchedulerValidationErrors errors = new SchedulerValidationErrors();
         SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
@@ -54,8 +54,8 @@ public class DelayScheduler extends SingleProcScheduler {
                 "Could not parse <" + delay + "> as either an integer or " + Duration.class.getName());
     }
 
-    public DelayScheduler(String delay, String procedure, String[] procedureParameters) {
-        super(procedure, procedureParameters);
+    public void initialize(SchedulerHelper helper,String delay, String procedure, String[] procedureParameters) {
+        super.initialize(helper, procedure, procedureParameters);
         m_delayNs = parseDelay(delay);
     }
 

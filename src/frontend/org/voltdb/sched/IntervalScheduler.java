@@ -24,10 +24,10 @@ import java.util.concurrent.TimeUnit;
  * A {@link Scheduler} which tries to execute a procedure with a fixed amount of time between procedure start times
  */
 public class IntervalScheduler extends SingleProcScheduler {
-    private final long m_intervalNs;
+    private long m_intervalNs;
     private long m_lastRunNs = System.nanoTime();
 
-    public static String validateParameters(SchedulerValidationHelper helper, int interval, String timeUnit,
+    public static String validateParameters(SchedulerHelper helper, int interval, String timeUnit,
             String procedure, String... procedureParameters) {
         SchedulerValidationErrors errors = new SchedulerValidationErrors();
         SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
@@ -48,8 +48,9 @@ public class IntervalScheduler extends SingleProcScheduler {
         return errors.getErrorMessage();
     }
 
-    public IntervalScheduler(int interval, String timeUnit, String procedure, String[] procedureParameters) {
-        super(procedure, procedureParameters);
+    public void initialize(SchedulerHelper helper, int interval, String timeUnit, String procedure,
+            String[] procedureParameters) {
+        super.initialize(helper, procedure, procedureParameters);
         m_intervalNs = TimeUnit.valueOf(timeUnit).toNanos(interval);
         // Introduce some jitter to first start time
         m_lastRunNs = System.nanoTime()
@@ -63,7 +64,8 @@ public class IntervalScheduler extends SingleProcScheduler {
         long delay = nextRun - now;
 
         if (delay < 0) {
-            // TODO it would be nice to log a warning here
+            m_helper.logWarning(
+                    "Desired execution time is in the past. Resetting interval start to now. Interval might be too short for procedure.");
             m_lastRunNs = now;
             return 0;
         }
