@@ -515,34 +515,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     }
 
     @Test
-    public void testAlterTableWithMigrate() throws Exception
-    {
-        assertTrue("Stream T65 should exist", findTableInSystemCatalogResults("T65"));
-        assertColumnExists    ("T65", "A1");
-        assertColumnTypeEquals("T65", "A1", "VARCHAR");
-        assertColumnSizeEquals("T65", "A1", 2048);
-        assertColumnIsNotNullable("T65", "A1");
-        assertColumnDefaultValueEquals   ("T65", "A1", "'ghi'");
-        assertColumnOrdinalPositionEquals("T65", "A1", 1);
-        assertColumnOrdinalPositionEquals("T65", "C1", 2);
-        assertColumnOrdinalPositionEquals("T65", "C3", 3);
-    }
-
-    @Test
-    public void testAlterTableWithExport() throws Exception
-    {
-        assertTrue("Stream T66 should exist", findTableInSystemCatalogResults("T66"));
-        assertColumnExists    ("T66", "A1");
-        assertColumnTypeEquals("T66", "A1", "VARCHAR");
-        assertColumnSizeEquals("T66", "A1", 2048);
-        assertColumnIsNotNullable("T66", "A1");
-        assertColumnDefaultValueEquals   ("T66", "A1", "'ghi'");
-        assertColumnOrdinalPositionEquals("T66", "A1", 1);
-        assertColumnOrdinalPositionEquals("T66", "C1", 2);
-        assertColumnOrdinalPositionEquals("T66", "C3", 3);
-    }
-
-    @Test
     public void testAlterTableWithTTLAlterColumn() throws Exception
     {
         assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
@@ -559,6 +531,42 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertColumnIsNullable("T64", "C1");
         assertColumnDefaultValueEquals("T64", "C1", "'jkl'");
     }
+
+//    @Test
+//    public void testImportClass() throws Exception
+//    {
+//        LocalCluster cluster = new LocalCluster(catalogJar, 2, 1, 1, BackendTarget.NATIVE_EE_JNI);
+//        cluster.setHasLocalServer(false);
+//
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//
+//        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+//
+//        cluster.startUp();
+//
+//        Client client = ClientFactory.createClient();
+//        client.createConnection("localhost");
+//
+//        String classpath = "org/voltdb_testprocs/fullddlfeatures/NoMeaningClass.class";
+//        Process p = Runtime.getRuntime().exec("jar tf " + pathToCatalog);
+//
+//        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//        String file = null;
+//        boolean exist = false;
+//        while ((file = in.readLine()) != null)
+//        {
+//            if(file.equals(classpath))
+//            {
+//                exist = true;
+//                break;
+//            }
+//        }
+//        assertTrue(exist);
+//
+//        client.close();
+//        cluster.shutDown();
+//    }
 
     @Test
     public void testPartitionProcedure() throws Exception
