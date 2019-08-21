@@ -38,6 +38,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
         const char* buf = getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
+        msg_format_buffer[sizeof msg_format_buffer - 1] = '\0';
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
     } else {
@@ -46,6 +47,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
             return *this;
         }
         snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", (long) intValue);
+        state_format_buffer[sizeof state_format_buffer - 1] = '\0';
         sqlstatecode = state_format_buffer;
         msgtext = SQLException::specific_error_specified_by_user;
     }
@@ -67,7 +69,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (intValue == 0) {
             return codeArg;
         }
-        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", (long) intValue);
+        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld",
+                 static_cast<long>(intValue));
+        state_format_buffer[sizeof state_format_buffer - 1] = '\0';
         sqlstatecode = state_format_buffer;
     }
 
@@ -82,6 +86,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         const char* buf = strValue.getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
+        msg_format_buffer[sizeof msg_format_buffer - 1] = '\0';
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
 }

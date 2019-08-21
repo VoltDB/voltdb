@@ -46,7 +46,7 @@ SQL error while compiling query: Error in "select * from cte" - object not found
 This should succeed.  The table cte above should be cleared.
 ------------------------------------------------------------
 This should fail.  The table cte should be gone.
-[Ad Hoc DDL Input:1]: DDL Error: "object not found: CTE in statement [drop table cte]"
+Table CTE not found
 ============================================================
 Cleaning up.
 Done.

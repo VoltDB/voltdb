@@ -42,8 +42,13 @@
 
 #include <string>
 
-#define throwDRTableNotFoundException(tableHash, ...) \
-do { char _msg_[1024]; snprintf(_msg_, 1024, __VA_ARGS__); throw DRTableNotFoundException(tableHash, _msg_); } while (false)
+#define throwDRTableNotFoundException(tableHash, ...)         \
+    do {                                                      \
+        char _msg_[1024];                                     \
+        snprintf(_msg_, 1024, __VA_ARGS__);                   \
+        _msg_[sizeof _msg_ - 1] = '\0';                       \
+        throw DRTableNotFoundException(tableHash, _msg_);     \
+    } while (false)
 
 namespace voltdb {
 

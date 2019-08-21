@@ -32,11 +32,16 @@ public class VoltFastSqlParser {
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
      * parse it into a {@link SqlNode}.
+     * If the sql ends with a semicolon, make sure that it is removed before passing to SqlParser,
+     * which would not recognize query that ends with semicolon.
      *
      * @param sql the SQL statement to parse.
      * @return the parsed SqlNode tree for it.
      */
     public static SqlNode parse(String sql) throws SqlParseException {
+        if (sql.endsWith(";")) {
+            sql = sql.substring(0, sql.length() - 1);
+        }
         return SqlParser.create(sql, VoltFrameworkConfig.PARSER_CONFIG).parseQuery(sql);
     }
 }

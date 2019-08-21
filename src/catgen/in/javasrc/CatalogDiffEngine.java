@@ -504,7 +504,8 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint)
+            suspect instanceof Constraint ||
+            suspect instanceof ProcedureSchedule)
         {
             return null;
         }
@@ -1050,6 +1051,10 @@ public class CatalogDiffEngine {
             }
         }
 
+        if (suspect instanceof ProcedureSchedule && field.equals("enabled")) {
+            return null;
+        }
+
         // whitelist certain column changes
         if (suspect instanceof Column) {
             CatalogType parent = suspect.getParent();
@@ -1065,6 +1070,8 @@ public class CatalogDiffEngine {
             Table table = (Table) parent;
             if (TableType.needsExportDataSource(table.getTabletype())) {
                 m_requiresNewExportGeneration = true;
+                return null;
+            } else if (TableType.isConnectorLessStream(table.getTabletype())) {
                 return null;
             }
 

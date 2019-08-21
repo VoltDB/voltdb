@@ -36,13 +36,14 @@ public interface Generation {
     public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDrained(int partitionId, String tableName);
 
-    public void pushExportBuffer(int partitionId, String signature,
-                                long seqNo, long committedSeqNo, int tupleCount,
-                                 long uniqueId, ByteBuffer buffer);
-    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                StreamStartAction action,
-                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
-                                                boolean isLowestSite);
+    public void pushExportBuffer(int partitionId, String signature, long seqNo, long committedSeqNo,
+            int tupleCount, long uniqueId, ByteBuffer buffer);
+
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature, StreamStartAction action,
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition);
+
+    public void updateDanglingExportStates(StreamStartAction action,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
 

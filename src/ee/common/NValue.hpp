@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <cfloat>
 #include <climits>
 #include <cmath>
@@ -57,17 +56,17 @@ namespace voltdb {
  * depending on how many bytes are needed to represent the length. These
  * define how many bytes are used for the short value vs. the long value.
  */
-#define SHORT_OBJECT_LENGTHLENGTH static_cast<int>(1)
-#define OBJECT_NULL_BIT static_cast<char>(1 << 6)
-#define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
-#define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
+constexpr int SHORT_OBJECT_LENGTHLENGTH = 1;
+constexpr char OBJECT_NULL_BIT = 1 << 6;
+constexpr char OBJECT_CONTINUATION_BIT = static_cast<char>(1 << 7);
+constexpr auto OBJECT_MAX_LENGTH_SHORT_LENGTH = 63;
 
-#define FULL_STRING_IN_MESSAGE_THRESHOLD 100
+constexpr auto FULL_STRING_IN_MESSAGE_THRESHOLD = 100;
 
 //The int used for storage and return values
-typedef ttmath::Int<2> TTInt;
+using TTInt = ttmath::Int<2>;
 //Long integer with space for multiplication and division without carry/overflow
-typedef ttmath::Int<4> TTLInt;
+using TTLInt = ttmath::Int<4>;
 
 template<typename T>
 void throwCastSQLValueOutOfRangeException(
@@ -78,46 +77,45 @@ void throwCastSQLValueOutOfRangeException(
 template<>
 inline void throwCastSQLValueOutOfRangeException<double>(
         const double value, const ValueType origType, const ValueType newType) {
-    char msg[1024];
-    snprintf(msg, 1024, "Type %s with value %f can't be cast as %s because the value is "
-            "out of range for the destination type",
+    throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+            "Type %s with value %f can't be cast as %s because the value is out of range for the destination type",
             valueToString(origType).c_str(), value, valueToString(newType).c_str());
-    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                       msg);
 }
 
 template<>
 inline void throwCastSQLValueOutOfRangeException<int64_t>(
       const int64_t value, const ValueType origType, const ValueType newType) {
     char msg[1024];
-    snprintf(msg, 1024, "Type %s with value %jd can't be cast as %s because the value is "
-            "out of range for the destination type",
+    snprintf(msg, sizeof msg,
+            "Type %s with value %jd can't be cast as %s because the value is out of range for the destination type",
             valueToString(origType).c_str(), (intmax_t)value, valueToString(newType).c_str());
+    msg[sizeof msg - 1] = '\0';
 
     // record underflow or overflow for executors that catch this (indexes, mostly)
     int internalFlags = 0;
-    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
-    else if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
-
-    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                       msg, internalFlags);
+    if (value > 0) {
+        internalFlags |= SQLException::TYPE_OVERFLOW;
+    } else if (value < 0) {
+        internalFlags |= SQLException::TYPE_UNDERFLOW;
+    }
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg, internalFlags);
 }
 
 template<>
 inline void throwCastSQLValueOutOfRangeException<TTInt>(
       const TTInt value, const ValueType origType, const ValueType newType) {
     char msg[1024];
-    snprintf(msg, 1024,
+    snprintf(msg, sizeof msg,
           "Type %s with value %s can't be cast as %s because the value is out of range for the destination type",
           valueToString(origType).c_str(), value.ToString().c_str(), valueToString(newType).c_str());
+    msg[sizeof msg - 1] = '\0';
 
     // record underflow or overflow for executors that catch this (indexes, mostly)
     int internalFlags = 0;
     if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
     if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
 
-    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                       msg, internalFlags);
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg, internalFlags);
 }
 
 int warn_if(int condition, const char* message);
@@ -137,9 +135,8 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
    if ((warned_once_no_nan || ! std::isnan(value)) && (warned_once_no_inf || ! non_std_isinf(value))) {
       return;
    } else {
-      char msg[1024];
-      snprintf(msg, sizeof(msg), "Invalid result value (%f) from floating point %s", value, function);
-      throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
+       throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+               "Invalid result value (%f) from floating point %s", value, function);
    }
 }
 
@@ -147,8 +144,7 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
 /// Stream out a double value in SQL standard format, a specific variation of E-notation.
 /// TODO: it has been suggested that helper routines like this that are not specifically tied to
 /// the NValue representation should be defined in some other header to help reduce clutter, here.
-inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue)
-{
+inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue) {
     // Standard SQL wants capital E scientific notation.
     // Yet it differs in some detail from C/C++ E notation, even with all of its customization options.
 
@@ -1039,10 +1035,9 @@ private:
     bool isBooleanNULL() const ;
 
     static void throwCastSQLException(const ValueType origType, const ValueType newType) {
-        char msg[1024];
-        snprintf(msg, 1024, "Type %s can't be cast as %s",
-                 valueToString(origType).c_str(), valueToString(newType).c_str());
-        throw SQLException(SQLException::data_exception_most_specific_type_mismatch, msg);
+        throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+                "Type %s can't be cast as %s",
+                valueToString(origType).c_str(), valueToString(newType).c_str());
     }
 
     /** return the whole part of a TTInt*/
@@ -1610,9 +1605,8 @@ private:
         {
             const double& value = getDouble();
             if (value >= s_gtMaxDecimalAsDouble || value <= s_ltMinDecimalAsDouble) {
-                char message[4096];
-                snprintf(message, 4096, "Attempted to cast value %f causing overflow/underflow", value);
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+                throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Attempted to cast value %f causing overflow/underflow", value);
             }
             // Resort to string as the intermediary since even int64_t does not cover the full range.
             char decimalAsString[41]; // Large enough to account for digits, sign, decimal, and terminating null.
@@ -1756,9 +1750,10 @@ private:
                       inputValue = std::string(ptr, objLength);
                    }
                    char msg[1024];
-                   snprintf(msg, 1024,
+                   snprintf(msg, sizeof msg,
                          "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column",
                          objLength, inputValue.c_str(), maxLength);
+                   msg[sizeof msg - 1] = '\0';
                    throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                          msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
@@ -1773,10 +1768,10 @@ private:
                 } else {
                    inputValue = std::string(ptr, objLength);
                 }
-                snprintf(msg, 1024,
+                snprintf(msg, sizeof msg,
                       "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                       charLength, inputValue.c_str(), maxLength);
-
+                msg[sizeof msg - 1] = '\0';
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                       msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
              }
@@ -1905,16 +1900,13 @@ private:
             if (lhsValue) {
                 return -1;
             } else {
-               return 1;
+                return 1;
             }
         }
-        char message[128];
-        snprintf(message, 128,
-                 "Type %s cannot be cast for comparison to type %s",
-                 valueToString(rhs.getValueType()).c_str(),
-                 valueToString(getValueType()).c_str());
-         throw SQLException(SQLException::data_exception_most_specific_type_mismatch, message);
-         // Not reached
+        throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+                "Type %s cannot be cast for comparison to type %s",
+                valueToString(rhs.getValueType()).c_str(),
+                valueToString(getValueType()).c_str());
     }
 
     int compareTimestamp (const NValue& rhs) const {
@@ -1972,15 +1964,9 @@ private:
             break;
         }
         default:
-            char message[128];
-            snprintf(message, 128,
-                    "Type %s cannot be cast for comparison to type %s",
-                    valueToString(rhs.getValueType()).c_str(),
-                    valueToString(getValueType()).c_str());
-            throw SQLException(SQLException::
-                    data_exception_most_specific_type_mismatch,
-                    message);
-            // Not reached
+            throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+            "Type %s cannot be cast for comparison to type %s",
+                    valueToString(rhs.getValueType()).c_str(), valueToString(getValueType()).c_str());
         }
 
         return compareDoubleValue(lhsValue, rhsValue);
@@ -1991,10 +1977,9 @@ private:
 
         ValueType rhsType = rhs.getValueType();
         if (rhsType != VALUE_TYPE_VARCHAR) {
-            char message[128];
-            snprintf(message, 128, "Type %s cannot be cast for comparison to type %s",
+            throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+                    "Type %s cannot be cast for comparison to type %s",
                     valueToString(rhsType).c_str(), valueToString(m_valueType).c_str());
-            throw SQLException(SQLException::data_exception_most_specific_type_mismatch, message);
         }
 
         vassert(m_valueType == VALUE_TYPE_VARCHAR);
@@ -2021,14 +2006,9 @@ private:
         vassert(m_valueType == VALUE_TYPE_VARBINARY);
 
         if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
-            char message[128];
-            snprintf(message, 128,
-                     "Type %s cannot be cast for comparison to type %s",
-                     valueToString(rhs.getValueType()).c_str(),
-                     valueToString(m_valueType).c_str());
-            throw SQLException(SQLException::
-                               data_exception_most_specific_type_mismatch,
-                               message);
+            throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+                    "Type %s cannot be cast for comparison to type %s",
+                    valueToString(rhs.getValueType()).c_str(), valueToString(m_valueType).c_str());
         }
         int32_t leftLength;
         const char* left = getObject_withoutNull(leftLength);
@@ -2097,14 +2077,9 @@ private:
         default:
             break;
         }
-        char message[128];
-        snprintf(message, 128,
-                 "Type %s cannot be cast for comparison to type %s",
-                 valueToString(rhs.getValueType()).c_str(),
-                 valueToString(getValueType()).c_str());
-        throw SQLException(SQLException::
-                data_exception_most_specific_type_mismatch,
-                message);
+        throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+                "Type %s cannot be cast for comparison to type %s",
+                valueToString(rhs.getValueType()).c_str(), valueToString(getValueType()).c_str());
     }
 
     int comparePointValue (const NValue &rhs) const {
@@ -2119,8 +2094,6 @@ private:
                 << valueToString(getValueType());
             throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
                                oss.str().c_str());
-            // Not reached
-            return 0;
         }
     }
 
@@ -2143,26 +2116,25 @@ private:
 
     static NValue opAddBigInts(const int64_t lhs, const int64_t rhs) {
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
-        if ( ((lhs^rhs)
-                | (((lhs^(~(lhs^rhs)
-                  & (1L << (sizeof(int64_t)*CHAR_BIT-1))))+rhs)^rhs)) >= 0) {
-            char message[4096];
-            snprintf(message, 4096, "Adding %jd and %jd will overflow BigInt storage", (intmax_t)lhs, (intmax_t)rhs);
-            throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        if (((lhs^rhs) | (((lhs^(~(lhs^rhs) &
+                                    (1L << (sizeof(int64_t)*CHAR_BIT-1))))+rhs)^rhs)) >= 0) {
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Adding %jd and %jd will overflow BigInt storage", (intmax_t)lhs, (intmax_t)rhs);
+        } else {
+            return getBigIntValue(lhs + rhs);
         }
-        return getBigIntValue(lhs + rhs);
     }
 
     static NValue opSubtractBigInts(const int64_t lhs, const int64_t rhs) {
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
-        if ( ((lhs^rhs)
-                & (((lhs ^ ((lhs^rhs)
-                  & (1L << (sizeof(int64_t)*CHAR_BIT-1))))-rhs)^rhs)) < 0) {
-            char message[4096];
-            snprintf(message, 4096, "Subtracting %jd from %jd will overflow BigInt storage", (intmax_t)lhs, (intmax_t)rhs);
-            throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        if (((lhs^rhs) & (((lhs ^ ((lhs^rhs) &
+                                    (1L << (sizeof(int64_t)*CHAR_BIT-1))))-rhs)^rhs)) < 0) {
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Subtracting %jd from %jd will overflow BigInt storage",
+                    (intmax_t)lhs, (intmax_t)rhs);
+        } else {
+            return getBigIntValue(lhs - rhs);
         }
-        return getBigIntValue(lhs - rhs);
     }
 
     static int64_t multiplyAndCheckOverflow(const int64_t lhs, const int64_t rhs, bool *overflowed) {
@@ -2204,21 +2176,18 @@ private:
     static NValue opMultiplyBigInts(const int64_t lhs, const int64_t rhs) {
         bool overflow = false;
         int64_t result = multiplyAndCheckOverflow(lhs, rhs, &overflow);
-
         if (overflow) {
-            char message[4096];
-            snprintf(message, 4096, "Multiplying %jd with %jd will overflow BigInt storage", (intmax_t)lhs, (intmax_t)rhs);
-            throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Multiplying %jd with %jd will overflow BigInt storage", (intmax_t)lhs, (intmax_t)rhs);
+        } else {
+            return getBigIntValue(result);
         }
-
-        return getBigIntValue(result);
     }
 
     static NValue opDivideBigInts(const int64_t lhs, const int64_t rhs) {
         if (rhs == 0) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to divide %jd by 0", (intmax_t)lhs);
-            throw SQLException(SQLException::data_exception_division_by_zero, message);
+            throwSQLException(SQLException::data_exception_division_by_zero,
+                    "Attempted to divide %jd by 0", (intmax_t)lhs);
         }
 
         /**
@@ -2260,12 +2229,12 @@ private:
 
         TTInt retval(lhs.getDecimal());
         if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to add %s with %s causing overflow/underflow",
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Attempted to add %s with %s causing overflow/underflow",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+        } else {
+            return getDecimalValue(retval);
         }
-        return getDecimalValue(retval);
     }
 
     static NValue opSubtractDecimals(const NValue& lhs, const NValue& rhs) {
@@ -2276,12 +2245,12 @@ private:
 
         TTInt retval(lhs.getDecimal());
         if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to subtract %s from %s causing overflow/underflow",
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Attempted to subtract %s from %s causing overflow/underflow",
                     rhs.createStringFromDecimal().c_str(), lhs.createStringFromDecimal().c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+        } else {
+            return getDecimalValue(retval);
         }
-        return getDecimalValue(retval);
     }
 
     /*
@@ -2302,14 +2271,13 @@ private:
         calc /= kMaxScaleFactor;
         TTInt retval;
         if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                     calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
+        } else {
+            return getDecimalValue(retval);
         }
-        return getDecimalValue(retval);
     }
 
 
@@ -2335,22 +2303,19 @@ private:
         calc.FromInt(lhs.getDecimal());
         calc *= kMaxScaleFactor;
         if (calc.Div(rhs.getDecimal())) {
-            char message[4096];
-            snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
         }
         TTInt retval;
         if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
+            throwSQLException(SQLException::data_exception_numeric_value_out_of_range,
+                    "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                     calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
+        } else {
+            return getDecimalValue(retval);
         }
-        return getDecimalValue(retval);
     }
 
     static NValue getTinyIntValue(int8_t value) {
@@ -2887,11 +2852,9 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
     default:
         break;
     }
-    char message[128];
-    snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
-             getTypeName(type).c_str());
-    throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                       message);
+    throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
+            "NValue::serializeToTupleStorage() unrecognized type '%s'",
+            getTypeName(type).c_str());
 }
 
 
@@ -3074,8 +3037,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             if (type != VALUE_TYPE_GEOGRAPHY) {
                const char *str = (const char*) input.getRawPointer(length);
                createObjectPointer(length, str, tempPool);
-            }
-            else {
+            } else {
                StringRef* sref = createObjectPointer(length, NULL, tempPool);
                GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
             }
@@ -3469,10 +3431,8 @@ inline NValue NValue::castAs(ValueType type) const {
     DEBUG_IGNORE_OR_THROW_OR_CRASH("Fallout from planner error."
                                    " The invalid target value type for a cast is " <<
                                    getTypeName(type));
-    char message[128];
-    snprintf(message, 128, "Type %d not a recognized type for casting",
-             (int) type);
-    throw SQLException(SQLException::data_exception_most_specific_type_mismatch, message);
+    throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+            "Type %d not a recognized type for casting", (int) type);
 }
 
 inline void* NValue::castAsAddress() const {

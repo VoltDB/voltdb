@@ -663,6 +663,141 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
+// Four parameters for this function:
+// * functionId is the id of the user-defined aggregate function
+// * argument is a value in the table for the specified column (assemble method), or it can be the byte array
+// that represents the output from a worker (combine method), or it can be NULL value (end method)
+// * type is similar to argument. It can be the type for the specified column (assemble method), or it can be
+// varbinary (combine method), or invalid (end method)
+// * udafIndex represents the index for the same user-defined aggregate function in a query.
+// For example, for "SELECT udf(b), avg(c), udf(a) FROM t", udf(b) has an udafIndex of 1,
+// udf(a) has an udafIndex of 1
+void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument,
+                                                ValueType type, int32_t udafIndex) {
+    // Estimate the size of the buffer we need. We will put:
+    //   * buffer size needed
+    //   * function id (int32_t)
+    //   * udaf index (int32_t)
+    //   * parameters.
+
+    // three int32_t: size of the buffer, function id, and udaf index
+    int32_t bufferSizeNeeded = 3 * sizeof(int32_t);
+    NValue cast_argument;
+    if (type != VALUE_TYPE_INVALID) {
+        cast_argument = argument.castAs(type);
+        bufferSizeNeeded += cast_argument.serializedSize();
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    if (bufferSizeNeeded > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded);
+    }
+    resetUDFOutputBuffer();
+
+    // Serialize buffer size, function ID.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+    m_udfOutput.writeInt(udafIndex);
+
+    if (type != VALUE_TYPE_INVALID) {
+        cast_argument.serializeTo(m_udfOutput);
+    }
+
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded == m_udfOutput.position());
+}
+
+void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, int32_t functionId) {
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
+}
+
+void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
+    if (returnCode != 0) {
+        throwSQLException(SQLException::volt_user_defined_function_error, "%s failed", name);
+    }
+}
+
+NValue VoltDBEngine::udfResultHelper(int32_t returnCode, bool partition_table, ValueType type) {
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (returnCode == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval;
+        if (partition_table) {
+            // if this is a partitioned table, the returnType here
+            // is a varbinary since we serialized the worker's
+            // output on the java side
+            retval = ValueFactory::getNValueOfType(VALUE_TYPE_VARBINARY);
+        } else {
+            // if this is a replicated table, the returnType will just be
+            // the final returnType in the end method
+            retval = ValueFactory::getNValueOfType(type);
+        }
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        std::string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    }
+}
+
+void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart(functionId);
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
+}
+
+void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int32_t udafIndex) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front(), udafIndex);
+    // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
+}
+
+void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int32_t udafIndex) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    // the argument here is of the type varbinary because this is the serialized byte
+    // array after the worker end method
+    serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, udafIndex);
+    // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
+    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
+}
+
+NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
+    // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
+    return udfResultHelper(returnCode, true, info->returnType);
+}
+
+NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    checkUserDefinedFunctionInfo(info, functionId);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
+    // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
+    // Java user-defined function. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
+    return udfResultHelper(returnCode, false, info->returnType);
+}
+
+
 void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
         m_currentUndoQuantum = NULL;
@@ -1243,6 +1378,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
@@ -1259,7 +1395,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 }
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
-                         catalogTable->name().c_str());
+                        catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
@@ -1624,8 +1761,10 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
         auto handler = table->materializedViewHandler();
         if (handler && handler->snapshotable() && handler->isEnabled()) {
             char msg[256];
-            snprintf(msg, sizeof(msg), "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
-                     table->name().c_str());
+            snprintf(msg, sizeof(msg),
+                    "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
+                    table->name().c_str());
+            msg[sizeof msg - 1] = '\0';
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
             return true;
         }
@@ -2556,8 +2695,10 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
     }
     if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
         char msg[512];
-        snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+        snprintf(msg, sizeof(msg),
+                "Attempted to delete migrated rows for a Table (%s) that has been removed.",
                 tableName.c_str());
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 

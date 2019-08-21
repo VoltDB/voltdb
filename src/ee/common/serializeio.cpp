@@ -23,32 +23,31 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
     /*
      * Leave some space for message headers and such, almost 50 megabytes
      */
-    size_t maxAllocationSize = ((1024 * 1024 *50) - (1024 * 32));
-    if (fallbackBuffer_ != NULL || minimum_desired > maxAllocationSize) {
-        if (fallbackBuffer_ != NULL) {
-            char *temp = fallbackBuffer_;
-            fallbackBuffer_ = NULL;
+    size_t maxAllocationSize = (1024 * 1024 *50) - (1024 * 32);
+    if (m_fallbackBuffer != NULL || minimum_desired > maxAllocationSize) {
+        if (m_fallbackBuffer != NULL) {
+            char *temp = m_fallbackBuffer;
+            m_fallbackBuffer = NULL;
             delete []temp;
         }
         throw SQLException(SQLException::volt_output_buffer_overflow,
             "Output from SQL stmt overflowed output/network buffer of 50mb (-32k for message headers). "
             "Try a \"limit\" clause or a stronger predicate.");
     }
-    fallbackBuffer_ = new char[maxAllocationSize];
-    ::memcpy(fallbackBuffer_, data(), position_);
-    setPosition(position_);
-    initialize(fallbackBuffer_, maxAllocationSize);
-    ExecutorContext::getPhysicalTopend()->fallbackToEEAllocatedBuffer(fallbackBuffer_, maxAllocationSize);
+    m_fallbackBuffer = new char[maxAllocationSize];
+    ::memcpy(m_fallbackBuffer, data(), m_position);
+    setPosition(m_position);
+    initialize(m_fallbackBuffer, maxAllocationSize);
+    ExecutorContext::getPhysicalTopend()->fallbackToEEAllocatedBuffer(m_fallbackBuffer, maxAllocationSize);
 }
 
 template<voltdb::Endianess E>
 std::string SerializeInput<E>::fullBufferStringRep() {
-    std::stringstream message(std::stringstream::in
-                              | std::stringstream::out);
+    std::stringstream message(std::stringstream::in | std::stringstream::out);
 
-    message << "length: " << end_ - current_ << " data: ";
+    message << "length: " << m_end - m_current << " data: ";
 
-    for (const char* i = current_; i != end_; i++) {
+    for (const char* i = m_current; i != m_end; i++) {
         const uint8_t value = static_cast<uint8_t>(*i);
         message << std::setw( 2 ) << std::setfill( '0' ) << std::hex << std::uppercase << (int)value;
         message << " ";
