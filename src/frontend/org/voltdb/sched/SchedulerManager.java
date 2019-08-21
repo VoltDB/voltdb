@@ -526,7 +526,7 @@ public final class SchedulerManager {
                 // Do not restart a schedule if it has not changed
                 if (handler.isSameSchedule(procedureSchedule, result.m_factory, classesUpdated)) {
                     newHandlers.put(procedureSchedule.getName(), handler);
-                    handler.setEnabled(procedureSchedule.getEnabled());
+                    handler.updateDefinition(procedureSchedule);
                     if (frequencyChanged) {
                         handler.setMaxRunFrequency(m_maxRunFrequency);
                     }
@@ -615,20 +615,8 @@ public final class SchedulerManager {
 
             Class<?>[] methodParameterTypes = m.getParameterTypes();
 
-            /*
-             * Test the parameters for the validate method. The first parameter must be a SchedulerValidationErrors the
-             * second parameter may be a SchedulerValidationHelper or the first parameter of the constructor
-             */
-            if (!SchedulerValidationErrors.class.isAssignableFrom(methodParameterTypes[0])) {
-                log.warn(generateLogMessage(definition.getName(),
-                        schedulerClass.getName()
-                                + " defines a 'validateParameters' method but first parameter is not of type "
-                                + SchedulerValidationErrors.class.getName()));
-                continue;
-            }
-
             Class<?>[] constructorParameterTypes = constructor.getParameterTypes();
-            boolean takesHelper = SchedulerValidationHelper.class.isAssignableFrom(methodParameterTypes[1]);
+            boolean takesHelper = SchedulerValidationHelper.class.isAssignableFrom(methodParameterTypes[0]);
             int expectedParameterCount = constructorParameterTypes.length + (takesHelper ? 1 : 0);
 
             if (methodParameterTypes.length != expectedParameterCount) {
@@ -830,19 +818,23 @@ public final class SchedulerManager {
         }
 
         /**
-         * Does not include {@link ProcedureSchedule#getEnabled()} in {@code definition} comparison
+         * Does not include {@link ProcedureSchedule#getEnabled()} or {@link ProcedureSchedule#getOnerror()} in
+         * {@code definition} comparison
          *
          * @param definition {@link ProcedureSchedule} defining the schedule configuration
          * @param factory    {@link SchedulerFactory} derived from {@code definition}
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
         boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory, boolean checkHashes) {
+            return isSameDefinition(definition) && (!checkHashes || m_factory.hashesMatch(factory));
+        }
+
+        private boolean isSameDefinition(ProcedureSchedule definition) {
             return Objects.equals(m_definition.getName(), definition.getName())
                     && Objects.equals(m_definition.getScope(), definition.getScope())
                     && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
                     && Objects.equals(m_definition.getUser(), definition.getUser())
-                    && Objects.equals(m_definition.getParameters(), definition.getParameters())
-                    && (!checkHashes || m_factory.hashesMatch(factory));
+                    && Objects.equals(m_definition.getParameters(), definition.getParameters());
         }
 
         String getName() {
@@ -851,6 +843,10 @@ public final class SchedulerManager {
 
         String getUser() {
             return m_definition.getUser();
+        }
+
+        String getOnError() {
+            return m_definition.getOnerror();
         }
 
         /**
@@ -882,11 +878,16 @@ public final class SchedulerManager {
         abstract void promotedPartition(int partitionId);
 
         /**
-         * Set the enabled state of the schedule.
+         * Handle allowed definition updates. The only allowed changes are those ignored by
+         * {@link #isSameSchedule(ProcedureSchedule, SchedulerFactory, boolean)}
+         *
+         * @param newDefintion Updated definition
          */
-        void setEnabled(boolean enabled) {
-            m_definition.setEnabled(enabled);
-        };
+        void updateDefinition(ProcedureSchedule newDefintion) {
+            assert isSameDefinition(newDefintion);
+            m_definition.setEnabled(newDefintion.getEnabled());
+            m_definition.setOnerror(newDefintion.getOnerror());
+        }
 
         /**
          * Notify this scheduler configuration of partitions which were locally demoted from leader
@@ -936,9 +937,9 @@ public final class SchedulerManager {
         }
 
         @Override
-        void setEnabled(boolean enabled) {
-            super.setEnabled(enabled);
-            m_wrapper.setEnabled(enabled);
+        void updateDefinition(ProcedureSchedule newDefintion) {
+            super.updateDefinition(newDefintion);
+            m_wrapper.setEnabled(newDefintion.getEnabled());
         }
 
         @Override
@@ -982,8 +983,9 @@ public final class SchedulerManager {
         }
 
         @Override
-        void setEnabled(boolean enabled) {
-            super.setEnabled(enabled);
+        void updateDefinition(ProcedureSchedule newDefintion) {
+            super.updateDefinition(newDefintion);
+            boolean enabled = newDefintion.getEnabled();
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
                 wrapper.setEnabled(enabled);
             }
@@ -1207,9 +1209,29 @@ public final class SchedulerManager {
             if (m_state != SchedulerWrapperState.RUNNING) {
                 return;
             }
+
+            boolean failed = response.getStatus() != ClientResponse.SUCCESS;
             m_procedure.setResponse(response);
-            m_stats.addProcedureCall(m_procedure.getExecutionTime(), m_procedure.getWaitTime(),
-                    response.getStatus() != ClientResponse.SUCCESS);
+            m_stats.addProcedureCall(m_procedure.getExecutionTime(), m_procedure.getWaitTime(), failed);
+
+            if (failed) {
+                String onError = m_handler.getOnError();
+
+                boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
+                if (!isIgnore || log.isDebugEnabled()) {
+                    String message = "Procedure " + m_procedure.getProcedure() + " with parameters "
+                            + Arrays.toString(m_procedure.getProcedureParameters()) + " failed: "
+                            + m_procedure.getResponse().getStatusString();
+
+                    if (isIgnore || "LOG".equalsIgnoreCase(onError)) {
+                        log.log(isIgnore ? Level.DEBUG : Level.INFO, generateLogMessage(message), null);
+                    } else {
+                        errorOccurred(message);
+                        return;
+                    }
+                }
+            }
+
             submitHandleNextRun();
         }
 

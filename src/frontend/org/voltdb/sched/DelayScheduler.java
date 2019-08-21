@@ -28,10 +28,10 @@ import java.util.concurrent.TimeUnit;
 public class DelayScheduler extends SingleProcScheduler {
     private final long m_delayNs;
 
-    public static String validateParameters(SchedulerValidationHelper helper, String name, String errorHandler,
-            String delay, String procedure, String... procedureParameters) {
+    public static String validateParameters(SchedulerValidationHelper helper, String delay, String procedure,
+            String... procedureParameters) {
         SchedulerValidationErrors errors = new SchedulerValidationErrors();
-        SingleProcScheduler.validateParameters(errors, helper, errorHandler, procedure, procedureParameters);
+        SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
         try {
             parseDelay(delay);
         } catch (RuntimeException e) {
@@ -43,22 +43,19 @@ public class DelayScheduler extends SingleProcScheduler {
     private static long parseDelay(String delay) {
         try {
             return TimeUnit.SECONDS.toNanos(Integer.parseInt(delay));
-        } catch (NumberFormatException e) {
-        }
+        } catch (NumberFormatException e) {}
 
         try {
             Duration duration = Duration.parse(delay);
             return TimeUnit.SECONDS.toNanos(duration.getSeconds()) + duration.getNano();
-        } catch (DateTimeParseException e) {
-        }
+        } catch (DateTimeParseException e) {}
 
         throw new IllegalArgumentException(
                 "Could not parse <" + delay + "> as either an integer or " + Duration.class.getName());
     }
 
-    public DelayScheduler(String name, String errorHandler, String delay, String procedure,
-            String[] procedureParameters) {
-        super(name, errorHandler, procedure, procedureParameters);
+    public DelayScheduler(String delay, String procedure, String[] procedureParameters) {
+        super(procedure, procedureParameters);
         m_delayNs = parseDelay(delay);
     }
 

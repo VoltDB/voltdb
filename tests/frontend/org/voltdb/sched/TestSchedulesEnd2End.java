@@ -197,7 +197,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         String schedule = getMethodName();
         client.callProcedure("@AdHoc",
-                "CREATE SCHEDULE " + schedule + " ON PARTITIONS DELAY PT0.01S AS '" + procName
+                "CREATE SCHEDULE " + schedule + " RUN ON PARTITIONS DELAY PT0.01S AS '" + procName
                         + "'");
 
         // Give everything some time to run

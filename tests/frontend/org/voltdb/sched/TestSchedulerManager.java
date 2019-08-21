@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import org.junit.After;
 import org.junit.Before;
@@ -61,6 +62,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -96,6 +98,7 @@ public class TestSchedulerManager {
     private Procedure m_procedure = new Procedure();
     private StatsAgent m_statsAgent = new StatsAgent();
     private SchedulerType m_schedulesConfig = new SchedulerType();
+    private ClientResponse m_response;
 
     @Before
     public void setup() {
@@ -103,9 +106,11 @@ public class TestSchedulerManager {
         when(m_authSystem.getUser(anyString())).then(m -> mock(AuthUser.class));
 
         m_internalConnectionHandler = mock(InternalConnectionHandler.class);
+
+        m_response = when(mock(ClientResponse.class).getStatus()).thenReturn(ClientResponse.SUCCESS).getMock();
         when(m_internalConnectionHandler.callProcedure(any(), eq(false), anyInt(), any(), eq(PROCEDURE_NAME), any()))
                 .then(m -> {
-                    ((ProcedureCallback) m.getArgument(3)).clientCallback(mock(ClientResponse.class));
+                    ((ProcedureCallback) m.getArgument(3)).clientCallback(m_response);
                     return true;
                 });
 
@@ -142,7 +147,7 @@ public class TestSchedulerManager {
 
         promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
                 s_postRunSchedulerCallCount.get() > 0);
@@ -164,7 +169,7 @@ public class TestSchedulerManager {
 
         processUpdateSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
                 s_postRunSchedulerCallCount.get() > 0);
@@ -198,7 +203,7 @@ public class TestSchedulerManager {
 
         promotedPartitionsSync(0, 4);
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(2, s_firstSchedulerCallCount.get());
         assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
                 s_postRunSchedulerCallCount.get() > 0);
@@ -232,7 +237,7 @@ public class TestSchedulerManager {
 
         promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
                 s_postRunSchedulerCallCount.get() > 0);
@@ -300,7 +305,7 @@ public class TestSchedulerManager {
         startSync(schedule);
         promoteToLeaderSync(schedule);
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertEquals(4, s_postRunSchedulerCallCount.get());
     }
@@ -315,13 +320,13 @@ public class TestSchedulerManager {
 
         startSync();
         promoteToLeaderSync(schedule);
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
 
         schedule.setEnabled(false);
         processUpdateSync(schedule);
         Thread.sleep(5);
-        validateStats();
+        validateStats("DISABLED", null);
 
         schedule.setEnabled(true);
         processUpdateSync(schedule);
@@ -381,7 +386,7 @@ public class TestSchedulerManager {
         ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
         startSync();
         promoteToLeaderSync(schedule);
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertEquals(0, s_postRunSchedulerCallCount.get());
     }
@@ -395,7 +400,7 @@ public class TestSchedulerManager {
         ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_SYSTEM);
         startSync();
         promoteToLeaderSync(schedule);
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertEquals(1, s_firstSchedulerCallCount.get());
         assertEquals(1, s_postRunSchedulerCallCount.get());
     }
@@ -479,6 +484,34 @@ public class TestSchedulerManager {
         }
     }
 
+    /*
+     * Test that the onErrot value can be modified on a running schedule
+     */
+    @Test
+    public void changeOnErrorWhileRunning() throws Exception {
+        when(m_response.getStatus()).thenReturn(ClientResponse.USER_ABORT);
+        ProcedureSchedule schedule = createProcedureSchedule(TestScheduler.class, SchedulerManager.SCOPE_PARTITIONS);
+        m_procedure.setSinglepartition(true);
+        schedule.setOnerror("IGNORE");
+
+        startSync(schedule);
+        promotedPartitionsSync(0, 1, 2, 3, 4, 5);
+
+        // Long sleep because it sometimes takes a while for the first execution
+        Thread.sleep(50);
+        assertEquals(6, s_firstSchedulerCallCount.get());
+        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
+                s_postRunSchedulerCallCount.get() > 0);
+
+        validateStats("RUNNING", r -> assertNull(r.getString("SCHEDULER_STATUS")));
+
+        schedule.setOnerror("ABORT");
+        processUpdateSync(schedule);
+        Thread.sleep(5);
+
+        validateStats("ERROR", r -> assertTrue(r.getString("SCHEDULER_STATUS").startsWith("Procedure ")));
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -517,6 +550,7 @@ public class TestSchedulerManager {
         ps.setScope(scope);
         ps.setSchedulerclass(clazz.getName());
         ps.setUser("user");
+        ps.setOnerror("ABORT");
         CatalogMap<SchedulerParam> paramMap = ps.getParameters();
         for (int i = 0;i<params.length;++i) {
             SchedulerParam sp = paramMap.add(Integer.toString(i));
@@ -569,10 +603,18 @@ public class TestSchedulerManager {
     }
 
     private void validateStats() {
+        validateStats("RUNNING", null);
+    }
+
+    private void validateStats(String state, Consumer<VoltTableRow> validator) {
         VoltTable table = getScheduleStats();
         long totalSchedulerInvocations = 0;
         long totalProcedureInvocations = 0;
         while (table.advanceRow()) {
+            if (validator != null) {
+                validator.accept(table);
+            }
+            assertEquals(state, table.getString("STATE"));
             totalSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
             totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
         }

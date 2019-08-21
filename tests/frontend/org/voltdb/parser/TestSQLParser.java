@@ -756,7 +756,10 @@ public class TestSQLParser extends TestCase {
         validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS USING a.b.c.D;",
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D ON ERROR ABORT;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "onError", "ABORT"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS USING a.b.c.D;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D", "scope", "PARTITIONS"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D AS USER me;",
@@ -775,7 +778,7 @@ public class TestSQLParser extends TestCase {
         validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 ON ERROR ABORT AS proc;",
                 ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "onError", "ABORT"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS DELAY 5999 AS proc;",
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS DELAY 5999 AS proc;",
                 ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "delay", "5999"));
 
         validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS USER me AS proc;",
@@ -795,7 +798,7 @@ public class TestSQLParser extends TestCase {
                 ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "onError",
                         "ABORT"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah ON PARTITIONS CRON */5 ? 1-4,7 L W 1,3# AS proc;",
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS CRON */5 ? 1-4,7 L W 1,3# AS proc;",
                 ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "cron",
                         "*/5 ? 1-4,7 L W 1,3#"));
 

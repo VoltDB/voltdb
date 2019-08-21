@@ -434,7 +434,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_CREATE_SCHEDULE =
             SPF.statement(
                 SPF.token("create"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("on"),
+                    SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
                         SPF.capture("scope", SPF.oneOf("system", "hosts", "partitions")))),
                 SPF.oneOf(
                     SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
@@ -442,9 +442,10 @@ public class SQLParser extends SQLPatternFactory
                     SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
                     SPF.clause(SPF.token("cron"),
                         SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                            SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD)))),
-                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
-                            SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))))),
+                            SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))))
+                    )),
+                SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                        SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))),
                 SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
                 SPF.optional(SPF.capture("disabled", SPF.token("disabled"))),
                 SPF.optional(SPF.oneOf(
@@ -475,7 +476,10 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_ALTER_SCHEDULE =
             SPF.statement(
                 SPF.token("alter"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.capture("action", SPF.oneOf("enable", "disable"))
+                    SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
+                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                            SPF.capture("onError",
+                                    SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore")))))
             ).compile("PAT_ALTER_SCHEDULE");
 
     /**
