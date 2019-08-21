@@ -439,11 +439,12 @@ public class SQLParser extends SQLPatternFactory
                 SPF.oneOf(
                     SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
                     SPF.clause(SPF.oneOf(
-                    SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
-                    SPF.clause(SPF.token("cron"),
-                        SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                            SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))))
-                    )),
+                        SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
+                        SPF.clause(SPF.token("cron"),
+                            SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))),
+                        SPF.clause(SPF.token("every"), SPF.capture("interval", SPF.integer()),
+                            SPF.capture("timeUnit", SPF.oneOf("milliseconds", "seconds", "minutes", "hours", "days")))))),
                 SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
                         SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))),
                 SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),

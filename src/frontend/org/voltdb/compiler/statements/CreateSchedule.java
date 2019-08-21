@@ -34,6 +34,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.sched.CronScheduler;
 import org.voltdb.sched.DelayScheduler;
+import org.voltdb.sched.IntervalScheduler;
 import org.voltdb.sched.SchedulerManager;
 
 import com.google_voltpatches.common.base.MoreObjects;
@@ -85,13 +86,19 @@ public class CreateSchedule extends StatementProcessor {
                         "Schedule configures procdure when scheduler parameters are expected.");
             }
         } else {
-            String config;
+            CatalogMap<SchedulerParam> params = schedule.getParameters();
+            int index = 0;
+
             if (matcher.group("cron") != null) {
                 schedule.setSchedulerclass(CronScheduler.class.getName());
-                config =matcher.group("cron");
+                addParameter(params, index++, matcher.group("cron"));
             } else if (matcher.group("delay") != null) {
                 schedule.setSchedulerclass(DelayScheduler.class.getName());
-                config = matcher.group("delay");
+                addParameter(params, index++, matcher.group("delay"));
+            } else if (matcher.group("interval") != null) {
+                schedule.setSchedulerclass(IntervalScheduler.class.getName());
+                addParameter(params, index++, matcher.group("interval"));
+                addParameter(params, index++, matcher.group("timeUnit"));
             } else {
                 throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
             }
@@ -99,16 +106,14 @@ public class CreateSchedule extends StatementProcessor {
             if (matcher.group("procedure") == null) {
                 throw m_compiler.new VoltCompilerException("Schedule does not specify procedure to execute");
             }
-            CatalogMap<SchedulerParam> params = schedule.getParameters();
-            int index = 0;
-            addParameter(params, index++, config);
+
             fillOutParams(params, matcher.group("procedure"), index);
         }
         String user = matcher.group("asUser");
         // If no user is set and this is new DDL use the user which is creating the schedule
         schedule.setUser(user == null && newDdl ? m_compiler.getUser() : user);
         schedule.setEnabled(matcher.group("disabled") == null);
-        schedule.setOnerror(MoreObjects.firstNonNull(matcher.group("onError"), "ABORT"));
+        schedule.setOnerror(MoreObjects.firstNonNull(matcher.group("onError"), "ABORT").toUpperCase());
 
         return schedule;
     }
