@@ -1455,21 +1455,21 @@ function alertNodeClicked(obj) {
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
-                var tuple_count = {}; // For keeping separate sums for each target
+                var tuple_count = {}; // For keeping separate sums for each id
                 var tuple_pending = {};
-                var target = "";
+                var id = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
-                    if(target != info[colIndex["TARGET"]]){
-                        target = info[colIndex["TARGET"]];
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
                     }
-                    if(isNaN(tuple_count[target])){ // Catches when tuple_count has not started tracking a certain target
-                        tuple_count[target] = 0;
+                    if(isNaN(tuple_count[id])){ // Catches when tuple_count has not started tracking a certain id
+                        tuple_count[id] = 0;
                     }
-                    if(isNaN(tuple_pending[target])){
-                        tuple_pending[target] = 0;
+                    if(isNaN(tuple_pending[id])){
+                        tuple_pending[id] = 0;
                     }
-                    if (!exporterDetails.hasOwnProperty("SOURCE")) { // Add property for each group of data we want to get
-                        exporterDetails["SOURCE"] = {};
+                    if (!exporterDetails.hasOwnProperty("TARGET")) { // Add property for each group of data we want to get
+                        exporterDetails["TARGET"] = {};
                     }
                     if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
                         exporterDetails["TUPLE_COUNT"] = {};
@@ -1482,14 +1482,15 @@ function alertNodeClicked(obj) {
                     }
                     
                     
-                    tuple_count[target] += info[colIndex["TUPLE_COUNT"]];
-                    tuple_pending[target] += info[colIndex["TUPLE_PENDING"]];
-                    exporterDetails["SOURCE"][target] = info[colIndex["SOURCE"]];
-                    exporterDetails["TUPLE_COUNT"][target] = tuple_count[target];
-                    exporterDetails["TUPLE_PENDING"][target] = tuple_pending[target];
+                    tuple_count[id] += info[colIndex["TUPLE_COUNT"]];
+                    tuple_pending[id] += info[colIndex["TUPLE_PENDING"]];
+                    
+                    exporterDetails["TARGET"][id] = info[colIndex["TARGET"]];
+                    exporterDetails["TUPLE_COUNT"][id] = tuple_count[id];
+                    exporterDetails["TUPLE_PENDING"][id] = tuple_pending[id];
                     exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
-                    exporterDetails["ACTIVE"][target] = info[colIndex["ACTIVE"]];
+                    exporterDetails["ACTIVE"][id] = info[colIndex["ACTIVE"]];
                 });
             }
         };
@@ -1504,26 +1505,26 @@ function alertNodeClicked(obj) {
 
             connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
-                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "TARGET")
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "SOURCE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
                 var tuple_count = {};
-                var target = "";
+                var id = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
-                    if(target != info[colIndex["TARGET"]]){
-                        target = info[colIndex["TARGET"]];
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
                     }
-                    if(isNaN(tuple_count[target])){
-	                    tuple_count[target] = 0;
+                    if(isNaN(tuple_count[id])){
+	                    tuple_count[id] = 0;
                     }
                     if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
                         exporterDetails["TUPLE_COUNT"] = {};
                     }
-                    tuple_count[target] += info[colIndex["TUPLE_COUNT"]];
-                    exporterDetails["TUPLE_COUNT"][target] = tuple_count[target];
+                    tuple_count[id] += info[colIndex["TUPLE_COUNT"]];
+                    exporterDetails["TUPLE_COUNT"][id] = tuple_count[id];
                     exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
@@ -1540,26 +1541,26 @@ function alertNodeClicked(obj) {
 
             connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
-                    || columnInfo["name"] == "TUPLE_PENDING" || columnInfo["name"] == "TARGET")
+                    || columnInfo["name"] == "TUPLE_PENDING" || columnInfo["name"] == "SOURCE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
                 var tuple_count = {};
-                var target = "";
+                var id = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
-                    if(target != info[colIndex["TARGET"]]){
-                        target = info[colIndex["TARGET"]];
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
                     }
-                    if(isNaN(tuple_count[target])){
-	                    tuple_count[target] = 0;
+                    if(isNaN(tuple_count[id])){
+	                    tuple_count[id] = 0;
                     }
                     if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
                         exporterDetails["TUPLE_PENDING"] = {};
                     }
-                    tuple_count[target] += info[colIndex["TUPLE_PENDING"]];
-                    exporterDetails["TUPLE_PENDING"][target] = tuple_count[target];
+                    tuple_count[id] += info[colIndex["TUPLE_PENDING"]];
+                    exporterDetails["TUPLE_PENDING"][id] = tuple_count[id];
                     exporterDetails["TUPLE_PENDING"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
