@@ -7,6 +7,7 @@ create table RI5 (
 CREATE UNIQUE INDEX RI5_UNIQUE_IND_I ON RI5 (i);
 CREATE INDEX RI5_IND_I ON RI5 (i);
 CREATE INDEX RI5_IND_II_III ON RI5 (ii, iii);
+CREATE INDEX RI5_IND_I_II_III ON RI5 (i, ii, iii);
 CREATE INDEX RI5_IND_II ON RI5 (ii);
 CREATE INDEX RI5_IND_II_PART ON RI5 (ii) WHERE ABS(I) > 8;
 
@@ -64,7 +65,7 @@ CREATE TABLE c
 );
 CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
 CREATE INDEX a_partial_idx_not_null_d_e ON c (a + b) where (d + e) is not null;
-CREATE UNIQUE INDEX z_full_idx_a ON c (a);
+CREATE INDEX z_full_idx_a ON c (a);
 CREATE INDEX partial_idx_not_null_e_dup ON c (a) where e is not null;
 CREATE INDEX partial_idx_null_e ON c (a) where e is null;
 CREATE INDEX partial_idx_or_expr ON c (f) where e > 0 or d < 5;
