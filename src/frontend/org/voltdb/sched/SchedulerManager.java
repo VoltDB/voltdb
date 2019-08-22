@@ -1605,6 +1605,7 @@ public final class SchedulerManager {
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
                 m_rawExecutor.setCorePoolSize(threadCount);
+                m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
             }
         }
     }
