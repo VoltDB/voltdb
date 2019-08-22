@@ -72,11 +72,12 @@ public class KafkaExportClient extends ExportClientBase {
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
 
     private final static int SHUTDOWN_TIMEOUT_MS = 10_000;
+    public final static String DEFAULT_EXPORT_PREFIX = "voltdbexport";
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
 
     Properties m_producerConfig;
-    String m_topicPrefix = "voltdbexport";
+    String m_topicPrefix = DEFAULT_EXPORT_PREFIX;
     Map<String, String> m_tableTopics;
 
     //Keep this default to false as people out there might depend on index in csv
