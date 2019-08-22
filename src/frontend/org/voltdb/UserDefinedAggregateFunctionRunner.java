@@ -114,17 +114,16 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
 
     public void assemble(ByteBuffer udfBuffer, int udafIndex) throws Throwable {
         // assemble method has only one argument, which is defined in the voltUDAggregate interface
+        // Note: changes needed when we need to support UDAF that takes more than one columns.
         assert(m_paramCount == 1);
         // retrieve the argument count from udfbuffer
         int argNum = udfBuffer.getInt();
         while (argNum-- > 0) {
             // read the buffer multiple times for each argument and pass it to assmble method
             Object[] paramsIn = new Object[m_paramCount];
-            for (int i = 0; i < m_paramCount; i++) {
-                paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
-                if (m_boxUpByteArray[i]) {
-                    paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
-                }
+            paramsIn[0] = getValueFromBuffer(udfBuffer, m_paramTypes[0]);
+            if (m_boxUpByteArray[0]) {
+                paramsIn[0] = SerializationHelper.boxUpByteArray((byte[])paramsIn[0]);
             }
             m_assembleMethod.invoke(m_functionInstances.get(udafIndex), paramsIn);
         }
