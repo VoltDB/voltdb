@@ -27,11 +27,7 @@
 #include <string>
 #include <vector>
 #include <pthread.h>
-#if __cplusplus >= 201103L
 #include <atomic>
-#else
-#include <cstdatomic>
-#endif
 
 #include "common/UndoQuantumReleaseInterest.h"
 
@@ -45,11 +41,10 @@ typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
-    SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) : m_realInterest(realInterest) {}
-    virtual ~SynchronizedUndoQuantumReleaseInterest() { }
-
+    SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) :
+        m_realInterest(realInterest) {}
+    virtual ~SynchronizedUndoQuantumReleaseInterest() {}
     void notifyQuantumRelease();
-
 private:
     UndoQuantumReleaseInterest *m_realInterest;
 };
@@ -58,7 +53,6 @@ class SynchronizedDummyUndoQuantumReleaseInterest : public UndoQuantumReleaseInt
 public:
     SynchronizedDummyUndoQuantumReleaseInterest() { }
     virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
-
     void notifyQuantumRelease();
 };
 

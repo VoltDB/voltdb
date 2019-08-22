@@ -200,9 +200,9 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * All conflicting rows are put into @conflictRows.
    */
 void findConflictTuple(PersistentTable *table, const TableTuple *existingTuple, const TableTuple *searchTuple,
-                       const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
-    boost::unordered_set<char*> redundancyFilter;
-    BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
+                       const TableTuple *expectedTuple, std::vector<LabeledTableTuple> &conflictRows) {
+    std::unordered_set<char*> redundancyFilter;
+    for(TableIndex* index : table->allIndexes()) {
         if (index->isUniqueIndex()) {
             IndexCursor cursor(index->getTupleSchema());
             if (index->moveToKeyByTuple(searchTuple, cursor)) {
@@ -498,9 +498,9 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     return true;
 }
 
-inline void truncateTable(boost::unordered_map<int64_t, PersistentTable*> &tables,
+inline void truncateTable(std::unordered_map<int64_t, PersistentTable*> &tables,
         VoltDBEngine *engine, bool replicatedTableOperation, int64_t tableHandle, std::string *tableName) {
-    boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+    std::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
     if (tableIter == tables.end()) {
         throwDRTableNotFoundException(tableHandle, "Unable to find table %s hash %jd while applying binary log for truncate record",
                                       tableName->c_str(), (intmax_t) tableHandle);
@@ -654,7 +654,7 @@ BinaryLogSink::BinaryLogSink() {}
 bool s_replicatedApplySuccess;
 
 int64_t BinaryLogSink::apply(const char *rawLogs,
-        boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
+        std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
         int32_t remoteClusterId, int64_t localUniqueId) {
     int32_t logCount = BinaryLog::readRawInt(rawLogs);
     rawLogs += sizeof(int32_t);
@@ -680,7 +680,7 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
 }
 
 int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
-        boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
+        std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
         int32_t remoteClusterId, int64_t localUniqueId) {
     boost::scoped_array<boost::scoped_ptr<BinaryLog>> logs(new boost::scoped_ptr<BinaryLog>[logCount]);
     int64_t rowCount = 0;
@@ -810,9 +810,8 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
     return rowCount;
 }
 
-int64_t BinaryLogSink::applyLog(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
-        VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId) {
-
+int64_t BinaryLogSink::applyLog(BinaryLog *log, std::unordered_map<int64_t, PersistentTable*> &tables,
+        Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId) {
     int64_t rowCount = 0;
 
     if (log->isReplicatedTableLog()) {
@@ -827,7 +826,7 @@ int64_t BinaryLogSink::applyLog(BinaryLog *log, boost::unordered_map<int64_t, Pe
     return rowCount;
 }
 
-int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables,
+int64_t BinaryLogSink::applyTxn(BinaryLog *log, std::unordered_map<int64_t, PersistentTable*> &tables,
                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                  int64_t localUniqueId, bool replicatedTable) {
 
@@ -861,7 +860,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
     return rowCount;
 }
 
-int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables,
+int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, std::unordered_map<int64_t, PersistentTable*> &tables,
         Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId) {
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(true, engine->isLowestSite(),
             &s_replicatedApplySuccess, false);
@@ -886,14 +885,10 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<i
     return rowCount;
 }
 
-int64_t BinaryLogSink::applyRecord(BinaryLog *log,
-                             const DRRecordType type,
-                             boost::unordered_map<int64_t, PersistentTable*> &tables,
-                             Pool *pool,
-                             VoltDBEngine *engine,
-                             int32_t remoteClusterId,
-                             bool replicatedTable,
-                             bool skipRow) {
+int64_t BinaryLogSink::applyRecord(
+        BinaryLog *log, const DRRecordType type, std::unordered_map<int64_t, PersistentTable*> &tables,
+        Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+        bool replicatedTable, bool skipRow) {
     ReferenceSerializeInputLE *taskInfo = &log->m_taskInfo;
     int64_t uniqueId = log->m_uniqueId;
     int64_t sequenceNumber = log->m_sequenceNumber;
@@ -913,7 +908,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             break;
         }
 
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+        std::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
             throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log insert record",
                                           (intmax_t) tableHandle);
@@ -952,7 +947,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             break;
         }
 
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+        std::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
             throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log delete record",
                                          (intmax_t)tableHandle);
@@ -1008,7 +1003,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             break;
         }
 
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+        std::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
             throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log update record",
                                          (intmax_t)tableHandle);
