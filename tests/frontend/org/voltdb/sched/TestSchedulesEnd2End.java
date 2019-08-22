@@ -24,11 +24,13 @@
 package org.voltdb.sched;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
@@ -253,8 +255,54 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         }
     }
 
+    @Test
+    public void customScheduler() throws Exception {
+        Client client = getClient(0);
+        client.callProcedure("@AdHoc",
+                "CREATE SCHEDULE " + getMethodName() + " USING " + CustomScheduler.class.getName() + " WITH 5, NULL;");
+        Thread.sleep(1000);
+
+        VoltTable table = getScheduleStats(client);
+        while (table.advanceRow()) {
+            assertEquals("RUNNING", table.getString("STATE"));
+            assertNull(table.getString("SCHEDULER_STATUS"));
+        }
+
+        client.callProcedure("@AdHoc", "DROP SCHEDULE " + getMethodName());
+        client.callProcedure("@AdHoc", "CREATE SCHEDULE " + getMethodName() + " USING "
+                + CustomScheduler.class.getName() + " WITH 5, 'STATUS';");
+
+        table = getScheduleStats(client);
+        while (table.advanceRow()) {
+            assertEquals("RUNNING", table.getString("STATE"));
+            assertEquals("STATUS", table.getString("SCHEDULER_STATUS"));
+        }
+
+    }
+
     private static VoltTable getScheduleStats(Client client)
             throws NoConnectionsException, IOException, ProcCallException {
         return client.callProcedure("@Statistics", "SCHEDULES", 0).getResults()[0];
+    }
+
+    public static class CustomScheduler implements Scheduler {
+        private int m_delayMs;
+        private String m_status;
+
+        public void initialize(int delayMs, String status) {
+            m_delayMs = delayMs;
+            m_status = status;
+        }
+
+        @Override
+        public Action getFirstAction() {
+            return getNextAction(null);
+        }
+
+        @Override
+        public Action getNextAction(ActionResult result) {
+            return Action.createRerun(m_delayMs, TimeUnit.MILLISECONDS).setStatusMessage(m_status);
+        }
+
     }
 }

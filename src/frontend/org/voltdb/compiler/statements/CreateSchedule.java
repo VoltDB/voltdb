@@ -138,6 +138,10 @@ public class CreateSchedule extends StatementProcessor {
             case Tokens.MINUS:
                 minus = true;
                 break;
+            case Tokens.NULL:
+            case Tokens.X_NULL:
+                addParameter(params, i++, null);
+                //$FALL-THROUGH$
             case 664: /** Same as {@link Tokens#COMMA} but that isn't visible */
                 if (minus) {
                     throw m_compiler.new VoltCompilerException("Minus sign encountered by itself");
