@@ -642,8 +642,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * put buffer size needed, function id, udaf index, row count and a list of rows (if there is any)
          * into the buffer, so that the java side would receive them
          */
-        void serializeSingleRowToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
-        void serializeMultipleRowsToUDFOutputBuffer(int32_t functionId, std::vector<NValue>& argVector, int32_t argCount, ValueType type, int32_t udafIndex);
+        void serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type, int32_t udafIndex);
+        void serializeToUDFOutputBuffer(int32_t functionId,
+                std::vector<NValue> const& argVector, int32_t argCount, ValueType type, int32_t udafIndex);
         /*
          * if the info related to this functionId is not found, throw an exception
          */
