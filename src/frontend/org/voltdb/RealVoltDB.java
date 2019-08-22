@@ -5237,5 +5237,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public ElasticService getElasticService() {
         return m_elasticService;
     }
+
+    @Override
+    public SchedulerManager getSchedulerManager() {
+        return m_schedulerManager;
+    }
 }
 

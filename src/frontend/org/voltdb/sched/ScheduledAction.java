@@ -23,29 +23,38 @@ import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ClientResponse;
 
 /**
- * A class to define a scheduled execution from a {@link Scheduler} and the result of the procedure execution
+ * Defines a procedure scheduled for execution by a {@link Scheduler} instance and the result of the execution.
  */
-public final class ScheduledProcedure {
+final class ScheduledAction implements ActionResult {
+    private final Action.Type m_type;
     private final long m_requestedDelayNs;
     private final String m_procedure;
     private final Object[] m_procedureParameters;
     private ClientResponse m_response;
     private Object m_attachment;
 
-    long m_expectedExecutionTimeNs;
-    long m_startedAtNs;
-    long m_completedAtNs;
+    private long m_expectedExecutionTimeNs;
+    private long m_startedAtNs;
+    private long m_completedAtNs;
 
-    ScheduledProcedure(long delay, TimeUnit timeUnit, String procedure, Object... procedureParameters) {
+    ScheduledAction(Action.Type type, long delay, TimeUnit timeUnit, String procedure,
+            Object... procedureParameters) {
+        m_type = type;
         m_requestedDelayNs = Math.max(timeUnit.toNanos(delay), 0);
         m_procedure = procedure;
         m_procedureParameters = procedureParameters.clone();
+    }
+
+    @Override
+    public Action.Type getType() {
+        return m_type;
     }
 
     /**
      * @param timeUnit {@link TimeUnit} of delay returned by this method
      * @return Time delay in {@code timeUnit}
      */
+    @Override
     public long getDelay(TimeUnit timeUnit) {
         return timeUnit.convert(m_requestedDelayNs, TimeUnit.NANOSECONDS);
     }
@@ -53,6 +62,7 @@ public final class ScheduledProcedure {
     /**
      * @return Name of procedure to execute. May be {@code null} if this is a forced rerun of the {@link Scheduler}
      */
+    @Override
     public String getProcedure() {
         return m_procedure;
     }
@@ -60,6 +70,7 @@ public final class ScheduledProcedure {
     /**
      * @return A The parameters that are to be passed the the procedure returned by {@link #getProcedure()}
      */
+    @Override
     public Object[] getProcedureParameters() {
         return m_procedureParameters.clone();
     }
@@ -75,7 +86,7 @@ public final class ScheduledProcedure {
      * @param attachment object to attach. May be {@code null}
      * @return {@code this}
      */
-    public ScheduledProcedure setAttachment(Object attachment) {
+    public ScheduledAction setAttachment(Object attachment) {
         m_attachment = attachment;
         return this;
     }
@@ -84,8 +95,9 @@ public final class ScheduledProcedure {
      * Retrieve the attachment associated with this scheduled procedure
      *
      * @param <T> Type of attachment
-     * @return The attachement or {@code null} of there was no attachment
+     * @return The attachment or {@code null} of there was no attachment
      */
+    @Override
     @SuppressWarnings("unchecked")
     public <T> T getAttachment() {
         return (T) m_attachment;
@@ -95,22 +107,27 @@ public final class ScheduledProcedure {
      * @return {@link ClientResponse} from the execution of {@link #getProcedure()}. Will be null if procedure has not
      *         be executed or this is a rerun of the scheduler
      */
+    @Override
     public ClientResponse getResponse() {
         return m_response;
     }
 
-    ScheduledProcedure setResponse(ClientResponse response) {
+    long getRequestedDelayNs() {
+        return m_requestedDelayNs;
+    }
+
+    ScheduledAction setResponse(ClientResponse response) {
         m_response = Objects.requireNonNull(response);
         m_completedAtNs = System.nanoTime();
         return this;
     }
 
-    ScheduledProcedure expectedExecutionTime(long expectedExecutionTimeNs) {
+    ScheduledAction setExpectedExecutionTime(long expectedExecutionTimeNs) {
         m_expectedExecutionTimeNs = expectedExecutionTimeNs;
         return this;
     }
 
-    ScheduledProcedure setStarted() {
+    ScheduledAction setStarted() {
         m_startedAtNs = System.nanoTime();
         return this;
     }

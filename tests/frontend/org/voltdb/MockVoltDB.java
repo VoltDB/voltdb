@@ -63,6 +63,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -953,5 +954,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean isClusterComplete() {
         return true;
+    }
+
+    @Override
+    public SchedulerManager getSchedulerManager() {
+        return null;
     }
 }

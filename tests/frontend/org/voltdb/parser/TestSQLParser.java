@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,7 +49,9 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.collect.ImmutableMap;
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 import junit.framework.TestCase;
 
@@ -745,6 +748,84 @@ public class TestSQLParser extends TestCase {
                 "Too many hexadecimal digits for BIGINT value",
                 "exec myProc_bi x'ffffffffffffffff0'");
 
+    }
+
+    @Test
+    public void testCreateSchedule() {
+        // Positive test cases of base create scheduler
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D ON ERROR ABORT;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "onError", "ABORT"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS USING a.b.c.D;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "scope", "PARTITIONS"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D AS USER me;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "asUser", "me"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D DISABLED;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "disabled", "DISABLED"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D WITH 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+
+        // Positive test cases of delay scheduler
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 ON ERROR ABORT AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "onError", "ABORT"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS DELAY 5999 AS proc;",
+                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "delay", "5999"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS USER me AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "asUser", "me"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 DISABLED AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "disabled", "DISABLED"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
+                ImmutableMap.of("name", "blah", "delay", "5999", "procedure", "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+
+        // Positive test cases of cron scheduler
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# ON ERROR ABORT AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "onError",
+                        "ABORT"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS CRON */5 ? 1-4,7 L W 1,3# AS proc;",
+                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "cron",
+                        "*/5 ? 1-4,7 L W 1,3#"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS USER me AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "asUser", "me"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# DISABLED AS proc;", ImmutableMap
+                .of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "disabled", "DISABLED"));
+
+        validateCreateScheduleMatcher(
+                "CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
+                ImmutableMap.of("name", "blah", "cron", "*/5 ? 1-4,7 L W 1,3#", "procedure",
+                        "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+    }
+
+    private static final Set<String> s_allCreateScheduleGroups = ImmutableSet.of("name", "scope", "class",
+            "asUser", "disabled", "parameters", "procedure", "delay", "cron", "onError");
+
+    private static void validateCreateScheduleMatcher(String statement, Map<String, String> expectedGroupValues) {
+        Matcher matcher = SQLParser.matchCreateSchedule(statement);
+        assertTrue(statement, matcher.matches());
+        assertEquals(s_allCreateScheduleGroups.size(), matcher.groupCount());
+
+        for (String group : s_allCreateScheduleGroups) {
+            assertEquals("Statement: " + statement + " group: " + group, expectedGroupValues.get(group),
+                    matcher.group(group));
+        }
     }
 
     public final String PATTERN_1 = "\"line: 10, column: 1\"";

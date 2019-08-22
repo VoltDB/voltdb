@@ -29,7 +29,6 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
@@ -37,7 +36,6 @@ import org.junit.Test;
 import org.voltdb.LocalClustersTestBase;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
@@ -56,7 +54,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
             VoltTable table = client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
             StringBuilder sb = new StringBuilder();
             while (table.advanceRow()) {
-                sb.append("DROP SCHEDULE ").append(table.getString(0)).append(';');
+                sb.append("DROP SCHEDULE ").append(table.getString("SCHEDULE_NAME")).append(';');
             }
             if (sb.length() != 0) {
                 client.callProcedure("@AdHoc", sb.toString());
@@ -100,13 +98,12 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         String schedule1 = getMethodName() + "_1";
         String schedule2 = getMethodName() + "_2";
 
-        String summaryFormat = "CREATE SCHEDULE %s USING " + ProcScheduler.class.getName()
-                + " WITH %d, '@AdHoc', 'INSERT INTO " + summaryTable
+        String summaryFormat = "CREATE SCHEDULE %s %s ON ERROR IGNORE AS '@AdHoc', 'INSERT INTO " + summaryTable
                 + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
                 + getTableName(0, TableType.REPLICATED) + ";';";
 
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, 5, 1));
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, 8, 2));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY PT0.05S", 1));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
 
         // Give everything some time to run
         Thread.sleep(1000);
@@ -116,7 +113,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         VoltTable table = getScheduleStats(client);
         assertEquals(2, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
 
         client.callProcedure("@AdHoc",
@@ -127,7 +124,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(2, table.getRowCount());
         while (table.advanceRow()) {
-            String scheduleName = table.getString(0);
+            String scheduleName = table.getString("NAME");
             int id = -1;
             if (schedule1.equalsIgnoreCase(scheduleName)) {
                 id = 1;
@@ -137,17 +134,17 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                 fail("Unknown schedule " + scheduleName);
             }
 
-            assertEquals("DISABLED", table.getString(1));
+            assertEquals("DISABLED", table.getString("STATE"));
 
             long summaryCount = client
                     .callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + summaryTable + " WHERE id = " + id + ";")
                     .getResults()[0].asScalarLong();
-            long procedureInvocations = table.getLong(10);
-            long successfulProcedureInvocations = procedureInvocations - table.getLong(15);
+            long procedureInvocations = table.getLong("PROCEDURE_INVOCATIONS");
+            long successfulProcedureInvocations = procedureInvocations - table.getLong("PROCEDURE_FAILURES");
 
             /*
-             * There can be one extra row since stats are done when the result comes back and a schedule can be stopped
-             * after procedure is called but before the result comes back
+             * There can be one extra invocation since stats are done when the result comes back and a schedule can be
+             * stopped after procedure is called but before the result comes back
              */
             assertTrue(
                     "Summary table has " + summaryCount + " rows. Invocation count is " + successfulProcedureInvocations
@@ -155,7 +152,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
                     summaryCount == successfulProcedureInvocations
                             || summaryCount == successfulProcedureInvocations + 1);
 
-            long schedulerInvocations = table.getLong(5);
+            long schedulerInvocations = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue(
                     schedulerInvocations == procedureInvocations || schedulerInvocations == procedureInvocations + 1);
         }
@@ -200,8 +197,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         String schedule = getMethodName();
         client.callProcedure("@AdHoc",
-                "CREATE SCHEDULE " + schedule + " ON PARTITIONS USING " + ProcScheduler.class.getName() + " WITH 10, '"
-                        + procName + "'");
+                "CREATE SCHEDULE " + schedule + " RUN ON PARTITIONS DELAY PT0.01S AS '" + procName
+                        + "'");
 
         // Give everything some time to run
         Thread.sleep(1000);
@@ -211,7 +208,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         VoltTable table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
 
         Thread.sleep(15);
@@ -223,11 +220,11 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("DISABLED", table.getString(1));
-            assertTrue("Scheduler invocation count is lower than expected: " + table.getLong(5),
-                    table.getLong(5) >= 50);
-            assertTrue("Procedure invocation count is lower than expected: " + table.getLong(10),
-                    table.getLong(10) >= 50);
+            assertEquals("DISABLED", table.getString("STATE"));
+            assertTrue("Scheduler invocation count is lower than expected: " + table.getLong("SCHEDULER_INVOCATIONS"),
+                    table.getLong("SCHEDULER_INVOCATIONS") >= 50);
+            assertTrue("Procedure invocation count is lower than expected: " + table.getLong("PROCEDURE_INVOCATIONS"),
+                    table.getLong("PROCEDURE_INVOCATIONS") >= 50);
         }
 
         assertEquals(60,
@@ -239,7 +236,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(4, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("DISABLED", table.getString(1));
+            assertEquals("DISABLED", table.getString("STATE"));
         }
 
         client.callProcedure("@AdHoc", "ALTER SCHEDULE " + schedule + " ENABLE;");
@@ -247,35 +244,12 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
-            assertEquals("RUNNING", table.getString(1));
+            assertEquals("RUNNING", table.getString("STATE"));
         }
     }
 
     private static VoltTable getScheduleStats(Client client)
             throws NoConnectionsException, IOException, ProcCallException {
         return client.callProcedure("@Statistics", "SCHEDULES", 0).getResults()[0];
-    }
-
-    public static class ProcScheduler implements Scheduler {
-        private final int m_delay;
-        private final String m_procedure;
-        private final Object[] m_procedureParams;
-
-        public ProcScheduler(int delay, String procedure, Object... procedureParams) {
-            super();
-            this.m_delay = delay;
-            this.m_procedure = procedure;
-            this.m_procedureParams = procedureParams;
-        }
-
-        @Override
-        public SchedulerResult nextRun(ScheduledProcedure previousProcedureRun) {
-            if (previousProcedureRun != null) {
-                if (previousProcedureRun.getResponse().getStatus() != ClientResponse.SUCCESS) {
-                    System.err.println("ERROR: " + previousProcedureRun.getResponse().getStatusString());
-                }
-            }
-            return SchedulerResult.createScheduledProcedure(m_delay, TimeUnit.MILLISECONDS, m_procedure, m_procedureParams);
-        }
     }
 }
