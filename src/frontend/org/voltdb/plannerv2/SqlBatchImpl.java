@@ -117,8 +117,9 @@ public class SqlBatchImpl extends SqlBatch {
                     throw new PlannerFallbackException("Not in white list, or is black listed: " + sql);
                 }
             } catch (SqlParseException e) {
-                final String errMsg = "Error: invalid SQL statement in line: " + (lineNo + e.getPos().getLineNum()) + ", column: " + e.getPos().getColumnNum() + ". " +
-                                      "Expecting one of: " + e.getExpectedTokenNames();
+                final String errMsg = String.format("Error: invalid SQL statement in line: %d, column %d. Expecting one of: %s",
+                        (lineNo + e.getPos().getLineNum()), e.getPos().getColumnNum(),
+                        e.getExpectedTokenNames());
                 log.debug(errMsg);
                 throw new PlannerFallbackException(errMsg);
                 // TODO throw a parse exception instead of fallback exception to reflect error position
