@@ -70,7 +70,7 @@ public final class Action {
 
     /**
      * Schedule the scheduler to be invoked again without a procedure being executed. This causes the
-     * {@link Scheduler#getNextAction(ActionReRsult)} to be called again after a delay. A {@link ActionResult} will be
+     * {@link Scheduler#getNextAction(ActionResult)} to be called again after a delay. A {@link ActionResult} will be
      * associated with this call however it will have a {@code null} procedure but an {@code attachment} can be used.
      *
      * @param delay    time for the scheduler to be executed

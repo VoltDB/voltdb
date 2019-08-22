@@ -24,7 +24,7 @@ using namespace std;
 using namespace voltdb;
 
 int64_t BinaryLogSinkWrapper::apply(const char *logs,
-        boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
+        std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
         int32_t remoteClusterId, int64_t localUniqueId) {
     return m_sink.apply(logs, tables, pool, engine, remoteClusterId, localUniqueId);
 }

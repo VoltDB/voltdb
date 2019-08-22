@@ -54,7 +54,7 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
                 throw new PlanningErrorException("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");
             } else { // For all Calcite unsupported syntax, fall back to VoltDB implementation
-                throw e;
+                throw e;    // The fall back occurs in SqlBatchImpl's ctor's try-catch block calling CalciteSqlCheck.
             }
         }
     }

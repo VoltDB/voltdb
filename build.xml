@@ -595,6 +595,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/sched/Scheduler.java" />
             <include name="src/frontend/org/voltdb/sched/Action.java" />
             <include name="src/frontend/org/voltdb/sched/ActionResult.java" />
+            <include name="src/frontend/org/voltdb/sched/SchedulerValidationErrors.java" />
             <include name="src/frontend/org/voltdb/sched/SchedulerValidationHelper.java" />
         </fileset>
     </javadoc>
