@@ -43,21 +43,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "common/SerializableEEException.h"
 #include "executors/aggregateexecutor.h"
-
 #include "plannodes/aggregatenode.h"
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
-#include "common/SerializableEEException.h"
-
 namespace voltdb {
 /*
  * Type of the hash set used to check for column aggregate distinctness
  */
-using AggregateNValueSetType = boost::unordered_set<NValue, NValue::hash, NValue::equal_to>;
+using AggregateNValueSetType = std::unordered_set<NValue>;
 
 /**
  * Mix-in class to tweak some Aggs' behavior when the DISTINCT flag was specified,
@@ -117,17 +115,18 @@ public:
     // We're providing a NULL pool argument here to ifDistinct because
     // SUM only operates on numeric values which don't have the same
     // issues as inlined strings.
-    SumAgg() = default;
+    explicit SumAgg() = default;
 
     void advance(const NValue& val) override {
         if (val.isNull() || ifDistinct.excludeValue(val)) {
             return;
-        }
-        if (!m_haveAdvanced) {
-            m_value = val;
-            m_haveAdvanced = true;
         } else {
-            m_value = m_value.op_add(val);
+            if (!m_haveAdvanced) {
+                m_value = val;
+                m_haveAdvanced = true;
+            } else {
+                m_value = m_value.op_add(val);
+            }
         }
     }
 
@@ -147,26 +146,26 @@ public:
     // We're providing a NULL pool argument here to ifDistinct because
     // AVG only operates on numeric values which don't have the same
     // issues as inlined strings.
-    AvgAgg() = default;
+    explicit AvgAgg() = default;
 
     void advance(const NValue& val) override {
-        if (val.isNull() || ifDistinct.excludeValue(val)) {
-            return;
+        if (! val.isNull() && ! ifDistinct.excludeValue(val)) {
+            if (m_count == 0) {
+                m_value = val;
+            } else {
+                m_value = m_value.op_add(val);
+            }
+            ++m_count;
         }
-        if (m_count == 0) {
-            m_value = val;
-        } else {
-            m_value = m_value.op_add(val);
-        }
-        ++m_count;
     }
 
     NValue finalize(ValueType type) override {
         if (m_count == 0) {
             return ValueFactory::getNullValue().castAs(type);;
+        } else {
+            ifDistinct.clear();
+            return m_value.op_divide(ValueFactory::getBigIntValue(m_count)).castAs(type);
         }
-        ifDistinct.clear();
-        return m_value.op_divide(ValueFactory::getBigIntValue(m_count)).castAs(type);
     }
 
     void resetAgg() override {
@@ -185,10 +184,9 @@ public:
     CountAgg(Pool* memoryPool) : ifDistinct(memoryPool) {}
 
     void advance(const NValue& val) override {
-        if (val.isNull() || ifDistinct.excludeValue(val)) {
-            return;
+        if (! val.isNull() && !ifDistinct.excludeValue(val)) {
+            m_count++;
         }
-        m_count++;
     }
 
     NValue finalize(ValueType type) override {
@@ -266,8 +264,7 @@ public:
     void advance(const NValue& val) override {
         if (val.isNull()) {
             return;
-        }
-        if (!m_haveAdvanced) {
+        } else if (!m_haveAdvanced) {
             m_value = val;
             if (m_value.getVolatile()) {
                 // see comment in MaxAgg above, regarding why we're
@@ -479,18 +476,21 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType aggType, bool isDist
         case EXPRESSION_TYPE_AGGREGATE_COUNT:
             if (isDistinct) {
                 return new (memoryPool) CountAgg<Distinct>(&memoryPool);
+            } else {
+                return new (memoryPool) CountAgg<NotDistinct>(&memoryPool);
             }
-            return new (memoryPool) CountAgg<NotDistinct>(&memoryPool);
         case EXPRESSION_TYPE_AGGREGATE_SUM:
             if (isDistinct) {
                 return new (memoryPool) SumAgg<Distinct>();
+            } else {
+                return new (memoryPool) SumAgg<NotDistinct>();
             }
-            return new (memoryPool) SumAgg<NotDistinct>();
         case EXPRESSION_TYPE_AGGREGATE_AVG:
             if (isDistinct) {
                 return new (memoryPool) AvgAgg<Distinct>();
+            } else {
+                return new (memoryPool) AvgAgg<NotDistinct>();
             }
-            return new (memoryPool) AvgAgg<NotDistinct>();
         case EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT:
             return new (memoryPool) ApproxCountDistinctAgg();
         case EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG:
@@ -560,7 +560,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_postPredicate = node->getPostPredicate();
 
     m_groupByKeySchema = constructGroupBySchema(false);
-    m_groupByKeyPartialHashSchema = NULL;
+    m_groupByKeyPartialHashSchema = nullptr;
     if (! m_partialSerialGroupByColumns.empty()) {
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
             if (std::find(m_partialSerialGroupByColumns.begin(),
@@ -645,7 +645,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
                             m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
     }
 
-    bool needInsert = m_postfilter.eval(&tempTuple, NULL);
+    bool needInsert = m_postfilter.eval(&tempTuple, nullptr);
     if (needInsert) {
         m_tmpOutputTable->insertTempTuple(tempTuple);
     }
@@ -736,7 +736,7 @@ TableTuple AggregateExecutorBase::p_execute_init(
 
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
     // set the schema first because of the NON-null check in MOVE function
-    m_inProgressGroupByKeyTuple.move(NULL);
+    m_inProgressGroupByKeyTuple.move(nullptr);
 
     char * storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(
                 schema->tupleLength() + TUPLE_HEADER_SIZE));
@@ -776,7 +776,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params) {
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
-    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, NULL);
+    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, nullptr);
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
@@ -810,7 +810,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
-        nextGroupByKeyTuple.move(NULL);
+        nextGroupByKeyTuple.move(nullptr);
 
         if (m_aggTypes.empty()) {
             insertOutputTuple(aggregateRow);
@@ -876,7 +876,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params) {
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
-    AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
+    AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), nullptr);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
         m_pmp->countdownProgress();
@@ -891,7 +891,7 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // Use the first input tuple to "prime" the system.
     if (m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
-        if (m_prePredicate == NULL || m_prePredicate->eval(&nextTuple, NULL).isTrue()) {
+        if (m_prePredicate == nullptr || m_prePredicate->eval(&nextTuple, nullptr).isTrue()) {
             initGroupByKeyTuple(nextTuple);
 
             // Start the aggregation calculation.
@@ -970,7 +970,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
     TableTuple& nextPartialGroupByKeyTuple = m_nextGroupByKeyStorage;
-    nextPartialGroupByKeyTuple.move(NULL);
+    nextPartialGroupByKeyTuple.move(nullptr);
 
     m_hash.clear();
 
@@ -987,7 +987,7 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params) {
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
-    AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
+    AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), nullptr);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
         m_pmp->countdownProgress();
@@ -1058,7 +1058,7 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
-        nextPartialGroupByKeyTuple.move(NULL);
+        nextPartialGroupByKeyTuple.move(nullptr);
     } else {
         // otherwise, the agg row is the second item of the pair...
         aggregateRow = keyIter->second;
@@ -1082,7 +1082,7 @@ void AggregatePartialExecutor::p_execute_finish() {
     // Clean up
     m_hash.clear();
     TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
-    nextGroupByKeyTuple.move(NULL);
+    nextGroupByKeyTuple.move(nullptr);
 
     AggregateExecutorBase::p_execute_finish();
 }
