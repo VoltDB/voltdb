@@ -12,9 +12,7 @@ table.tablesorter {
 #exporter table.tablesorter th {
 
 	padding-right: 45px;
-	background-image: url(../images/bg.gif);
-	background-repeat: no-repeat;
-	background-position: center right;
+	background: url(../images/bg.gif) no-repeat center right;
 	cursor: pointer;
 }
 table.tablesorter td {

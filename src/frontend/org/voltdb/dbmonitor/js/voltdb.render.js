@@ -1455,9 +1455,9 @@ function alertNodeClicked(obj) {
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
-                var tuple_count = {} // For keeping separate sums for each target
-                var tuple_pending = {}
-                var target = ""
+                var tuple_count = {}; // For keeping separate sums for each target
+                var tuple_pending = {};
+                var target = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
                     if(target != info[colIndex["TARGET"]]){
                         target = info[colIndex["TARGET"]];
@@ -1510,8 +1510,8 @@ function alertNodeClicked(obj) {
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
-                var tuple_count = {}
-                var target = ""
+                var tuple_count = {};
+                var target = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
                     if(target != info[colIndex["TARGET"]]){
                         target = info[colIndex["TARGET"]];
@@ -1546,8 +1546,8 @@ function alertNodeClicked(obj) {
             });
 
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
-                var tuple_count = {}
-                var target = ""
+                var tuple_count = {};
+                var target = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
                     if(target != info[colIndex["TARGET"]]){
                         target = info[colIndex["TARGET"]];

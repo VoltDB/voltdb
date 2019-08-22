@@ -384,13 +384,13 @@
             "key": "Throughput",
             "values": getEmptyDataOptimized(),
             "color": "rgb(164, 136, 5)"
-        }]
+        }];
 
         var dataQueued = [{
             "key": "Queued",
             "values": getEmptyDataOptimized(),
             "color": "rgb(164, 136, 5)"
-        }]
+        }];
 
         var dataSuccessRate = [{
             "key": "Success Rate",
@@ -428,7 +428,7 @@
             "color": "rgb(27, 135, 200)"
         }];
 
-        var dataDrReplication = {}
+        var dataDrReplication = {};
 
         var dataCommandLog = [{
             "key": "Command Log Statistics",
@@ -440,37 +440,37 @@
             key: "Execution Time",
             values: [],
             color: "rgb(27, 135, 200)"
-        }]
+        }];
 
         var dataFrequencyAnalysis = [{
             key: "Frequency",
             values: [],
             color: "rgb(27, 135, 200)"
-        }]
+        }];
 
         var dataProcessingTimeAnalysis = [{
             key: "Total Processing Time",
             values: [],
             color: "rgb(27, 135, 200)"
-        }]
+        }];
 
         var dataLatencyDetailAnalysis = [{
             key: "Avg Execution Time",
             values: [],
             color: "rgb(118, 189, 29)"
-        }]
+        }];
 
         var dataFrequencyDetailAnalysis = [{
             key: "Frequency Detail",
             values: [],
             color: "rgb(118, 189, 29)"
-        }]
+        }];
 
         var dataCombinedDetailAnalysis = [{
             key: "Processing Time Detail",
             values: [],
             color: "rgb(118, 189, 29)"
-        }]
+        }];
 
         var dataPartitionIdleTime = [];
 
@@ -3177,13 +3177,13 @@
             }
 
             if (dataMapperExporterSec == undefined || $.isEmptyObject(dataMapperExporterSec))
-                return
+                return;
 
             if (dataMapperExporterDay == undefined || $.isEmptyObject(dataMapperExporterDay))
-                return
+                return;
 
             if (dataMapperExporterMin == undefined || $.isEmptyObject(dataMapperExporterMin))
-                return
+                return;
 
             var throughputData = monitor.throughputData;
             var throughputDataMin = monitor.throughputDataMin;
@@ -3194,34 +3194,34 @@
             var throughputDetailsArrDay = [];
 
             if(localStorage.throughputDetailsMin != undefined && JSON.parse(localStorage.throughputDetailsMin).length == throughputDataMin.length){
-                throughputDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetailsMin))
+                throughputDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetailsMin));
             } else {
-                throughputDetailsArrMin = JSON.stringify(convertDataFormatForPartition(throughputDataMin))
-                throughputDetailsArrMin = JSON.parse(throughputDetailsArrMin)
+                throughputDetailsArrMin = JSON.stringify(convertDataFormatForPartition(throughputDataMin));
+                throughputDetailsArrMin = JSON.parse(throughputDetailsArrMin);
             }
 
             if(localStorage.throughputDetailsDay != undefined  && JSON.parse(localStorage.throughputDetailsDay).length == throughputDataDay.length){
-                throughputDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetailsDay))
+                throughputDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetailsDay));
             } else {
-                throughputDetailsArrDay = JSON.stringify(convertDataFormatForPartition(throughputDataDay))
-                throughputDetailsArrDay = JSON.parse(throughputDetailsArrDay)
+                throughputDetailsArrDay = JSON.stringify(convertDataFormatForPartition(throughputDataDay));
+                throughputDetailsArrDay = JSON.parse(throughputDetailsArrDay);
             }
 
             if(localStorage.throughputDetails != undefined  && JSON.parse(localStorage.throughputDetails).length == throughputData.length){
-                throughputDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetails))
+                throughputDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.throughputDetails));
             } else {
-                throughputDetailsArr = JSON.stringify(convertDataFormatForPartition(throughputData))
-                throughputDetailsArr = JSON.parse(throughputDetailsArr)
+                throughputDetailsArr = JSON.stringify(convertDataFormatForPartition(throughputData));
+                throughputDetailsArr = JSON.parse(throughputDetailsArr);
             }
 
             if(monitor.throughputFirstData){
                 for(var i = 0; i< throughputDetailsArr.length; i++){
                     var keyIndexSec =  i;
                     if(throughputDetailsArr[i]["values"].length > 0 && !(currentTime.getTime() - (new Date(throughputDetailsArr[i]["values"][throughputDetailsArr[i]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
-                        throughputData[keyIndexSec]["values"] = []
+                        throughputData[keyIndexSec]["values"] = [];
                         for(var b = 0; b < throughputDetailsArr[i]["values"].length; b++){
                             throughputData[keyIndexSec]["values"] = sliceFirstData(throughputData[keyIndexSec]["values"], dataView.Seconds);
-                            throughputData[keyIndexSec]["values"].push({"x": new Date(throughputDetailsArr[i]["values"][b].x), "y": throughputDetailsArr[i]["values"][b].y})
+                            throughputData[keyIndexSec]["values"].push({"x": new Date(throughputDetailsArr[i]["values"][b].x), "y": throughputDetailsArr[i]["values"][b].y});
                         }
                     }
                 }
@@ -3229,10 +3229,10 @@
                 for(var k = 0; k< throughputDetailsArrMin.length; k++){
                     var keyIndexMin = k;
                     if(throughputDetailsArrMin[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(throughputDetailsArrMin[k]["values"][throughputDetailsArrMin[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
-                        throughputDataDay[keyIndexMin]["values"] = []
+                        throughputDataDay[keyIndexMin]["values"] = [];
                         for(var c = 0; c < throughputDetailsArrMin[k]["values"].length; c++){
-                            throughputDataMin[keyIndexMin]["values"] = sliceFirstData(throughputDataMin[keyIndexMin]["values"], dataView.Days)
-                            throughputDataMin[keyIndexMin]["values"].push({"x": new Date(throughputDetailsArrMin[k]["values"][c].x), "y": throughputDetailsArrMin[k]["values"][c].y})
+                            throughputDataMin[keyIndexMin]["values"] = sliceFirstData(throughputDataMin[keyIndexMin]["values"], dataView.Days);
+                            throughputDataMin[keyIndexMin]["values"].push({"x": new Date(throughputDetailsArrMin[k]["values"][c].x), "y": throughputDetailsArrMin[k]["values"][c].y});
                         }
                     }
                 }
@@ -3240,10 +3240,10 @@
                 for(var k = 0; k< throughputDetailsArrDay.length; k++){
                     var keyIndexDay = k;
                     if(throughputDetailsArrDay[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(throughputDetailsArrDay[k]["values"][throughputDetailsArrDay[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
-                        throughputDataDay[keyIndexDay]["values"] = []
+                        throughputDataDay[keyIndexDay]["values"] = [];
                         for(var c = 0; c < throughputDetailsArrDay[k]["values"].length; c++){
-                            throughputDataDay[keyIndexDay]["values"] = sliceFirstData(throughputDataDay[keyIndexDay]["values"], dataView.Days)
-                            throughputDataDay[keyIndexDay]["values"].push({"x": new Date(throughputDetailsArrDay[k]["values"][c].x), "y": throughputDetailsArrDay[k]["values"][c].y})
+                            throughputDataDay[keyIndexDay]["values"] = sliceFirstData(throughputDataDay[keyIndexDay]["values"], dataView.Days);
+                            throughputDataDay[keyIndexDay]["values"].push({"x": new Date(throughputDetailsArrDay[k]["values"][c].x), "y": throughputDetailsArrDay[k]["values"][c].y});
                         }
                     }
                 }
@@ -3265,10 +3265,10 @@
                                 throughputDataMin[keyIndex]["values"] = sliceFirstData(throughputDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.throughputMaxTimeStamp) {
                                     throughputDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": throughputDataMin[keyIndex]["values"][throughputDataMin[keyIndex]["values"].length - 1].y });
-                                    throughputDetailsArrMin = savePartitionDataToLocalStorage(throughputDetailsArrMin, {"x": new Date(timeStamp), "y": throughputDataMin[keyIndex]["values"][throughputDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
+                                    throughputDetailsArrMin = savePartitionDataToLocalStorage(throughputDetailsArrMin, {"x": new Date(timeStamp), "y": throughputDataMin[keyIndex]["values"][throughputDataMin[keyIndex]["values"].length - 1].y }, keyIndex);
                                 } else {
                                     throughputDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
-                                    throughputDetailsArrMin = savePartitionDataToLocalStorage(throughputDetailsArrMin, { 'x': new Date(timeStamp), 'y': newValue }, keyIndex)
+                                    throughputDetailsArrMin = savePartitionDataToLocalStorage(throughputDetailsArrMin, { 'x': new Date(timeStamp), 'y': newValue }, keyIndex);
                                 }
                                 Monitors.throughputDataMin = throughputDataMin;
                             }
@@ -3279,10 +3279,10 @@
                             throughputDataDay[keyIndexDay]["values"] = sliceFirstData(throughputDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.throughputMaxTimeStamp) {
                                 throughputDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": throughputDataDay[keyIndexDay]["values"][throughputDataDay[keyIndexDay]["values"].length - 1].y });
-                                throughputDetailsArrDay = savePartitionDataToLocalStorage(throughputDetailsArrDay, { "x": new Date(timeStamp), "y": throughputDataDay[keyIndexDay]["values"][throughputDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
+                                throughputDetailsArrDay = savePartitionDataToLocalStorage(throughputDetailsArrDay, { "x": new Date(timeStamp), "y": throughputDataDay[keyIndexDay]["values"][throughputDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay);
                             } else {
                                 throughputDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
-                                throughputDetailsArrDay = savePartitionDataToLocalStorage(throughputDetailsArrDay, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexDay)
+                                throughputDetailsArrDay = savePartitionDataToLocalStorage(throughputDetailsArrDay, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexDay);
                             }
                             Monitors.throughputDataDay = throughputDataDay;
                         }
@@ -3292,19 +3292,19 @@
                         throughputData[keyIndexSec]["values"] = sliceFirstData(throughputData[keyIndexSec]["values"], dataView.Seconds);
                        if (timeStamp == monitor.throughputMaxTimeStamp) {
                             throughputData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": throughputData[keyIndexSec]["values"][throughputData[keyIndexSec]["values"].length - 1].y });
-                            throughputDetailsArr = savePartitionDataToLocalStorage(throughputDetailsArr, {"x": new Date(timeStamp), "y": throughputData[keyIndexSec]["values"][throughputData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
+                            throughputDetailsArr = savePartitionDataToLocalStorage(throughputDetailsArr, {"x": new Date(timeStamp), "y": throughputData[keyIndexSec]["values"][throughputData[keyIndexSec]["values"].length - 1].y }, keyIndexSec);
                         } else {
                             throughputData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': newValue });
-                            throughputDetailsArr = savePartitionDataToLocalStorage(throughputDetailsArr, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexSec  )
+                            throughputDetailsArr = savePartitionDataToLocalStorage(throughputDetailsArr, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexSec  );
                         }
 
                         Monitors.throughputData = throughputData;
                     }
                 });
 
-                localStorage.throughputDetails = JSON.stringify(throughputDetailsArr)
-                localStorage.throughputDetailsMin = JSON.stringify(throughputDetailsArrMin)
-                localStorage.throughputDetailsDay = JSON.stringify(throughputDetailsArrDay)
+                localStorage.throughputDetails = JSON.stringify(throughputDetailsArr);
+                localStorage.throughputDetailsMin = JSON.stringify(throughputDetailsArrMin);
+                localStorage.throughputDetailsDay = JSON.stringify(throughputDetailsArrDay);
                 if (monitor.throughputFirstData) {
                     $(".legend").css("display", "block");
                 }
@@ -3339,13 +3339,13 @@
             }
 
             if (dataMapperExporterSec == undefined || $.isEmptyObject(dataMapperExporterSec))
-                return
+                return;
 
             if (dataMapperExporterDay == undefined || $.isEmptyObject(dataMapperExporterDay))
-                return
+                return;
 
             if (dataMapperExporterMin == undefined || $.isEmptyObject(dataMapperExporterMin))
-                return
+                return;
 
             var queuedData = monitor.queuedData;
             var queuedDataMin = monitor.queuedDataMin;
@@ -3358,34 +3358,34 @@
 
 
             if(localStorage.queuedDetailsMin != undefined && JSON.parse(localStorage.queuedDetailsMin).length == queuedDataMin.length){
-                queuedDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetailsMin))
+                queuedDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetailsMin));
             } else {
-                queuedDetailsArrMin = JSON.stringify(convertDataFormatForPartition(queuedDataMin))
-                queuedDetailsArrMin = JSON.parse(queuedDetailsArrMin)
+                queuedDetailsArrMin = JSON.stringify(convertDataFormatForPartition(queuedDataMin));
+                queuedDetailsArrMin = JSON.parse(queuedDetailsArrMin);
             }
 
             if(localStorage.queuedDetailsDay != undefined  && JSON.parse(localStorage.queuedDetailsDay).length == queuedDataDay.length){
-                queuedDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetailsDay))
+                queuedDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetailsDay));
             } else {
-                queuedDetailsArrDay = JSON.stringify(convertDataFormatForPartition(queuedDataDay))
-                queuedDetailsArrDay = JSON.parse(queuedDetailsArrDay)
+                queuedDetailsArrDay = JSON.stringify(convertDataFormatForPartition(queuedDataDay));
+                queuedDetailsArrDay = JSON.parse(queuedDetailsArrDay);
             }
 
             if(localStorage.queuedDetails != undefined  && JSON.parse(localStorage.queuedDetails).length == queuedData.length){
-                queuedDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetails))
+                queuedDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.queuedDetails));
             } else {
-                queuedDetailsArr = JSON.stringify(convertDataFormatForPartition(queuedData))
-                queuedDetailsArr = JSON.parse(queuedDetailsArr)
+                queuedDetailsArr = JSON.stringify(convertDataFormatForPartition(queuedData));
+                queuedDetailsArr = JSON.parse(queuedDetailsArr);
             }
 
             if(monitor.queuedFirstData){
                 for(var i = 0; i< queuedDetailsArr.length; i++){
                     var keyIndexSec =  i;
                     if(queuedDetailsArr[i]["values"].length > 0 && !(currentTime.getTime() - (new Date(queuedDetailsArr[i]["values"][queuedDetailsArr[i]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
-                        queuedData[keyIndexSec]["values"] = []
+                        queuedData[keyIndexSec]["values"] = [];
                         for(var b = 0; b < queuedDetailsArr[i]["values"].length; b++){
                             queuedData[keyIndexSec]["values"] = sliceFirstData(queuedData[keyIndexSec]["values"], dataView.Seconds);
-                            queuedData[keyIndexSec]["values"].push({"x": new Date(queuedDetailsArr[i]["values"][b].x), "y": queuedDetailsArr[i]["values"][b].y})
+                            queuedData[keyIndexSec]["values"].push({"x": new Date(queuedDetailsArr[i]["values"][b].x), "y": queuedDetailsArr[i]["values"][b].y});
                         }
                     }
                 }
@@ -3393,10 +3393,10 @@
                 for(var k = 0; k< queuedDetailsArrMin.length; k++){
                     var keyIndexMin = k;
                     if(queuedDetailsArrMin[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(queuedDetailsArrMin[k]["values"][queuedDetailsArrMin[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
-                        queuedDataDay[keyIndexMin]["values"] = []
+                        queuedDataDay[keyIndexMin]["values"] = [];
                         for(var c = 0; c < queuedDetailsArrMin[k]["values"].length; c++){
-                            queuedDataMin[keyIndexMin]["values"] = sliceFirstData(queuedDataMin[keyIndexMin]["values"], dataView.Days)
-                            queuedDataMin[keyIndexMin]["values"].push({"x": new Date(queuedDetailsArrMin[k]["values"][c].x), "y": queuedDetailsArrMin[k]["values"][c].y})
+                            queuedDataMin[keyIndexMin]["values"] = sliceFirstData(queuedDataMin[keyIndexMin]["values"], dataView.Days);
+                            queuedDataMin[keyIndexMin]["values"].push({"x": new Date(queuedDetailsArrMin[k]["values"][c].x), "y": queuedDetailsArrMin[k]["values"][c].y});
                         }
                     }
                 }
@@ -3404,10 +3404,10 @@
                 for(var k = 0; k< queuedDetailsArrDay.length; k++){
                     var keyIndexDay = k;
                     if(queuedDetailsArrDay[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(queuedDetailsArrDay[k]["values"][queuedDetailsArrDay[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
-                        queuedDataDay[keyIndexDay]["values"] = []
+                        queuedDataDay[keyIndexDay]["values"] = [];
                         for(var c = 0; c < queuedDetailsArrDay[k]["values"].length; c++){
-                            queuedDataDay[keyIndexDay]["values"] = sliceFirstData(queuedDataDay[keyIndexDay]["values"], dataView.Days)
-                            queuedDataDay[keyIndexDay]["values"].push({"x": new Date(queuedDetailsArrDay[k]["values"][c].x), "y": queuedDetailsArrDay[k]["values"][c].y})
+                            queuedDataDay[keyIndexDay]["values"] = sliceFirstData(queuedDataDay[keyIndexDay]["values"], dataView.Days);
+                            queuedDataDay[keyIndexDay]["values"].push({"x": new Date(queuedDetailsArrDay[k]["values"][c].x), "y": queuedDetailsArrDay[k]["values"][c].y});
                         }
                     }
                 }
@@ -3429,10 +3429,10 @@
                                 queuedDataMin[keyIndex]["values"] = sliceFirstData(queuedDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.queuedMaxTimeStamp) {
                                     queuedDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": queuedDataMin[keyIndex]["values"][queuedDataMin[keyIndex]["values"].length - 1].y });
-                                    queuedDetailsArrMin = savePartitionDataToLocalStorage(queuedDetailsArrMin, {"x": new Date(timeStamp), "y": queuedDataMin[keyIndex]["values"][queuedDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
+                                    queuedDetailsArrMin = savePartitionDataToLocalStorage(queuedDetailsArrMin, {"x": new Date(timeStamp), "y": queuedDataMin[keyIndex]["values"][queuedDataMin[keyIndex]["values"].length - 1].y }, keyIndex);
                                 } else {
                                     queuedDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
-                                    queuedDetailsArrMin = savePartitionDataToLocalStorage(queuedDetailsArrMin, { 'x': new Date(timeStamp), 'y': newValue }, keyIndex)
+                                    queuedDetailsArrMin = savePartitionDataToLocalStorage(queuedDetailsArrMin, { 'x': new Date(timeStamp), 'y': newValue }, keyIndex);
                                 }
                                 Monitors.queuedDataMin = queuedDataMin;
                             }
@@ -3443,10 +3443,10 @@
                             queuedDataDay[keyIndexDay]["values"] = sliceFirstData(queuedDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.queuedMaxTimeStamp) {
                                 queuedDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": queuedDataDay[keyIndexDay]["values"][queuedDataDay[keyIndexDay]["values"].length - 1].y });
-                                queuedDetailsArrDay = savePartitionDataToLocalStorage(queuedDetailsArrDay, { "x": new Date(timeStamp), "y": queuedDataDay[keyIndexDay]["values"][queuedDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
+                                queuedDetailsArrDay = savePartitionDataToLocalStorage(queuedDetailsArrDay, { "x": new Date(timeStamp), "y": queuedDataDay[keyIndexDay]["values"][queuedDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay);
                             } else {
                                 queuedDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
-                                queuedDetailsArrDay = savePartitionDataToLocalStorage(queuedDetailsArrDay, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexDay)
+                                queuedDetailsArrDay = savePartitionDataToLocalStorage(queuedDetailsArrDay, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexDay);
                             }
                             Monitors.queuedDataDay = queuedDataDay;
                         }
@@ -3456,10 +3456,10 @@
                         queuedData[keyIndexSec]["values"] = sliceFirstData(queuedData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.queuedMaxTimeStamp) {
                             queuedData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": queuedData[keyIndexSec]["values"][queuedData[keyIndexSec]["values"].length - 1].y });
-                            queuedDetailsArr = savePartitionDataToLocalStorage(queuedDetailsArr, {"x": new Date(timeStamp), "y": queuedData[keyIndexSec]["values"][queuedData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
+                            queuedDetailsArr = savePartitionDataToLocalStorage(queuedDetailsArr, {"x": new Date(timeStamp), "y": queuedData[keyIndexSec]["values"][queuedData[keyIndexSec]["values"].length - 1].y }, keyIndexSec);
                         } else {
                             queuedData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': newValue });
-                            queuedDetailsArr = savePartitionDataToLocalStorage(queuedDetailsArr, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexSec  )
+                            queuedDetailsArr = savePartitionDataToLocalStorage(queuedDetailsArr, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexSec  );
                         }
 
                         Monitors.queuedData = queuedData;
@@ -3467,9 +3467,9 @@
 
                 });
 
-                localStorage.queuedDetails = JSON.stringify(queuedDetailsArr)
-                localStorage.queuedDetailsMin = JSON.stringify(queuedDetailsArrMin)
-                localStorage.queuedDetailsDay = JSON.stringify(queuedDetailsArrDay)
+                localStorage.queuedDetails = JSON.stringify(queuedDetailsArr);
+                localStorage.queuedDetailsMin = JSON.stringify(queuedDetailsArrMin);
+                localStorage.queuedDetailsDay = JSON.stringify(queuedDetailsArrDay);
                 if (monitor.queuedFirstData) {
                     $(".legend").css("display", "block");
                 }

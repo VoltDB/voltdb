@@ -1202,14 +1202,13 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.getExportTableInformation(function(exporterDetails){
             if(!$.isEmptyObject(exporterDetails)){
                 Object.keys(exporterDetails["TUPLE_COUNT"]).forEach(key => {
-                    var tupleCountDetails = exporterDetails["TUPLE_COUNT"]
-                    var sources = exporterDetails["SOURCE"]
+                    var tupleCountDetails = exporterDetails["TUPLE_COUNT"];
+                    var sources = exporterDetails["SOURCE"];
                     
                     if($('#'+sources[key]).length == 0 && key != "TIMESTAMP"){
                         var newRow = '<tr id=' + sources[key] + '>' + 
                         '<td>' + key + 
                         '</td><td>' + exporterDetails["SOURCE"][key] +
-//                        '</td><td>' + 'NA' + // Not working yet
                         '</td><td>' + 0 +
                         '</td><td>' + exporterDetails["TUPLE_PENDING"][key] +
                         '</td></tr>';         
@@ -1217,23 +1216,23 @@ var loadPage = function (serverName, portid) {
                     }
                     
                     if(!previousTupleCount.hasOwnProperty(key)){
-                        previousTupleCount[key] = tupleCountDetails[key]
+                        previousTupleCount[key] = tupleCountDetails[key];
                     }
                     
                     if(previousTupleCount.hasOwnProperty(key) && key != "TIMESTAMP") {
                         if(tupleCountDetails[key] >= previousTupleCount[key]){
-                            tupleCountDetails[key] = tupleCountDetails[key] - previousTupleCount[key]                            
+                            tupleCountDetails[key] = tupleCountDetails[key] - previousTupleCount[key];                           
                         }
                     }
                     
-                    $('#'+sources[key]+' td:nth-child(4)').html(tupleCountDetails[key])
-                    $('#'+sources[key]+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key])
+                    $('#'+sources[key]+' td:nth-child(4)').html(tupleCountDetails[key]);
+                    $('#'+sources[key]+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key]);
                     
                     if(exporterDetails["ACTIVE"][key] == "FALSE"){
-                        $('#'+sources[key]).css('color', 'red')
+                        $('#'+sources[key]).css('color', 'red');
                     }
                     else{
-                        $('#'+sources[key]).css('color', 'black')
+                        $('#'+sources[key]).css('color', 'black');
                     }
                     
                 })
@@ -1258,7 +1257,7 @@ var loadPage = function (serverName, portid) {
                 }
 
                 if(VoltDbUI.isFirstThroughputLoad){
-                    MonitorGraphUI.SetThroughputData(exporterDetails)
+                    MonitorGraphUI.SetThroughputData(exporterDetails);
                     MonitorGraphUI.AddThroughputGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"), $('#chartThroughput'));
                     VoltDbUI.isFirstThroughputLoad = false;
                 }
@@ -1268,7 +1267,7 @@ var loadPage = function (serverName, portid) {
                         if(!throughput.hasOwnProperty(key)){
                             throughput[key] = 0;
                         }
-                    throughput[key] = tupleCount[key] - previousTupleCount[key]
+                    throughput[key] = tupleCount[key] - previousTupleCount[key];
                     }
                 })
                 throughput.TIMESTAMP = tupleCount.TIMESTAMP;
@@ -1276,18 +1275,18 @@ var loadPage = function (serverName, portid) {
 
                 var dataMapper = MonitorGraphUI.getExportMapperData();
                 var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
-                var dataArray = ["throughputData_second", "throughputDataMin_minute", "throughputDataDay_day"]
+                var dataArray = ["throughputData_second", "throughputDataMin_minute", "throughputDataDay_day"];
                 $.each(throughput, function(key, value){
                     if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
                         for(var i = 0; i < dataArray.length; i++){
-                            var dataSplit = dataArray[i].split('_')
-                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex)
+                            var dataSplit = dataArray[i].split('_');
+                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex);
                         }
                     }
                 });
 
-                MonitorGraphUI.RefreshThroughputExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"))
-                MonitorGraphUI.RefreshThroughputGraph(throughput, graphView, curTab)
+                MonitorGraphUI.RefreshThroughputExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"));
+                MonitorGraphUI.RefreshThroughputGraph(throughput, graphView, curTab);
 
             } else {
                 if($("#navExporter").hasClass('active'))
@@ -1318,13 +1317,13 @@ var loadPage = function (serverName, portid) {
                 $.each(exporterDetails["TUPLE_PENDING"], function(key, value){
                     if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
                         for(var i = 0; i < dataArray.length; i++){
-                            var dataSplit = dataArray[i].split('_')
-                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex)
+                            var dataSplit = dataArray[i].split('_');
+                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex);
                         }
                     }
                 });
 
-                MonitorGraphUI.RefreshQueuedExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"))
+                MonitorGraphUI.RefreshQueuedExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"));
                 MonitorGraphUI.RefreshQueuedGraph(exporterDetails["TUPLE_PENDING"], graphView, curTab);
             } else {
                 if($("#navExporter").hasClass('active'))

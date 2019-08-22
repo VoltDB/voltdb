@@ -25,32 +25,32 @@ function navigate(hash) {
     console.log(hash);
     if (hash.length == 0) hash = '#o';
     hash = hash.toLowerCase();
-    var anchor = hash.substring(1);
-    var parts = anchor.split('-');
-    var toppage = parts[0];
+    const anchor = hash.substring(1);
+    const parts = anchor.split('-');
+    const topPage = parts[0];
 
     $('.nav-collapse ul li').removeClass('active');
     $('div.reportpage').hide();
-    $('#' + toppage + '-nav').addClass('active');
-    $('#' + toppage).show();
+    $('#' + topPage + '-nav').addClass('active');
+    $('#' + topPage).show();
 
     if (parts.length > 1) {
-        var primary = parts[1];
+        const primary = parts[1];
         console.log("primary = " + primary);
 
-        var iconid = "#" + toppage + "-" + primary + "--icon";
-        var dropdownid = "#" + toppage + "-" + primary + "--dropdown";
+        const iconid = "#" + topPage + "-" + primary + "--icon";
+        const dropDownId = "#" + topPage + "-" + primary + "--dropdown";
 
-        $(dropdownid).show();
+        $(dropDownId).show();
         $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
         $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
 
         if (parts.length > 2) {
-            var secondary = parts[2];
+            const secondary = parts[2];
             console.log("secondary = " + secondary);
 
-            var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
-            var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+            const iconid2 = "#" + topPage + "-" + primary + "-" + secondary + "--icon";
+            const dropdownid2 = "#" + topPage + "-" + primary + "-" + secondary + "--dropdown";
 
             $(dropdownid2).show();
             $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
@@ -117,17 +117,17 @@ $(document).ready(function () {
     });
 
     $('.tableL1').delegate('.togglex', 'click', function () {
-        var id = $(this).attr('id');
-        var toppage = id.split('-')[0];
-        var dropdownid = "#" + id + "--dropdown";
+        const id = $(this).attr('id');
+        const topPage = id.split('-')[0];
+        const dropDownId = "#" + id + "--dropdown";
 
         var hash = "#" + id;
-        if ($(dropdownid).is(":visible")) {
-			hash = "#" + toppage;
-			var iconid = "#" + toppage + "-" + id.split('-')[1] + "--icon";
+        if ($(dropDownId).is(":visible")) {
+			hash = "#" + topPage;
+			var iconid = "#" + topPage + "-" + id.split('-')[1] + "--icon";
             $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#ffffff');
             $(iconid).removeClass('icon-chevron-down').addClass('icon-chevron-right');
-            $(dropdownid).hide();
+            $(dropDownId).hide();
             $("[id^="+id+"]").each(function (i, el) {
                 var element = '#' + this.id;
                 if(element.match("--icon$")) {
@@ -142,22 +142,22 @@ $(document).ready(function () {
     });
 
     $('.tableL2').delegate('.togglex', 'click', function () {
-        var id = $(this).attr('id');
+        const id = $(this).attr('id');
 
         console.log("l2click: " + id);
 
-        var parts = id.split('-');
-        var toppage = parts[0];
-        var primary = parts[1];
-        var dropdownid = "#" + id + "--dropdown";
+        const parts = id.split('-');
+        const topPage = parts[0];
+        const primary = parts[1];
+        const dropDownId = "#" + id + "--dropdown";
 
         var hash = "#" + id;
-        if ($(dropdownid).is(":visible")) {
+        if ($(dropDownId).is(":visible")) {
             console.log("l2clickVISIBLE");
-            hash = "#" + toppage + "-" + primary;
-            var iconid = "#" + toppage + "-" + primary + "-" + id.split('-')[2] + "--icon";
+            hash = "#" + topPage + "-" + primary;
+            const iconid = "#" + topPage + "-" + primary + "-" + id.split('-')[2] + "--icon";
             $(iconid).removeClass('icon-chevron-down').addClass('icon-chevron-right');
-            $(dropdownid).hide();
+            $(dropDownId).hide();
         }
         else {
             console.log("not visible");
@@ -183,13 +183,13 @@ $(document).ready(function () {
     });
 
     $('.tableL3').delegate('.togglex', 'click', function () {
-        var id = $(this).attr('id');
-        var toppage = id.split('-')[0];
-        var dropdownid = "#" + id + "--dropdown";
+        const id = $(this).attr('id');
+        const topPage = id.split('-')[0];
+        const dropDownId = "#" + id + "--dropdown";
 
         var hash = "#" + id;
-        if ($(dropdownid).is(":visible")) {
-            hash = "#" + toppage;
+        if ($(dropDownId).is(":visible")) {
+            hash = "#" + topPage;
         }
         navigate(hash);
         return false;
@@ -208,17 +208,17 @@ $(document).ready(function () {
     });
 
     $('.tableL4').delegate('.togglex', 'click', function () {
-        var id = $(this).attr('id');
-        var toppage = id.split('-')[0];
-        var dropdownid = "#" + id + "--dropdown";
+        const id = $(this).attr('id');
+        const topPage = id.split('-')[0];
+        const dropDownId = "#" + id + "--dropdown";
 
         var hash = "#" + id;
-        if ($(dropdownid).is(":visible")) {
-            hash = "#" + toppage;
-            var iconid = "#" + toppage + "-" + id.split('-')[1] + "--icon";
+        if ($(dropDownId).is(":visible")) {
+            hash = "#" + topPage;
+            const iconid = "#" + topPage + "-" + id.split('-')[1] + "--icon";
             $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#ffffff');
             $(iconid).removeClass('icon-chevron-down').addClass('icon-chevron-right');
-            $(dropdownid).hide();
+            $(dropDownId).hide();
             $("[id^="+id+"]").each(function (i, el) {
                 var element = '#' + this.id;
                 if(element.match("--icon$")) {
@@ -234,26 +234,26 @@ $(document).ready(function () {
 
     $('.cb').click(function () {
         if ($(this).is(":checked")) {
-            var elementList = $(".tableL1").find(".togglex");
+            const elementList = $(".tableL1").find(".togglex");
             for ( var i = 0; i < elementList.length; i++ ) {
-                var item = elementList[i];
-                var id = item["id"];
+                const item = elementList[i];
+                const id = item["id"];
 
-                var anchor = id.toLowerCase();
-                var parts = anchor.split('-');
-                var toppage = parts[0];
+                const anchor = id.toLowerCase();
+                const parts = anchor.split('-');
+                const topPage = parts[0];
 
                 if (parts.length > 1) {
-                    var primary = parts[1];
-                    var iconid = "#" + toppage + "-" + primary + "--icon";
-                    var dropdownid = "#" + id + "--dropdown";
+                    const primary = parts[1];
+                    const iconid = "#" + topPage + "-" + primary + "--icon";
+                    const dropDownId = "#" + id + "--dropdown";
                     $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
                     $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
-                    $(dropdownid).show();
+                    $(dropDownId).show();
                     if (parts.length > 2) {
-                        var secondary = parts[2];
-                        var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
-                        var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+                        const secondary = parts[2];
+                        const iconid2 = "#" + topPage + "-" + primary + "-" + secondary + "--icon";
+                        const dropdownid2 = "#" + topPage + "-" + primary + "-" + secondary + "--dropdown";
                         $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
                         $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
                         $(dropdownid2).show();
