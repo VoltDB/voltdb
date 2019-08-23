@@ -49,6 +49,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientInterfaceRepairCallback;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
@@ -69,6 +70,8 @@ import org.voltdb.compiler.deploymentfile.SchedulerType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.base.MoreObjects;
+import com.google_voltpatches.common.base.MoreObjects.ToStringHelper;
 import com.google_voltpatches.common.math.DoubleMath;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -254,6 +257,7 @@ public final class SchedulerManager {
      */
     ListenableFuture<?> promoteToLeader(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader) {
+        log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
             m_leader = true;
             processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
@@ -296,6 +300,9 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> promotedPartition(int partitionId) {
+        if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Promoting partition: " + partitionId);
+        }
         return execute(() -> {
             if (m_locallyLedPartitions.add(partitionId)) {
                 updatePartitionedThreadPoolSize();
@@ -314,6 +321,9 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<Boolean> demotedPartition(int partitionId) {
+        if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Demoting partition: " + partitionId);
+        }
         return execute(() -> {
             if (!m_locallyLedPartitions.remove(partitionId)) {
                 return false;
@@ -530,8 +540,17 @@ public final class SchedulerManager {
         m_authSystem = authSystem;
 
         if (configuration == null) {
+            if (log.isDebugEnabled()) {
+                log.debug("MANAGER: Using default schedules configuration");
+            }
             // No configuration provided so use defaults
             configuration = new SchedulerType();
+        } else if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Applying schedule configuration: "
+                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMinDelayMs())
+                            .add("maxRunFrequency", configuration.getMaxRunFrequency())
+                            .add("hostThreadCount", configuration.getHostThreadCount())
+                            .add("partitionedThreadCount", configuration.getPartitionedThreadCount()).toString());
         }
 
         m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMinDelayMs());
@@ -547,12 +566,24 @@ public final class SchedulerManager {
         boolean hasPartitionedSchedule = false;
 
         for (ProcedureSchedule procedureSchedule : procedureSchedules) {
+            if (log.isDebugEnabled()) {
+                ToStringHelper toString = MoreObjects.toStringHelper(procedureSchedule);
+                for (String field : procedureSchedule.getFields()) {
+                    toString.add(field, procedureSchedule.getField(field));
+                }
+                log.debug(generateLogMessage(procedureSchedule.getName(),
+                        "Applying schedule configuration: " + toString()));
+            }
             SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
             SchedulerValidationResult result = validateScheduler(procedureSchedule, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
                 if (handler.isSameSchedule(procedureSchedule, result.m_factory, classesUpdated)) {
+                    if (log.isDebugEnabled()) {
+                        log.debug(generateLogMessage(procedureSchedule.getName(),
+                                "Schedule is running and does not need to be restarted"));
+                    }
                     newHandlers.put(procedureSchedule.getName(), handler);
                     handler.updateDefinition(procedureSchedule);
                     if (frequencyChanged) {
@@ -565,6 +596,10 @@ public final class SchedulerManager {
                     }
                     continue;
                 }
+                if (log.isDebugEnabled()) {
+                    log.debug(generateLogMessage(procedureSchedule.getName(),
+                            "Schedule is running and needs to be restarted"));
+                }
                 handler.cancel();
             }
 
@@ -575,6 +610,11 @@ public final class SchedulerManager {
                     log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
                             result.getException());
                     continue;
+                }
+
+                if (log.isDebugEnabled()) {
+                    log.debug(generateLogMessage(procedureSchedule.getName(),
+                            "Creating handler for scope: " + procedureSchedule.getScope()));
                 }
 
                 SchedulerHandler definition;
@@ -1020,7 +1060,7 @@ public final class SchedulerManager {
      * @param <H> Type of {@link SchedulerHandler} which created this wrapper
      */
     private abstract class SchedulerWrapper<H extends SchedulerHandler> {
-        ScheduledAction m_procedure;
+        ScheduledAction m_scheduledAction;
 
         final H m_handler;
 
@@ -1044,7 +1084,14 @@ public final class SchedulerManager {
          */
         synchronized void start() {
             if (m_state != SchedulerWrapperState.INITIALIZED) {
+                if (log.isTraceEnabled()) {
+                    log.trace(generateLogMessage("Ignoring start on already initialized schedule"));
+                }
                 return;
+            }
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Starting schedule"));
             }
             m_scheduler = m_handler
                     .constructScheduler(new SchedulerHelper(this::generateLogMessage, getScope(), m_clientInterface));
@@ -1074,9 +1121,14 @@ public final class SchedulerManager {
             long startTime = System.nanoTime();
             long waitTime = startTime - m_expectedExecutionTime;
 
+            if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Calling scheduler"));
+            }
+
             Action action;
             try {
-                action = m_procedure == null ? scheduler.getFirstAction() : scheduler.getNextAction(m_procedure);
+                action = m_scheduledAction == null ? scheduler.getFirstAction()
+                        : scheduler.getNextAction(m_scheduledAction);
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
@@ -1088,6 +1140,10 @@ public final class SchedulerManager {
             }
 
             m_stats.addSchedulerCall(System.nanoTime() - startTime, waitTime, action.getStatusMessage());
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Scheduler returned action: " + action));
+            }
 
             synchronized (this) {
                 if (m_state != SchedulerWrapperState.RUNNING) {
@@ -1112,18 +1168,22 @@ public final class SchedulerManager {
                     throw new IllegalStateException("Unknown status: " + action.getType());
                 }
 
-                m_procedure = action.getScheduledAction();
+                m_scheduledAction = action.getScheduledAction();
 
                 try {
                     long delay = calculateDelay();
+                    if (log.isTraceEnabled()) {
+                        log.trace(generateLogMessage("Scheduling action with delay " + delay));
+                    }
+
                     m_expectedExecutionTime = System.nanoTime() + delay;
-                    m_procedure.setExpectedExecutionTime(m_expectedExecutionTime);
+                    m_scheduledAction.setExpectedExecutionTime(m_expectedExecutionTime);
                     m_scheduledFuture = addExceptionListener(
                             m_executor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
                     if (log.isDebugEnabled()) {
                         log.debug(generateLogMessage(
-                                "Could not schedule next procedure scheduler shutdown: " + m_procedure.getProcedure()));
+                                "Could not schedule next procedure scheduler shutdown: " + m_scheduledAction.getProcedure()));
                     }
                 }
             }
@@ -1150,11 +1210,16 @@ public final class SchedulerManager {
                 return;
             }
 
-            m_procedure.setStarted();
+            if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Executing procedure " + m_scheduledAction.getProcedure() + ' '
+                        + Arrays.toString(procedureParameters)));
+            }
+
+            m_scheduledAction.setStarted();
             if (!m_clientInterface.getInternalConnectionHandler().callProcedure(user, false,
-                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_procedure.getProcedure(),
+                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_scheduledAction.getProcedure(),
                     procedureParameters)) {
-                errorOccurred("Could not call procedure %s", m_procedure.getProcedure());
+                errorOccurred("Could not call procedure %s", m_scheduledAction.getProcedure());
             }
         }
 
@@ -1164,17 +1229,17 @@ public final class SchedulerManager {
             }
 
             boolean failed = response.getStatus() != ClientResponse.SUCCESS;
-            m_procedure.setResponse(response);
-            m_stats.addProcedureCall(m_procedure.getExecutionTime(), m_procedure.getWaitTime(), failed);
+            m_scheduledAction.setResponse(response);
+            m_stats.addProcedureCall(m_scheduledAction.getExecutionTime(), m_scheduledAction.getWaitTime(), failed);
 
             if (failed) {
                 String onError = m_handler.getOnError();
 
                 boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
                 if (!isIgnore || log.isDebugEnabled()) {
-                    String message = "Procedure " + m_procedure.getProcedure() + " with parameters "
-                            + Arrays.toString(m_procedure.getProcedureParameters()) + " failed: "
-                            + m_procedure.getResponse().getStatusString();
+                    String message = "Procedure " + m_scheduledAction.getProcedure() + " with parameters "
+                            + Arrays.toString(m_scheduledAction.getProcedureParameters()) + " failed: "
+                            + m_scheduledAction.getResponse().getStatusString();
 
                     if (isIgnore || "LOG".equalsIgnoreCase(onError)) {
                         log.log(isIgnore ? Level.DEBUG : Level.INFO, generateLogMessage(message), null);
@@ -1183,6 +1248,11 @@ public final class SchedulerManager {
                         return;
                     }
                 }
+            } else if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Received response: " + ((ClientResponseImpl) response).toJSONString()));
+            } else if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage(
+                        "Received response: " + ((ClientResponseImpl) response).toStatusJSONString()));
             }
 
             submitHandleNextRun();
@@ -1203,6 +1273,9 @@ public final class SchedulerManager {
          * Shutdown the scheduler with a cancel state
          */
         void cancel() {
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Canceling schedule"));
+            }
             shutdown(SchedulerWrapperState.CANCELED);
             m_stats.deregister(m_statsAgent);
         }
@@ -1237,15 +1310,15 @@ public final class SchedulerManager {
          *         parameters
          */
         Object[] getProcedureParameters(Procedure procedure) {
-            return m_procedure.getProcedureParameters();
+            return m_scheduledAction.getRawProcedureParameters();
         }
 
         /**
-         * @return The {@link Procedure} definition for the procedure in {@link #m_procedure} or {@code null} if an
+         * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if an
          *         error was encountered.
          */
         private Procedure getProcedureDefinition() {
-            String procedureName = m_procedure.getProcedure();
+            String procedureName = m_scheduledAction.getProcedure();
             Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
 
             if (procedure == null) {
@@ -1328,7 +1401,7 @@ public final class SchedulerManager {
             setState(state);
 
             m_scheduler = null;
-            m_procedure = null;
+            m_scheduledAction = null;
 
             if (m_scheduledFuture != null) {
                 m_scheduledFuture.cancel(false);
@@ -1342,7 +1415,7 @@ public final class SchedulerManager {
                 long rateLimitDelayNs = TimeUnit.MICROSECONDS.toNanos(m_rateLimiter.reserve(1));
                 minDelayNs = Math.max(minDelayNs, rateLimitDelayNs);
             }
-            return Math.max(m_procedure.getRequestedDelayNs(), minDelayNs);
+            return Math.max(m_scheduledAction.getRequestedDelayNs(), minDelayNs);
         }
 
         /**
@@ -1557,12 +1630,13 @@ public final class SchedulerManager {
      * count or a dynamic thread count.
      */
     static private final class ScheduledExecutorHolder {
+        private final String m_name;
         private final ScheduledThreadPoolExecutor m_rawExecutor;
         private final ListeningScheduledExecutorService m_executor;
         private boolean m_dynamicThreadCount = true;
 
         ScheduledExecutorHolder(String name) {
-            super();
+            m_name = name;
             m_rawExecutor = CoreUtils.getScheduledThreadPoolExecutor("Scheduler-" + name, 0,
                     CoreUtils.SMALL_STACK_SIZE);
             m_executor = MoreExecutors.listeningDecorator(m_rawExecutor);
@@ -1598,6 +1672,9 @@ public final class SchedulerManager {
          */
         void setDynamicThreadCount(int threadCount) {
             if (m_dynamicThreadCount) {
+                if (log.isTraceEnabled()) {
+                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
+                }
                 setCorePoolSize(threadCount);
             }
         }
