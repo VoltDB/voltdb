@@ -1628,6 +1628,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
                         {1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
                         {3, 1, Long.MIN_VALUE}, {4, 2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
 
+        // ENG-16932 NPE when subquery on partitioned table
+        try {
+            client.callProcedure("@AdHoc", "select * from P1 where exists (select count(*) from P1 where ID = ID);");
+            fail();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("Unsupported statement, subquery expressions are only supported for "
+                    + "single partition procedures and AdHoc replicated tables"));
+        }
     }
 
     // Test scalar subqueries
