@@ -55,6 +55,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class KafkaExportClient extends ExportClientBase {
 
+    private final static String DEFAULT_CLIENT_ID = "voltdb";
     private final static String TIMEZONE_PN = "timezone";
     private final static String SKIP_INTERNALS_PN = "skipinternals";
     private final static String BINARY_ENCODING_PN = "binaryencoding";
@@ -168,7 +169,9 @@ public class KafkaExportClient extends ExportClientBase {
 
         String idVal = config.getProperty(ProducerConfig.CLIENT_ID_CONFIG, "").trim();
         if (idVal.isEmpty()) {
-            m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "voltdb");
+            // If no client id was provided, set it to a default which will be
+            // replaced by a unique value in the decoder
+            m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, DEFAULT_CLIENT_ID);
         }
 
         String acksVal = config.getProperty(ProducerConfig.ACKS_CONFIG, "").trim();
@@ -313,6 +316,7 @@ public class KafkaExportClient extends ExportClientBase {
 
         final void checkOnFirstRow() throws RestartBlockException {
             if (!m_primed) try {
+                setClientId();
                 m_producer = new KafkaProducer<>(m_producerConfig);
             }
             catch (ConfigException e) {
@@ -325,6 +329,16 @@ public class KafkaExportClient extends ExportClientBase {
             m_primed = true;
         }
 
+        private void setClientId() {
+            String clientId = m_producerConfig.getProperty(ProducerConfig.CLIENT_ID_CONFIG);
+            if (DEFAULT_CLIENT_ID.equals(clientId)) {
+                // Generate a unique kafka client id
+                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId;
+                LOG.info("Set Kafka client id to " + clientId);
+                m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
+            }
+        }
+
         private void populateTopic(String tableName) {
             if (m_tableTopics != null && m_tableTopics.containsKey(tableName.toLowerCase())) {
                 m_topic = m_tableTopics.get(tableName.toLowerCase()).intern();
@@ -333,6 +347,7 @@ public class KafkaExportClient extends ExportClientBase {
                 m_topic = new StringBuilder(m_topicPrefix).append(tableName).toString().intern();
             }
         }
+
         @Override
         public ListeningExecutorService getExecutor() {
             return m_es;
