@@ -59,7 +59,7 @@ public class DropTableUtils {
         try {
             return VoltFastSqlParser.parse(sql);
         } catch (SqlParseException e) {
-            return null;    // TODO: when Calcite eventually support all Volt syntax, we need to rethrow in here.
+            return null;    // TODO: do not catch when Calcite eventually supports all Volt DDL syntax.
         }
     }
 
