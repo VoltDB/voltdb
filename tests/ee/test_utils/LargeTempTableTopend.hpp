@@ -21,8 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef LARGE_TEMP_TABLE_TOPEND_HPP
-#define LARGE_TEMP_TABLE_TOPEND_HPP
+#pragma once
 
 #include <cstring>
 #include <map>
@@ -47,7 +46,6 @@ class TupleSchema;
  */
 class LargeTempTableTopend : public voltdb::DummyTopend {
 private:
-
     class Block {
     public:
         Block(char* data, const voltdb::TupleSchema *schema)
@@ -90,7 +88,7 @@ private:
         const voltdb::TupleSchema* m_schema;
         char* m_origAddress;
     };
-
+    std::map<voltdb::LargeTempTableBlockId, Block*> m_map;
 public:
 
     bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
@@ -142,16 +140,12 @@ public:
     std::string debug() const {
         std::ostringstream oss;
         oss << "LTTTopend: (" << m_map.size() << " blocks)\n";
-        BOOST_FOREACH(auto &entry, m_map) {
+        for(auto &entry : m_map) {
             oss << "  Block " << entry.first << ": " << entry.second->debug() << "\n";
         }
 
         return oss.str();
     }
 
-private:
-
-    std::map<voltdb::LargeTempTableBlockId, Block*> m_map;
 };
 
-#endif // LARGE_TEMP_TABLE_TOPEND_HPP

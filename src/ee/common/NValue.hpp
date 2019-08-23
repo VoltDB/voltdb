@@ -111,9 +111,11 @@ inline void throwCastSQLValueOutOfRangeException<TTInt>(
 
     // record underflow or overflow for executors that catch this (indexes, mostly)
     int internalFlags = 0;
-    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
-    if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
-
+    if (value > 0) {
+        internalFlags |= SQLException::TYPE_OVERFLOW;
+    } else if (value < 0) {
+        internalFlags |= SQLException::TYPE_UNDERFLOW;
+    }
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg, internalFlags);
 }
 
@@ -121,7 +123,9 @@ int warn_if(int condition, const char* message);
 
 // This has been demonstrated to be more reliable than std::isinf
 // -- less sensitive on LINUX to the "g++ -ffast-math" option.
-inline int non_std_isinf( double x ) { return (x > DBL_MAX) || (x < -DBL_MAX); }
+inline int non_std_isinf(double x) {
+    return x > DBL_MAX || x < -DBL_MAX;
+}
 
 inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function) {
    static int warned_once_no_nan = warn_if(! std::isnan(sqrt(-1.0)),
@@ -527,8 +531,7 @@ class NValue {
     };
 
 
-    /* For boost hashing */
-    void hashCombine(std::size_t &seed) const;
+    size_t hashCombine(std::size_t seed) const noexcept;
 
     /* Functor comparator for use with std::set */
     struct ltNValue {
@@ -580,12 +583,10 @@ class NValue {
                     const char* buf = getObject_withoutNull(length);
                     // Allocate 2 hex chars per input byte -- plus a terminator
                     // because hexEncodeString expects to terminate the result.
-                    char *scratchBuffer = new char[length * 2 + 1];
                     // Don't leak the scratch buffer.
-                    boost::scoped_array<char> scratchGuard(scratchBuffer);
-                    catalog::Catalog::hexEncodeString(buf, scratchBuffer, length);
-                    std::string retval(scratchBuffer, length * 2);
-                    return retval;
+                    std::unique_ptr<char[]> scratch(new char[length * 2 + 1]);
+                    catalog::Catalog::hexEncodeString(buf, scratch.get(), length);
+                    return std::string(scratch.get(), length * 2);
                 }
             case VALUE_TYPE_TIMESTAMP:
                 streamTimestamp(value);
@@ -3345,22 +3346,21 @@ inline NValue NValue::getNullValue(ValueType type) {
     return retval;
 }
 
-inline void NValue::hashCombine(std::size_t &seed) const {
-    const ValueType type = getValueType();
-    switch (type) {
+inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
+    switch (getValueType()) {
         case VALUE_TYPE_TINYINT:
             boost::hash_combine(seed, getTinyInt());
-            return;
+            return seed;
         case VALUE_TYPE_SMALLINT:
             boost::hash_combine(seed, getSmallInt());
-            return;
+            return seed;
         case VALUE_TYPE_INTEGER:
             boost::hash_combine(seed, getInteger());
-            return;
+            return seed;
         case VALUE_TYPE_BIGINT:
         case VALUE_TYPE_TIMESTAMP:
             boost::hash_combine(seed, getBigInt());
-            return;
+            return seed;
         case VALUE_TYPE_DOUBLE:
             if (isNull()) {
                 // A range of values for FLOAT are considered to be
@@ -3373,45 +3373,42 @@ inline void NValue::hashCombine(std::size_t &seed) const {
             } else {
                 MiscUtil::hashCombineFloatingPoint(seed, getDouble());
             }
-            return;
+            return seed;
         case VALUE_TYPE_VARCHAR:
             {
                 if (isNull()) {
-                    boost::hash_combine( seed, std::string(""));
-                    return;
+                    boost::hash_combine(seed, std::string(""));
+                    return seed;
                 }
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
                 boost::hash_combine(seed, std::string(buf, length));
-                return;
+                return seed;
             }
         case VALUE_TYPE_VARBINARY:
             {
                 if (isNull()) {
-                    boost::hash_combine( seed, std::string(""));
-                    return;
+                    boost::hash_combine(seed, std::string(""));
+                    return seed;
                 }
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
                 for (int32_t i = 0; i < length; i++) {
                     boost::hash_combine(seed, buf[i]);
                 }
-                return;
+                return seed;
             }
         case VALUE_TYPE_DECIMAL:
             getDecimal().hash(seed);
-            return;
+            return seed;
         case VALUE_TYPE_POINT:
-            getGeographyPointValue().hashCombine(seed);
-            return;
+            return getGeographyPointValue().hashCombine(seed);
         case VALUE_TYPE_GEOGRAPHY:
-            getGeographyValue().hashCombine(seed);
-            return;
+            return getGeographyValue().hashCombine(seed);
         default:
-            break;
+            vassert(false);     // should never reach here
+            return seed;
     }
-
-    throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
 }
 
 inline NValue NValue::castAs(ValueType type) const {
@@ -3981,9 +3978,7 @@ namespace std {
         using argument_type = voltdb::NValue;
         using result_type = size_t;
         result_type operator()(argument_type const& o) const noexcept {
-            size_t seed = 0;
-            o.hashCombine(seed);
-            return seed;
+            return o.hashCombine(0);
         }
     };
 }
