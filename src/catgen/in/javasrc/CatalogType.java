@@ -37,8 +37,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
     class CatalogReference<T extends CatalogType> {
 
-        T m_value = null;
-        String m_unresolvedPath = null;
+        volatile T m_value = null;
+        volatile String m_unresolvedPath = null;
         Object m_lock = new Object();
 
         public void setUnresolved(String path) {
