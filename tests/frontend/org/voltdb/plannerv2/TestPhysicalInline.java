@@ -75,9 +75,9 @@ public class TestPhysicalInline extends Plannerv2TestCase {
     public void testMJ() {
         m_tester.sql("SELECT RI1.SI, RI2.I FROM RI1 INNER JOIN RI2 ON RI2.TI = RI1.TI")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND1])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
                         "    VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND1_ASCEQ0_0])\n")
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}}," +
                         "{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]}," +
@@ -85,7 +85,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         "\"INLINE_NODES\":[{\"ID\":6,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\"," +
                         "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":" +
                         "{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"TARGET_TABLE_NAME\":\"RI2\",\"TARGET_TABLE_ALIAS\":\"RI2\"," +
-                        "\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI2_IND1\"}],\"CHILDREN_IDS\":[3]," +
+                        "\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI2_IND5_HASH\"}],\"CHILDREN_IDS\":[3]," +
                         "\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}," +
                         "{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}," +
                         "{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0,\"TABLE_IDX\":1}}," +
