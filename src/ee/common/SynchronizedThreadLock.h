@@ -15,24 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SYNCHRONIZEDTHREADLOCK_H_
-#define SYNCHRONIZEDTHREADLOCK_H_
+#pragma once
 
-//#include "boost/scoped_ptr.hpp"
-//#include "boost/unordered_map.hpp"
-
-#include <common/debuglog.h>
+#include <condition_variable>
 #include <map>
-#include <stack>
-#include <string>
-#include <vector>
-#include <pthread.h>
-#if __cplusplus >= 201103L
+#include <mutex>
 #include <atomic>
-#else
-#include <cstdatomic>
-#endif
 
+#include "common/debuglog.h"
 #include "common/UndoQuantumReleaseInterest.h"
 
 class DRBinaryLogTest;
@@ -45,11 +35,10 @@ typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
-    SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) : m_realInterest(realInterest) {}
-    virtual ~SynchronizedUndoQuantumReleaseInterest() { }
-
+    SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) :
+        m_realInterest(realInterest) {}
+    virtual ~SynchronizedUndoQuantumReleaseInterest() {}
     void notifyQuantumRelease();
-
 private:
     UndoQuantumReleaseInterest *m_realInterest;
 };
@@ -58,23 +47,42 @@ class SynchronizedDummyUndoQuantumReleaseInterest : public UndoQuantumReleaseInt
 public:
     SynchronizedDummyUndoQuantumReleaseInterest() { }
     virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
-
     void notifyQuantumRelease();
 };
 
 class PersistentTable;
-class ExecuteWithAllSitesMemory;
-class ReplicatedMaterializedViewHandler;
-
 class SynchronizedThreadLock {
-
     friend class ExecuteWithAllSitesMemory;
     friend class ReplicatedMaterializedViewHandler;
     friend class ScopedReplicatedResourceLock;
     friend class VoltDBEngine;
     friend class ::DRBinaryLogTest;
 
+    static bool s_inSingleThreadMode;
+#ifndef  NDEBUG
+    static bool s_usingMpMemory;
+#endif
+    static bool s_holdingReplicatedTableLock;
+    static std::mutex s_sharedEngineMutex;
+    static std::condition_variable s_sharedEngineCondition;
+    static std::condition_variable s_wakeLowestEngineCondition;
+    static int32_t s_globalTxnStartCountdownLatch;
+    static int32_t s_SITES_PER_HOST;
+    static EngineLocals s_mpEngine;
+    static SharedEngineLocalsType s_enginesByPartitionId;
+
+    // For use only by friends:
+    static void lockReplicatedResource();
+    static void unlockReplicatedResource();
+
+    // These methods are like the ones above, but are only
+    // used during initialization and have fewer asserts.
+    static void lockReplicatedResourceForInit();
+    static void unlockReplicatedResourceForInit();
+
 public:
+    static const int32_t s_mpMemoryPartitionId;
+
     static void create();
     static void destroy();
     static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
@@ -92,7 +100,7 @@ public:
      * Wrapper around calling UndoQuantum::registerUndoAction
      */
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-            PersistentTable *interest = NULL);
+            PersistentTable *interest = nullptr);
     static void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *deletedTable);
 
@@ -116,35 +124,7 @@ public:
     static void resetEngineLocalsForTest();
     static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
     static EngineLocals getMpEngine();
-
-private:
-
-    // For use only by friends:
-    static void lockReplicatedResource();
-    static void unlockReplicatedResource();
-
-    // These methods are like the ones above, but are only
-    // used during initialization and have fewer asserts.
-    static void lockReplicatedResourceForInit();
-    static void unlockReplicatedResourceForInit();
-
-    static bool s_inSingleThreadMode;
-#ifndef  NDEBUG
-    static bool s_usingMpMemory;
-#endif
-    static bool s_holdingReplicatedTableLock;
-    static pthread_mutex_t s_sharedEngineMutex;
-    static pthread_cond_t s_sharedEngineCondition;
-    static pthread_cond_t s_wakeLowestEngineCondition;
-    static int32_t s_globalTxnStartCountdownLatch;
-    static int32_t s_SITES_PER_HOST;
-    static EngineLocals s_mpEngine;
-    static SharedEngineLocalsType s_enginesByPartitionId;
-
-public:
-    static const int32_t s_mpMemoryPartitionId;
 };
 
 }
 
-#endif

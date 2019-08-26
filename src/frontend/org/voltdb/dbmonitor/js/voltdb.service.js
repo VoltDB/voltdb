@@ -146,6 +146,10 @@
             this.processTask(onConnectionAdded, "GRAPH_IMPORTER", ['@Statistics'], ["IMPORTER"], ['0']);
         };
 
+        this.GetExporterInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "GRAPH_EXPORT", ['@Statistics'], ["EXPORT"], ['0']);
+        };
+
         this.GetTableInformation = function (onConnectionAdded) {
             var procedureNames = ['@Statistics', '@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
             var parameters = ["TABLE", "INDEX", "EXPORT", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];

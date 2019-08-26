@@ -20,7 +20,13 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
@@ -60,6 +66,7 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.statements.AlterSchedule;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -67,18 +74,20 @@ import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
+import org.voltdb.compiler.statements.CreateSchedule;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
+import org.voltdb.compiler.statements.DropSchedule;
 import org.voltdb.compiler.statements.DropStream;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -90,6 +99,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -187,14 +197,20 @@ public class DDLCompiler {
     };
 
     public static class DDLStatement {
-        public DDLStatement() { }
+        public DDLStatement(boolean newDdl) {
+            this.newDdl = newDdl;
+        }
+
         public DDLStatement(String statement, int lineNo) {
             this.statement = statement;
             this.lineNo = lineNo;
+            newDdl = false;
         }
+
         public String statement = "";
         public int lineNo; // beginning of statement line number
         public int endLineNo; // end of statement line number
+        public final boolean newDdl;
     }
 
     public DDLCompiler(VoltCompiler compiler,
@@ -225,6 +241,9 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropStream(this))
                                 .addNextProcessor(new DRTable(this))
                                 .addNextProcessor(new SetGlobalParam(this))
+                                .addNextProcessor(new CreateSchedule(this))
+                                .addNextProcessor(new DropSchedule(this))
+                                .addNextProcessor(new AlterSchedule(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -317,6 +336,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
+        protected static final String SCHEDULE = "SCHEDULE";
         protected static final String AGGREGATE = "AGGREGATE";
     }
 
@@ -389,31 +409,29 @@ public class DDLCompiler {
 
     /**
      * Compile a DDL schema from an abstract reader
-     * @param reader  abstract DDL reader
-     * @param db  database
-     * @param whichProcs  which type(s) of procedures to load
+     *
+     * @param reader     abstract DDL reader
+     * @param db         database
+     * @param whichProcs which type(s) of procedures to load
+     * @param newDdl     Whether or not this DDL has been compiled before or not
      * @throws VoltCompiler.VoltCompilerException
      */
-    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs)
+    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs, boolean newDdl)
             throws VoltCompilerException {
         int currLineNo = 1;
 
-        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
+        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo, newDdl);
         final StringBuilder ddls = new StringBuilder();
         boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
-            final String encodedDropTable;
-            if (isBatch) {      // We cannot query previous database for existing tables in batch mode, as
-                encodedDropTable = null;    // current DDL batch may contain CREATE statements, that is later dropped.
-            } else {
-                encodedDropTable = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
-            }
-            if (encodedDropTable == null) {
+            if (isBatch || ! AdHocNTBase.USING_CALCITE) {      // We cannot query previous database for existing tables in batch mode, as
+                // current DDL batch may contain CREATE statements, that is later dropped.
                 processVoltDBStatements(db, whichProcs, stmt);
-            } else {        // matched & executed DROP TABLE stmt
-                ddls.append(encodedDropTable);
+            } else {        // ENG-17075: Until Calcite can handle all DDL statements,
+                // this could throw SqlParserException, that gets printed and transformed into FallbackException.
+                ddls.append(DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler));
             }
-            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
+            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo, newDdl);
             isBatch = true;
         }
         m_fullDDL += ddls;
@@ -517,7 +535,7 @@ public class DDLCompiler {
             DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
         Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
-        loadSchema(reader, db, previousDBIfAny, whichProcs);
+        loadSchema(reader, db, previousDBIfAny, whichProcs, false);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
@@ -770,9 +788,7 @@ public class DDLCompiler {
                     break;
                 }
             }
-        }
-        // if this is a fancy expression-based index...
-        else {
+        } else { // if this is a fancy expression-based index...
             try {
                 int partitionColIndex = partitionCol.getIndex();
                 List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
@@ -795,8 +811,7 @@ public class DDLCompiler {
                 "for an index that includes the partitioning column. Please use UNIQUE instead.");
                 throw m_compiler.new VoltCompilerException(exceptionMsg);
             }
-        }
-        else if ( ! index.getAssumeunique()) {
+        } else if (! index.getAssumeunique()) {
             // Throw compiler exception.
             String indexName = index.getTypeName();
             String keyword = "";
@@ -807,12 +822,10 @@ public class DDLCompiler {
                 indexName = "UNIQUE INDEX " + indexName;
                 keyword = "UNIQUE";
             }
-
-            String exceptionMsg = "Invalid use of " + keyword +
-                    ". The " + indexName + " on the partitioned table " + tableName +
-                    " does not include the partitioning column " + partitionCol.getName() +
-                    ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.";
-            throw m_compiler.new VoltCompilerException(exceptionMsg);
+            throw m_compiler.new VoltCompilerException(
+                    "Invalid use of " + keyword + ". The " + indexName + " on the partitioned table " + tableName +
+                            " does not include the partitioning column " + partitionCol.getName() +
+                            ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.");
         }
 
     }
@@ -847,7 +860,7 @@ public class DDLCompiler {
                         throw m_compiler.new VoltCompilerException(msg);
                     }
                     // make sure the column is marked not-nullable
-                    if (partitionCol.getNullable() == true) {
+                    if (partitionCol.getNullable()) {
                         msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
                             "Partition columns must be constrained \"NOT NULL\".";
                         throw m_compiler.new VoltCompilerException(msg);
@@ -883,12 +896,10 @@ public class DDLCompiler {
     private void handleTTL(Database db) throws VoltCompilerException {
         for (Table table : db.getTables()) {
             TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl == null) {
-                continue;
-            }
-            if (ttl.getTtlcolumn().getNullable()) {
-                String msg = "Column '" + table.getTypeName() + "." + ttl.getTtlcolumn().getName() + "' cannot be nullable for TTL." ;
-                throw m_compiler.new VoltCompilerException(msg);
+            if (ttl != null && ttl.getTtlcolumn().getNullable()) {
+                throw m_compiler.new VoltCompilerException(
+                        "Column '" + table.getTypeName() + "." + ttl.getTtlcolumn().getName() +
+                                "' cannot be nullable for TTL.");
             }
         }
     }
@@ -987,8 +998,7 @@ public class DDLCompiler {
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
     // requested from the compiler
-    private void fillTrackerFromXML()
-    {
+    private void fillTrackerFromXML() {
         for (VoltXMLElement e : m_schema.children) {
             if (e.name.equals("table")) {
                 String tableName = e.attributes.get("name");
@@ -1000,8 +1010,7 @@ public class DDLCompiler {
                 final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
-                }
-                else {
+                } else {
                     m_tracker.removePartition(tableName);
                 }
                 if (!StringUtil.isEmpty(export)) {
@@ -1086,33 +1095,27 @@ public class DDLCompiler {
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
             return kStateReadingCommentDelim;
-        }
-        else if (nchar[0] == '\n') {
+        } else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             retval.endLineNo += 1;
             retval.statement += " ";
-        }
-        else if (nchar[0] == '\r') {
+        } else if (nchar[0] == '\r') {
             // ignore carriage returns
-        }
-        else if (nchar[0] == ';') {
+        } else if (nchar[0] == ';') {
             // end of the statement
             retval.statement += nchar[0];
             // statement completed only if outside of begin..end
             if(!inAsBegin) {
                 return kStateCompleteStatement;
             }
-        }
-        else if (nchar[0] == '\'') {
+        } else if (nchar[0] == '\'') {
             retval.statement += nchar[0];
             return kStateReadingStringLiteral;
-        }
-        else if (SQLLexer.isBlockDelimiter(nchar[0])) {
+        } else if (SQLLexer.isBlockDelimiter(nchar[0])) {
             // we may be examining ### code block delimiters
             retval.statement += nchar[0];
             return kStateReadingCodeBlockDelim;
-        }
-        else {
+        } else {
             // accumulate and continue
             retval.statement += nchar[0];
         }
@@ -1146,16 +1149,18 @@ public class DDLCompiler {
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             retval.statement += nchar[0];
             return kStateReadingCodeBlock;
+        } else {
+            return readingState(nchar, retval);
         }
-        return readingState(nchar, retval);
     }
 
     private static int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReading;
+        } else {
+            return kStateReadingCodeBlock;
         }
-        return kStateReadingCodeBlock;
     }
 
     private static int readingCodeBlock(char [] nchar, DDLStatement retval) {
@@ -1183,8 +1188,7 @@ public class DDLCompiler {
         // if we see a SINGLE_QUOTE, change states to check for terminating literal
         if (nchar[0] != '\'') {
             return kStateReadingStringLiteral;
-        }
-        else {
+        } else {
             return kStateReadingStringLiteralSpecialChar;
         }
     }
@@ -1197,8 +1201,7 @@ public class DDLCompiler {
         if (nchar[0] == '\'') {
             retval.statement += nchar[0];
             return kStateReadingStringLiteral;
-        }
-        else {
+        } else {
             return readingState(nchar, retval);
         }
     }
@@ -1207,8 +1210,7 @@ public class DDLCompiler {
         if (nchar[0] == '-') {
             // confirmed that a comment is being read
             return kStateReadingComment;
-        }
-        else {
+        } else {
             // need to append the previously skipped '-' to the statement
             // and process the current character
             retval.statement += '-';
@@ -1221,18 +1223,19 @@ public class DDLCompiler {
             // a comment is continued until a newline is found.
             retval.endLineNo += 1;
             return kStateReading;
+        } else {
+            return kStateReadingComment;
         }
-        return kStateReadingComment;
     }
 
-    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo)
+    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo, boolean newDdl)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
 
         char[] nchar = new char[1];
         @SuppressWarnings("synthetic-access")
-        DDLStatement retval = new DDLStatement();
+        DDLStatement retval = new DDLStatement(newDdl);
 
         try {
 
@@ -1246,14 +1249,9 @@ public class DDLCompiler {
                 // trim leading whitespace outside of a statement
                 if (nchar[0] == '\n') {
                     currLineNo++;
-                }
-                else if (nchar[0] == '\r') {
-                }
-                else if (nchar[0] == ' ') {
-                }
-
-                // trim leading comments outside of a statement
-                else if (nchar[0] == '-') {
+                } else if (nchar[0] == '\r') {
+                } else if (nchar[0] == ' ') {
+                } else if (nchar[0] == '-') { // trim leading comments outside of a statement
                     // The next character must be a comment because no valid
                     // statement will start with "-<foo>". If a comment was
                     // found, read until the next newline.
@@ -1264,8 +1262,7 @@ public class DDLCompiler {
                     if (nchar[0] != '-') {
                         String msg = "Invalid content before or between DDL statements.";
                         throw compiler.new VoltCompilerException(msg, currLineNo);
-                    }
-                    else {
+                    } else {
                         do {
                             if (reader.read(nchar) == -1) {
                                 // a comment extending to EOF means no statement
@@ -1276,10 +1273,7 @@ public class DDLCompiler {
                         // process the newline and loop
                         currLineNo++;
                     }
-                }
-
-                // not whitespace or comment: start of a statement.
-                else {
+                } else { // not whitespace or comment: start of a statement.
                     retval.statement += nchar[0];
                     state = kStateReading;
                     break;
@@ -1302,48 +1296,36 @@ public class DDLCompiler {
 
                 if (state == kStateReading) {
                     state = readingState(nchar, retval);
-                }
-                else if (state == kStateReadingCommentDelim) {
+                } else if (state == kStateReadingCommentDelim) {
                     state = readingCommentDelimState(nchar, retval);
-                }
-                else if (state == kStateReadingComment) {
+                } else if (state == kStateReadingComment) {
                     state = readingCommentState(nchar, retval);
-                }
-                else if (state == kStateReadingStringLiteral) {
+                } else if (state == kStateReadingStringLiteral) {
                     state = readingStringLiteralState(nchar, retval);
-                }
-                else if (state == kStateReadingStringLiteralSpecialChar) {
+                } else if (state == kStateReadingStringLiteralSpecialChar) {
                     state = readingStringLiteralSpecialChar(nchar, retval);
-                }
-                else if (state == kStateReadingCodeBlockDelim) {
+                } else if (state == kStateReadingCodeBlockDelim) {
                     state = readingCodeBlockStateDelim(nchar, retval);
-                }
-                else if (state == kStateReadingCodeBlockNextDelim) {
+                } else if (state == kStateReadingCodeBlockNextDelim) {
                     state = readingCodeBlockStateNextDelim(nchar, retval);
-                }
-                else if (state == kStateReadingCodeBlock) {
+                } else if (state == kStateReadingCodeBlock) {
                     state = readingCodeBlock(nchar, retval);
-                }
-                else if (state == kStateReadingEndCodeBlockDelim) {
+                } else if (state == kStateReadingEndCodeBlockDelim) {
                     state = readingEndCodeBlockStateDelim(nchar, retval);
-                }
-                else if (state == kStateReadingEndCodeBlockNextDelim) {
+                } else if (state == kStateReadingEndCodeBlockNextDelim) {
                     state = readingEndCodeBlockStateNextDelim(nchar, retval);
-                }
-                else {
+                } else {
                     throw compiler.new VoltCompilerException("Unrecoverable error parsing DDL.");
                 }
             }
 
             return retval;
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw compiler.new VoltCompilerException("Unable to read from file");
         }
     }
 
-    private void addTableToCatalog(Database db, VoltXMLElement node, boolean isXDCR)
-            throws VoltCompilerException {
+    private void addTableToCatalog(Database db, VoltXMLElement node, boolean isXDCR) throws VoltCompilerException {
         assert node.name.equals("table");
 
         // Construct table-specific maps
@@ -1351,11 +1333,13 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-        // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
-        if (StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
-                .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
+        if (AdHocNTBase.USING_CALCITE &&    // Skip "CREATE TABLE" if we have already added it using Calcite parser.
+                StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                        .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
+            // Code below this point is not executed any more. See VoltCompiler#compileDatabase() for
+            // how CREATE TABLE statement is processed by Calcite.
             return;
-        }       // Code below this point is not executed any more.
+        }
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
         // set max value before return for view table
@@ -1429,22 +1413,22 @@ public class DDLCompiler {
                 // drop them: there are constraint objects in the catalog
                 // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) {
+                    if (!indexNode.name.equals("index")) {
                         continue;
                     }
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
+                    if (!indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX)) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
                                 indexMap, columnMap, m_compiler);
                     }
                 }
 
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) {
+                    if (!indexNode.name.equals("index")) {
                         continue;
                     }
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX)) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
                                 indexMap, columnMap, m_compiler);
                     }
@@ -1512,7 +1496,8 @@ public class DDLCompiler {
                 }
             }
             if (!hasUniqueIndex) {
-                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow.", table.getTypeName());
+                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans " +
+                                "to update/delete DR record and may become slower as table grow.", table.getTypeName());
                 m_compiler.addWarn(info);
             }
         }
@@ -1537,8 +1522,7 @@ public class DDLCompiler {
                             " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
                 }
                 maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
-            }
-            else if (t.isVariableLength()) {
+            } else if (t.isVariableLength()) {
                 // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
 
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
@@ -1547,8 +1531,7 @@ public class DDLCompiler {
                             " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
                 }
                 maxRowSize += 4 + c.getSize();
-            }
-            else {
+            } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
@@ -1573,15 +1556,14 @@ public class DDLCompiler {
                             VoltXMLElement node,
                             SortedMap<Integer, VoltType> columnTypes,
                             Map<String, Column> columnMap,
-                            VoltCompiler compiler) throws VoltCompilerException
-    {
+                            VoltCompiler compiler) throws VoltCompilerException {
         assert node.name.equals("column");
 
         String name = node.attributes.get("name");
         String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
-        int index = Integer.valueOf(node.attributes.get("index"));
+        int index = Integer.parseInt(node.attributes.get("index"));
         String defaultvalue = null;
         String defaulttype = null;
 
@@ -1662,8 +1644,7 @@ public class DDLCompiler {
                 //   omitted.
                 // Choose an appropriate default for the type.
                 size = type.defaultLengthForVariableLengthType();
-            }
-            else {
+            } else {
                 if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
                             " in table " + table.getTypeName() + " has unsupported length " + sizeString;
@@ -1711,29 +1692,17 @@ public class DDLCompiler {
      */
     private static boolean indexesAreDups(Index idx1, Index idx2) {
         // same attributes?
-        if (idx1.getType() != idx2.getType()) {
+        if (idx1.getType() != idx2.getType() ||
+                idx1.getCountable() != idx2.getCountable() ||
+                idx1.getUnique() != idx2.getUnique() ||
+                idx1.getAssumeunique() != idx2.getAssumeunique()) {
             return false;
-        }
-        if (idx1.getCountable() != idx2.getCountable()) {
+        } else if (idx1.getColumns().size() != idx2.getColumns().size()) { // same column count?
             return false;
-        }
-        if (idx1.getUnique() != idx2.getUnique()) {
-            return false;
-        }
-        if (idx1.getAssumeunique() != idx2.getAssumeunique()) {
-            return false;
-        }
-
-        // same column count?
-        if (idx1.getColumns().size() != idx2.getColumns().size()) {
-            return false;
-        }
-
-        //TODO: For index types like HASH that support only random access vs. scanned ranges, indexes on different
-        // permutations of the same list of columns/expressions could be considered dupes. This code skips that edge
-        // case optimization in favor of using a simpler more exact permutation-sensitive algorithm for all indexes.
-
-        if ( ! (idx1.getExpressionsjson().equals(idx2.getExpressionsjson()))) {
+        } else if ( ! idx1.getExpressionsjson().equals(idx2.getExpressionsjson())) {
+            //TODO: For index types like HASH that support only random access vs. scanned ranges, indexes on different
+            // permutations of the same list of columns/expressions could be considered dupes. This code skips that edge
+            // case optimization in favor of using a simpler more exact permutation-sensitive algorithm for all indexes.
             return false;
         }
 
@@ -1760,16 +1729,13 @@ public class DDLCompiler {
         // Duplicate indexes have identical columns in identical order.
         if ( ! Arrays.equals(idx1baseTableOrder, idx2baseTableOrder) ) {
             return false;
-        }
-
-        // Check the predicates
-        if (idx1.getPredicatejson().length() > 0) {
+        } else if (idx1.getPredicatejson().length() > 0) {
             return idx1.getPredicatejson().equals(idx2.getPredicatejson());
-        }
-        if (idx2.getPredicatejson().length() > 0) {
+        } else if (idx2.getPredicatejson().length() > 0) {
             return idx2.getPredicatejson().equals(idx1.getPredicatejson());
+        } else {
+            return true;
         }
-        return true;
     }
 
     private static void addIndexToCatalog(Database db,
@@ -1814,8 +1780,7 @@ public class DDLCompiler {
                         // indexing on expression with boolean result is not supported.
                         throw compiler.new VoltCompilerException("Cannot create index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
-                    }
-                    if ((unique || assumeUnique) && !expr.isValueTypeUniqueIndexable(exprMsg)) {
+                    } else if ((unique || assumeUnique) && !expr.isValueTypeUniqueIndexable(exprMsg)) {
                         // indexing on expression with boolean result is not supported.
                         throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
@@ -1824,8 +1789,7 @@ public class DDLCompiler {
                     checkExpressions.add(expr);
                     exprs.add(expr);
                 }
-            }
-            else if (subNode.name.equals("predicate")) {
+            } else if (subNode.name.equals("predicate")) {
                 assert(subNode.children.size() == 1);
                 VoltXMLElement predicateXML = subNode.children.get(0);
                 assert(predicateXML != null);
@@ -1864,15 +1828,11 @@ public class DDLCompiler {
                     String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
-                }
-
-                if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
+                } else if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
                     String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
-                }
-
-                if (!colType.isBackendIntegerType()) {
+                } else if (!colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
                     has_geo_col = colType.equals(VoltType.GEOGRAPHY);
@@ -1891,15 +1851,11 @@ public class DDLCompiler {
                     String emsg = "Cannot create index \""+ name + "\" because " +
                                 colType.getName() + " valued expressions are not currently supported as index keys.";
                     throw compiler.new VoltCompilerException(emsg);
-                }
-
-                if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
+                } else if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
                     String emsg = "Cannot create index \""+ name + "\" because " +
                                 colType.getName() + " valued expressions are not currently supported as unique index keys.";
                     throw compiler.new VoltCompilerException(emsg);
-                }
-
-                if (! colType.isBackendIntegerType()) {
+                } else if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                     has_geo_col = colType.equals(VoltType.GEOGRAPHY);
@@ -1934,8 +1890,7 @@ public class DDLCompiler {
         boolean isHashIndex = node.attributes.get("ishashindex").equals("true");
         if (has_geo_col) {
             index.setType(IndexType.COVERING_CELL_INDEX.getValue());
-        }
-        else if (isHashIndex) {
+        } else if (isHashIndex) {
             // warn user that hash index will be deprecated
             compiler.addWarn("Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"");
 
@@ -1947,8 +1902,7 @@ public class DDLCompiler {
                 throw compiler.new VoltCompilerException(emsg);
             }
             index.setType(IndexType.HASH_TABLE.getValue());
-        }
-        else {
+        } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
             index.setCountable(true);
         }
@@ -1975,7 +1929,7 @@ public class DDLCompiler {
                 index.setExpressionsjson(convertToJSONArray(exprs));
             } catch (JSONException e) {
                 throw compiler.new VoltCompilerException("Unexpected error serializing non-column expressions for index '" +
-                                                           name + "' on type '" + table.getTypeName() + "': " + e.toString());
+                        name + "' on type '" + table.getTypeName() + "': " + e.toString());
             }
         }
 
@@ -2026,7 +1980,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
+                if (! index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX)) {
                     // on dup-detection, add a warning but don't fail
                     String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
@@ -2097,18 +2051,14 @@ public class DDLCompiler {
                     );
                 }
             }
-        }
-        catch (HSQLInterface.HSQLParseException e) {
+        } catch (HSQLInterface.HSQLParseException e) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());
         }
 
         if (! deleteXml.name.equals("delete")) {
             // Could in theory allow TRUNCATE TABLE here too.
             throw m_compiler.new VoltCompilerException(msgPrefix + "not a DELETE statement");
-        }
-
-        String deleteTarget = deleteXml.attributes.get("table");
-        if (! deleteTarget.equals(tableName)) {
+        } else if (! deleteXml.attributes.get("table").equals(tableName)) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "target of DELETE must be " + tableName);
         }
 
@@ -2130,9 +2080,7 @@ public class DDLCompiler {
     private void addConstraintToCatalog(Table table,
             VoltXMLElement node,
             Map<String, String> indexReplacementMap,
-            Map<String, Index> indexMap)
-            throws VoltCompilerException
-    {
+            Map<String, Index> indexMap) throws VoltCompilerException {
         assert node.name.equals("constraint");
 
         String name = node.attributes.get("name");
@@ -2140,49 +2088,43 @@ public class DDLCompiler {
         ConstraintType type = ConstraintType.valueOf(typeName);
         String tableName = table.getTypeName();
 
-        if (type == ConstraintType.LIMIT) {
-            int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
-            if (tupleLimit < 0) {
-                throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
-            }
-            if (tableLimitConstraintCounter.contains(tableName)) {
-                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + tableName);
-            } else {
-                tableLimitConstraintCounter.add(tableName);
-            }
+        switch (type) {
+            case LIMIT:
+                int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
+                if (tupleLimit < 0) {
+                    throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
+                } else if (tableLimitConstraintCounter.contains(tableName)) {
+                    throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + tableName);
+                } else {
+                    tableLimitConstraintCounter.add(tableName);
+                }
 
-            table.setTuplelimit(tupleLimit);
-            String deleteStmt = node.attributes.get("rowslimitdeletestmt");
-            if (deleteStmt != null) {
-                Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
-                catStmt.setSqltext(deleteStmt);
-                validateTupleLimitDeleteStmt(catStmt);
-            }
-            return;
-        }
-
-        if (type == ConstraintType.CHECK) {
-            String msg = "VoltDB does not enforce check constraints. ";
-            msg += "Constraint on table " + tableName + " will be ignored.";
-            m_compiler.addWarn(msg);
-            return;
-        }
-        else if (type == ConstraintType.FOREIGN_KEY) {
-            String msg = "VoltDB does not enforce foreign key references and constraints. ";
-            msg += "Constraint on table " + tableName + " will be ignored.";
-            m_compiler.addWarn(msg);
-            return;
-        }
-        else if (type == ConstraintType.MAIN) {
-            // should never see these
-            assert(false);
-        }
-        else if (type == ConstraintType.NOT_NULL) {
-            // these get handled by table metadata inspection
-            return;
-        }
-        else if (type != ConstraintType.PRIMARY_KEY &&  type != ConstraintType.UNIQUE) {
-            throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
+                table.setTuplelimit(tupleLimit);
+                String deleteStmt = node.attributes.get("rowslimitdeletestmt");
+                if (deleteStmt != null) {
+                    Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
+                    catStmt.setSqltext(deleteStmt);
+                    validateTupleLimitDeleteStmt(catStmt);
+                }
+                return;
+            case CHECK:
+                m_compiler.addWarn("VoltDB does not enforce check constraints. " +
+                        "Constraint on table " + tableName + " will be ignored.");
+                return;
+            case FOREIGN_KEY:
+                m_compiler.addWarn("VoltDB does not enforce foreign key references and constraints. " +
+                        "Constraint on table " + tableName + " will be ignored.");
+                return;
+            case MAIN:
+                // should never see these
+                assert(false);
+            case NOT_NULL:
+                // these get handled by table metadata inspection
+                return;
+            default:
+                if (type != ConstraintType.PRIMARY_KEY &&  type != ConstraintType.UNIQUE) {
+                    throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
+                }
         }
 
         // else, create the unique index below
@@ -2248,18 +2190,18 @@ public class DDLCompiler {
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
         if ( ! predicate.isValidExprForIndexesAndMVs(msg, false) ) {
             throw compiler.new VoltCompilerException(msg.toString());
+        } else {
+            return predicate;
         }
-        return predicate;
     }
 
     public void processMaterializedViewWarnings(Database db) throws VoltCompilerException {
             m_mvProcessor.processMaterializedViewWarnings(db, m_matViewMap);
     }
 
-    private void processVoltDBStatements(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
-
+    private void processVoltDBStatements(
+            final Database db, final DdlProceduresToLoad whichProcs,DDLStatement stmt) throws VoltCompilerException {
         boolean processed = false;
-
         try {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
             // CREATE PROCEDURE, CREATE FUNCTION, CREATE ROLE,

@@ -95,12 +95,11 @@ SegvException::SegvException(
             symname = tmp;
 #endif
 
-        snprintf(trace, 1024, "% 2d: %p <%s+%lu> (%s)\n",
-                ++f,
-                ip,
-                symname,
+        snprintf(trace, sizeof trace, "% 2d: %p <%s+%lu> (%s)\n",
+                ++f, ip, symname,
                 (unsigned long)ip - (unsigned long)dlinfo.dli_saddr,
                 dlinfo.dli_fname);
+        trace[sizeof trace - 1] = '\0';
         traces.push_back(std::string(trace));
 
 #ifndef NO_CPP_DEMANGLE

@@ -632,7 +632,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_MP",
                         false, false, false, 0, VoltType.VARBINARY,
                         false, false, false, true,
-                        true, true, false));
+                        true, true, true));
         builder.put("@MigrateRowsSP",
                 new Config("org.voltdb.sysprocs.MigrateRowsSP",
                         true, false, false, 0, VoltType.INVALID,
@@ -642,7 +642,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.MigrateRowsMP",
                         false, false, false, 0, VoltType.VARBINARY,
                         false, false, false, true,
-                        false, true,false));
+                        false, true, true));
         builder.put("@MigrateRowsNT",
                 new Config("org.voltdb.sysprocs.MigrateRowsNT",
                         true, false, false, 0, VoltType.INVALID,

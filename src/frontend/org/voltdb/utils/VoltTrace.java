@@ -31,6 +31,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -41,6 +43,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -57,13 +60,35 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * This class is thread-safe.
  */
 public class VoltTrace implements Runnable {
-    private static final VoltLogger s_logger = new VoltLogger("TRACER");
 
+    /***********************************
+     *   Static Variables of VoltTrace
+     ***********************************/
+    private static final VoltLogger s_logger = new VoltLogger("TRACER");
+    private static volatile VoltTrace s_tracer;
+    private static volatile TraceEventFilter s_tracingFilter = null;
     // Current process id. Used by all trace events.
     private static final int s_pid;
     static {
         s_pid = Integer.parseInt(CoreUtils.getPID());
     }
+
+    /***********************************
+     *   Member Variables of VoltTrace
+     ***********************************/
+    // Events from trace producers are put into this queue.
+    // TraceFileWriter takes events from this queue and writes them to files.
+    static final int QUEUE_SIZE = Integer.getInteger("VOLTTRACE_QUEUE_SIZE", 4096);
+    private EvictingQueue<TraceEventBatch> m_traceEvents = EvictingQueue.create(QUEUE_SIZE);
+    private EvictingQueue<TraceEventBatch> m_emptyQueue = EvictingQueue.create(QUEUE_SIZE);
+    private final ListeningExecutorService m_writerThread = CoreUtils.getCachedSingleThreadExecutor("VoltTrace Writer", 1000);
+    private volatile boolean m_shutdown = false;
+    private volatile Runnable m_shutdownCallback = null;
+    private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
+    private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
+
+    // This is a singleton class, created through start() method below
+    private VoltTrace() {}
 
     public enum Category {
         CI, MPI, MPSITE, SPI, SPSITE, EE, DRPRODUCER, DRCONSUMER
@@ -289,6 +314,126 @@ public class VoltTrace implements Runnable {
     }
 
     /**
+     * Trace event filter
+     * This is a singleton class.
+     */
+    public static class TraceEventFilter {
+        // lazy initialization
+        private static TraceEventFilter s_filter = null;
+
+        private TraceEventFilter() {}
+
+        // Return an instance of TraceEventFilter
+        public static TraceEventFilter getFilterInstance() {
+            if (s_filter == null) {
+                s_filter = new TraceEventFilter();
+            }
+            return s_filter;
+        }
+
+        // m_filterTime (unit: microsecond) is a latency target set by the customers
+        // It is used as the threshold to filter the trace events,
+        // whose latencies are larger than the m_filterTime.
+        private double m_filterTime;
+
+        // Thread safe data structures
+        // Hash map and linked deque (used as stack) to temporarily store the begin of a trace event
+        private final static int INIT_CAPACITY = Integer.getInteger("VOLTTRACE_INIT_CAPACITY", 1024);
+        private ConcurrentHashMap<String, Pair<TraceEventWrapper, Long>> m_asyncEvents = new ConcurrentHashMap<>(INIT_CAPACITY);
+        // The concurrentLinkedDeque is used as stack to deal with nested duration begin and end events
+        // The end events always match the nearest begin event
+        // For example, we have a serias of nested duration events: B1, B2, E2, B3, E3, E1
+        // We push begin events in the stack
+        // When there comes an end event, the top event on the stack is the matched begin event and we pop it from stack
+        private ConcurrentLinkedDeque<Pair<TraceEventWrapper, Long>> m_durationEvents = new ConcurrentLinkedDeque<>();
+
+        public void setThreshold(double time) {
+            m_filterTime = time;
+        }
+
+        public double getThreshold() {
+            return m_filterTime;
+        }
+
+        // Put the trace events of DURATION_BEGIN or ASYNC_BGEIN type in the filter
+        public void put(TraceEventType eventType, TraceEventWrapper beginWrapper, long beginTime, String eventId) {
+            if (TraceEventType.DURATION_BEGIN.equals(eventType)) {
+                m_durationEvents.addLast(new Pair(beginWrapper, beginTime));
+                return;
+            }
+            if (TraceEventType.ASYNC_BEGIN.equals(eventType)) {
+                m_asyncEvents.put(eventId, new Pair(beginWrapper, beginTime));
+                return;
+            }
+            return;
+        }
+
+         // Check whether a trace event of DURATION_END or ASYNC_END type
+         // has a matched begin event such that the latency is above the threshold (m_filterTime).
+         // If so, return the trace event wrapper. Otherwise, return null.
+        public TraceEventWrapper get(TraceEventType eventType, long endTime, String eventId) {
+            final Pair<TraceEventWrapper, Long> p;
+            if (TraceEventType.DURATION_END.equals(eventType)) {
+                assert eventId == null;
+                p = m_durationEvents.pollLast();
+            } else if (TraceEventType.ASYNC_END.equals(eventType)) {
+                p = m_asyncEvents.remove(eventId);
+            } else {
+                p = null;
+            }
+            if (p != null) {
+                double diff = (double)(endTime - p.getSecond()) / 1000 - m_filterTime;
+                if (diff >= 0) {
+                    return p.getFirst();
+                }
+            }
+            return null;
+        }
+
+        // Clear the trace events batch buffer after dump
+        public void clear() {
+            m_asyncEvents.clear();
+            m_durationEvents.clear();
+        }
+    }
+
+    /**
+     * Creates and starts a filter. If one already exists, this is a no-op.
+     * Synchronized to prevent multiple threads enabling it at the same time.
+     */
+    private static synchronized void createFilter() throws IOException {
+        if (s_tracingFilter == null) {
+            final TraceEventFilter filter = TraceEventFilter.getFilterInstance();
+            s_tracingFilter = filter;
+        }
+    }
+
+    public static void turnOnFilter(double time) throws IOException {
+        if (s_tracingFilter == null) {
+            createFilter();
+        }
+        s_tracingFilter.setThreshold(time);
+    }
+
+    public static void turnOffFilter() {
+        if (s_tracingFilter != null) {
+            s_tracingFilter.clear();
+            s_tracingFilter = null;
+        }
+    }
+
+    public static boolean isFilterOn() {
+        return s_tracingFilter != null;
+    }
+
+    public static double getFilterTime() {
+        if (s_tracingFilter == null) {
+            return 0;
+        }
+        return s_tracingFilter.getThreshold();
+    }
+
+    /**
      * Represents a batch of trace events that belong to the same category and thread.
      */
     public static class TraceEventBatch {
@@ -312,8 +457,42 @@ public class VoltTrace implements Runnable {
          *          to file, the parameters will never be materialized.
          */
         public TraceEventBatch add(Supplier<TraceEvent> s) {
-            m_events.add(new TraceEventWrapper(s));
+            TraceEventWrapper eventWrapper = new TraceEventWrapper(s);
+
+            if (!isFilterOn()) {
+                m_events.add(eventWrapper);
+                return this;
+            }
+
+            filterTraceEvents(eventWrapper);
             return this;
+        }
+
+        private void filterTraceEvents(TraceEventWrapper eventWrapper) {
+            TraceEvent e = eventWrapper.get(m_cat, m_tid);
+            TraceEventType eventType = e.getType();
+
+            // Skip trace events without a duration of time
+            if (TraceEventType.METADATA.equals(eventType) || TraceEventType.ASYNC_INSTANT.equals(eventType) || TraceEventType.INSTANT.equals(eventType)) {
+                return;
+            }
+
+            String eventId = e.getId();
+            long eventTs = e.getNanos();
+            // Check trace events with a duration of time
+            if (TraceEventType.DURATION_BEGIN.equals(eventType) || TraceEventType.ASYNC_BEGIN.equals(eventType)) {
+                s_tracingFilter.put(eventType, eventWrapper, eventTs, eventId);
+            } else if (TraceEventType.DURATION_END.equals(eventType) || TraceEventType.ASYNC_END.equals(eventType)) {
+                TraceEventWrapper beginWrapper = s_tracingFilter.get(eventType, eventTs, eventId);
+                if (beginWrapper != null) {
+                    m_events.add(beginWrapper);
+                    m_events.add(eventWrapper);
+                    // add filtered tracer events to buffer
+                    final VoltTrace tracer = s_tracer;
+                    tracer.queueEvent(this);
+                }
+            }
+            return;
         }
 
         protected TraceEvent nextEvent() {
@@ -347,21 +526,6 @@ public class VoltTrace implements Runnable {
         }
     }
 
-    static final int QUEUE_SIZE = Integer.getInteger("VOLTTRACE_QUEUE_SIZE", 4096);
-    private static volatile VoltTrace s_tracer;
-
-    // Events from trace producers are put into this queue.
-    // TraceFileWriter takes events from this queue and writes them to files.
-    private EvictingQueue<TraceEventBatch> m_traceEvents = EvictingQueue.create(QUEUE_SIZE);
-    private EvictingQueue<TraceEventBatch> m_emptyQueue = EvictingQueue.create(QUEUE_SIZE);
-    private final ListeningExecutorService m_writerThread = CoreUtils.getCachedSingleThreadExecutor("VoltTrace Writer", 1000);
-
-    private volatile boolean m_shutdown = false;
-    private volatile Runnable m_shutdownCallback = null;
-
-    private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
-    private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
-
     private boolean isCategoryEnabled(Category cat) {
         return m_enabledCategories.contains(cat);
     }
@@ -393,6 +557,7 @@ public class VoltTrace implements Runnable {
      */
     private String write(String logDir) throws IOException, ExecutionException, InterruptedException {
         final File file = new File(logDir, "trace_" + System.currentTimeMillis() + ".json.gz");
+
         if (file.exists()) {
             throw new IOException("Trace file " + file.getAbsolutePath() + " already exists");
         }
@@ -444,12 +609,15 @@ public class VoltTrace implements Runnable {
         final VoltTrace tracer = s_tracer;
         if (tracer != null && tracer.isCategoryEnabled(cat)) {
             final TraceEventBatch batch = new TraceEventBatch(cat);
-            tracer.queueEvent(batch);
+            if (!isFilterOn()) {
+                tracer.queueEvent(batch);
+            }
             return batch;
         } else {
             return null;
         }
     }
+
     /**
      * Creates a metadata trace event. This method does not queue the
      * event. Call {@link TraceEventBatch#add(Supplier)} to queue the event.
@@ -579,6 +747,11 @@ public class VoltTrace implements Runnable {
             }
         }
 
+        // Clear the containers used in trace event filtering after dump
+        if (isFilterOn()) {
+            s_tracingFilter.clear();
+        }
+
         return path;
     }
 
@@ -632,6 +805,24 @@ public class VoltTrace implements Runnable {
         } else {
             tracer.m_enabledCategories = enabledCategories;
         }
+    }
+
+    /**
+     * Disable all categories and shutdown the tracer.
+     */
+    public static void disableAllCategories() {
+        final VoltTrace tracer = s_tracer;
+
+        if (tracer == null) {
+            return;
+        }
+        // clear the set of enabled categories
+        final ImmutableSet.Builder<Category> builder = ImmutableSet.builder();
+        tracer.m_enabledCategories = builder.build();
+
+        try {
+            closeAllAndShutdown(null, 0);
+        } catch (IOException e) {}
     }
 
     /**

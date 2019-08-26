@@ -306,8 +306,7 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_DROP_FUNCTION =
         SPF.statement(
-            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()),
-            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()), SPF.ifExisits()
         ).compile("PAT_DROP_FUNCTION");
 
     /*
@@ -420,6 +419,71 @@ public class SQLParser extends SQLPatternFactory
                     ).compile("PAT_DROP_STREAM");
 
     /**
+     * Build regex to support create schedule statement in the from of
+     * <p>
+     *
+     * <pre>
+     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
+     *     USING &lt;scheduler class> [AS USER &lt;user&gt;] [DISABLED] [WITH arg1, ...]
+     * or
+     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
+     *     (DELAY &lt;delay&gt;|CRON &lt;cron expression&gt;)
+     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [AS USER &lt;user&gt;] [DISABLED] AS &lt;procedure&gt; [arg1, ...]
+     * </pre>
+     */
+    private static final Pattern PAT_CREATE_SCHEDULE =
+            SPF.statement(
+                SPF.token("create"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
+                        SPF.capture("scope", SPF.oneOf("system", "hosts", "partitions")))),
+                SPF.oneOf(
+                    SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
+                    SPF.clause(SPF.oneOf(
+                        SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
+                        SPF.clause(SPF.token("cron"),
+                            SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))),
+                        SPF.clause(SPF.token("every"), SPF.capture("interval", SPF.integer()),
+                            SPF.capture("timeUnit", SPF.oneOf("milliseconds", "seconds", "minutes", "hours", "days")))))),
+                SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                        SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))),
+                SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
+                SPF.optional(SPF.capture("disabled", SPF.token("disabled"))),
+                SPF.optional(SPF.oneOf(
+                    SPF.clause(SPF.token("with"), SPF.capture("parameters", SPF.commaList(SPF.token(".+")))),
+                    SPF.clause(SPF.token("as"), SPF.capture("procedure", SPF.commaList(SPF.token(".+"))))))
+            ).compile("PAT_CREATE_SCHEDULE");
+
+    /**
+     * Build regex to support drop schedule statement in the from of
+     * <p>
+     * <code>
+     * DROP SCHEDULE <schedule name> [IF EXISTS]
+     * </code>
+     */
+    private static final Pattern PAT_DROP_SCHEDULE =
+            SPF.statement(
+                    SPF.token("drop"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.ifExisits())
+            .compile("PAT_DROP_SCHEDULE");
+
+    /**
+     * Build regex to support alter schedule statement in the from of
+     * <p>
+     * <code>
+     * ALTER SCHEDULE <schedule name> (ENABLE | DISABLE)
+     * </code>
+     */
+    private static final Pattern PAT_ALTER_SCHEDULE =
+            SPF.statement(
+                SPF.token("alter"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
+                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                            SPF.capture("onError",
+                                    SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore")))))
+            ).compile("PAT_ALTER_SCHEDULE");
+
+    /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
      */
@@ -476,14 +540,15 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|AGGREGATE)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|SCHEDULE|AGGREGATE)|" + // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
             "\\AREPLICATE|" +
             "\\AIMPORT|" +
             "\\ADR|" +
-            "\\ASET" +
+            "\\ASET|" +
+            "\\AALTER\\s+SCHEDULE" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -993,6 +1058,117 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchReplicateTable(String statement)
     {
         return PAT_REPLICATE_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against pattern for create schedule
+     * <p>
+     * If a match is found the following named groups are in the returned {@link Matcher}:
+     * <table>
+     * <tr>
+     * <th>Capture name</th>
+     * <th>Presence</th>
+     * <th>Description</th>
+     * </tr>
+     * <tr>
+     * <td>name</td>
+     * <td>Required</td>
+     * <td>Name of schedule</td>
+     * </tr>
+     * <tr>
+     * <td>scope</td>
+     * <td>Optional</td>
+     * <td>Scope of the schedule. IE system, hosts, partitions</td>
+     * </tr>
+     * <tr>
+     * <td>class|delay|cron</td>
+     * <td>Required</td>
+     * <td>Scheduler class, fixed delay or cron expression to be used</td>
+     * </tr>
+     * <tr>
+     * <td>asUser</td>
+     * <td>Optional</td>
+     * <td>Which user to use to execute the procedures run by the scheduler</td>
+     * </tr>
+     * <td>disabled</td>
+     * <td>Optional</td>
+     * <td>If present this schedule is part of the catalog but not executed</td>
+     * </tr>
+     * <tr>
+     * <td>parameters</td>
+     * <td>Optional</td>
+     * <td>Comma separated list of parameters to pass to the scheduler</td>
+     * </tr>
+     * <tr>
+     * <td>procedure</td>
+     * <td>Required for cron or delay</td>
+     * <td>Procedure name with comma separated list of parameters to pass to the procedure</td>
+     * </tr>
+     * </table>
+     *
+     * @param statement statement to match against
+     * @return pattern matcher object
+     */
+    public static Matcher matchCreateSchedule(String statement) {
+        return PAT_CREATE_SCHEDULE.matcher(statement);
+    }
+
+    /**
+     * Match statement against pattern for drop schedule
+     * <p>
+     * If a match is found the following named groups are in the returned {@link Matcher}:
+     * <table>
+     * <tr>
+     * <th>Capture name</th>
+     * <th>Presence</th>
+     * <th>Description</th>
+     * </tr>
+     * <tr>
+     * <td>name</td>
+     * <td>Required</td>
+     * <td>Name of schedule</td>
+     * </tr>
+     * <tr>
+     * <td>ifExists</td>
+     * <td>Optional</td>
+     * <td>If present then it is not an error if the schedule does not exist</td>
+     * </tr>
+     * </table>
+     *
+     * @param statement statement to match against
+     * @return pattern matcher object
+     */
+    public static Matcher matchDropSchedule(String statement) {
+        return PAT_DROP_SCHEDULE.matcher(statement);
+    }
+
+    /**
+     * Match statement against pattern for alter schedule
+     * <p>
+     * If a match is found the following named groups are in the returned {@link Matcher}:
+     * <table>
+     * <tr>
+     * <th>Capture name</th>
+     * <th>Presence</th>
+     * <th>Description</th>
+     * </tr>
+     * <tr>
+     * <td>name</td>
+     * <td>Required</td>
+     * <td>Name of schedule</td>
+     * </tr>
+     * <tr>
+     * <td>action</td>
+     * <td>Required</td>
+     * <td>What alter action should be performed. Enable or disable</td>
+     * </tr>
+     * </table>
+     *
+     * @param statement statement to match against
+     * @return pattern matcher object
+     */
+    public static Matcher matchAlterSchedule(String statement) {
+        return PAT_ALTER_SCHEDULE.matcher(statement);
     }
 
     /**
@@ -2122,8 +2298,9 @@ public class SQLParser extends SQLPatternFactory
                     continue;
                 }
                 line = line.trim();
-                if (line.equals(""))
+                if (line.equals("")) {
                     continue;
+                }
 
                 // we have a non-blank line that contains more than just a comment.
                 return queryIsDDL(line);

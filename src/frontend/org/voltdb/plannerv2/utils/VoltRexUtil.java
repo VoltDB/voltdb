@@ -93,7 +93,9 @@ public class VoltRexUtil {
      */
     public static RelCollation createIndexCollation(
             Index index, Table catTable, RexBuilder builder, RexProgram program) throws JSONException {
-        if (IndexType.isScannable(index.getType())) {
+        // HASH indexes are no longer supported, only an INVALID ones
+        // can't be used to provide ordering
+        if (IndexType.INVALID != IndexType.get(index.getType())) {
             // Convert index collation to take the program into an account
             return VoltRexUtil.adjustCollationForProgram(builder, program,
                     RelCollations.of(IndexUtil.getIndexCollationFields(catTable, index, program)));

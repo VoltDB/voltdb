@@ -3272,6 +3272,14 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    public static boolean isPersistentMigrate(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return TableType.isPersistentMigrate(table.getTabletype());
+        }
+        return false;
+    }
+
     /**
      * Utility method for converting a {@link Column} to a {@link VoltTable.ColumnInfo}
      *

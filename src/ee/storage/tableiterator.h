@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETABLEITERATOR_H
-#define HSTORETABLEITERATOR_H
+#pragma once
 
 #include "common/LargeTempTableBlockCache.h"
 #include "common/LargeTempTableBlockId.hpp"
@@ -535,11 +534,11 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
         }
 
         if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
-            LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+            LargeTempTableBlockCache& lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
             auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
             if (m_dataPtr != NULL) {
-                lttCache->unpinBlock(*blockIdIterator);
+                lttCache.unpinBlock(*blockIdIterator);
 
                 if (m_state.m_tempTableDeleteAsGo) {
                     blockIdIterator = m_table->releaseBlock(blockIdIterator);
@@ -549,7 +548,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
                 }
             }
 
-            LargeTempTableBlock* block = lttCache->fetchBlock(*blockIdIterator);
+            LargeTempTableBlock* block = lttCache.fetchBlock(*blockIdIterator);
             m_dataPtr = block->tupleStorage();
 
             uint32_t unusedTupleBoundary = block->unusedTupleBoundary();
@@ -573,11 +572,11 @@ inline void TableIterator::finishLargeTempTableScan() {
         return;
     }
 
-    LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
-    if (lttCache->blockIsPinned(*blockIdIterator)) {
-        lttCache->unpinBlock(*blockIdIterator);
+    if (lttCache.blockIsPinned(*blockIdIterator)) {
+        lttCache.unpinBlock(*blockIdIterator);
     }
 
     if (m_foundTuples == m_activeTuples
@@ -598,4 +597,3 @@ inline TableIterator::~TableIterator() {
 }
 
 }
-#endif

@@ -15,27 +15,23 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdexcept>
-
 #include "SchemaColumn.h"
 #include "common/debuglog.h"
 
 using namespace std;
 using namespace voltdb;
 
-SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
-{
+SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx) {
     if (colObject.hasKey("TABLE_NAME")) {
         m_tableName = colObject.valueForKey("TABLE_NAME").asStr();
     }
 
     if (colObject.hasKey("COLUMN_NAME")) {
         m_columnName = colObject.valueForKey("COLUMN_NAME").asStr();
-    }
-    else {
-//        throw runtime_error("SchemaColumn::constructor missing column name.");
+    } else {
         char tmpName[6]; // 1024
         std::snprintf(tmpName, sizeof(tmpName), "C%d", idx);
+        tmpName[sizeof tmpName - 1] = '\0';
         m_columnName = std::string(tmpName);
     }
 
@@ -62,19 +58,14 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
     }
 }
 
-SchemaColumn::~SchemaColumn()
-{
+SchemaColumn::~SchemaColumn() {
     delete m_expression;
 }
 
-string
-SchemaColumn::getColumnName() const
-{
+string SchemaColumn::getColumnName() const {
     return m_columnName;
 }
 
-AbstractExpression*
-SchemaColumn::getExpression()
-{
+AbstractExpression* SchemaColumn::getExpression() {
     return m_expression;
 }

@@ -253,11 +253,8 @@ void NValue::createDecimalFromString(const std::string &txt) {
      */
     for (int ii = (setSign ? 1 : 0); ii < static_cast<int>(txt.size()); ii++) {
         if ((txt[ii] < '0' || txt[ii] > '9') && txt[ii] != '.') {
-            char message[4096];
-            snprintf(message, 4096, "Invalid characters in decimal string: %s",
-                     txt.c_str());
-            throw SQLException(SQLException::volt_decimal_serialization_error,
-                               message);
+            throwSQLException(SQLException::volt_decimal_serialization_error,
+                    "Invalid characters in decimal string: %s", txt.c_str());
         }
     }
 
@@ -267,7 +264,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
         const std::size_t wholeStringSize = wholeString.size();
         if (wholeStringSize > 26) {
             throw SQLException(SQLException::volt_decimal_serialization_error,
-                               "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+                    "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
         }
         TTInt whole(wholeString);
         if (setSign) {
@@ -280,7 +277,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
 
     if (txt.find( '.', separatorPos + 1) != std::string::npos) {
         throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Too many decimal points");
+                "Too many decimal points");
     }
 
     // This is set to 1 if we carry in the scale.
@@ -353,16 +350,14 @@ void NValue::createDecimalFromString(const std::string &txt) {
 }
 
 struct NValueList {
-    static int allocationSizeForLength(size_t length)
-    {
+    static int allocationSizeForLength(size_t length) {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
         // This allocation has the advantage of getting freed via NValue::free.
         return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
     }
 
-    void* operator new(size_t size, char* placement)
-    {
+    void* operator new(size_t size, char* placement) {
         return placement;
     }
     void operator delete(void*, char*) {}
@@ -371,8 +366,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
-    {
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool) {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
         }
@@ -395,8 +389,7 @@ struct NValueList {
  * explicit cast operators and and/or constant promotions as needed.
  * @return a VALUE_TYPE_BOOLEAN NValue.
  */
-bool NValue::inList(const NValue& rhs) const
-{
+bool NValue::inList(const NValue& rhs) const {
     //TODO: research: does the SQL standard allow a null to match a null list element
     // vs. returning FALSE or NULL?
     const bool lhsIsNull = isNull();
@@ -417,8 +410,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
-{
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool) {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
     int trueSize = NValueList::allocationSizeForLength(length);
@@ -430,16 +422,14 @@ void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPo
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-void NValue::allocateANewNValueList(size_t length, ValueType elementType)
-{
+void NValue::allocateANewNValueList(size_t length, ValueType elementType) {
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, NULL);
     ::memset(storage, 0, trueSize);
     new (storage) NValueList(length, elementType);
 }
 
-void NValue::setArrayElements(std::vector<NValue> &args) const
-{
+void NValue::setArrayElements(std::vector<NValue> &args) const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
@@ -453,15 +443,13 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-int NValue::arrayLength() const
-{
+int NValue::arrayLength() const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
-const NValue& NValue::itemAtIndex(int index) const
-{
+const NValue& NValue::itemAtIndex(int index) const {
     vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     vassert(index >= 0);
@@ -469,8 +457,8 @@ const NValue& NValue::itemAtIndex(int index) const
     return listOfNValues->m_values[index];
 }
 
-void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const
-{
+void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
+        std::vector<NValue> &outList) const {
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
@@ -500,8 +488,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     }
 }
 
-void NValue::streamTimestamp(std::stringstream& value) const
-{
+void NValue::streamTimestamp(std::stringstream& value) const {
     int64_t epoch_micros = getTimestamp();
     if (epochMicrosOutOfRange(epoch_micros)) {
         throwOutOfRangeTimestampInput("CAST");
@@ -527,14 +514,11 @@ void NValue::streamTimestamp(std::stringstream& value) const
     value << mbstr;
 }
 
-inline static void throwTimestampFormatError(const std::string &str)
-{
-    char message[4096];
+inline static void throwTimestampFormatError(const std::string &str) {
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
-             "or \'YYYY-MM-DD\'",
-             str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
-    throw SQLException(SQLException::dynamic_sql_error, message);
+    throwSQLException(SQLException::dynamic_sql_error,
+            "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'or \'YYYY-MM-DD\'",
+            str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
 }
 
 int64_t NValue::parseTimestampString(const std::string &str)

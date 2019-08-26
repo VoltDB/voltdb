@@ -93,7 +93,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         vassert(targetTable->isReplicatedTable() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                []() { s_modifiedTuples = -1l; });
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             if (m_truncate) {
                 VOLT_TRACE("truncating table %s...", targetTable->name().c_str());

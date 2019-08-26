@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VALUEFACTORY_HPP_
-#define VALUEFACTORY_HPP_
+#pragma once
 
 #include "common/NValue.hpp"
 
@@ -262,4 +261,3 @@ public:
     static NValue getRandomValue(ValueType type, uint32_t maxLength, Pool* pool = NULL);
 };
 }
-#endif /* VALUEFACTORY_HPP_ */

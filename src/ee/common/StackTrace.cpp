@@ -57,8 +57,7 @@ bool backtraceIsSupported() {
     Topend* topend = engine->getTopend();
     if (dynamic_cast<JNITopend*>(topend) != NULL) {
         return false;
-    }
-    else {
+    } else {
         // Must be an IPC or some other top end for testing.
         return true;
     }
@@ -68,7 +67,6 @@ bool backtraceIsSupported() {
 }
 
 StackTrace::StackTrace(uint32_t skipFrames) {
-
     if (backtraceIsSupported()) {
         /**
          * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
@@ -76,8 +74,8 @@ StackTrace::StackTrace(uint32_t skipFrames) {
         void *traces[128];
         char mangledName[256];
         for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
-        const int numTraces = backtrace( traces, 128);
-        m_traceSymbols = backtrace_symbols( traces, numTraces);
+        const int numTraces = backtrace(traces, 128);
+        m_traceSymbols = backtrace_symbols(traces, numTraces);
 
         for (int ii = skipFrames; ii < numTraces; ii++) {
             std::size_t sz = 200;
