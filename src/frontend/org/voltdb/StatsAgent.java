@@ -27,7 +27,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.sched.ScheduleStatsSource;
+import org.voltdb.task.TaskStatsSource;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -82,9 +82,9 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
             break;
-        case SCHEDULED_PROCEDURES:
-        case SCHEDULERS:
-            ScheduleStatsSource.convert(subselector, request.aggregateTables);
+        case TASK_PROCEDURE:
+        case TASK_SCHEDULER:
+            TaskStatsSource.convert(subselector, request.aggregateTables);
             break;
         default:
         }

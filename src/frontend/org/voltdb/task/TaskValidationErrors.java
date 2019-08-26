@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import com.google_voltpatches.common.base.Joiner;
 /**
  * Used to collect errors that are encountered while validating the parameters of a {@link Scheduler}.
  */
-final class SchedulerValidationErrors {
+public final class TaskValidationErrors {
     private List<String> m_errors = null;
 
     /**
@@ -33,7 +33,7 @@ final class SchedulerValidationErrors {
      *
      * @param error message to add. If {@code null} the message will be ignored
      */
-    void addErrorMessage(String error) {
+    public void addErrorMessage(String error) {
         if (error == null) {
             return;
         }
@@ -46,11 +46,11 @@ final class SchedulerValidationErrors {
     /**
      * @return {@code true} if errors have been added to this instance
      */
-    boolean hasErrors() {
+    public boolean hasErrors() {
         return m_errors != null;
     }
 
-    String getErrorMessage() {
+    public String getErrorMessage() {
         if (m_errors == null) {
             return null;
         }

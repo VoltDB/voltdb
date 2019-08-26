@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.Collection;
 
@@ -25,7 +25,7 @@ import java.util.Collection;
  * A scheduler instance can have external parameters supplied by the DDL. If a scheduler needs to have procedure
  * parameters passed in it is done through a {@code public void initialize} method. Only valid column types are allowed
  * as initialize parameters with two exceptions. The first one being that the first argument may be an instance of
- * {@link SchedulerHelper}, but this is optional. The other exception is that the last parameter can be either
+ * {@link TaskHelper}, but this is optional. The other exception is that the last parameter can be either
  * {@code String[]} or {@code Object[]}. If the last parameter is an array then it will be treated as a var args
  * parameter.
  * <p>
@@ -33,9 +33,9 @@ import java.util.Collection;
  *
  * <pre>
  * public void initialize(int interval, String timeUnit)
- * public void initialize(SchedulerHelper helper, int interval, String timeUnit)
+ * public void initialize(TaskHelper helper, int interval, String timeUnit)
  * public void initialize(int interval, String timeUnit, String procedureName, Object... procedureParameters)
- * public void initialize(SchedulerHelper helper, int interval, String timeUnit, String procedureName, Object... procedureParameters)
+ * public void initialize(TaskHelper helper, int interval, String timeUnit, String procedureName, Object... procedureParameters)
  * </pre>
  * <p>
  * Optionally an implementation can implement a {@code validateParameters} method which will be invoked during the DDL

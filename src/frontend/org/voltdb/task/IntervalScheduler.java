@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -23,43 +23,21 @@ import java.util.concurrent.TimeUnit;
 /**
  * A {@link Scheduler} which tries to execute a procedure with a fixed amount of time between procedure start times
  */
-public class IntervalScheduler extends SingleProcScheduler {
-    private long m_intervalNs;
+public class IntervalScheduler extends DurationScheduler {
     private long m_lastRunNs = System.nanoTime();
 
-    public static String validateParameters(SchedulerHelper helper, int interval, String timeUnit,
-            String procedure, String... procedureParameters) {
-        SchedulerValidationErrors errors = new SchedulerValidationErrors();
-        SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
-        if (interval <= 0) {
-            errors.addErrorMessage("Interval must be greater than 0: " + interval);
-        }
-        switch (timeUnit) {
-        default:
-            errors.addErrorMessage("Unsupported time unit: " + timeUnit);
-            break;
-        case "MILLISECONDS":
-        case "SECONDS":
-        case "MINUTES":
-        case "HOURS":
-        case "DAYS":
-            break;
-        }
-        return errors.getErrorMessage();
-    }
-
-    public void initialize(SchedulerHelper helper, int interval, String timeUnit, String procedure,
+    @Override
+    public void initialize(TaskHelper helper, int interval, String timeUnit, String procedure,
             String[] procedureParameters) {
-        super.initialize(helper, procedure, procedureParameters);
-        m_intervalNs = TimeUnit.valueOf(timeUnit).toNanos(interval);
+        super.initialize(helper, interval, timeUnit, procedure, procedureParameters);
         // Introduce some jitter to first start time
         m_lastRunNs = System.nanoTime()
-                - ThreadLocalRandom.current().nextLong(Math.min((m_intervalNs / 2), TimeUnit.MINUTES.toNanos(5)));
+                - ThreadLocalRandom.current().nextLong(Math.min((m_durationNs / 2), TimeUnit.MINUTES.toNanos(5)));
     }
 
     @Override
     long getNextDelayNs() {
-        long nextRun = m_lastRunNs + m_intervalNs;
+        long nextRun = m_lastRunNs + m_durationNs;
         long now = System.nanoTime();
         long delay = nextRun - now;
 

@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,10 +36,10 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Iterators;
 
 /**
- * {@link StatsSource} used by {@link SchedulerManager}. A single instance of this stats source will be created for each
+ * {@link StatsSource} used by {@link TaskManager}. A single instance of this stats source will be created for each
  * running instance of a Scheduler.
  */
-public class ScheduleStatsSource extends StatsSource {
+public class TaskStatsSource extends StatsSource {
     private static final String PREFIX_SCHEDULER = "SCHEDULER_";
     private static final String PREFIX_PROCEDURE = "PROCEDURE_";
 
@@ -87,8 +87,8 @@ public class ScheduleStatsSource extends StatsSource {
     private long m_procedureFailures = 0;
 
     /**
-     * Convert stats collected under {@link StatsSelector#SCHEDULES} to either {@link StatsSelector#SCHEDULERS} or
-     * {@link StatsSelector#SCHEDULED_PROCEDURES}
+     * Convert stats collected under {@link StatsSelector#TASK} to either {@link StatsSelector#TASK_SCHEDULER} or
+     * {@link StatsSelector#TASK_PROCEDURE}
      *
      * @param subselector to format to convert to
      * @param tables      generated from the stats colleciton
@@ -100,13 +100,13 @@ public class ScheduleStatsSource extends StatsSource {
         VoltTable source = tables[0];
 
         switch (subselector) {
-        case SCHEDULED_PROCEDURES:
+        case TASK_PROCEDURE:
             columnConversion = getProceduresConverter(source);
             break;
-        case SCHEDULERS:
+        case TASK_SCHEDULER:
             columnConversion = getSchedulersConverter(source);
             break;
-        case SCHEDULES:
+        case TASK:
             return;
         default:
             throw new IllegalArgumentException("Unsupported selector: " + subselector);
@@ -167,15 +167,15 @@ public class ScheduleStatsSource extends StatsSource {
         return builder.build();
     }
 
-    static ScheduleStatsSource createDummy() {
-        return new ScheduleStatsSource(null, null, -1);
+    static TaskStatsSource createDummy() {
+        return new TaskStatsSource(null, null, -1);
     }
 
-    static ScheduleStatsSource create(String name, String scope, int partitionId) {
-        return new ScheduleStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId);
+    static TaskStatsSource create(String name, String scope, int partitionId) {
+        return new TaskStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId);
     }
 
-    private ScheduleStatsSource(String name, String scope, int partitionId) {
+    private TaskStatsSource(String name, String scope, int partitionId) {
         super(false);
         m_name = name;
         m_scope = scope;
@@ -191,11 +191,11 @@ public class ScheduleStatsSource extends StatsSource {
     }
 
     void register(StatsAgent agent) {
-        agent.registerStatsSource(StatsSelector.SCHEDULES, m_partitionId, this);
+        agent.registerStatsSource(StatsSelector.TASK, m_partitionId, this);
     }
 
     void deregister(StatsAgent agent) {
-        agent.deregisterStatsSource(StatsSelector.SCHEDULES, m_partitionId, this);
+        agent.deregisterStatsSource(StatsSelector.TASK, m_partitionId, this);
     }
 
     @Override
