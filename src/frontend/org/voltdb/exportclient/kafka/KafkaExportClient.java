@@ -338,7 +338,6 @@ public class KafkaExportClient extends ExportClientBase {
             if (DEFAULT_CLIENT_ID.equals(clientId)) {
                 // Generate a unique kafka client id
                 clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId;
-                LOG.info("Set Kafka client id to " + clientId);
                 m_decoderProducerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
             }
         }
