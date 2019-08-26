@@ -65,14 +65,12 @@ using AggregateNValueSetType = std::unordered_set<NValue>;
 class Distinct : public AggregateNValueSetType {
     Pool* m_memoryPool;
 public:
-    explicit Distinct(Pool* memoryPool) : m_memoryPool(memoryPool) { }
-
+    explicit Distinct(Pool* memoryPool) : m_memoryPool(memoryPool) {}
     bool excludeValue(const NValue& val) {
         // find this value in the set.  If it doesn't exist, add
         // it, otherwise indicate it shouldn't be included in the
         // aggregate
-        iterator setval = find(val);
-        if (setval == end()) {
+        if (find(val) == end()) {
             if (val.getVolatile()) {
                 // We only come here in the case of inlined VARCHAR or
                 // VARBINARY data.  The tuple backing this NValue may
@@ -110,12 +108,12 @@ struct NotDistinct {
 // Parameter D is either Distinct of NotDistinct.
 template<typename D>
 class SumAgg : public Agg {
-    D ifDistinct{nullptr};
+    D ifDistinct;
 public:
     // We're providing a NULL pool argument here to ifDistinct because
     // SUM only operates on numeric values which don't have the same
     // issues as inlined strings.
-    explicit SumAgg() = default;
+    explicit SumAgg() : ifDistinct{nullptr} {}
 
     void advance(const NValue& val) override {
         if (val.isNull() || ifDistinct.excludeValue(val)) {
@@ -140,13 +138,13 @@ public:
 // Parameter D is either Distinct of NotDistinct.
 template<typename D>
 class AvgAgg : public Agg {
-    D ifDistinct{nullptr};
+    D ifDistinct;
     int64_t m_count = 0;
 public:
     // We're providing a NULL pool argument here to ifDistinct because
     // AVG only operates on numeric values which don't have the same
     // issues as inlined strings.
-    explicit AvgAgg() = default;
+    explicit AvgAgg() : ifDistinct{nullptr} {}
 
     void advance(const NValue& val) override {
         if (! val.isNull() && ! ifDistinct.excludeValue(val)) {
