@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -61,12 +61,12 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.ProcedureSchedule;
-import org.voltdb.catalog.SchedulerParam;
+import org.voltdb.catalog.Task;
+import org.voltdb.catalog.TaskParameter;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.deploymentfile.SchedulerType;
+import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -81,27 +81,27 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
 
 /**
- * Manager for the life cycle of the current set of configured {@link Scheduler}s. Each schedule configuration is
- * represented by a {@link SchedulerHandler}. Each {@link SchedulerHandler} will hold a set of {@link SchedulerWrapper}s
- * which are used to wrap the execution of the scheduler and procedures which are scheduled.
+ * Manager for the life cycle of the current set of configured {@link Task}s. Each task configuration is represented by
+ * a {@link TaskHandler}. Each {@link TaskHandler} will hold a set of {@link SchedulerWrapper}s which are used to wrap
+ * the execution of the scheduler and procedures which are scheduled.
  * <p>
- * The scheduler manager will execute procedures which are scheduled to run on each host, system if this host is the
- * leader and all locally led partitions.
+ * The task manager will execute procedures which are scheduled to run on each host, database if this host is the leader
+ * and all locally led partitions.
  * <p>
- * All manager tasks will be executed in the {@link #m_managerExecutor} as well as {@link SchedulerHandler} methods. The
- * execution of {@link SchedulerWrapper} instances will be split between the {@link #m_managerExecutor} and
- * {@link #m_wrapperExecutor}. Pure management calls will be executed in the {@link #m_managerExecutor} while
- * scheduled procedures, results and calls to {@link Scheduler}s will be handled in the {@link #m_wrapperExecutor}
+ * All manager operations will be executed in the {@link #m_managerExecutor} as well as {@link TaskHandler} methods. The
+ * execution of {@link SchedulerWrapper} instances will be split between the {@link #m_managerExecutor} and and the
+ * handlers assigned executor. Pure management calls will be executed in the {@link #m_managerExecutor} while scheduled
+ * procedures, results and calls to {@link Scheduler}s will be handled in the assigned executor.
  */
-public final class SchedulerManager {
-    static final VoltLogger log = new VoltLogger("SCHEDULE");
-    static final String SCOPE_SYSTEM = "SYSTEM";
+public final class TaskManager {
+    static final VoltLogger log = new VoltLogger("TASK");
+    static final String SCOPE_DATABASE = "DATABASE";
     static final String SCOPE_HOSTS = "HOSTS";
     static final String SCOPE_PARTITIONS = "PARTITIONS";
     static final String HASH_ALGO = "SHA-512";
-    public static final String SCOPE_DEFAULT = SCOPE_SYSTEM;
+    public static final String SCOPE_DEFAULT = SCOPE_DATABASE;
 
-    private Map<String, SchedulerHandler> m_handlers = Collections.emptyMap();
+    private Map<String, TaskHandler> m_handlers = Collections.emptyMap();
     private volatile boolean m_leader = false;
     private AuthSystem m_authSystem;
     private boolean m_started = false;
@@ -141,8 +141,7 @@ public final class SchedulerManager {
         return lastParam.getType() == String[].class || lastParam.getType() == Object[].class;
     }
 
-
-    public SchedulerManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId) {
+    public TaskManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId) {
         m_clientInterface = clientInterface;
         m_statsAgent = statsAgent;
         m_hostId = hostId;
@@ -207,28 +206,28 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> start(CatalogContext context) {
-        return start(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
-                context.authSystem, context.getCatalogJar().getLoader());
+        return start(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+                context.getCatalogJar().getLoader());
     }
 
     /**
      * Asynchronously start the scheduler manager and any configured schedules which are eligible to be run on this
      * host.
      *
-     * @param configuration      Global configuration for all schedules
-     * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
+     * @param configuration      Global configuration for all tasks
+     * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> start(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader) {
+    ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> procedureSchedules, AuthSystem authSystem,
+            ClassLoader classLoader) {
         return execute(() -> {
             m_started = true;
 
             // Create a dummy stats source so something is always reported
-            ScheduleStatsSource.createDummy().register(m_statsAgent);
+            TaskStatsSource.createDummy().register(m_statsAgent);
 
             processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
         });
@@ -241,21 +240,20 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> promoteToLeader(CatalogContext context) {
-        return promoteToLeader(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
-                context.authSystem,
+        return promoteToLeader(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
     /**
      * Asynchronously promote this host to be the global leader
      *
-     * @param configuration      Global configuration for all schedules
-     * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
+     * @param configuration      Global configuration for all tasks
+     * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> promoteToLeader(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+    ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader) {
         log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
@@ -272,21 +270,21 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> processUpdate(CatalogContext context, boolean classesUpdated) {
-        return processUpdate(context.getDeployment().getScheduler(), context.database.getProcedureschedules(),
-                context.authSystem, context.getCatalogJar().getLoader(), classesUpdated);
+        return processUpdate(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+                context.getCatalogJar().getLoader(), classesUpdated);
     }
 
     /**
      * Asynchronously process an update to the scheduler configuration
      *
-     * @param configuration      Global configuration for all schedules
-     * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
+     * @param configuration      Global configuration for all tasks
+     * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
      * @param classesUpdated     If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> processUpdate(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+    ListenableFuture<?> processUpdate(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
         return execute(
                 () -> processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, classesUpdated));
@@ -306,7 +304,7 @@ public final class SchedulerManager {
         return execute(() -> {
             if (m_locallyLedPartitions.add(partitionId)) {
                 updatePartitionedThreadPoolSize();
-                for (SchedulerHandler sd : m_handlers.values()) {
+                for (TaskHandler sd : m_handlers.values()) {
                     sd.promotedPartition(partitionId);
                 }
             }
@@ -329,7 +327,7 @@ public final class SchedulerManager {
                 return false;
             }
             updatePartitionedThreadPoolSize();
-            for (SchedulerHandler sd : m_handlers.values()) {
+            for (TaskHandler sd : m_handlers.values()) {
                 sd.demotedPartition(partitionId);
             }
             return true;
@@ -337,7 +335,7 @@ public final class SchedulerManager {
     }
 
     private void updatePartitionedThreadPoolSize() {
-        if (m_handlers.values().stream().filter(h -> h instanceof PartitionedScheduleHandler).findAny().isPresent()) {
+        if (m_handlers.values().stream().filter(h -> h instanceof PartitionedTaskHandler).findAny().isPresent()) {
             m_partitionedExecutor.setDynamicThreadCount(calculatePartitionedThreadPoolSize());
         }
     }
@@ -356,9 +354,9 @@ public final class SchedulerManager {
             return m_managerExecutor.submit(() -> {
                 m_managerExecutor.shutdown();
                 m_started = false;
-                Map<String, SchedulerHandler> handlers = m_handlers;
+                Map<String, TaskHandler> handlers = m_handlers;
                 m_handlers = Collections.emptyMap();
-                handlers.values().stream().forEach(SchedulerHandler::cancel);
+                handlers.values().stream().forEach(TaskHandler::cancel);
                 m_singleExecutor.getExecutor().shutdown();
                 m_partitionedExecutor.getExecutor().shutdown();
             });
@@ -368,34 +366,34 @@ public final class SchedulerManager {
     }
 
     /**
-     * Create a factory supplier for instances of {@link Scheduler} as defined by the provided
-     * {@link ProcedureSchedule}. If an instance of {@link Scheduler} cannot be constructed using the provided
-     * configuration {@code null} is returned and a detailed error message will be logged.
+     * Create a factory supplier for instances of {@link Scheduler} as defined by the provided {@link Task}. If an
+     * instance of {@link Scheduler} cannot be constructed using the provided configuration {@code null} is returned and
+     * a detailed error message will be logged.
      *
-     * @param definition  {@link ProcedureSchedule} defining the configuration of the schedule
+     * @param definition  {@link Task} defining the configuration of the schedule
      * @param classLoader {@link ClassLoader} to use when loading the {@link Scheduler} in {@code definition}
-     * @return {@link SchedulerValidationResult} describing any problems encountered
+     * @return {@link TaskValidationResult} describing any problems encountered
      */
     @SuppressWarnings("unchecked")
-    public SchedulerValidationResult validateScheduler(ProcedureSchedule definition, ClassLoader classLoader) {
+    public TaskValidationResult validateTask(Task definition, ClassLoader classLoader) {
         String schedulerClassString = definition.getSchedulerclass();
         try {
             Class<?> schedulerClass;
             try {
                 schedulerClass = classLoader.loadClass(schedulerClassString);
             } catch (ClassNotFoundException e) {
-                return new SchedulerValidationResult("Scheduler class does not exist: " + schedulerClassString);
+                return new TaskValidationResult("Scheduler class does not exist: " + schedulerClassString);
             }
             if (!Scheduler.class.isAssignableFrom(schedulerClass)) {
-                return new SchedulerValidationResult(String.format("Class %s is not an instance of %s",
-                        schedulerClassString, Scheduler.class.getName()));
+                return new TaskValidationResult(String.format("Class %s is not an instance of %s", schedulerClassString,
+                        Scheduler.class.getName()));
             }
 
             Constructor<Scheduler> constructor;
             try {
                 constructor = (Constructor<Scheduler>) schedulerClass.getConstructor();
             } catch (NoSuchMethodException e) {
-                return new SchedulerValidationResult(String.format(
+                return new TaskValidationResult(String.format(
                         "Scheduler class should have a public no argument constructor: %s", schedulerClassString));
             }
             Method initMethod = null;
@@ -409,29 +407,29 @@ public final class SchedulerManager {
             Object[] parameters;
             boolean takesHelper = false;
             if (initMethod == null) {
-                if(!definition.getParameters().isEmpty()) {
-                    return new SchedulerValidationResult(String.format(
+                if (!definition.getParameters().isEmpty()) {
+                    return new TaskValidationResult(String.format(
                             "Scheduler class does not have an initialize method and parameters were provided: %s",
                             schedulerClassString));
                 }
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
                 if (initMethod.getReturnType() != void.class) {
-                    return new SchedulerValidationResult(
+                    return new TaskValidationResult(
                             String.format("Scheduler initialization method is not void: %s", schedulerClassString));
                 }
 
-                CatalogMap<SchedulerParam> schedulerParams = definition.getParameters();
+                CatalogMap<TaskParameter> taskParams = definition.getParameters();
                 Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
-                takesHelper = SchedulerHelper.class.isAssignableFrom(initMethodParamTypes[0]);
+                takesHelper = TaskHelper.class.isAssignableFrom(initMethodParamTypes[0]);
 
-                int actualParamCount = (schedulerParams == null ? 0 : schedulerParams.size()) + (takesHelper ? 1 : 0);
+                int actualParamCount = (taskParams == null ? 0 : taskParams.size()) + (takesHelper ? 1 : 0);
                 int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
                         : Integer.MAX_VALUE;
                 if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
-                    return new SchedulerValidationResult(String.format(
+                    return new TaskValidationResult(String.format(
                             "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                            schedulerClassString, initMethod.getParameterCount(), schedulerParams.size()));
+                            schedulerClassString, initMethod.getParameterCount(), taskParams.size()));
                 }
 
                 if (actualParamCount == 0) {
@@ -444,14 +442,14 @@ public final class SchedulerManager {
                         varArgParams = new String[actualParamCount - minVarArgParamCount];
                         parameters[parameters.length - 1] = varArgParams;
                     }
-                    for (SchedulerParam sp : schedulerParams) {
+                    for (TaskParameter sp : taskParams) {
                         int index = sp.getIndex() + indexOffset;
                         if (index < minVarArgParamCount) {
                             try {
                                 parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
                                         sp.getParameter());
                             } catch (Exception e) {
-                                return new SchedulerValidationResult(String.format(
+                                return new TaskValidationResult(String.format(
                                         "Could not convert parameter %d with the value \"%s\" to type %s: %s",
                                         sp.getIndex(), sp.getParameter(), initMethodParamTypes[index].getName(),
                                         e.getMessage()));
@@ -464,7 +462,7 @@ public final class SchedulerManager {
 
                 String parameterErrors = validateSchedulerParameters(definition, initMethod, parameters, takesHelper);
                 if (parameterErrors != null) {
-                    return new SchedulerValidationResult("Error validating scheduler parameters: " + parameterErrors);
+                    return new TaskValidationResult("Error validating scheduler parameters: " + parameterErrors);
                 }
             }
 
@@ -474,10 +472,10 @@ public final class SchedulerManager {
                 hash = jarFile.getClassHash(schedulerClassString, HASH_ALGO);
             }
 
-            return new SchedulerValidationResult(
+            return new TaskValidationResult(
                     new SchedulerFactory(constructor, initMethod, parameters, takesHelper, hash));
         } catch (Exception e) {
-            return new SchedulerValidationResult(
+            return new TaskValidationResult(
                     String.format("Could not load and construct class: %s", schedulerClassString), e);
         }
     }
@@ -525,18 +523,18 @@ public final class SchedulerManager {
      * Process any potential scheduler changes. Any modified schedules will be stopped and restarted with their new
      * configuration. If a schedule was not modified it will be left running.
      *
-     * @param configuration      Global configuration for all schedules
-     * @param procedureSchedules {@link Collection} of configured {@link ProcedureSchedule}
+     * @param configuration      Global configuration for all tasks
+     * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
      * @param classLoader        {@link ClassLoader} to use to load {@link Scheduler} classes
      */
-    private void processCatalogInline(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
+    private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
         if (!m_started) {
             return;
         }
 
-        Map<String, SchedulerHandler> newHandlers = new HashMap<>();
+        Map<String, TaskHandler> newHandlers = new HashMap<>();
         m_authSystem = authSystem;
 
         if (configuration == null) {
@@ -544,7 +542,7 @@ public final class SchedulerManager {
                 log.debug("MANAGER: Using default schedules configuration");
             }
             // No configuration provided so use defaults
-            configuration = new SchedulerType();
+            configuration = new TaskSettingsType();
         } else if (log.isDebugEnabled()) {
             log.debug("MANAGER: Applying schedule configuration: "
                     + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMinDelayMs())
@@ -565,7 +563,7 @@ public final class SchedulerManager {
         boolean hasNonPartitionedSchedule = false;
         boolean hasPartitionedSchedule = false;
 
-        for (ProcedureSchedule procedureSchedule : procedureSchedules) {
+        for (Task procedureSchedule : procedureSchedules) {
             if (log.isDebugEnabled()) {
                 ToStringHelper toString = MoreObjects.toStringHelper(procedureSchedule);
                 for (String field : procedureSchedule.getFields()) {
@@ -574,8 +572,8 @@ public final class SchedulerManager {
                 log.debug(generateLogMessage(procedureSchedule.getName(),
                         "Applying schedule configuration: " + toString()));
             }
-            SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
-            SchedulerValidationResult result = validateScheduler(procedureSchedule, classLoader);
+            TaskHandler handler = m_handlers.remove(procedureSchedule.getName());
+            TaskValidationResult result = validateTask(procedureSchedule, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
@@ -604,8 +602,7 @@ public final class SchedulerManager {
             }
 
             String scope = procedureSchedule.getScope();
-            if (procedureSchedule.getEnabled()
-                    && (m_leader || !SCOPE_SYSTEM.equals(scope))) {
+            if (procedureSchedule.getEnabled() && (m_leader || !SCOPE_DATABASE.equals(scope))) {
                 if (!result.isValid()) {
                     log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
                             result.getException());
@@ -617,30 +614,29 @@ public final class SchedulerManager {
                             "Creating handler for scope: " + procedureSchedule.getScope()));
                 }
 
-                SchedulerHandler definition;
+                TaskHandler definition;
                 switch (scope) {
                 case SCOPE_HOSTS:
-                case SCOPE_SYSTEM:
-                    definition = new SingleSchedulerHandler(procedureSchedule, scope, result.m_factory,
+                case SCOPE_DATABASE:
+                    definition = new SingleTaskHandler(procedureSchedule, scope, result.m_factory,
                             m_singleExecutor.getExecutor());
                     hasNonPartitionedSchedule = true;
                     break;
                 case SCOPE_PARTITIONS:
-                    definition = new PartitionedScheduleHandler(procedureSchedule, result.m_factory,
+                    definition = new PartitionedTaskHandler(procedureSchedule, result.m_factory,
                             m_partitionedExecutor.getExecutor());
                     m_locallyLedPartitions.forEach(definition::promotedPartition);
                     hasPartitionedSchedule = true;
                     break;
                 default:
-                    throw new IllegalArgumentException(
-                            "Unsupported run location: " + procedureSchedule.getScope());
+                    throw new IllegalArgumentException("Unsupported run location: " + procedureSchedule.getScope());
                 }
                 newHandlers.put(procedureSchedule.getName(), definition);
             }
         }
 
         // Cancel all removed schedules
-        for (SchedulerHandler handler : m_handlers.values()) {
+        for (TaskHandler handler : m_handlers.values()) {
             handler.cancel();
         }
 
@@ -649,7 +645,7 @@ public final class SchedulerManager {
         m_partitionedExecutor.setDynamicThreadCount(hasPartitionedSchedule ? calculatePartitionedThreadPoolSize() : 0);
 
         // Start all current schedules. This is a no-op for already started schedules
-        for (SchedulerHandler handler : newHandlers.values()) {
+        for (TaskHandler handler : newHandlers.values()) {
             handler.start();
         }
 
@@ -660,14 +656,14 @@ public final class SchedulerManager {
      * Try to find the optional static method {@code validateParameters} and call it if it is compatible to see if the
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
-     * @param definition  Instance of {@link ProcedureSchedule} defining the schedule
+     * @param definition  Instance of {@link Task} defining the schedule
      * @param initMethod  initialize {@link Method} instance for the {@link Scheduler}
      * @param parameters  that are going to be passed to the constructor
      * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private String validateSchedulerParameters(ProcedureSchedule definition, Method initMethod,
-            Object[] parameters, boolean takesHelper) {
+    private String validateSchedulerParameters(Task definition, Method initMethod, Object[] parameters,
+            boolean takesHelper) {
         Class<?> schedulerClass = initMethod.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
@@ -677,15 +673,14 @@ public final class SchedulerManager {
             }
 
             if (m.getReturnType() != String.class) {
-                log.warn(generateLogMessage(definition.getName(),
-                        schedulerClass.getName()
-                                + " defines a 'validateParameters' method but it does not return a String"));
+                log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
+                        + " defines a 'validateParameters' method but it does not return a String"));
             }
 
             if (m.getParameterCount() != initMethod.getParameterCount()) {
                 log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
                         + " defines a 'validateParameters' method but parameter count is not correct. It should be the same as constructor with possibly an optional "
-                        + SchedulerHelper.class.getSimpleName() + " first"));
+                        + TaskHelper.class.getSimpleName() + " first"));
                 continue;
             }
 
@@ -699,7 +694,7 @@ public final class SchedulerManager {
             Object[] validatorParameters = parameters.clone();
 
             if (takesHelper) {
-                validatorParameters[0] = new SchedulerHelper(b -> generateLogMessage(definition.getName(), b),
+                validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
                         definition.getScope(), m_clientInterface);
             }
 
@@ -724,7 +719,7 @@ public final class SchedulerManager {
      */
     static String isProcedureValidForScope(String scope, Procedure procedure) {
         switch (scope) {
-        case SCOPE_SYSTEM:
+        case SCOPE_DATABASE:
             break;
         case SCOPE_HOSTS:
             if (procedure.getTransactional()) {
@@ -738,7 +733,8 @@ public final class SchedulerManager {
                         procedure.getTypeName());
             }
             if (procedure.getPartitionparameter() != 0) {
-                return String.format("Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
+                return String.format(
+                        "Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
@@ -749,27 +745,26 @@ public final class SchedulerManager {
     }
 
     /**
-     * Result object returned by {@link SchedulerManager#validateScheduler(ProcedureSchedule, ClassLoader)}. Used to
-     * determine if the {@link Scheduler} and {@link ProcedureSchedule#getParameters()} in a {@link ProcedureSchedule}
-     * are valid. If they are not valid then an error message and potential exception are contained within this result
-     * describing the problem.
+     * Result object returned by {@link TaskManager#validateTask(Task, ClassLoader)}. Used to determine if the
+     * {@link Scheduler} and {@link Task#getParameters()} in a {@link Task} are valid. If they are not valid then an
+     * error message and potential exception are contained within this result describing the problem.
      */
-    public static final class SchedulerValidationResult {
+    public static final class TaskValidationResult {
         final String m_errorMessage;
         final Exception m_exception;
         final SchedulerFactory m_factory;
 
-        SchedulerValidationResult(String errorMessage) {
+        TaskValidationResult(String errorMessage) {
             this(errorMessage, null);
         }
 
-        SchedulerValidationResult(String errorMessage, Exception exception) {
+        TaskValidationResult(String errorMessage, Exception exception) {
             m_errorMessage = errorMessage;
             m_exception = exception;
             m_factory = null;
         }
 
-        SchedulerValidationResult(SchedulerFactory factory) {
+        TaskValidationResult(SchedulerFactory factory) {
             m_errorMessage = null;
             m_exception = null;
             m_factory = factory;
@@ -800,28 +795,27 @@ public final class SchedulerManager {
     /**
      * Base class for wrapping a single scheduler configuration.
      */
-    private abstract class SchedulerHandler {
-        private final ProcedureSchedule m_definition;
+    private abstract class TaskHandler {
+        private final Task m_definition;
         private final SchedulerFactory m_factory;
 
-        SchedulerHandler(ProcedureSchedule definition, SchedulerFactory factory) {
+        TaskHandler(Task definition, SchedulerFactory factory) {
             m_definition = definition;
             m_factory = factory;
         }
 
         /**
-         * Does not include {@link ProcedureSchedule#getEnabled()} or {@link ProcedureSchedule#getOnerror()} in
-         * {@code definition} comparison
+         * Does not include {@link Task#getEnabled()} or {@link Task#getOnerror()} in {@code definition} comparison
          *
-         * @param definition {@link ProcedureSchedule} defining the schedule configuration
+         * @param definition {@link Task} defining the schedule configuration
          * @param factory    {@link SchedulerFactory} derived from {@code definition}
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
-        boolean isSameSchedule(ProcedureSchedule definition, SchedulerFactory factory, boolean checkHashes) {
+        boolean isSameSchedule(Task definition, SchedulerFactory factory, boolean checkHashes) {
             return isSameDefinition(definition) && (!checkHashes || m_factory.hashesMatch(factory));
         }
 
-        private boolean isSameDefinition(ProcedureSchedule definition) {
+        private boolean isSameDefinition(Task definition) {
             return Objects.equals(m_definition.getName(), definition.getName())
                     && Objects.equals(m_definition.getScope(), definition.getScope())
                     && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
@@ -871,11 +865,11 @@ public final class SchedulerManager {
 
         /**
          * Handle allowed definition updates. The only allowed changes are those ignored by
-         * {@link #isSameSchedule(ProcedureSchedule, SchedulerFactory, boolean)}
+         * {@link #isSameSchedule(Task, SchedulerFactory, boolean)}
          *
          * @param newDefintion Updated definition
          */
-        void updateDefinition(ProcedureSchedule newDefintion) {
+        void updateDefinition(Task newDefintion) {
             assert isSameDefinition(newDefintion);
             m_definition.setEnabled(newDefintion.getEnabled());
             m_definition.setOnerror(newDefintion.getOnerror());
@@ -888,26 +882,25 @@ public final class SchedulerManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        Scheduler constructScheduler(SchedulerHelper helper) {
+        Scheduler constructScheduler(TaskHelper helper) {
             return m_factory.construct(helper);
         }
 
         String generateLogMessage(String body) {
-            return SchedulerManager.generateLogMessage(m_definition.getName(), body);
+            return TaskManager.generateLogMessage(m_definition.getName(), body);
         }
 
         abstract void setMaxRunFrequency(double frequency);
     }
 
     /**
-     * An instance of {@link SchedulerHandler} which contains a single {@link SchedulerWrapper}. This is used for
-     * schedules which are configured for {@link SchedulerManager#SCOPE_SYSTEM} or
-     * {@link SchedulerManager#SCOPE_HOSTS}.
+     * An instance of {@link TaskHandler} which contains a single {@link SchedulerWrapper}. This is used for schedules
+     * which are configured for {@link TaskManager#SCOPE_DATABASE} or {@link TaskManager#SCOPE_HOSTS}.
      */
-    private class SingleSchedulerHandler extends SchedulerHandler {
-        private final SchedulerWrapper<? extends SingleSchedulerHandler> m_wrapper;
+    private class SingleTaskHandler extends TaskHandler {
+        private final SchedulerWrapper<? extends SingleTaskHandler> m_wrapper;
 
-        SingleSchedulerHandler(ProcedureSchedule definition, String scope, SchedulerFactory factory,
+        SingleTaskHandler(Task definition, String scope, SchedulerFactory factory,
                 ListeningScheduledExecutorService executor) {
             super(definition, factory);
 
@@ -915,7 +908,7 @@ public final class SchedulerManager {
             case SCOPE_HOSTS:
                 m_wrapper = new HostSchedulerWrapper(this, executor);
                 break;
-            case SCOPE_SYSTEM:
+            case SCOPE_DATABASE:
                 m_wrapper = new SystemSchedulerWrapper(this, executor);
                 break;
             default:
@@ -929,7 +922,7 @@ public final class SchedulerManager {
         }
 
         @Override
-        void updateDefinition(ProcedureSchedule newDefintion) {
+        void updateDefinition(Task newDefintion) {
             super.updateDefinition(newDefintion);
             m_wrapper.setEnabled(newDefintion.getEnabled());
         }
@@ -952,16 +945,15 @@ public final class SchedulerManager {
     }
 
     /**
-     * An instance of {@link SchedulerHandler} which contains a {@link SchedulerWrapper} for each locally led partition.
-     * This is used for schedules which are configured for {@link SchedulerManager#SCOPE_PARTITIONS}.
+     * An instance of {@link TaskHandler} which contains a {@link SchedulerWrapper} for each locally led partition. This
+     * is used for schedules which are configured for {@link TaskManager#SCOPE_PARTITIONS}.
      */
-    private class PartitionedScheduleHandler extends SchedulerHandler {
+    private class PartitionedTaskHandler extends TaskHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
         private final ListeningScheduledExecutorService m_executor;
         private boolean m_handlerStarted = false;
 
-        PartitionedScheduleHandler(ProcedureSchedule definition, SchedulerFactory factory,
-                ListeningScheduledExecutorService executor) {
+        PartitionedTaskHandler(Task definition, SchedulerFactory factory, ListeningScheduledExecutorService executor) {
             super(definition, factory);
             m_executor = executor;
         }
@@ -975,7 +967,7 @@ public final class SchedulerManager {
         }
 
         @Override
-        void updateDefinition(ProcedureSchedule newDefintion) {
+        void updateDefinition(Task newDefintion) {
             super.updateDefinition(newDefintion);
             boolean enabled = newDefintion.getEnabled();
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
@@ -1055,11 +1047,11 @@ public final class SchedulerManager {
      * wrapper is cancelled or {@link Scheduler#getNextAction(ScheduledAction)} returns a non schedule result.
      * <p>
      * This class needs to be thread safe since it's execution is split between the
-     * {@link SchedulerManager#m_managerExecutor} and the schedule executors
+     * {@link TaskManager#m_managerExecutor} and the schedule executors
      *
-     * @param <H> Type of {@link SchedulerHandler} which created this wrapper
+     * @param <H> Type of {@link TaskHandler} which created this wrapper
      */
-    private abstract class SchedulerWrapper<H extends SchedulerHandler> {
+    private abstract class SchedulerWrapper<H extends TaskHandler> {
         ScheduledAction m_scheduledAction;
 
         final H m_handler;
@@ -1068,7 +1060,7 @@ public final class SchedulerManager {
         private Scheduler m_scheduler;
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
-        private ScheduleStatsSource m_stats;
+        private TaskStatsSource m_stats;
         private UnsynchronizedRateLimiter m_rateLimiter;
 
         // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
@@ -1093,10 +1085,10 @@ public final class SchedulerManager {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("Starting schedule"));
             }
-            m_scheduler = m_handler
-                    .constructScheduler(new SchedulerHelper(this::generateLogMessage, getScope(), m_clientInterface));
+            m_scheduler = m_handler.constructScheduler(
+                    new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
             if (m_stats == null) {
-                m_stats = ScheduleStatsSource.create(m_handler.getName(), getScope(), getSiteId());
+                m_stats = TaskStatsSource.create(m_handler.getName(), getScope(), getSiteId());
                 m_stats.register(m_statsAgent);
             }
             setMaxRunFrequency(m_maxRunFrequency);
@@ -1182,8 +1174,8 @@ public final class SchedulerManager {
                             m_executor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
                     if (log.isDebugEnabled()) {
-                        log.debug(generateLogMessage(
-                                "Could not schedule next procedure scheduler shutdown: " + m_scheduledAction.getProcedure()));
+                        log.debug(generateLogMessage("Could not schedule next procedure scheduler shutdown: "
+                                + m_scheduledAction.getProcedure()));
                     }
                 }
             }
@@ -1314,8 +1306,8 @@ public final class SchedulerManager {
         }
 
         /**
-         * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if an
-         *         error was encountered.
+         * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if
+         *         an error was encountered.
          */
         private Procedure getProcedureDefinition() {
             String procedureName = m_scheduledAction.getProcedure();
@@ -1373,10 +1365,9 @@ public final class SchedulerManager {
                 log.log(level, generateLogMessage(message), t);
             }
             m_stats.setSchedulerStatus(message);
-            log.info(generateLogMessage(
-                    "Schedule is terminating because of an error. "
-                            + "Please resolve the error and either drop and recreate the schedule "
-                            + "or disable and reenable it."));
+            log.info(generateLogMessage("Schedule is terminating because of an error. "
+                    + "Please resolve the error and either drop and recreate the schedule "
+                    + "or disable and reenable it."));
             shutdown(SchedulerWrapperState.ERROR);
         }
 
@@ -1439,16 +1430,16 @@ public final class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_SYSTEM}
+     * Wrapper class for schedulers with a run location of {@link TaskManager#SCOPE_DATABASE}
      */
-    private class SystemSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        SystemSchedulerWrapper(SingleSchedulerHandler definition, ListeningScheduledExecutorService executor) {
+    private class SystemSchedulerWrapper extends SchedulerWrapper<SingleTaskHandler> {
+        SystemSchedulerWrapper(SingleTaskHandler definition, ListeningScheduledExecutorService executor) {
             super(definition, executor);
         }
 
         @Override
         String getScope() {
-            return SCOPE_SYSTEM;
+            return SCOPE_DATABASE;
         }
 
         @Override
@@ -1458,10 +1449,10 @@ public final class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_HOSTS}
+     * Wrapper class for schedulers with a run location of {@link TaskManager#SCOPE_HOSTS}
      */
-    private class HostSchedulerWrapper extends SchedulerWrapper<SingleSchedulerHandler> {
-        HostSchedulerWrapper(SingleSchedulerHandler handler, ListeningScheduledExecutorService executor) {
+    private class HostSchedulerWrapper extends SchedulerWrapper<SingleTaskHandler> {
+        HostSchedulerWrapper(SingleTaskHandler handler, ListeningScheduledExecutorService executor) {
             super(handler, executor);
         }
 
@@ -1477,12 +1468,12 @@ public final class SchedulerManager {
     }
 
     /**
-     * Wrapper class for schedulers with a run location of {@link SchedulerManager#SCOPE_PARTITIONS}
+     * Wrapper class for schedulers with a run location of {@link TaskManager#SCOPE_PARTITIONS}
      */
-    private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedScheduleHandler> {
+    private class PartitionSchedulerWrapper extends SchedulerWrapper<PartitionedTaskHandler> {
         private final int m_partition;
 
-        PartitionSchedulerWrapper(PartitionedScheduleHandler handler, int partition,
+        PartitionSchedulerWrapper(PartitionedTaskHandler handler, int partition,
                 ListeningScheduledExecutorService executor) {
             super(handler, executor);
             m_partition = partition;
@@ -1537,7 +1528,7 @@ public final class SchedulerManager {
 
         @Override
         String generateLogMessage(String body) {
-            return SchedulerManager.generateLogMessage(m_handler.getName() + " P" + m_partition, body);
+            return TaskManager.generateLogMessage(m_handler.getName() + " P" + m_partition, body);
         }
 
         @Override
@@ -1573,7 +1564,7 @@ public final class SchedulerManager {
             this.m_classHash = classHash;
         }
 
-        Scheduler construct(SchedulerHelper helper) {
+        Scheduler construct(TaskHelper helper) {
             try {
                 Scheduler scheduler = m_constructor.newInstance();
                 if (m_initMethod != null) {
@@ -1637,7 +1628,7 @@ public final class SchedulerManager {
 
         ScheduledExecutorHolder(String name) {
             m_name = name;
-            m_rawExecutor = CoreUtils.getScheduledThreadPoolExecutor("Scheduler-" + name, 0,
+            m_rawExecutor = CoreUtils.getScheduledThreadPoolExecutor("Task-" + name, 0,
                     CoreUtils.SMALL_STACK_SIZE);
             m_executor = MoreExecutors.listeningDecorator(m_rawExecutor);
         }

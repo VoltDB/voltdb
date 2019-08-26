@@ -49,9 +49,9 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.ProcedureSchedule;
-import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Task;
+import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
@@ -465,29 +465,31 @@ public abstract class CatalogSchemaTools {
         }
     }
 
-    public static void toSchema(StringBuilder sb, ProcedureSchedule schedule) {
-        sb.append("CREATE SCHEDULE ").append(schedule.getName()).append(" RUN ON ").append(schedule.getScope())
-                .append(" USING ").append(schedule.getSchedulerclass()).append(" ON ERROR ")
-                .append(schedule.getOnerror());
-        if (schedule.getUser() != null) {
-            sb.append(" AS USER ").append(schedule.getUser());
-        }
-        if (!schedule.getEnabled()) {
-            sb.append(" DISABLED");
-        }
-        CatalogMap<SchedulerParam> params = schedule.getParameters();
-        String delimiter = " WITH ";
-        for (int i = 0; i < params.size(); ++i) {
-            String param = params.get(Integer.toString(i)).getParameter();
-            sb.append(delimiter);
-            if (param == null) {
-                sb.append("NULL");
-            } else {
-                sb.append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+    public static void toSchema(StringBuilder sb, Task task) {
+        sb.append("CREATE TASK ").append(task.getName())
+                .append(" FROM CLASS ").append(task.getSchedulerclass());
+
+        CatalogMap<TaskParameter> params = task.getParameters();
+        if (!params.isEmpty()) {
+            String delimiter = " WITH (";
+            for (int i = 0; i < params.size(); ++i) {
+                String param = params.get(Integer.toString(i)).getParameter();
+                sb.append(delimiter);
+                if (param == null) {
+                    sb.append("NULL");
+                } else {
+                    sb.append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+                }
+                delimiter = ", ";
             }
-            delimiter = ", ";
+            sb.append(')');
         }
-        sb.append(";\n");
+        sb.append(" ON ERROR ")
+                .append(task.getOnerror()).append(" RUN ON ").append(task.getScope());
+        if (task.getUser() != null) {
+            sb.append(" AS USER ").append(task.getUser());
+        }
+        sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
     }
 
     /**
@@ -661,10 +663,10 @@ public abstract class CatalogSchemaTools {
                     }
                 }
 
-                CatalogMap<ProcedureSchedule> schedules = db.getProcedureschedules();
+                CatalogMap<Task> schedules = db.getTasks();
                 if (!schedules.isEmpty()) {
-                    for (ProcedureSchedule schedule : schedules) {
-                        toSchema(sb, schedule);
+                    for (Task task : schedules) {
+                        toSchema(sb, task);
                     }
                 }
 

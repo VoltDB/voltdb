@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -41,7 +41,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
-public class TestSchedulesEnd2End extends LocalClustersTestBase {
+public class TestTasksEnd2End extends LocalClustersTestBase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
@@ -53,10 +53,10 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
     public void cleanUpSchedules() {
         try {
             Client client = getClient(0);
-            VoltTable table = client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
+            VoltTable table = client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
             StringBuilder sb = new StringBuilder();
             while (table.advanceRow()) {
-                sb.append("DROP SCHEDULE ").append(table.getString("SCHEDULE_NAME")).append(';');
+                sb.append("DROP TASK ").append(table.getString("TASK_NAME")).append(';');
             }
             if (sb.length() != 0) {
                 client.callProcedure("@AdHoc", sb.toString());
@@ -101,11 +101,11 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         String schedule2 = getMethodName() + "_2";
         String schedule3 = getMethodName() + "_3";
 
-        String summaryFormat = "CREATE SCHEDULE %s %s ON ERROR IGNORE AS '@AdHoc', 'INSERT INTO " + summaryTable
+        String summaryFormat = "CREATE TASK %s ON SCHEDULE %s PROCEDURE @AdHoc WITH ('INSERT INTO " + summaryTable
                 + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
-                + getTableName(0, TableType.REPLICATED) + ";';";
+                + getTableName(0, TableType.REPLICATED) + ";') ON ERROR IGNORE;";
 
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY PT0.05S", 1));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY 50 MILLISECONDS", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 MILLISECONDS", 3));
 
@@ -120,9 +120,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
             assertEquals("RUNNING", table.getString("STATE"));
         }
 
-        client.callProcedure("@AdHoc",
-                "ALTER SCHEDULE " + schedule1 + " DISABLE; ALTER SCHEDULE " + schedule2 + " DISABLE; ALTER SCHEDULE "
-                        + schedule3 + " DISABLE;");
+        client.callProcedure("@AdHoc", "ALTER TASK " + schedule1 + " DISABLE; ALTER TASK " + schedule2
+                + " DISABLE; ALTER TASK " + schedule3 + " DISABLE;");
 
         Thread.sleep(5);
 
@@ -181,8 +180,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
         String procName = getMethodName() + "_prune";
         client.callProcedure("@AdHoc",
                 "CREATE PROCEDURE " + procName + " PARTITION ON TABLE " + tableName
-                        + " COLUMN key PARAMETER 0 AS DELETE FROM "
-                        + tableName + " WHERE CAST(? AS INTEGER) IS NOT NULL ORDER BY key OFFSET 10");
+                        + " COLUMN key PARAMETER 0 AS DELETE FROM " + tableName
+                        + " WHERE CAST(? AS INTEGER) IS NOT NULL ORDER BY key OFFSET 10");
 
         AtomicReference<Exception> error = new AtomicReference<>();
         Thread producer = new Thread() {
@@ -204,8 +203,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         String schedule = getMethodName();
         client.callProcedure("@AdHoc",
-                "CREATE SCHEDULE " + schedule + " RUN ON PARTITIONS DELAY PT0.01S AS '" + procName
-                        + "'");
+                "CREATE TASK " + schedule + " ON SCHEDULE DELAY 10 MILLISECONDS PROCEDURE " + procName
+                        + " RUN ON PARTITIONS");
 
         // Give everything some time to run
         Thread.sleep(1000);
@@ -220,7 +219,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
         Thread.sleep(15);
 
-        client.callProcedure("@AdHoc", "ALTER SCHEDULE " + schedule + " DISABLE;");
+        client.callProcedure("@AdHoc", "ALTER TASK " + schedule + " DISABLE;");
 
         Thread.sleep(5);
 
@@ -246,7 +245,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
             assertEquals("DISABLED", table.getString("STATE"));
         }
 
-        client.callProcedure("@AdHoc", "ALTER SCHEDULE " + schedule + " ENABLE;");
+        client.callProcedure("@AdHoc", "ALTER TASK " + schedule + " ENABLE;");
 
         table = getScheduleStats(client);
         assertEquals(6, table.getRowCount());
@@ -259,7 +258,8 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
     public void customScheduler() throws Exception {
         Client client = getClient(0);
         client.callProcedure("@AdHoc",
-                "CREATE SCHEDULE " + getMethodName() + " USING " + CustomScheduler.class.getName() + " WITH 5, NULL;");
+                "CREATE TASK " + getMethodName() + " FROM CLASS " + CustomScheduler.class.getName()
+                        + " WITH (5, NULL);");
         Thread.sleep(1000);
 
         VoltTable table = getScheduleStats(client);
@@ -268,9 +268,10 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
             assertNull(table.getString("SCHEDULER_STATUS"));
         }
 
-        client.callProcedure("@AdHoc", "DROP SCHEDULE " + getMethodName());
-        client.callProcedure("@AdHoc", "CREATE SCHEDULE " + getMethodName() + " USING "
-                + CustomScheduler.class.getName() + " WITH 5, 'STATUS';");
+        client.callProcedure("@AdHoc", "DROP TASK " + getMethodName());
+        client.callProcedure("@AdHoc",
+                "CREATE TASK " + getMethodName() + " FROM CLASS " + CustomScheduler.class.getName()
+                        + " WITH (5, 'STATUS');");
 
         table = getScheduleStats(client);
         while (table.advanceRow()) {
@@ -282,7 +283,7 @@ public class TestSchedulesEnd2End extends LocalClustersTestBase {
 
     private static VoltTable getScheduleStats(Client client)
             throws NoConnectionsException, IOException, ProcCallException {
-        return client.callProcedure("@Statistics", "SCHEDULES", 0).getResults()[0];
+        return client.callProcedure("@Statistics", "TASK", 0).getResults()[0];
     }
 
     public static class CustomScheduler implements Scheduler {

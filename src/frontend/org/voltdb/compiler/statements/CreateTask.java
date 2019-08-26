@@ -24,101 +24,104 @@ import org.hsqldb_voltpatches.Tokens;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcedureSchedule;
-import org.voltdb.catalog.SchedulerParam;
+import org.voltdb.catalog.Task;
+import org.voltdb.catalog.TaskParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
-import org.voltdb.sched.CronScheduler;
-import org.voltdb.sched.DelayScheduler;
-import org.voltdb.sched.IntervalScheduler;
-import org.voltdb.sched.SchedulerManager;
+import org.voltdb.task.CronScheduler;
+import org.voltdb.task.DelayScheduler;
+import org.voltdb.task.IntervalScheduler;
+import org.voltdb.task.TaskManager;
 
 import com.google_voltpatches.common.base.MoreObjects;
 
 /**
- * Handle processing ddl which matches {@link SQLParser#matchCreateSchedule(String)}
+ * Handle processing ddl which matches {@link SQLParser#matchCreateTask(String)}
  */
-public class CreateSchedule extends StatementProcessor {
-    public CreateSchedule(DDLCompiler ddlCompiler) {
+public class CreateTask extends StatementProcessor {
+    public CreateTask(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
     }
 
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
-        Matcher matcher = SQLParser.matchCreateSchedule(ddlStatement.statement);
+        Matcher matcher = SQLParser.matchCreateTask(ddlStatement.statement);
         if (!matcher.matches()) {
             return false;
         }
 
-        CatalogMap<ProcedureSchedule> schedules = db.getProcedureschedules();
+        CatalogMap<Task> tasks = db.getTasks();
         String name = matcher.group("name");
-        if (schedules.get(name) != null) {
+        if (tasks.get(name) != null) {
             throw m_compiler.new VoltCompilerException("Schedule with name already exists: " + name);
         }
 
-        ProcedureSchedule schedule = schedules.add(name);
-        configureScheduler(schedule, matcher, ddlStatement.newDdl);
+        Task task = tasks.add(name);
+        configureTask(task, matcher, ddlStatement.newDdl);
 
-        SchedulerManager.SchedulerValidationResult result = VoltDB.instance().getSchedulerManager()
-                .validateScheduler(schedule, m_classLoader);
+        TaskManager.TaskValidationResult result = VoltDB.instance().getTaskManager()
+                .validateTask(task, m_classLoader);
         if (!result.isValid()) {
-            schedules.delete(name);
+            tasks.delete(name);
             throw m_compiler.new VoltCompilerException(result.getErrorMessage());
         }
         return true;
     }
 
-    private ProcedureSchedule configureScheduler(ProcedureSchedule schedule, Matcher matcher, boolean newDdl)
+    private Task configureTask(Task task, Matcher matcher, boolean newDdl)
             throws VoltCompilerException {
-        schedule.setName(matcher.group("name"));
-        schedule.setScope(
-                MoreObjects.firstNonNull(matcher.group("scope"), SchedulerManager.SCOPE_DEFAULT).toUpperCase());
+        task.setName(matcher.group("name"));
+        task.setScope(
+                MoreObjects.firstNonNull(matcher.group("scope"), TaskManager.SCOPE_DEFAULT).toUpperCase());
         if (matcher.group("class") != null) {
-            schedule.setSchedulerclass(matcher.group("class"));
-            fillOutParams(schedule.getParameters(), matcher.group("parameters"), 0);
+            task.setSchedulerclass(matcher.group("class"));
+            fillOutParams(task.getParameters(), matcher.group("parameters"), 0);
             if (matcher.group("procedure") != null) {
                 throw m_compiler.new VoltCompilerException(
                         "Schedule configures procdure when scheduler parameters are expected.");
             }
         } else {
-            CatalogMap<SchedulerParam> params = schedule.getParameters();
+            CatalogMap<TaskParameter> params = task.getParameters();
             int index = 0;
 
             if (matcher.group("cron") != null) {
-                schedule.setSchedulerclass(CronScheduler.class.getName());
+                task.setSchedulerclass(CronScheduler.class.getName());
                 addParameter(params, index++, matcher.group("cron"));
-            } else if (matcher.group("delay") != null) {
-                schedule.setSchedulerclass(DelayScheduler.class.getName());
-                addParameter(params, index++, matcher.group("delay"));
-            } else if (matcher.group("interval") != null) {
-                schedule.setSchedulerclass(IntervalScheduler.class.getName());
+            } else {
+                String intervalSchedule = matcher.group("intervalSchedule");
+                if ("delay".equalsIgnoreCase(intervalSchedule)) {
+                task.setSchedulerclass(DelayScheduler.class.getName());
+                } else if ("every".equalsIgnoreCase(intervalSchedule)) {
+                    task.setSchedulerclass(IntervalScheduler.class.getName());
+                } else {
+                    throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
+                }
                 addParameter(params, index++, matcher.group("interval"));
                 addParameter(params, index++, matcher.group("timeUnit"));
-            } else {
-                throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
             }
 
             if (matcher.group("procedure") == null) {
                 throw m_compiler.new VoltCompilerException("Schedule does not specify procedure to execute");
             }
 
-            fillOutParams(params, matcher.group("procedure"), index);
+            addParameter(params, index++, matcher.group("procedure"));
+            fillOutParams(params, matcher.group("parameters"), index);
         }
         String user = matcher.group("asUser");
         // If no user is set and this is new DDL use the user which is creating the schedule
-        schedule.setUser(user == null && newDdl ? m_compiler.getUser() : user);
-        schedule.setEnabled(matcher.group("disabled") == null);
-        schedule.setOnerror(MoreObjects.firstNonNull(matcher.group("onError"), "ABORT").toUpperCase());
+        task.setUser(user == null && newDdl ? m_compiler.getUser() : user);
+        task.setEnabled(matcher.group("disabled") == null);
+        task.setOnerror(MoreObjects.firstNonNull(matcher.group("onError"), "STOP").toUpperCase());
 
-        return schedule;
+        return task;
     }
 
-    private void fillOutParams(CatalogMap<SchedulerParam> params, String paramsCsv, int startIndex)
+    private void fillOutParams(CatalogMap<TaskParameter> params, String paramsCsv, int startIndex)
             throws VoltCompilerException {
         if (paramsCsv == null) {
             return;
@@ -156,9 +159,9 @@ public class CreateSchedule extends StatementProcessor {
         }
     }
 
-    private static void addParameter(CatalogMap<SchedulerParam> params, int index, String param) {
-        SchedulerParam schedulerParam = params.add(Integer.toString(index));
-        schedulerParam.setIndex(index);
-        schedulerParam.setParameter(param);
+    private static void addParameter(CatalogMap<TaskParameter> params, int index, String param) {
+        TaskParameter taskParam = params.add(Integer.toString(index));
+        taskParam.setIndex(index);
+        taskParam.setParameter(param);
     }
 }

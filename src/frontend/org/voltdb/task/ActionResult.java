@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.concurrent.TimeUnit;
 

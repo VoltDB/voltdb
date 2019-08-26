@@ -419,69 +419,85 @@ public class SQLParser extends SQLPatternFactory
                     ).compile("PAT_DROP_STREAM");
 
     /**
-     * Build regex to support create schedule statement in the from of
+     * Build regex to support create task statement in the from of
      * <p>
      *
      * <pre>
-     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
-     *     USING &lt;scheduler class> [AS USER &lt;user&gt;] [DISABLED] [WITH arg1, ...]
+     * CREATE TASK &lt;task name&gt; USING &lt;scheduler class&gt;
+     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER &lt;user&gt;]
+     *     [DISABLED] [WITH arg1, ...]
      * or
-     * CREATE SCHEDULE &lt;schedule name&gt; [ON (SYSTEM | HOSTS | PARTITIONS)]
-     *     (DELAY &lt;delay&gt;|CRON &lt;cron expression&gt;)
-     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [AS USER &lt;user&gt;] [DISABLED] AS &lt;procedure&gt; [arg1, ...]
+     * CREATE TASK &lt;task name&gt; (DELAY &lt;delay&gt;|CRON &lt;cron expression&gt;)
+     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER &lt;user&gt;]
+     *     [DISABLED] AS &lt;procedure&gt; [arg1, ...]
      * </pre>
      */
-    private static final Pattern PAT_CREATE_SCHEDULE =
+    private static final Pattern PAT_CREATE_TASK =
             SPF.statement(
-                SPF.token("create"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
-                        SPF.capture("scope", SPF.oneOf("system", "hosts", "partitions")))),
+                SPF.token("create"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
                 SPF.oneOf(
-                    SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
-                    SPF.clause(SPF.oneOf(
-                        SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
-                        SPF.clause(SPF.token("cron"),
-                            SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                                SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))),
-                        SPF.clause(SPF.token("every"), SPF.capture("interval", SPF.integer()),
-                            SPF.capture("timeUnit", SPF.oneOf("milliseconds", "seconds", "minutes", "hours", "days")))))),
+                    SPF.clause(SPF.token("from"), SPF.token("class"), SPF.capture("class", SPF.className())),
+                    SPF.clause(
+                        SPF.token("on"), SPF.token("SCHEDULE"),
+                        SPF.oneOf(
+                            SPF.clause(
+                                SPF.capture("intervalSchedule", SPF.oneOf("delay", "every")),
+                                SPF.capture("interval", SPF.integer()),
+                                SPF.capture("timeUnit", SPF.oneOf("milliseconds", "seconds", "minutes", "hours", "days"))
+                            ),
+                            SPF.clause(SPF.token("cron"),
+                                SPF.capture("cron",
+                                    SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                                )
+                            )
+                        ),
+                        SPF.token("procedure"), SPF.capture("procedure", SPF.token("@?[\\w.$]+"))
+                    )
+                ),
+                SPF.optional(
+                    SPF.clause(
+                        SPF.token("with"), SPF.token("\\(\\s*"),
+                        SPF.capture("parameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                    )
+                ),
                 SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
-                        SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))),
+                    SPF.capture("onError", SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))),
+                SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
+                    SPF.capture("scope", SPF.oneOf("database", "hosts", "partitions")))),
                 SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
-                SPF.optional(SPF.capture("disabled", SPF.token("disabled"))),
-                SPF.optional(SPF.oneOf(
-                    SPF.clause(SPF.token("with"), SPF.capture("parameters", SPF.commaList(SPF.token(".+")))),
-                    SPF.clause(SPF.token("as"), SPF.capture("procedure", SPF.commaList(SPF.token(".+"))))))
-            ).compile("PAT_CREATE_SCHEDULE");
+                SPF.optional(SPF.oneOf(SPF.capture("disabled", SPF.token("disable")), SPF.token("enable")))
+            ).compile("PAT_CREATE_TASK");
 
     /**
-     * Build regex to support drop schedule statement in the from of
+     * Build regex to support drop task statement in the from of
      * <p>
      * <code>
-     * DROP SCHEDULE <schedule name> [IF EXISTS]
+     * DROP TASK <task name> [IF EXISTS]
      * </code>
      */
-    private static final Pattern PAT_DROP_SCHEDULE =
+    private static final Pattern PAT_DROP_TASK =
             SPF.statement(
-                    SPF.token("drop"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.token("drop"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.ifExisits())
-            .compile("PAT_DROP_SCHEDULE");
+            .compile("PAT_DROP_TASK");
 
     /**
-     * Build regex to support alter schedule statement in the from of
+     * Build regex to support alter task statement in the from of
      * <p>
      * <code>
-     * ALTER SCHEDULE <schedule name> (ENABLE | DISABLE)
+     * ALTER TASK <task name> [(ENABLE | DISABLE)]
      * </code>
      */
-    private static final Pattern PAT_ALTER_SCHEDULE =
+    private static final Pattern PAT_ALTER_TASK =
             SPF.statement(
-                SPF.token("alter"), SPF.token("schedule"), SPF.capture("name", SPF.databaseObjectName()),
+                SPF.token("alter"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
                     SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
                             SPF.capture("onError",
-                                    SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore")))))
-            ).compile("PAT_ALTER_SCHEDULE");
+                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))))
+            ).compile("PAT_ALTER_TASK");
 
     /**
      * NB supports only unquoted table names
@@ -540,7 +556,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|SCHEDULE|AGGREGATE)|" + // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE)|" + // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -548,7 +564,7 @@ public class SQLParser extends SQLPatternFactory
             "\\AIMPORT|" +
             "\\ADR|" +
             "\\ASET|" +
-            "\\AALTER\\s+SCHEDULE" +
+            "\\AALTER\\s+TASK" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -1061,7 +1077,7 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Match statement against pattern for create schedule
+     * Match statement against pattern for create task
      * <p>
      * If a match is found the following named groups are in the returned {@link Matcher}:
      * <table>
@@ -1073,17 +1089,42 @@ public class SQLParser extends SQLPatternFactory
      * <tr>
      * <td>name</td>
      * <td>Required</td>
-     * <td>Name of schedule</td>
+     * <td>Name of task</td>
+     * </tr>
+     * <tr>
+     * <td>class|intervalSchedule|cron</td>
+     * <td>Required</td>
+     * <td>Scheduler class, fixed delay, every or cron expression to be used</td>
+     * </tr>
+     * <tr>
+     * <td>interval</td>
+     * <td>Required for delay and every</td>
+     * <td>Interval of time for scheduling</td>
+     * </tr>
+     * <tr>
+     * <td>timeUnit</td>
+     * <td>Required for delay and every</td>
+     * <td>Time unit of the interval</td>
+     * </tr>
+     * <tr>
+     * <td>procedure</td>
+     * <td>Required for cron, delay or every</td>
+     * <td>Procedure name with comma separated list of parameters to pass to the procedure</td>
+     * </tr>
+     * <tr>
+     * <td>parameters</td>
+     * <td>Optional</td>
+     * <td>Comma separated list of parameters to pass to the scheduler or procedure</td>
+     * </tr>
+     * <tr>
+     * <td>onError</td>
+     * <td>Optional</td>
+     * <td>How error responses from a procedure should be handled</td>
      * </tr>
      * <tr>
      * <td>scope</td>
      * <td>Optional</td>
-     * <td>Scope of the schedule. IE system, hosts, partitions</td>
-     * </tr>
-     * <tr>
-     * <td>class|delay|cron</td>
-     * <td>Required</td>
-     * <td>Scheduler class, fixed delay or cron expression to be used</td>
+     * <td>Scope of the task. IE database, hosts, partitions</td>
      * </tr>
      * <tr>
      * <td>asUser</td>
@@ -1092,29 +1133,19 @@ public class SQLParser extends SQLPatternFactory
      * </tr>
      * <td>disabled</td>
      * <td>Optional</td>
-     * <td>If present this schedule is part of the catalog but not executed</td>
-     * </tr>
-     * <tr>
-     * <td>parameters</td>
-     * <td>Optional</td>
-     * <td>Comma separated list of parameters to pass to the scheduler</td>
-     * </tr>
-     * <tr>
-     * <td>procedure</td>
-     * <td>Required for cron or delay</td>
-     * <td>Procedure name with comma separated list of parameters to pass to the procedure</td>
+     * <td>If present this task is part of the catalog but not executed</td>
      * </tr>
      * </table>
      *
      * @param statement statement to match against
      * @return pattern matcher object
      */
-    public static Matcher matchCreateSchedule(String statement) {
-        return PAT_CREATE_SCHEDULE.matcher(statement);
+    public static Matcher matchCreateTask(String statement) {
+        return PAT_CREATE_TASK.matcher(statement);
     }
 
     /**
-     * Match statement against pattern for drop schedule
+     * Match statement against pattern for drop task
      * <p>
      * If a match is found the following named groups are in the returned {@link Matcher}:
      * <table>
@@ -1126,24 +1157,24 @@ public class SQLParser extends SQLPatternFactory
      * <tr>
      * <td>name</td>
      * <td>Required</td>
-     * <td>Name of schedule</td>
+     * <td>Name of task</td>
      * </tr>
      * <tr>
      * <td>ifExists</td>
      * <td>Optional</td>
-     * <td>If present then it is not an error if the schedule does not exist</td>
+     * <td>If present then it is not an error if the task does not exist</td>
      * </tr>
      * </table>
      *
      * @param statement statement to match against
      * @return pattern matcher object
      */
-    public static Matcher matchDropSchedule(String statement) {
-        return PAT_DROP_SCHEDULE.matcher(statement);
+    public static Matcher matchDropTask(String statement) {
+        return PAT_DROP_TASK.matcher(statement);
     }
 
     /**
-     * Match statement against pattern for alter schedule
+     * Match statement against pattern for alter task
      * <p>
      * If a match is found the following named groups are in the returned {@link Matcher}:
      * <table>
@@ -1155,20 +1186,25 @@ public class SQLParser extends SQLPatternFactory
      * <tr>
      * <td>name</td>
      * <td>Required</td>
-     * <td>Name of schedule</td>
+     * <td>Name of task</td>
      * </tr>
      * <tr>
      * <td>action</td>
      * <td>Required</td>
      * <td>What alter action should be performed. Enable or disable</td>
      * </tr>
+     * <tr>
+     * <td>onError</td>
+     * <td>Optional</td>
+     * <td>How error responses from a procedure should be handled</td>
+     * </tr>
      * </table>
      *
      * @param statement statement to match against
      * @return pattern matcher object
      */
-    public static Matcher matchAlterSchedule(String statement) {
-        return PAT_ALTER_SCHEDULE.matcher(statement);
+    public static Matcher matchAlterTask(String statement) {
+        return PAT_ALTER_TASK.matcher(statement);
     }
 
     /**

@@ -66,7 +66,7 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.statements.AlterSchedule;
+import org.voltdb.compiler.statements.AlterTask;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -74,14 +74,14 @@ import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
-import org.voltdb.compiler.statements.CreateSchedule;
+import org.voltdb.compiler.statements.CreateTask;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
-import org.voltdb.compiler.statements.DropSchedule;
 import org.voltdb.compiler.statements.DropStream;
+import org.voltdb.compiler.statements.DropTask;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -241,9 +241,9 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropStream(this))
                                 .addNextProcessor(new DRTable(this))
                                 .addNextProcessor(new SetGlobalParam(this))
-                                .addNextProcessor(new CreateSchedule(this))
-                                .addNextProcessor(new DropSchedule(this))
-                                .addNextProcessor(new AlterSchedule(this))
+                                .addNextProcessor(new CreateTask(this))
+                                .addNextProcessor(new DropTask(this))
+                                .addNextProcessor(new AlterTask(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -336,7 +336,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
-        protected static final String SCHEDULE = "SCHEDULE";
+        protected static final String TASK = "TASK";
         protected static final String AGGREGATE = "AGGREGATE";
     }
 

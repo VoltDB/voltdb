@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -29,9 +29,9 @@ import fc.cron.CronExpression;
 public class CronScheduler extends SingleProcScheduler {
     private CronExpression m_cronExpression;
 
-    public static String validateParameters(SchedulerHelper helper, String cronConfiguration,
+    public static String validateParameters(TaskHelper helper, String cronConfiguration,
             String procedure, String... procedureParameters) {
-        SchedulerValidationErrors errors = new SchedulerValidationErrors();
+        TaskValidationErrors errors = new TaskValidationErrors();
         SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
         try {
             new CronExpression(cronConfiguration, true);
@@ -41,7 +41,7 @@ public class CronScheduler extends SingleProcScheduler {
         return errors.getErrorMessage();
     }
 
-    public void initialize(SchedulerHelper helper, String cronConfiguration, String procedure,
+    public void initialize(TaskHelper helper, String cronConfiguration, String procedure,
             String... procedureParameters) {
         super.initialize(helper, procedure, procedureParameters);
         m_cronExpression = new CronExpression(cronConfiguration, true);

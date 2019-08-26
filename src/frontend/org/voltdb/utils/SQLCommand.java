@@ -377,8 +377,8 @@ public class SQLCommand {
                 case "configuration":
                     execListConfigurations();
                     break;
-                case "schedules":
-                    executeListSchedules();
+            case "tasks":
+                    executeListTasks();
                     break;
                 default:
                     String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
@@ -567,8 +567,8 @@ public class SQLCommand {
         }
     }
 
-    private static void executeListSchedules() throws Exception {
-        VoltTable schedules = m_client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
+    private static void executeListTasks() throws Exception {
+        VoltTable schedules = m_client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
         System.out.println("--- Schedules ------------------------------------------------");
         while (schedules.advanceRow()) {
             System.out.println(schedules.getString(0));

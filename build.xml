@@ -589,12 +589,12 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
-            <include name="src/frontend/org/voltdb/sched/package-info.java" />
-            <include name="src/frontend/org/voltdb/sched/Scheduler.java" />
-            <include name="src/frontend/org/voltdb/sched/Action.java" />
-            <include name="src/frontend/org/voltdb/sched/ActionResult.java" />
-            <include name="src/frontend/org/voltdb/sched/SchedulerValidationErrors.java" />
-            <include name="src/frontend/org/voltdb/sched/SchedulerValidationHelper.java" />
+            <include name="src/frontend/org/voltdb/task/package-info.java" />
+            <include name="src/frontend/org/voltdb/task/Scheduler.java" />
+            <include name="src/frontend/org/voltdb/task/Action.java" />
+            <include name="src/frontend/org/voltdb/task/ActionResult.java" />
+            <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
         </fileset>
     </javadoc>
 

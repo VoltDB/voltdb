@@ -16,6 +16,6 @@
  */
 
 /**
- * Provides classes and interfaces for for supporting in-server scheduling of procedures
+ * Provides classes and interfaces for for supporting tasks executing on a schedule
  */
-package org.voltdb.sched;
+package org.voltdb.task;

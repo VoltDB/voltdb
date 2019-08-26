@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.Task;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -30,31 +30,31 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
 /**
- * Handle processing ddl which matches {@link SQLParser#matchDropSchedule(String)}
+ * Handle processing ddl which matches {@link SQLParser#matchDropTask(String)}
  */
-public class DropSchedule extends StatementProcessor {
-    public DropSchedule(DDLCompiler ddlCompiler) {
+public class DropTask extends StatementProcessor {
+    public DropTask(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
     }
 
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
-        Matcher matcher = SQLParser.matchDropSchedule(ddlStatement.statement);
+        Matcher matcher = SQLParser.matchDropTask(ddlStatement.statement);
         if (!matcher.matches()) {
             return false;
         }
 
         String name = matcher.group("name");
 
-        CatalogMap<ProcedureSchedule> schedules = db.getProcedureschedules();
-        if (schedules.get(name) == null) {
+        CatalogMap<Task> tasks = db.getTasks();
+        if (tasks.get(name) == null) {
             if (matcher.group("ifExists") == null) {
                 throw m_compiler.new VoltCompilerException(
-                        String.format("Schedule name \"%s\" in DROP SCHEDULE statement does not exist.", name));
+                        String.format("Schedule name \"%s\" in DROP TASK statement does not exist.", name));
             }
         } else {
-            schedules.delete(name);
+            tasks.delete(name);
         }
 
         return true;

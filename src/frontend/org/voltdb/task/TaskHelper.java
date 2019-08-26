@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.function.UnaryOperator;
 
@@ -31,14 +31,15 @@ import org.voltdb.catalog.Procedure;
  * Helper class passed to {@link Scheduler} instances for calling in to the volt system to perform logging, validation
  * and other operations
  */
-public final class SchedulerHelper {
-    private static final VoltLogger log = new VoltLogger("SCHEDULE");
-
+public final class TaskHelper {
+    private final VoltLogger m_logger;
     private final UnaryOperator<String> m_generateLogMessage;
     private final String m_scope;
     private final ClientInterface m_clientInterface;
 
-    SchedulerHelper(UnaryOperator<String> generateLogMessage, String scope, ClientInterface clientInterface) {
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
+            ClientInterface clientInterface) {
+        m_logger = logger;
         m_generateLogMessage = generateLogMessage;
         m_scope = scope;
         m_clientInterface = clientInterface;
@@ -48,7 +49,7 @@ public final class SchedulerHelper {
      * @return {@code true} if debug logging is enabled
      */
     public boolean isDebugLoggingEnabled() {
-        return log.isDebugEnabled();
+        return m_logger.isDebugEnabled();
     }
 
     /**
@@ -67,7 +68,7 @@ public final class SchedulerHelper {
      * @param throwable to log along with {@code message}
      */
     public void logDebug(String message, Throwable throwable) {
-        log.debug(generateLogMessage(message), throwable);
+        m_logger.debug(generateLogMessage(message), throwable);
     }
 
     /**
@@ -86,7 +87,7 @@ public final class SchedulerHelper {
      * @param throwable to log along with {@code message}
      */
     public void logInfo(String message, Throwable throwable) {
-        log.info(generateLogMessage(message), throwable);
+        m_logger.info(generateLogMessage(message), throwable);
     }
 
     /**
@@ -105,7 +106,7 @@ public final class SchedulerHelper {
      * @param throwable to log along with {@code message}
      */
     public void logWarning(String message, Throwable throwable) {
-        log.warn(generateLogMessage(message), throwable);
+        m_logger.warn(generateLogMessage(message), throwable);
     }
 
     /**
@@ -124,7 +125,7 @@ public final class SchedulerHelper {
      * @param throwable to log along with {@code message}
      */
     public void logError(String message, Throwable throwable) {
-        log.error(generateLogMessage(message), throwable);
+        m_logger.error(generateLogMessage(message), throwable);
     }
 
     /**
@@ -132,13 +133,13 @@ public final class SchedulerHelper {
      * <p>
      * Note: parameter validation might not work for system procedures
      *
-     * @param errors                   {@link SchedulerValidationErrors} instance to collect errors
+     * @param errors                   {@link TaskValidationErrors} instance to collect errors
      * @param restrictProcedureByScope If true type of procedures will be restricted. See
      *                                 {@link Scheduler#restrictProcedureByScope()}
      * @param procedureName            Name of procedure to validate
      * @param parameters               that will be passed to {@code name}
      */
-    public void validateProcedure(SchedulerValidationErrors errors, boolean restrictProcedureByScope,
+    public void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope,
             String procedureName, Object[] parameters) {
         Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
         if (procedure == null) {
@@ -152,7 +153,7 @@ public final class SchedulerHelper {
         }
 
         if (restrictProcedureByScope) {
-            String error = SchedulerManager.isProcedureValidForScope(m_scope, procedure);
+            String error = TaskManager.isProcedureValidForScope(m_scope, procedure);
             if (error != null) {
                 errors.addErrorMessage(error);
                 return;

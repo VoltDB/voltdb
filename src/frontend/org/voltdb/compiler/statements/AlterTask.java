@@ -20,7 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.Task;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -29,26 +29,26 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
 /**
- * Handle processing ddl which matches {@link SQLParser#matchAlterSchedule(String)}
+ * Handle processing ddl which matches {@link SQLParser#matchAlterTask(String)}
  */
-public class AlterSchedule extends StatementProcessor {
-    public AlterSchedule(DDLCompiler ddlCompiler) {
+public class AlterTask extends StatementProcessor {
+    public AlterTask(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
     }
 
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
-        Matcher matcher = SQLParser.matchAlterSchedule(ddlStatement.statement);
+        Matcher matcher = SQLParser.matchAlterTask(ddlStatement.statement);
         if (!matcher.matches()) {
             return false;
         }
 
         String name = matcher.group("name");
-        ProcedureSchedule schedule = db.getProcedureschedules().get(name);
-        if (schedule == null) {
+        Task task = db.getTasks().get(name);
+        if (task == null) {
             throw m_compiler.new VoltCompilerException(
-                    String.format("Schedule name \"%s\" in ALTER SCHEDULE statement does not exist.", name));
+                    String.format("Schedule name \"%s\" in ALTER TASK statement does not exist.", name));
         }
 
         String action = matcher.group("action");
@@ -57,16 +57,16 @@ public class AlterSchedule extends StatementProcessor {
 
             assert enable || "DISABLE".equalsIgnoreCase(action);
 
-            if (enable == schedule.getEnabled()) {
+            if (enable == task.getEnabled()) {
                 throw m_compiler.new VoltCompilerException(
                         String.format("Schedule \"%s\" is already %s", name, enable ? "enabled" : "disabled"));
             }
-            schedule.setEnabled(enable);
+            task.setEnabled(enable);
         }
 
         String onError = matcher.group("onError");
         if (onError != null) {
-            schedule.setOnerror(onError);
+            task.setOnerror(onError);
         }
 
         return true;

@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.sched;
+package org.voltdb.task;
 
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
@@ -25,16 +25,16 @@ import java.util.concurrent.TimeUnit;
  * parameters repeatedly.
  */
 abstract class SingleProcScheduler implements Scheduler {
-    SchedulerHelper m_helper;
+    TaskHelper m_helper;
     private String m_procedure;
     private Object[] m_procedureParameters;
 
-    static void validateParameters(SchedulerValidationErrors errors, SchedulerHelper helper, String procedure,
+    static void validateParameters(TaskValidationErrors errors, TaskHelper helper, String procedure,
             String... procedureParameters) {
         helper.validateProcedure(errors, true, procedure, procedureParameters);
     }
 
-    void initialize(SchedulerHelper helper, String procedure, String... procedureParameters) {
+    void initialize(TaskHelper helper, String procedure, String... procedureParameters) {
         m_helper = helper;
         m_procedure = procedure;
         m_procedureParameters = procedureParameters;

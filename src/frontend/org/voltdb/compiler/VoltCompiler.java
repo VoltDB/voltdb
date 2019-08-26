@@ -70,7 +70,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.Task;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -82,9 +82,9 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.utils.CreateTableUtils;
-import org.voltdb.sched.SchedulerManager;
-import org.voltdb.sched.SchedulerManager.SchedulerValidationResult;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.task.TaskManager;
+import org.voltdb.task.TaskManager.TaskValidationResult;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -1957,9 +1957,9 @@ public class VoltCompiler {
             addClassToJar(jarOutput, ancestor);
         }
 
-        SchedulerManager schedulerManager = VoltDB.instance().getSchedulerManager();
-        for (ProcedureSchedule schedule : db.getProcedureschedules()) {
-            SchedulerValidationResult result = schedulerManager.validateScheduler(schedule, classLoader);
+        TaskManager taskManager = VoltDB.instance().getTaskManager();
+        for (Task task : db.getTasks()) {
+            TaskValidationResult result = taskManager.validateTask(task, classLoader);
             if (!result.isValid()) {
                 throw new VoltCompilerException(result.getErrorMessage());
             }
