@@ -254,9 +254,9 @@ public:
     ~AggregateHashExecutor();
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
             const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
-            CountingPostfilter* parentPredicate = nullptr);
-    void p_execute_tuple(const TableTuple& nextTuple);
-    void p_execute_finish();
+            CountingPostfilter* parentPredicate = nullptr) override;
+    void p_execute_tuple(const TableTuple& nextTuple) override;
+    void p_execute_finish() override;
 };
 
 /**
@@ -272,9 +272,9 @@ public:
     ~AggregateSerialExecutor();
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
             const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
-            CountingPostfilter* parentPredicate = nullptr);
-    void p_execute_tuple(const TableTuple& nextTuple);
-    void p_execute_finish();
+            CountingPostfilter* parentPredicate = nullptr) override;
+    void p_execute_tuple(const TableTuple& nextTuple) override;
+    void p_execute_finish() override;
 
 protected:
     AggregateRow* m_aggregateRow = nullptr;
