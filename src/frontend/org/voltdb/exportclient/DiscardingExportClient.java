@@ -115,6 +115,7 @@ public class DiscardingExportClient extends ExportClientBase {
                 m_logger.error("Failed to decode ackdelay value \'" + sleepValue + "\': " + e);
             }
         }
+        setRunEverywhere(Boolean.parseBoolean(config.getProperty("replicated", "false")));
     }
 
     @Override
