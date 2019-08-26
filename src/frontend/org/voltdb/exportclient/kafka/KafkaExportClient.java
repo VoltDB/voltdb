@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -333,7 +334,9 @@ public class KafkaExportClient extends ExportClientBase {
             String clientId = m_producerConfig.getProperty(ProducerConfig.CLIENT_ID_CONFIG);
             if (DEFAULT_CLIENT_ID.equals(clientId)) {
                 // Generate a unique kafka client id
-                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId;
+                UUID uuid = UUID.randomUUID();
+                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId
+                        + "-" + uuid;
                 LOG.info("Set Kafka client id to " + clientId);
                 m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
             }
