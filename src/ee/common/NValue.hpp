@@ -218,6 +218,9 @@ class NValue {
     NValue& operator=(const NValue& val);
 
     bool operator==(NValue const& rhs) const;
+    bool operator!=(NValue const& rhs) const {
+        return ! operator==(rhs);
+    }
 
     /* Release memory associated to object type NValues */
     void free() const;
