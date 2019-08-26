@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -292,6 +291,7 @@ public class KafkaExportClient extends ExportClientBase {
 
         String m_topic = null;
         boolean m_primed = false;
+        Properties m_decoderProducerConfig;
         KafkaProducer<String, String> m_producer;
         final CSVStringDecoder m_decoder;
         final List<Future<RecordMetadata>> m_futures = new ArrayList<>();
@@ -313,12 +313,15 @@ public class KafkaExportClient extends ExportClientBase {
                             source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
 
             m_decoder = builder.build();
+            // Ensure each decoder uses its own properties (ENG-17657)
+            m_decoderProducerConfig = new Properties();
+            m_decoderProducerConfig.putAll(m_producerConfig);
         }
 
         final void checkOnFirstRow() throws RestartBlockException {
             if (!m_primed) try {
                 setClientId();
-                m_producer = new KafkaProducer<>(m_producerConfig);
+                m_producer = new KafkaProducer<>(m_decoderProducerConfig);
             }
             catch (ConfigException e) {
                 LOG.error("Unable to instantiate a Kafka producer", e);
@@ -331,14 +334,12 @@ public class KafkaExportClient extends ExportClientBase {
         }
 
         private void setClientId() {
-            String clientId = m_producerConfig.getProperty(ProducerConfig.CLIENT_ID_CONFIG);
+            String clientId = m_decoderProducerConfig.getProperty(ProducerConfig.CLIENT_ID_CONFIG);
             if (DEFAULT_CLIENT_ID.equals(clientId)) {
                 // Generate a unique kafka client id
-                UUID uuid = UUID.randomUUID();
-                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId
-                        + "-" + uuid;
+                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId;
                 LOG.info("Set Kafka client id to " + clientId);
-                m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
+                m_decoderProducerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
             }
         }
 
@@ -400,7 +401,7 @@ public class KafkaExportClient extends ExportClientBase {
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         if (e != null){
                             LOG.warn("Failed to send data. Verify if the kafka server matches bootstrap.servers %s", e,
-                                    m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
+                                    m_decoderProducerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
                             m_failure.compareAndSet(false, true);
                         }
                     }
