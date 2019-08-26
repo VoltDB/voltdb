@@ -77,15 +77,12 @@ public:
     Agg() {
         m_value.setNull();
     }
-    virtual ~Agg() {
-        /* do nothing */
-    }
+    virtual ~Agg() {}
     virtual void advance(const NValue& val) = 0;
     virtual NValue finalize(ValueType type) {
         m_value.castAs(type);
         return m_value;
     }
-
     virtual void resetAgg() {
         m_haveAdvanced = false;
         m_value.setNull();
@@ -97,10 +94,15 @@ public:
  * A collection of aggregates in progress for a specific group.
  */
 struct AggregateRow {
+    // A tuple from the group of tuples being aggregated. Source of pass through columns.
+    TableTuple m_passThroughTuple;
+    // The aggregates for each column for this group
+    Agg* m_aggregates[0];
+
     void* operator new(size_t size, Pool& memoryPool, size_t nAggs) {
         // allocate nAggs +1 for null terminator: see resetAggs, and destructor.
         // Would it be cleaner to have a count data member? Not by much.
-        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+        return memoryPool.allocateZeroes(size + sizeof(void*) * (nAggs + 1));
     }
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
@@ -131,12 +133,6 @@ struct AggregateRow {
         passThroughTupleSource.copy(tuple);
         m_passThroughTuple = passThroughTupleSource;
     }
-
-    // A tuple from the group of tuples being aggregated. Source of pass through columns.
-    TableTuple m_passThroughTuple;
-
-    // The aggregates for each column for this group
-    Agg* m_aggregates[0];
 };
 
 /**
@@ -159,7 +155,8 @@ public:
      * but will use other's output table instead.
      */
     virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-            const TupleSchema * schema, AbstractTempTable* newTempTable = NULL, CountingPostfilter* parentPredicate = NULL);
+            const TupleSchema * schema, AbstractTempTable* newTempTable = NULL,
+            CountingPostfilter* parentPredicate = NULL);
 
     /**
      * Evaluate a tuple. As a side effect, signals when LIMIT has been met, the caller may stop executing.
@@ -171,13 +168,12 @@ public:
      */
     virtual void p_execute_finish();
 
-    virtual void cleanupMemoryPool() {
+    void cleanupMemoryPool() override {
         AggregateExecutorBase::p_execute_finish();
     }
 
 protected:
-    virtual bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
-
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector) override;
     void initCountingPredicate(const NValueArray& params, CountingPostfilter* parentPredicate);
 
     /// Helper method responsible for inserting the results of the
@@ -213,7 +209,7 @@ protected:
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema = nullptr;
     std::vector<ExpressionType> m_aggTypes;
-    std::vector<int> m_aggregateIds;
+    std::vector<int> m_aggregateIds;        // TODO: these are added for UDAF: should be stored elsewhere.
     std::vector<bool> m_isWorker;
     std::vector<bool> m_isPartition;
     std::vector<bool> m_distinctAggs;
@@ -248,7 +244,7 @@ std::unordered_map<TableTuple, AggregateRow*, TableTupleHasher, TableTupleEquali
  */
 class AggregateHashExecutor : public AggregateExecutorBase {
     HashAggregateMapType m_hash;
-    virtual bool p_execute(const NValueArray& params);
+    bool p_execute(const NValueArray& params) override;
 public:
     AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
@@ -256,10 +252,9 @@ public:
     // empty destructor defined in .cpp file because of it is called virtually (not inline)
     // same reason for serial and partial
     ~AggregateHashExecutor();
-
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
-                              CountingPostfilter* parentPredicate = nullptr);
+            const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
+            CountingPostfilter* parentPredicate = nullptr);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 };
@@ -270,14 +265,14 @@ public:
  * at least to the extent that rows with equal keys arrive sequentially (not interspersed with other key values).
  */
 class AggregateSerialExecutor : public AggregateExecutorBase {
+    bool p_execute(const NValueArray& params) override;
 public:
     AggregateSerialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor();
-
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
-                              CountingPostfilter* parentPredicate = nullptr);
+            const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
+            CountingPostfilter* parentPredicate = nullptr);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
@@ -288,31 +283,25 @@ protected:
     bool m_failPrePredicateOnFirstRow = false;
 
     TableTuple m_passThroughTupleSource;
-
-private:
-    virtual bool p_execute(const NValueArray& params);
 };
 
 
 class AggregatePartialExecutor : public AggregateExecutorBase {
+    bool m_atTheFirstRow = true;
+    PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
+    HashAggregateMapType m_hash;
+
+    virtual bool p_execute(const NValueArray& params);
+    void initPartialHashGroupByKeyTuple(const TableTuple& nextTuple);
 public:
     AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregatePartialExecutor();
-
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
-                              CountingPostfilter* parentPredicate = nullptr);
+            const TupleSchema * schema, AbstractTempTable* newTempTable  = nullptr,
+            CountingPostfilter* parentPredicate = nullptr);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
-
-private:
-    virtual bool p_execute(const NValueArray& params);
-    void initPartialHashGroupByKeyTuple(const TableTuple& nextTuple);
-
-    bool m_atTheFirstRow = true;
-    PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
-    HashAggregateMapType m_hash;
 };
 
 
