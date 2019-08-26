@@ -154,7 +154,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 result.advanceRow();
                 String success = result.getString("RESULT");
                 if (success.equals("SUCCESS")) {
-                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), txnId);
+                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), m_runner.getTxnState());
                 }
             }
             return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
@@ -172,8 +172,7 @@ public class SnapshotSave extends VoltSystemProcedure
     {
         // TRAIL [SnapSave:1] 1 [MPI] Check parameters and perform SnapshotCreationWork.
         final long startTime = System.currentTimeMillis();
-        @SuppressWarnings("deprecation")
-        final long txnId = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+        final long txnId = m_runner.getTxnState().txnId;
 
         JSONObject jsObj = new JSONObject(command);
         final boolean block = jsObj.optBoolean(SnapshotUtil.JSON_BLOCK, false);
