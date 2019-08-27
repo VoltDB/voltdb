@@ -95,6 +95,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                             , row.get(20, VoltType.STRING)
                             , row.get(21, VoltType.STRING)
                             );
+                }
             }
             else
             {

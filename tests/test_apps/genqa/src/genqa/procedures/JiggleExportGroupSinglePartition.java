@@ -52,16 +52,10 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
           Useful for debugging export data correctness, but not useful
           for not running out of memory....
         */
-<<<<<<< HEAD
-
-        voltQueueSQL(
-                      insert
-=======
         SQLStmt [] statements = {insert, export_kafka, export_rabbit, export_file, export_jdbc};
         for (SQLStmt stmt: statements) {
             voltQueueSQL(
                     stmt
->>>>>>> master
                     , DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                     , rowid
                     , record.rowid_group
@@ -74,11 +68,7 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
                     , record.type_null_bigint
                     , record.type_not_null_bigint
                     , record.type_null_timestamp
-<<<<<<< HEAD
-                    // , record.type_not_null_timestamp
-=======
                     // , record.type_not_null_timestamp -- changed to "DEFAULT NOW" in ddl
->>>>>>> master
                     , record.type_null_float
                     , record.type_not_null_float
                     , record.type_null_decimal
@@ -90,115 +80,8 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
-<<<<<<< HEAD
 
-        voltQueueSQL(
-                     export_kafka
-                     , txid
-                     , rowid
-                     , record.rowid_group
-                     , record.type_null_tinyint
-                     , record.type_not_null_tinyint
-                     , record.type_null_smallint
-                     , record.type_not_null_smallint
-                     , record.type_null_integer
-                     , record.type_not_null_integer
-                     , record.type_null_bigint
-                     , record.type_not_null_bigint
-                     , record.type_null_timestamp
-                     // , record.type_not_null_timestamp
-                     , record.type_null_float
-                     , record.type_not_null_float
-                     , record.type_null_decimal
-                     , record.type_not_null_decimal
-                     , record.type_null_varchar25
-                     , record.type_not_null_varchar25
-                     , record.type_null_varchar128
-                     , record.type_not_null_varchar128
-                     , record.type_null_varchar1024
-                     , record.type_not_null_varchar1024
-        );
-        voltQueueSQL(
-                export_rabbit
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
-        voltQueueSQL(
-                export_file
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
-        voltQueueSQL(
-                export_jdbc
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                // , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-                );
-=======
         }
->>>>>>> master
 
         // Execute last statement batch
         voltExecuteSQL(true);
