@@ -19,75 +19,28 @@ package org.voltdb.compiler.statements;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.regex.Matcher;
 
-import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
-import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
-import org.voltdb.types.GeographyPointValue;
-import org.voltdb.types.GeographyValue;
-import org.voltdb.types.TimestampType;
+import org.voltdb.compiler.statements.CreateFunction;
 
 /**
  * Process CREATE FUNCTION <function-name> FROM METHOD <class-name>.<method-name>
  */
-public class CreateFunctionFromMethod extends StatementProcessor {
-    private static VoltLogger m_logger = new VoltLogger("UDF");
-
-    static int ID_NOT_DEFINED = -1;
-    static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
-
-    static {
-        m_allowedDataTypes.add(byte.class);
-        m_allowedDataTypes.add(byte[].class);
-        m_allowedDataTypes.add(short.class);
-        m_allowedDataTypes.add(int.class);
-        m_allowedDataTypes.add(long.class);
-        m_allowedDataTypes.add(double.class);
-        m_allowedDataTypes.add(Byte.class);
-        m_allowedDataTypes.add(Byte[].class);
-        m_allowedDataTypes.add(Short.class);
-        m_allowedDataTypes.add(Integer.class);
-        m_allowedDataTypes.add(Long.class);
-        m_allowedDataTypes.add(Double.class);
-        m_allowedDataTypes.add(BigDecimal.class);
-        m_allowedDataTypes.add(String.class);
-        m_allowedDataTypes.add(TimestampType.class);
-        m_allowedDataTypes.add(GeographyPointValue.class);
-        m_allowedDataTypes.add(GeographyValue.class);
-    }
+public class CreateFunctionFromMethod extends CreateFunction {
 
     public CreateFunctionFromMethod(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
-    }
-
-    /**
-     * Find out if the function is defined.  It might be defined in the
-     * FunctionForVoltDB table.  It also might be in the VoltXML.
-     *
-     * @param functionName
-     * @return
-     */
-    private boolean isDefinedFunctionName(String functionName) {
-        return FunctionForVoltDB.isFunctionNameDefined(functionName)
-                || FunctionSQL.isFunction(functionName)
-                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
-                || (null != m_schema.findChild("ud_function", functionName));
     }
 
     @Override
@@ -242,7 +195,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // may revive a saved user defined function, and that nothing is put into the
         // catalog here.
         //
-        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes);
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes, false);
         funcXML.attributes.put("functionid", String.valueOf(functionId));
 
         m_logger.debug(String.format("Added XML for function \"%s\"", functionName));

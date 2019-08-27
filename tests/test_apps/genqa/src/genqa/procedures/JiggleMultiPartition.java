@@ -115,7 +115,7 @@ public class JiggleMultiPartition extends VoltProcedure {
         // Execute last SQL batch
         voltExecuteSQL(true);
 
-        // Retun to caller
+        // Return to caller
         return null;
     }
 }

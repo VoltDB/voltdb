@@ -390,15 +390,17 @@ function help() {
     echo -e "    ddl-pro         : runs (in sqlcmd) the DDL (.sql) files needed by the ('pro') tests"
     echo -e "    prepare         : runs (almost) all of the above, except the '-pro' options"
     echo -e "    prepare-pro     : runs (almost) all of the above, using the '-pro' options"
-    echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare' has been run"
-    echo -e "    tests           : runs the tests, preceded by whatever other options are needed"
+    echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare[-pro]' has been run"
+    echo -e "    tests           : runs the tests, preceded by whatever other (community) options are needed"
+    echo -e "    tests-pro       : runs the tests, preceded by whatever other (pro) options are needed"
     echo -e "    shutdown        : stops a VoltDB server that is currently running"
     echo -e "    all             : runs 'prepare', 'tests', 'shutdown', effectively calling everything (non-pro)"
-    echo -e "    all-pro         : runs 'prepare-pro', 'tests', 'shutdown', effectively calling everything (-pro)"
+    echo -e "    all-pro         : runs 'prepare-pro', 'tests-pro', 'shutdown', effectively calling everything (-pro)"
     echo -e "    tests-help      : prints a help message for the SQL-grammar-generator Python program"
     echo -e "    test-tools-help : prints a help message for the test-tools.sh script, which is used by this one"
     echo -e "    help            : prints this message"
-    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details."
+    echo -e "The 'tests-only', 'tests[-pro]', and 'all[-pro]' options accept test arguments: see the 'tests-help'"
+    echo -e "  option for details."
     echo -e "The 'build[-pro]', options accept VoltDB build arguments, e.g. '-Dbuild=debug'."
     echo -e "Some options (build[-pro], init, jars, server[-pro], ddl[-pro]) may have '-if-needed' appended,"
     echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
@@ -432,7 +434,7 @@ function exit-with-code() {
             echo -e "\ncode3a code3b: $code_voltdb_init $code_voltdb_start (server-init, server-start)"
         fi
         if [[ "${code[4]}" -ne "0" ]]; then
-            echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d $code4e (grammar-ddl, UDF-drop, UDF-load, UDF-ddl, grammar-pro)"
+            echo -e "\ncode4a code4b code4c code4d code4e: $code4a $code4b $code4c $code4d $code4e (grammar-ddl, UDF-drop, UDF-load, UDF-ddl; grammar-pro)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
     fi

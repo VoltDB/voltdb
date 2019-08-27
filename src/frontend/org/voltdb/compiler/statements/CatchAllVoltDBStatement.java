@@ -90,6 +90,21 @@ public class CatchAllVoltDBStatement extends StatementProcessor {
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 
+        if (SCHEDULE.equals(m_firstProcessor.getCommandPrefix())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE SCHEDULE statement: \"%s\", "
+                            + "expected syntax: \"CREATE SCHEDULE <name> [ON (SYSTEM | HOSTS | PARTITIONS)] "
+                            + "USING <scheduler class> [AS USER <user>] [DISABLED] [WITH arg1, ...]\"",
+                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
+        }
+
+        if (AGGREGATE.equals(m_firstProcessor.getCommandPrefix())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE AGGREGATE FUNCTION statement: \"%s\", " +
+                    "expected syntax: \"CREATE AGGREGATE FUNCTION <name> FROM CLASS <class-name>\"",
+                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
+        }
+
         // Not a VoltDB-specific DDL statement.
         return false;
     }

@@ -19,6 +19,7 @@ package org.voltdb.plannerv2.utils;
 
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.ddl.SqlCreateTable;
 import org.apache.calcite.sql.ddl.SqlDropTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -58,7 +59,7 @@ public class DropTableUtils {
         try {
             return VoltFastSqlParser.parse(sql);
         } catch (SqlParseException e) {
-            return null;    // TODO: when Calcite eventually support all Volt syntax, we need to rethrow in here.
+            return null;    // TODO: do not catch when Calcite eventually supports all Volt DDL syntax.
         }
     }
 
@@ -151,8 +152,8 @@ public class DropTableUtils {
      * @return Generated encoded SQL drop-table statement if successfully executed; empty string otherwise (when
      * drop table request is legitimately rejected).
      */
-    private static String execDropTable(Database db, String sql, SqlDropTable dropStmt,
-                                        VoltXMLElement schema, VoltCompiler compiler) {
+    private static String execDropTable(
+            Database db, String sql, SqlDropTable dropStmt, VoltXMLElement schema, VoltCompiler compiler) {
         final String tableName = dropStmt.getOperandList().get(0).toString();
         final boolean ignoreNotFound = dropStmt.getIfExists(), cascaded = dropStmt.getCascade();
         final Optional<Table> table =
@@ -162,43 +163,48 @@ public class DropTableUtils {
         CalciteUtils.exceptWhen(!ignoreNotFound && !table.isPresent(),
                 String.format("Table %s not found", tableName));
         if (table.isPresent()) {     // found table: check dependencies
-            final Table tbl = table.get();
-            final Set<String> materializedViews = collectMaterializedViews(tbl),
-                    procs = collectStoredProcedures(db,
-                            new HashSet<String>(){{
-                                addAll(materializedViews);
-                                add(tableName);
-                            }});
-            // We decline drop table when some stored procedure depend on it, regardless cascaded or not.
-            // In future (ENG-7542, ENG-6353, doc), we will drop those stored procedures in cascade mode.
-            CalciteUtils.exceptWhen(! procs.isEmpty(),
-                    String.format("Cannot drop table %s: stored procedure(s) %s depend on it.",
-                            tableName, String.join(", ", procs)));
-            final String viewNames = String.join(", ", materializedViews);
-            CalciteUtils.exceptWhen(!cascaded && !materializedViews.isEmpty(),
-                    String.format("Dependent object exists: PUBLIC.%s in statement [%s]", viewNames, sql));
-            materializedViews.add(tableName);
-            final VoltXMLElement.VoltXMLDiff od = new VoltXMLElement.VoltXMLDiff("databaseschemadatabaseschema");
-            for (int index = schema.children.size() - 1; index >= 0; --index) {
-                final VoltXMLElement elm = schema.children.get(index);
-                final String dirtyTable = elm.attributes.get("name");
-                if (elm.name.equals("table") && materializedViews.contains(dirtyTable)) {
-                    compiler.markTableAsDirty(dirtyTable);
-                    od.getRemovedNodes().add(elm);
-                    schema.children.remove(index);
-                }
-            }
-            schema.applyDiff(od);
-            return Encoder.hexEncode(sql) + "\n";
+            return execDropTable(db, sql, tableName, table.get(), cascaded, schema, compiler);
         } else {        // Exec "DROP TABLE t IF EXISTS;" and t does not exist
             return "";
         }
     }
 
+    private static String execDropTable(
+            Database db, String sql, String tableName, Table tbl, boolean cascaded,
+            VoltXMLElement schema, VoltCompiler compiler) {
+        final Set<String> materializedViews = collectMaterializedViews(tbl),
+                procs = collectStoredProcedures(db,
+                        new HashSet<String>(){{
+                            addAll(materializedViews);
+                            add(tableName);
+                        }});
+        // We decline drop table when some stored procedure depend on it, regardless cascaded or not.
+        // In future (ENG-7542, ENG-6353, doc), we will drop those stored procedures in cascade mode.
+        CalciteUtils.exceptWhen(! procs.isEmpty(),
+                String.format("Cannot drop table %s: stored procedure(s) %s depend on it.",
+                        tableName, String.join(", ", procs)));
+        final String viewNames = String.join(", ", materializedViews);
+        CalciteUtils.exceptWhen(!cascaded && !materializedViews.isEmpty(),
+                String.format("Dependent object exists: PUBLIC.%s in statement [%s]", viewNames, sql));
+        materializedViews.add(tableName);
+        final VoltXMLElement.VoltXMLDiff od = new VoltXMLElement.VoltXMLDiff("databaseschemadatabaseschema");
+        for (int index = schema.children.size() - 1; index >= 0; --index) {
+            final VoltXMLElement elm = schema.children.get(index);
+            final String dirtyTable = elm.attributes.get("name");
+            if (elm.name.equals("table") && materializedViews.contains(dirtyTable)) {
+                compiler.markTableAsDirty(dirtyTable);
+                od.getRemovedNodes().add(elm);
+                schema.children.remove(index);
+            }
+        }
+        schema.applyDiff(od);
+        return Encoder.hexEncode(sql) + "\n";
+    }
+
     /**
      * Check whether the given SQL query is DROP TABLE statement, and execute it here if it is.
      * @param db Database catalog.
-     * @param sql SQL statement
+     * @param sql SQL statement, possibly ends with semi-colon
      * @param schema HSQL session to effect on when executing DROP TABLE syntax
      * @param compiler the Volt compiler
      * @return encoded SQL statement (later appended, encoded and set database's schema to the batch) when the statement
@@ -206,10 +212,20 @@ public class DropTableUtils {
      */
     public static String run(Database db, String sql, VoltXMLElement schema, VoltCompiler compiler) {
         final SqlNode query = toSqlNode(sql);
-        if (query == null || query.getKind() != SqlKind.DROP_TABLE) {
-            return null;
+        if (query == null) {    // Calcite parse error
+           return null;
         } else {
-            return execDropTable(db, sql, (SqlDropTable) query, schema, compiler);
+            switch (query.getKind()) {
+                case DROP_TABLE:
+                    return execDropTable(db, sql, (SqlDropTable) query, schema, compiler);
+                case CREATE_TABLE:
+                    /*final String tableName = ((SqlCreateTable) query).getOperandList().get(0).toString();
+                    Database db, String sql, String tableName, Table tbl, boolean cascaded,
+                    VoltXMLElement schema, VoltCompiler compiler)
+                    return execDropTable(db, sql, tableName, tb, )*/
+                default:
+                    return null;
+            }
         }
     }
 }

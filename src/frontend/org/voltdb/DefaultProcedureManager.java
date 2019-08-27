@@ -74,7 +74,7 @@ public class DefaultProcedureManager {
         for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
-            if (CatalogUtil.isTableExportOnly(m_db, table)) {
+            if (CatalogUtil.isStream(m_db, table)) {
                 Column partitioncolumn = table.getPartitioncolumn();
                 if (partitioncolumn != null) {
                     int partitionIndex = partitioncolumn.getIndex();

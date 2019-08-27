@@ -377,12 +377,15 @@ public class SQLCommand {
                 case "configuration":
                     execListConfigurations();
                     break;
+                case "schedules":
+                    executeListSchedules();
+                    break;
                 default:
                     String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + subcommand + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are proc, procedures, tables, or classes.");
+                            "The valid SHOW command completions are proc, procedures, tables, classes or schedules.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
@@ -556,6 +559,14 @@ public class SQLCommand {
         }
     }
 
+    private static void executeListSchedules() throws Exception {
+        VoltTable schedules = m_client.callProcedure("@SystemCatalog", "SCHEDULES").getResults()[0];
+        System.out.println("--- Schedules ------------------------------------------------");
+        while (schedules.advanceRow()) {
+            System.out.println(schedules.getString(0));
+        }
+    }
+
     private static void execListClasses() {
         //TODO: since sqlcmd makes no intrinsic use of the Classlist, it would be more
         // efficient to load the Classlist only "on demand" from here and to cache a
@@ -622,8 +633,13 @@ public class SQLCommand {
             String functionName = tableData.getString("FUNCTION_NAME");
             String className = tableData.getString("CLASS_NAME");
             String methodName = tableData.getString("METHOD_NAME");
-            System.out.println(String.format(outputFormat, functionName,
-                    functionType + " function", className + "." + methodName));
+            if (methodName != null) {
+                System.out.println(String.format(outputFormat, functionName,
+                        functionType + " function", className + "." + methodName));
+            } else {
+                System.out.println(String.format(outputFormat, functionName,
+                        functionType + " function", className));
+            }
         }
         System.out.println();
     }
@@ -796,8 +812,9 @@ public class SQLCommand {
             throws Exception {
 
         // return back in case of multiple batch files
-        if (reader == null)
+        if (reader == null) {
             return;
+        }
 
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
@@ -1497,23 +1514,35 @@ public class SQLCommand {
         for (String arg : args) {
             if (arg.startsWith("--servers=")) {
                 serverList = extractArgInput(arg);
-                if (serverList == null) return -1;
+                if (serverList == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--port=")) {
                 String portStr = extractArgInput(arg);
-                if (portStr == null) return -1;
+                if (portStr == null) {
+                    return -1;
+                }
                 port = Integer.parseInt(portStr);
             } else if (arg.startsWith("--user=")) {
                 user = extractArgInput(arg);
-                if (user == null) return -1;
+                if (user == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
-                if (password == null) return -1;
+                if (password == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--credentials")) {
                 credentials = extractArgInput(arg);
-                if (credentials == null) return -1;
+                if (credentials == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
-                if (kerberos == null) return -1;
+                if (kerberos == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
@@ -1527,7 +1556,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--output-format=")) {
                 String formatName = extractArgInput(arg);
-                if (formatName == null) return -1;
+                if (formatName == null) {
+                    return -1;
+                }
                 formatName = formatName.toLowerCase();
                 switch (formatName) {
                     case "fixed":
@@ -1545,7 +1576,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--stop-on-error=")) {
                 String optionName = extractArgInput(arg);
-                if (optionName == null) return -1;
+                if (optionName == null) {
+                    return -1;
+                }
                 optionName = optionName.toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
@@ -1557,7 +1590,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--ddl-file=")) {
                 String ddlFilePath = extractArgInput(arg);
-                if (ddlFilePath == null) return -1;
+                if (ddlFilePath == null) {
+                    return -1;
+                }
                 try {
                     File ddlJavaFile = new File(ddlFilePath);
                     Scanner scanner = new Scanner(ddlJavaFile);
@@ -1570,14 +1605,18 @@ public class SQLCommand {
             } else if (arg.startsWith("--query-timeout=")) {
                 m_hasBatchTimeout = true;
                 String batchTimeoutStr = extractArgInput(arg);
-                if (batchTimeoutStr == null) return -1;
+                if (batchTimeoutStr == null) {
+                    return -1;
+                }
                 m_batchTimeout = Integer.parseInt(batchTimeoutStr);
             } else if (arg.equals("--output-skip-metadata")) { // equals check starting here
                 m_outputShowMetadata = false;
             } else if (arg.startsWith("--ssl=")) {
                 enableSSL = true;
                 sslConfigFile = extractArgInput(arg);
-                if (sslConfigFile == null) return -1;
+                if (sslConfigFile == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--ssl")) {
                 enableSSL = true;
                 sslConfigFile = null;

@@ -470,9 +470,17 @@ public class AsyncExportClient
             Thread.sleep(10000);
             // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
+
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
-            log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
-            clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            //Write to export table to get count to be expected on other side.
+            if (config.exportGroups) {
+                log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
+                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            }
+            else {
+                log.info("Insert row in Done table with JiggleExportDoneTable proc");
+                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            }
             writer.close(true);
 
             // Now print application results:

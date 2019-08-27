@@ -26,10 +26,11 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class JiggleExportGroupDoneTable extends VoltProcedure {
-    public final SQLStmt export_kafka = new SQLStmt("INSERT INTO export_done_table_kafka (txnid) VALUES (?)");
-    public final SQLStmt export_rabbit = new SQLStmt("INSERT INTO export_done_table_file (txnid) VALUES (?)");
-    public final SQLStmt export_file = new SQLStmt("INSERT INTO export_done_table_jdbc (txnid) VALUES (?)");
-    public final SQLStmt export_jdbc = new SQLStmt("INSERT INTO export_done_table_rabbit (txnid) VALUES (?)");
+    String template = "INSERT INTO export_done_table_BASE (txnid) VALUES (?)";
+    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
+    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
+    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
+    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
 
     public long run(long txid)
     {

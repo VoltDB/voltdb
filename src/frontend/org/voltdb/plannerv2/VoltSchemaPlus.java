@@ -55,10 +55,7 @@ public class VoltSchemaPlus {
                 false /*no caching*/, VoltFrameworkConfig.DEFAULT_SCHEMA_NAME).plus();
 
         // Get all tables from the database and add them to the SchemaPlus.
-        db.getTables().forEach(table -> {
-            schema.add(table.getTypeName(), new VoltTable(table));
-        });
-
+        db.getTables().forEach(table -> schema.add(table.getTypeName(), new VoltTable(table)));
         // Get all user-defined function from the database and add them to the SchemaPlus.
         db.getFunctions().forEach(function -> {
             try {
@@ -79,33 +76,33 @@ public class VoltSchemaPlus {
         });
 
         // add Volt extend SQL functions to the SchemaPlus
-        for (Map.Entry<Class, VoltSqlFunctions.FunctionDescriptor> function :
-                VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
-            switch(function.getValue().getType()){
-                case SCALAR:
-                    ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
-                    schema.add(scalarFunction.getFunctionName().toUpperCase(),
-                            ScalarFunctionImpl.create(
-                                    function.getKey(),
-                                    scalarFunction.getFunctionName(),
-                                    scalarFunction.isExactArgumentTypes(),
-                                    scalarFunction.getFunctionId(),
-                                    scalarFunction.getArgumentTypes()));
-                    break;
-                case AGGREGATE:
-                    AggregateFunctionDescriptor aggregateFunction = (AggregateFunctionDescriptor) function.getValue();
-                    schema.add(aggregateFunction.getFunctionName().toUpperCase(),
-                            AggregateFunctionImpl.create(
-                                    function.getKey(),
-                                    aggregateFunction.getFunctionName(),
-                                    aggregateFunction.isExactArgumentTypes(),
-                                    aggregateFunction.getAggType(),
-                                    aggregateFunction.getArgumentTypes()));
-                    break;
-                default:
-                    break;
-            }
-        }
+        VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()
+                .forEach(function -> {
+                    switch(function.getValue().getType()){
+                        case SCALAR:
+                            ScalarFunctionDescriptor scalarFunction = (ScalarFunctionDescriptor) function.getValue();
+                            schema.add(scalarFunction.getFunctionName().toUpperCase(),
+                                    ScalarFunctionImpl.create(
+                                            function.getKey(),
+                                            scalarFunction.getFunctionName(),
+                                            scalarFunction.isExactArgumentTypes(),
+                                            scalarFunction.getFunctionId(),
+                                            scalarFunction.getArgumentTypes()));
+                            break;
+                        case AGGREGATE:
+                            AggregateFunctionDescriptor aggregateFunction = (AggregateFunctionDescriptor) function.getValue();
+                            schema.add(aggregateFunction.getFunctionName().toUpperCase(),
+                                    AggregateFunctionImpl.create(
+                                            function.getKey(),
+                                            aggregateFunction.getFunctionName(),
+                                            aggregateFunction.isExactArgumentTypes(),
+                                            aggregateFunction.getAggType(),
+                                            aggregateFunction.getArgumentTypes()));
+                            break;
+                        default:
+                            break;
+                    }
+                });
 
         return schema;
     }

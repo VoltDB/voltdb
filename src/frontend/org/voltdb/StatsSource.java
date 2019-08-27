@@ -54,7 +54,6 @@ public abstract class StatsSource {
      * Initialize this source of statistical information with the specified
      * name. Populate the column schema by calling populateColumnSchema on the
      * derived class and use it to populate the columnNameToIndex map.
-     * @param name
      * @param isEE If this source represents statistics from EE
      */
     public StatsSource(boolean isEE) {

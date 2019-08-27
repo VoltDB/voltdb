@@ -18,9 +18,19 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
+import java.io.ObjectOutput;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectInput;
+import java.lang.reflect.Array;
+
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -31,7 +41,8 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
+import org.voltdb.UserDefinedScalarFunctionRunner;
+import org.voltdb.UserDefinedAggregateFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -47,6 +58,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
+
 
 /**
  * Wrapper for native Execution Engine library.
@@ -770,11 +782,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_udfBuffer.clear();
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
         int functionId = m_udfBuffer.getInt();
-        UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
-        assert(udfRunner != null);
-        Throwable throwable = null;
+        UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         Object returnValue = null;
+        Throwable throwable = null;
         try {
+            assert(udfRunner != null);
             // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);
 
@@ -811,7 +823,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            UserDefinedScalarFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
         }
@@ -837,6 +849,212 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         catch (IOException e) {
             throw new RuntimeException(e);
+        }
+        return -1;
+    }
+
+    private UserDefinedAggregateFunctionRunner getUdafRunner() {
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
+        return m_functionManager.getAggregateFunctionRunnerById(functionId);
+    }
+
+    private void handleUDAFError(Throwable throwable) {
+        // Getting here means the execution was not successful.
+        try {
+            assert(throwable != null);
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+            // But you never know.
+            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(errorMsg.length + 4);
+            }
+            m_udfBuffer.clear();
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void resizeUDAFBuffer(Object returnValue, VoltType returnType) {
+        // If the function we are running returns variable-length return value,
+        // it may be possible that the buffer is not large enough to hold it.
+        // Check the required buffer size and enlarge the existing buffer when necessary.
+        // The default buffer size is 256K, which is more than enough for any
+        // fixed-length data and NULL variable-length data (the buffer size will not go less than 256K).
+        if (returnType.isVariableLength() && ! VoltType.isVoltNullValue(returnValue)) {
+            // The minimum required size is 5 bytes:
+            // 1 byte for the type indicator, 4 bytes for the prefixed length.
+            int sizeRequired = 1 + 4;
+            if (returnValue instanceof byte[] || returnValue instanceof Byte[]) {
+                sizeRequired += Array.getLength(returnValue);
+            }
+            if (sizeRequired > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(sizeRequired);
+            }
+        }
+    }
+
+    class UDAFObjectInputStream extends ObjectInputStream {
+
+        public UDAFObjectInputStream(InputStream in) throws IOException {
+            super(in);
+        }
+
+        @Override
+        protected Class<?> resolveClass(ObjectStreamClass desc)
+            throws IOException, ClassNotFoundException
+            {
+                String name = desc.getName();
+                try {
+                    return Class.forName(name, true, VoltDB.instance().getCatalogContext().m_catalogInfo.m_jarfile.getLoader());
+                } catch (ClassNotFoundException ex) {
+                    throw ex;
+                }
+            }
+    }
+
+    public int callJavaUserDefinedAggregateStart(int functionId) {
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        try {
+            assert(udafRunner != null);
+            // Call the user-defined function start method
+            udafRunner.start();
+            m_udfBuffer.clear();
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateAssemble() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        try {
+            assert(udafRunner != null);
+            // Call the user-defined function assemble method.
+            // For vectorization, pass an array of arguments of same type, stored in m_udfBuffer
+            udafRunner.assemble(m_udfBuffer, udafIndex);
+            m_udfBuffer.clear();
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateCombine() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        Object workerObject = null;
+        try {
+            assert(udafRunner != null);
+            // get the worker's byte array from the buffer
+            byte[] workerByteArray = UserDefinedAggregateFunctionRunner.readVarbinary(m_udfBuffer);
+            // convert worker's byte array to the object
+            ByteArrayInputStream bis = new ByteArrayInputStream(workerByteArray);
+            ObjectInput in = new UDAFObjectInputStream(bis);
+            try {
+                workerObject = in.readObject();
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException exIgnored) {}
+            }
+            // call the combine method with the deserialized worker object
+            udafRunner.combine(workerObject, udafIndex);
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateWorkerEnd() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
+        Object returnValue = null;
+        VoltType returnType = null;
+        try {
+            assert(udafRunner != null);
+            // we serialized the object to a byte array
+            // and the return type for a worker is a varbinary
+            Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutput out = null;
+            try {
+                out = new ObjectOutputStream(bos);
+                out.writeObject(workerInstance);
+                out.flush();
+                returnValue = bos.toByteArray();
+            } finally {
+                try {
+                    bos.close();
+                } catch (IOException ex) {
+                // ignore close exception
+                }
+            }
+            returnType = VoltType.VARBINARY;
+            udafRunner.clearFunctionInstance(udafIndex);
+            resizeUDAFBuffer(returnValue, returnType);
+            m_udfBuffer.clear();
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateCoordinatorEnd() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        Object returnValue = null;
+        try {
+            assert(udafRunner != null);
+            // call the end method to terminate the entire aggregate function process
+            returnValue = udafRunner.end(udafIndex);
+            VoltType returnType = udafRunner.getReturnType();
+            resizeUDAFBuffer(returnValue, returnType);
+            m_udfBuffer.clear();
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
         }
         return -1;
     }

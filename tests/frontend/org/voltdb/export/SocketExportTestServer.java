@@ -81,18 +81,13 @@ public class SocketExportTestServer extends Thread {
         stopClients();
         // close the socket and reopen to avoid new connections
         close();
-        try {
-            ssocket = new ServerSocket(m_port);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
     }
 
     public void unpause() {
         m_paused = false;
     }
 
-    private void stopClients() {
+    private void stopClients() throws IOException {
         synchronized(m_clients) {
             for (ClientConnectionHandler s : m_clients) {
                 s.stopClient();
@@ -109,6 +104,9 @@ public class SocketExportTestServer extends Thread {
                 continue;
             }
             try {
+                if (ssocket == null) {
+                    ssocket = new ServerSocket(m_port);
+                }
                 Socket clientSocket = ssocket.accept();
                 synchronized(m_clients) {
                     if (!m_paused && !shuttingDown) {
@@ -118,7 +116,7 @@ public class SocketExportTestServer extends Thread {
                     }
                 }
             } catch (IOException ex) {
-                System.out.println("Exception in socket server accept loop: " + ex.getMessage());
+                System.err.println("Exception in socket server accept loop: " + ex.getMessage());
             }
         }
     }
@@ -190,8 +188,9 @@ public class SocketExportTestServer extends Thread {
             }
         }
 
-        public void stopClient() {
+        public void stopClient() throws IOException {
             m_closed = true;
+            m_clientSocket.close();
         }
     }
 }

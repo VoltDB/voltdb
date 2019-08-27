@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
@@ -34,6 +35,8 @@ import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.ProcedureSchedule;
+import org.voltdb.catalog.SchedulerParam;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -204,6 +207,15 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("CONFIG_DESCRIPTION", VoltType.STRING)
         };
 
+    static public final ColumnInfo[] SCHEDULES_SCHEMA = new ColumnInfo[] {
+            new ColumnInfo("SCHEDULE_NAME", VoltType.STRING),
+            new ColumnInfo("RUN_LOCATION", VoltType.STRING),
+            new ColumnInfo("SCHEDULER_CLASS", VoltType.STRING),
+            new ColumnInfo("USER", VoltType.STRING),
+            new ColumnInfo("ENABLED", VoltType.STRING),
+            new ColumnInfo("SCHEDULER_PARAMETERS", VoltType.STRING)
+    };
+
     JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
@@ -252,6 +264,8 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("CLASSES"))
         {
             result = getClasses();
+        } else if (selector.equalsIgnoreCase("SCHEDULES")) {
+            result = getSchedules();
         }
         return result;
     }
@@ -591,8 +605,9 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(FUNCTIONS_SCHEMA);
 
         for (Function func : m_database.getFunctions()) {
+            String functionType = func.getMethodname() == null ? "aggregate" : "scalar";
             results.addRow(
-                           "scalar",                // Function Type
+                           functionType,           // Function Type
                            func.getFunctionname(),  // Function Name
                            func.getClassname(),     // Class Name
                            func.getMethodname());   // Method Name
@@ -819,6 +834,32 @@ public class JdbcDatabaseMetaDataGenerator
             }
         }
         return results;
+    }
+
+    VoltTable getSchedules() {
+        VoltTable results = new VoltTable(SCHEDULES_SCHEMA);
+        for (ProcedureSchedule schedule : m_database.getProcedureschedules()) {
+            results.addRow(schedule.getName(), schedule.getScope(), schedule.getSchedulerclass(),
+                    schedule.getUser(), Boolean.toString(schedule.getEnabled()),
+                    getParamsString(schedule));
+
+        }
+        return results;
+    }
+
+    private String getParamsString(ProcedureSchedule schedule) {
+        CatalogMap<SchedulerParam> params = schedule.getParameters();
+        String paramsArray[] = new String[params.size()];
+        for (SchedulerParam param : params) {
+            paramsArray[param.getIndex()] = param.getParameter();
+        }
+        StringBuilder sb = new StringBuilder("[");
+        String prefix = "'";
+        for (String param : paramsArray) {
+            sb.append(prefix).append(param).append('\'');
+            prefix = ", '";
+        }
+        return sb.append(']').toString();
     }
 
     private final Catalog m_catalog;

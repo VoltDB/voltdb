@@ -1,4 +1,4 @@
-﻿<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>VoltDB Management Center</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -72,6 +72,7 @@
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
                                 <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
+                                <li id="navExporter" style="display:none"><a href="#">Exporter</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -102,7 +103,7 @@
                                             <li><a href="#About" id="ShowAbout">About</a></li>
                                         </ul>
                                     </li>
-                                </ul>	
+                                </ul>
                             </div>
                         </li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -202,15 +203,15 @@
                     </div>
 
                     <div id="mainGraphBlock">
-                    <div class="errorMsgLocalStorageFull" style="display:none">
-                        <div class="errorMsgLocalWrapper">
-                        <img src="images/alert.png" alt="Alert"/>
+                        <div class="errorMsgLocalStorageFull" style="display:none">
+                            <div class="errorMsgLocalWrapper">
+                                <img src="images/alert.png" alt="Alert"/>
+                            </div>
+                            <div class="textMsgLocalWrapper">
+                                <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                            </div>
+                            <div class="clear"></div>
                         </div>
-                        <div class="textMsgLocalWrapper">
-                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
-                        </div>
-                        <div class="clear"></div>
-                    </div>
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
@@ -530,11 +531,8 @@
                                             </div>
                                         </div>
                                     </div>
-                                   
                                 </div>
-
                             </div>
-
                        </div>
                         <div class="clear"></div>
                         <div id="analysisRemarks" class="analysisRemarks" style="display:none">
@@ -812,7 +810,6 @@
                                 <tr class="child-row-4 subLabelRow">
                                     <td class="configLabel">Export Streams</td>
                                     <td align="right">&nbsp;
-                                        
                                     </td>
                                     <td></td>
                                     <td>
@@ -1217,7 +1214,6 @@
                     </div>
                     <div class="queryInput split split-horizontal" id="inputQuery">
                     <h1 class="theHeadingQuery">
-                    
                     <div class="icon-query queryHeadName"><span>Query</span></div>
                     <div class="clsQueryWrapper">
                         <div id="queryTimeOut" class="queryTimeClass">
@@ -1363,6 +1359,74 @@
                             <svg id="visualisationFailureRate" width="100%" height="400"></svg>
                         </div>
                         <div class="clear"></div>
+                    </div>
+                </div>
+            </div>
+            <!--Exporter-->
+            <div class="container contents" id="exporter" style="display: none;">
+                 <div class="displayPre" id="contentExport">
+                    <div class="rightShowhide">
+                        <ul class="rightShowhideList" id="showHideRightExportList">
+                            <li class="viewSelect">
+                                <label id="exporterTimeLabel">View</label>
+                                <select id="exporterGraphView">
+                                    <option selected="selected">Seconds</option>
+                                    <option>Minutes</option>
+                                    <option>Days</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div>
+                 	<div class="dataBlock">
+                        <div class="dataBlockHeading"> <a name='e'></a>
+                            <h1>Export Connections</h1>
+                        </div>
+                        <div class="dataBlockContent">
+                            <div id=exportTableScrollBar>
+                                <table class="table tableL4 tablesorter exportTable" id=exportTable>
+                                    <thead>
+                                        <tr >
+                                            <th>Source</th>
+                                            <th>Target</th>
+                                            <th>Thoroughput</th>
+                                            <th>Pending</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>   
+                    <div class="clear"></div>
+                    <div class="errorExporterMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                            <img src="images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="graphChart" id="graphChartExporter">
+                        <div id="chartThroughputForExport" class="chart left">
+                            <div class="chartHeader" id="chartThroughputHeaderForExport">
+                                <h1>Throughput (Tuples/sec)<span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "throughput-data" }, "throughput");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationThroughput" width="100%" height="400"></svg>
+                        </div>
+                        <div id="chartQueuedForExport" class="chart right">
+                            <div class="chartHeader" id="chartQueuedHeaderForExport">
+                                <h1>Queued (Tuples/sec)<span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "queued-data" }, "queued");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationQueued" width="100%" height="400"></svg>
+                    	</div>
                     </div>
                 </div>
             </div>

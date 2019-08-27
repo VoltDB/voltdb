@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _EXECUTORCONTEXT_HPP_
-#define _EXECUTORCONTEXT_HPP_
+#pragma once
 
 #include "Topend.h"
 #include "common/LargeTempTableBlockCache.h"
@@ -32,7 +31,6 @@
 #include <vector>
 #include <stack>
 #include <map>
-#include <memory>
 
 namespace voltdb {
 
@@ -48,28 +46,22 @@ class VoltDBEngine;
 class UndoQuantum;
 struct EngineLocals;
 
-class TempTable;
-
+// Some unit tests require the re-initialization of the
+// SynchronizedThreadLock globals. We do this here so that
+// the next time the first executor gets created we will
+// (re)initialize any necessary global state.
 void globalDestroyOncePerProcess();
 
 struct ProgressStats {
-    int64_t TuplesProcessedInBatch;
-    int64_t TuplesProcessedInFragment;
-    int64_t TuplesProcessedSinceReport;
-    int64_t TupleReportThreshold;
-    PlanNodeType LastAccessedPlanNodeType;
-
-    ProgressStats() {
-        TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
-        TupleReportThreshold = LONG_OP_THRESHOLD;
-        LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
-    }
-
-    inline void resetForNewBatch() {
+    int64_t TuplesProcessedInBatch = 0;
+    int64_t TuplesProcessedInFragment = 0;
+    int64_t TuplesProcessedSinceReport = 0;
+    int64_t TupleReportThreshold = LONG_OP_THRESHOLD;
+    PlanNodeType LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    void resetForNewBatch() {
         TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
     }
-
-    inline void rollUpForPlanFragment() {
+    void rollUpForPlanFragment() {
         TuplesProcessedInBatch += TuplesProcessedInFragment;
         TuplesProcessedInFragment = 0;
         TuplesProcessedSinceReport = 0;
@@ -89,17 +81,10 @@ struct ProgressStats {
  */
 class ExecutorContext {
   public:
-    ExecutorContext(int64_t siteId,
-                    CatalogId partitionId,
-                    UndoQuantum *undoQuantum,
-                    Topend* topend,
-                    Pool* tempStringPool,
-                    VoltDBEngine* engine,
-                    std::string hostname,
-                    CatalogId hostId,
-                    AbstractDRTupleStream *drTupleStream,
-                    AbstractDRTupleStream *drReplicatedStream,
-                    CatalogId drClusterId);
+    ExecutorContext(int64_t siteId, CatalogId partitionId, UndoQuantum *undoQuantum,
+            Topend* topend, Pool* tempStringPool, VoltDBEngine* engine,
+            std::string const& hostname, CatalogId hostId, AbstractDRTupleStream *drTupleStream,
+            AbstractDRTupleStream *drReplicatedStream, CatalogId drClusterId);
 
     ~ExecutorContext();
 
@@ -113,18 +98,14 @@ class ExecutorContext {
         m_partitionId = partitionId;
     }
 
-    int32_t getPartitionId() {
-        return static_cast<int32_t>(m_partitionId);
+    int32_t getPartitionId() const {
+        return m_partitionId;
     }
 
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
-                               int64_t txnId,
-                               int64_t spHandle,
-                               int64_t lastCommittedSpHandle,
-                               int64_t uniqueId,
-                               bool traceOn)
-    {
+            int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
+            int64_t uniqueId, bool traceOn) {
         m_undoQuantum = undoQuantum;
         m_spHandle = spHandle;
         m_txnId = txnId;
@@ -137,8 +118,7 @@ class ExecutorContext {
     }
 
     // data available via tick()
-    void setupForTick(int64_t lastCommittedSpHandle)
-    {
+    void setupForTick(int64_t lastCommittedSpHandle) {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_spHandle = std::max(m_spHandle, lastCommittedSpHandle);
     }
@@ -179,7 +159,7 @@ class ExecutorContext {
         return static_cast<int8_t>(hiddenValue >> 49);
     }
 
-    UndoQuantum *getCurrentUndoQuantum() {
+    UndoQuantum *getCurrentUndoQuantum() const {
         return m_undoQuantum;
     }
 
@@ -200,40 +180,40 @@ class ExecutorContext {
     static Topend* getPhysicalTopend();
 
     /** Current or most recent sp handle */
-    int64_t currentSpHandle() {
+    int64_t currentSpHandle() const {
         return m_spHandle;
     }
 
     /** Current or most recent txnid, may go backwards due to multiparts */
-    int64_t currentTxnId() {
+    int64_t currentTxnId() const {
         return m_txnId;
     }
 
     /** Timestamp from unique id for this transaction */
-    int64_t currentUniqueId() {
+    int64_t currentUniqueId() const {
         return m_uniqueId;
     }
 
     /** DR cluster id for the local cluster */
-    int32_t drClusterId() {
+    int32_t drClusterId() const {
         return m_drClusterId;
     }
 
     /** Last committed transaction known to this EE */
-    int64_t lastCommittedSpHandle() {
+    int64_t lastCommittedSpHandle() const {
         return m_lastCommittedSpHandle;
     }
 
     /** DR timestamp field value for this transaction */
-    int64_t currentDRTimestamp() {
+    int64_t currentDRTimestamp() const {
         return m_currentDRTimestamp;
     }
 
-    bool isTraceOn() {
+    bool isTraceOn() const {
         return m_traceOn;
     }
 
-    bool externalStreamsEnabled() {
+    bool externalStreamsEnabled() const {
         return m_externalStreamsEnabled;
     }
 
@@ -241,7 +221,7 @@ class ExecutorContext {
         m_externalStreamsEnabled = false;
     }
 
-    VoltDBEngine* getContextEngine() {
+    VoltDBEngine* getContextEngine() const {
         return m_engine;
     }
 
@@ -318,11 +298,11 @@ class ExecutorContext {
     void setDrStream(AbstractDRTupleStream *drStream);
     void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
 
-    AbstractDRTupleStream* drStream() {
+    AbstractDRTupleStream* drStream() const {
         return m_drStream;
     }
 
-    AbstractDRTupleStream* drReplicatedStream() {
+    AbstractDRTupleStream* drReplicatedStream() const {
         return m_drReplicatedStream;
     }
 
@@ -357,18 +337,32 @@ class ExecutorContext {
 
     bool checkTransactionForDR();
 
-    void setUsedParameterCount(int usedParamcnt) { m_usedParamcnt = usedParamcnt; }
-    int getUsedParameterCount() const { return m_usedParamcnt; }
-    NValueArray& getParameterContainer() { return m_staticParams; }
-    const NValueArray& getParameterContainer() const { return m_staticParams; }
+    void setUsedParameterCount(int usedParamcnt) {
+        m_usedParamcnt = usedParamcnt;
+    }
+    int getUsedParameterCount() const {
+        return m_usedParamcnt;
+    }
+    NValueArray& getParameterContainer() {
+        return m_staticParams;
+    }
+    const NValueArray& getParameterContainer() const {
+        return m_staticParams;
+    }
 
-    void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
-    void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
+    void pushNewModifiedTupleCounter() {
+        m_tuplesModifiedStack.push(0);
+    }
+    void popModifiedTupleCounter() {
+        m_tuplesModifiedStack.pop();
+    }
     const int64_t getModifiedTupleCount() const {
         vassert(m_tuplesModifiedStack.size() > 0);
         return m_tuplesModifiedStack.top();
     }
-    const size_t getModifiedTupleStackSize() const { return m_tuplesModifiedStack.size(); }
+    const size_t getModifiedTupleStackSize() const {
+        return m_tuplesModifiedStack.size();
+    }
 
     /** DML executors call this to indicate how many tuples
          * have been modified */
@@ -385,7 +379,7 @@ class ExecutorContext {
      * statistics for long running operations thru m_engine if
      * total tuples accessed passes the threshold.
      */
-    inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
+    int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
         m_progressStats.LastAccessedPlanNodeType = planNodeType;
         return m_progressStats.TupleReportThreshold - m_progressStats.TuplesProcessedSinceReport;
     }
@@ -394,8 +388,8 @@ class ExecutorContext {
      * Called periodically during a long-running operation to see
      * if we need to report a long-running fragment.
      */
-    inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                            int64_t tuplesProcessed) {
+    int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+            int64_t tuplesProcessed) {
         m_progressStats.TuplesProcessedSinceReport += tuplesProcessed;
         if (m_progressStats.TuplesProcessedSinceReport >= m_progressStats.TupleReportThreshold) {
             reportProgressToTopend(limits);
@@ -407,7 +401,7 @@ class ExecutorContext {
      * Called when a long-running operation completes.
      */
     inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                              int64_t tuplesProcessed) {
+            int64_t tuplesProcessed) {
         try {
             pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
         } catch(const SerializableEEException &e) {
@@ -422,15 +416,13 @@ class ExecutorContext {
      * If the table does not yet exist, run the specified statement
      * to generate it.
      */
-    AbstractTempTable* getCommonTable(const std::string& tableName,
-                                      int cteStmtId);
+    AbstractTempTable* getCommonTable(const std::string& tableName, int cteStmtId);
 
     /**
      * Set the common table map entry for the specified name
      * to point to the specified table.
      */
-    void setCommonTable(const std::string& tableName,
-                        AbstractTempTable* table) {
+    void setCommonTable(const std::string& tableName, AbstractTempTable* table) {
         m_commonTableMap[tableName] = table;
     }
 
@@ -439,8 +431,8 @@ class ExecutorContext {
      */
     void reportProgressToTopend(const TempTableLimits* limits);
 
-    LargeTempTableBlockCache* lttBlockCache() {
-        return &m_lttBlockCache;
+    LargeTempTableBlockCache& lttBlockCache() {
+        return m_lttBlockCache;
     }
 
   private:
@@ -457,62 +449,60 @@ class ExecutorContext {
     UndoQuantum *m_undoQuantum;
 
     /** reused parameter container. */
-    NValueArray m_staticParams;
+    NValueArray m_staticParams{MAX_PARAM_COUNT};
     /** TODO : should be passed as execute() parameter..*/
-    int m_usedParamcnt;
+    int m_usedParamcnt = 0;
 
     /** Counts tuples modified by a plan fragments.  Top of stack is the
      * most deeply nested executing plan fragment.
      */
-    std::stack<int64_t> m_tuplesModifiedStack;
+    std::stack<int64_t> m_tuplesModifiedStack{};
 
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
-    std::map<int, std::vector<AbstractExecutor*>>* m_executorsMap;
+    std::map<int, std::vector<AbstractExecutor*>>* m_executorsMap = nullptr;
     std::map<std::string, AbstractTempTable*> m_commonTableMap;
-    std::map<int, SubqueryContext> m_subqueryContextMap;
+    std::map<int, SubqueryContext> m_subqueryContextMap{};
 
     AbstractDRTupleStream *m_drStream;
     AbstractDRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
-    int64_t m_txnId;
-    int64_t m_spHandle;
-    int64_t m_uniqueId;
+    int64_t m_txnId = 0;
+    int64_t m_spHandle = 0;
+    int64_t m_uniqueId = 0;
     int64_t m_currentTxnTimestamp;
-    int64_t m_currentDRTimestamp;
+    int64_t m_currentDRTimestamp = 0;
     LargeTempTableBlockCache m_lttBlockCache;
-    bool m_traceOn;
+    bool m_traceOn = false;
     // used by elastic shrink once all data has been migrated away
     // from this partition. The site will continue to participate in MP txns
     // until the site is removed fully from the system, but we want to disable
     // all streaming (export, DR) because the sites are done at this point.
-    bool m_externalStreamsEnabled;
+    bool m_externalStreamsEnabled = true;
 
   public:
-    int64_t m_lastCommittedSpHandle;
+    int64_t m_lastCommittedSpHandle = 0;
     int64_t m_siteId;
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
-    ProgressStats m_progressStats;
+    ProgressStats m_progressStats{};
 };
 
 struct EngineLocals : public PoolLocals {
-    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals() = default;
     inline explicit EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
     inline explicit EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
-    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
-    {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context) {}
 
-    inline EngineLocals& operator = (EngineLocals const& rhs) {
-        PoolLocals::operator = (rhs);
+    inline EngineLocals& operator=(EngineLocals const& rhs) {
+        PoolLocals::operator=(rhs);
         context = rhs.context;
         return *this;
     }
 
-    ExecutorContext* context;
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
 };
 }
 
-#endif

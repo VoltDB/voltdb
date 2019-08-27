@@ -24,6 +24,7 @@ import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -55,7 +56,7 @@ public class CreateProcedureAsSQL extends CreateProcedure {
         String clazz = checkProcedureIdentifier(statementMatcher.group(1), ddlStatement.statement);
         String sqlStatement = statementMatcher.group(3) + ";";
 
-        ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+        ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
                 new ArrayList<String>(), clazz, sqlStatement, null, null, false, null);
 
         // Parse the ALLOW and PARTITION clauses.

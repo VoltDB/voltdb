@@ -82,7 +82,6 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
-
 CREATE TABLE export_partitioned_table_loopback EXPORT TO TARGET loopback_target ON insert, update, delete
 (
   txnid                     BIGINT        NOT NULL

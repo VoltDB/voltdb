@@ -177,6 +177,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
 import org.voltdb.settings.DbSettings;
@@ -187,6 +188,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.sysprocs.VerifyCatalogAndWriteJar;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -348,6 +350,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Rejoin coordinator
     private JoinCoordinator m_joinCoordinator = null;
     private ElasticService m_elasticService = null;
+
+    // Scheduler manager
+    private SchedulerManager m_schedulerManager = null;
 
     // Snapshot IO agent
     private SnapshotIOAgent m_snapshotIOAgent = null;
@@ -876,7 +881,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
             // check that this is a 64 bit VM
-            if (System.getProperty("java.vm.name").contains("64") == false) {
+            if (! System.getProperty("java.vm.name").contains("64")) {
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
@@ -988,19 +993,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
-                stageSchemaFiles(config, readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
+                stageSchemaFiles(config,
+                        readDepl.deployment.getDr() != null &&
+                                DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
                 stageInitializedMarker(config);
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             }
             if (config.m_startAction.isLegacy()) {
-                consoleLog.warn("The \"" + config.m_startAction.m_verb + "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
+                consoleLog.warn("The \"" + config.m_startAction.m_verb +
+                        "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
             }
 
             // config UUID is part of the status tracker.
             m_statusTracker = new NodeStateTracker();
-            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
+            final File stagedCatalogLocation = new VoltFile(
+                    RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
             if (config.m_startAction.isLegacy()) {
                 File rootFH = CatalogUtil.getVoltDbRoot(readDepl.deployment.getPaths());
@@ -1279,14 +1288,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // IV2 mailbox stuff
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
-                m_partitionZeroLeader = new Supplier<Boolean>() {
-                    @Override
-                    public Boolean get() {
-                        return m_cartographer.isPartitionZeroLeader();
-                    }
-                };
+                m_partitionZeroLeader = () -> m_cartographer.isPartitionZeroLeader();
                 List<Integer> partitions = null;
-                Set<Integer> partitionGroupPeers = null;
+                final Set<Integer> partitionGroupPeers;
                 if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     Set<Integer> recoverPartitions = null;
@@ -1467,7 +1471,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * If sync command log is on, not initializing the command log before the initiators
              * are up would cause deadlock.
              */
-            if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
+            if (m_commandLog != null && m_commandLog.needsInitialization()) {
                 consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForLogging.name(), null);
             }
             else {
@@ -1514,6 +1518,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
+
+            m_schedulerManager = new SchedulerManager(m_clientInterface, getStatsAgent(), m_myHostId);
+            m_globalServiceElector.registerService(() -> m_schedulerManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
             if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
@@ -1680,8 +1687,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // warn if cluster is partitionable, but partition detection is off
-            if ((m_catalogContext.cluster.getNetworkpartition() == false) &&
-                    (m_configuredReplicationFactor > 0)) {
+            if (! m_catalogContext.cluster.getNetworkpartition() && m_configuredReplicationFactor > 0) {
                 hostLog.warn("Running a redundant (k-safe) cluster with network " +
                         "partition detection disabled is not recommended for production use.");
                 // we decided not to include the stronger language below for the 3.0 version (ENG-4215)
@@ -1707,6 +1713,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
 
+            // TODO determine if this is actually a good place for this
+            m_schedulerManager.start(m_catalogContext);
+
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
@@ -1727,10 +1736,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
             // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
             // we should ignore.
-            final double largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
-                    System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+            final double largeModeRatio = Double.parseDouble(
+                    System.getenv("LARGE_MODE_RATIO") == null || System.getenv("LARGE_MODE_RATIO").equals("-1") ?
+                            System.getProperty("LARGE_MODE_RATIO", "0") :
+                            System.getenv("LARGE_MODE_RATIO"));
             if (largeModeRatio > 0) {
                 hostLog.info(String.format("The large_mode_ratio property is set as %.2f", largeModeRatio));
+            }
+            if (AdHocNTBase.USING_CALCITE) {
+                hostLog.warn("Using Calcite as parser/planner. This is an experimental feature.");
             }
         }
     }
@@ -3647,6 +3661,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } catch (Throwable t) { }
 
+                m_schedulerManager.shutdown();
+
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
                 TTLManager.instance().shutDown();
@@ -4030,6 +4046,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 4.5. (added)
                 // Update the NT procedure service AFTER stats are cleared in the previous step
                 m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
+
+                // 4.6 Update scheduler (asynchronously)
+                m_schedulerManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
@@ -5222,6 +5241,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public ElasticService getElasticService() {
         return m_elasticService;
+    }
+
+    @Override
+    public SchedulerManager getSchedulerManager() {
+        return m_schedulerManager;
     }
 }
 

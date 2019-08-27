@@ -875,23 +875,23 @@ public final class InvocationDispatcher {
      * @param txnId
      * @param partitionId
      */
-    public final void sendSentinel(long txnId, int partitionId) {
+    public final void sendSentinel(long uniqueId, int partitionId) {
         final Long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
         if (initiatorHSId == null) {
             log.error("InvocationDispatcher.sendSentinel: Master does not exist for partition: " + partitionId);
         } else {
-            sendSentinel(txnId, initiatorHSId, -1, -1, true);
+            sendSentinel(uniqueId, initiatorHSId, -1, -1, true);
         }
     }
 
-    private final void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
+    private final void sendSentinel(long uniqueId, long initiatorHSId, long ciHandle,
                               long connectionId, boolean forReplay) {
         //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
                         m_siteId,
                         initiatorHSId,
-                        txnId,
+                        uniqueId,
                         ciHandle,
                         connectionId,
                         false,  // isReadOnly

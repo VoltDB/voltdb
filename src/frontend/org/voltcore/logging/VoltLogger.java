@@ -146,7 +146,9 @@ public class VoltLogger {
      * and wait for the task to complete.
      */
     private void submit(final Level level, final Object message, final Throwable t) {
-        if (!m_logger.isEnabledFor(level)) return;
+        if (!m_logger.isEnabledFor(level)) {
+            return;
+        }
 
         if (m_asynchLoggerPool == null) {
             m_logger.log(level, message, t);
@@ -166,7 +168,9 @@ public class VoltLogger {
      * but don't wait for the task to complete for info, debug, trace, and warn
      */
     private void execute(final Level level, final Object message, final Throwable t) {
-        if (!m_logger.isEnabledFor(level)) return;
+        if (!m_logger.isEnabledFor(level)) {
+            return;
+        }
 
         if (m_asynchLoggerPool == null) {
             m_logger.log(level, message, t);
@@ -341,6 +345,23 @@ public class VoltLogger {
 
     public void l7dlog(final Level level, final String key, final Object[] params, final Throwable t) {
         submitl7d(level, key, params, t);
+    }
+
+    public void log(Level level, Object message, Throwable t) {
+        switch (level) {
+        case WARN:
+        case INFO:
+        case DEBUG:
+        case TRACE:
+            execute(level, message, t);
+            break;
+        case FATAL:
+        case ERROR:
+            submit(level, message, t);
+            break;
+        default:
+            throw new AssertionError("Unrecognized level " + level);
+        }
     }
 
     public long getLogLevels(VoltLogger loggers[]) {

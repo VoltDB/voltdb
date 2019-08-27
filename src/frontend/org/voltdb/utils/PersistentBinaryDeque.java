@@ -626,7 +626,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     m_extraHeaderSerializer);
 
             try {
-                if (segment.getNumEntries() == 0) {
+                // Delete preceding empty segment
+                if (segment.getNumEntries() == 0 && m_segments.isEmpty()) {
                     if (m_usageSpecificLog.isDebugEnabled()) {
                         m_usageSpecificLog.debug("Found Empty Segment with entries: " + segment.getNumEntries()
                                 + " For: " + segment.file().getName());
@@ -646,7 +647,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     m_usageSpecificLog.debug(
                             "Segment " + segment.file() + " (final: " + segment.isFinal() + "), has been recovered");
                 }
-                m_segments.put(segment.segmentIndex(), segment);
             } catch (IOException e) {
                 m_usageSpecificLog.warn(
                         "Failed to retrieve entry count from segment " + segment.file() + ". Quarantining segment", e);
