@@ -32,9 +32,10 @@ import org.voltdb.volttableutil.VoltTableUtil;
 /**
  * QueryStats "pseudo-" system procedure.
  * Usage: exec @QueryStats 'select * from (table, 0);' -- Note that the query string needs to be quoted
- * Or, in sqlcmd: > querystats select * from (table, 0);
- * Complex queries are supported, e.g.
- * querystats select * from (table, 0) inner join (index, 0) using (host_id, hostname, site_id, partition_id) where site_id = 0;
+ * Or, in sqlcmd: > querystats select * from statistics(table, 0);
+ * Complex queries are supported, e.g.:
+ * querystats select * from statistics(table, 0) inner join statistics(index, 0)
+ * using (host_id, hostname, site_id, partition_id) where site_id = 0;
  *
  * This is called "pseudo-", since under the hood fake, temporary table(s) is created
  * inside Calcite that stores query statistics and Calcite is used to run the query.
@@ -52,7 +53,8 @@ public class QueryStats extends AdHocNTBase {
     private static final Map<String, StatsSelector> STATISTICS =
             Arrays.stream(StatsSelector.getAllStatsCollector())
             .collect(Collectors.toMap(Enum::name, a -> a, (a, b) -> b));
-    private static final Pattern PROC_PATTERN = Pattern.compile("\\(\\s*([a-zA-Z]+)\\s*,\\s*(\\d+)\\s*\\)");
+    private static final Pattern PROC_PATTERN =
+            Pattern.compile("statistics\\s*\\(\\s*([a-z]+)\\s*,\\s*(\\d+)\\s*\\)", Pattern.CASE_INSENSITIVE);
     private static final String tempTableAlias = "TT";
 
     @Override
@@ -70,20 +72,10 @@ public class QueryStats extends AdHocNTBase {
             try {
                 return dispatchQueryStats((String) params.getParam(0));
             } catch (Exception e) {
-                return error(e);
+                System.err.println(e.getMessage());
+                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], e.getMessage());
             }
         });
-    }
-
-    /**
-     * Report error back to sqlcmd.
-     * Note that since we choose to always succeed transaction, an error is only printed to stderr,
-     * and an empty table is returned.
-     * @param e exception to be printed to stderr, and an empty table will be returned.
-     */
-    private static ClientResponse error(Exception e) {
-        System.err.println(e.getMessage());
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], e.getMessage());
     }
 
     private static ClientResponse dispatchQueryStats(String sql) throws Exception {
