@@ -22,34 +22,36 @@ import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ClientResponse;
 
 /**
- * The result of executing a {@link Action} returned by {@link Scheduler#getFirstAction()} or
- * {@link Scheduler#getNextAction(ActionResult)}
+ * The result of executing an {@link Action} which was produed by either an {@link ActionSchedule} or
+ * {@link ActionScheduler}
  */
 public interface ActionResult {
     /**
      * @return The type of action which was performed
      */
-    public Action.Type getType();
+    public ActionType getType();
 
     /**
-     * @param unit {@link TimeUnit} of delay returned by this method
+     * Retrieve the delay which was applied to the executed action.
+     *
+     * @param timeUnit {@link TimeUnit} of delay returned by this method
      * @return Time delay in {@code timeUnit}
      */
-    public long getDelay(TimeUnit unit);
+    public long getDelay(TimeUnit timeUnit);
 
     /**
-     * @return Name of procedure to execute. May be {@code null} if this is a forced rerun of the {@link Scheduler}
+     * @return Name of procedure that was executed. Will be {@code null} if the action was a {@link ActionType#CALLBACK}
      */
     public String getProcedure();
 
     /**
-     * @return A The parameters that are to be passed the the procedure returned by {@link #getProcedure()}
+     * @return A The parameters that were passed to the procedure returned by {@link #getProcedure()}
      */
     public Object[] getProcedureParameters();
 
     /**
-     * @return {@link ClientResponse} from the execution of {@link #getProcedure()}. Will be null if procedure has not
-     *         be executed or this is a rerun of the scheduler
+     * @return {@link ClientResponse} from the execution of {@link #getProcedure()}. Will be {@code null} if the action
+     * was a {@link ActionType#CALLBACK}
      */
     public ClientResponse getResponse();
 

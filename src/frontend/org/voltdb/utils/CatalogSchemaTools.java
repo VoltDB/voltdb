@@ -472,10 +472,24 @@ public abstract class CatalogSchemaTools {
     }
 
     public static void toSchema(StringBuilder sb, Task task) {
-        sb.append("CREATE TASK ").append(task.getName())
-                .append(" FROM CLASS ").append(task.getSchedulerclass());
+        sb.append("CREATE TASK ").append(task.getName());
+        if (StringUtils.isBlank(task.getSchedulerclass())) {
+            sb.append(" ON SCHEDULE FROM CLASS ").append(task.getScheduleclass());
+            appendTaskParameters(sb, task.getScheduleparameters());
+            sb.append(" PROCEDURE FROM CLASS ").append(task.getActiongeneratorclass());
+            appendTaskParameters(sb, task.getActiongeneratorparameters());
+        } else {
+            sb.append(" FROM CLASS ").append(task.getSchedulerclass());
+            appendTaskParameters(sb, task.getSchedulerparameters());
+        }
+        sb.append(" ON ERROR ").append(task.getOnerror()).append(" RUN ON ").append(task.getScope());
+        if (task.getUser() != null) {
+            sb.append(" AS USER ").append(task.getUser());
+        }
+        sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
+    }
 
-        CatalogMap<TaskParameter> params = task.getParameters();
+    private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";
             for (int i = 0; i < params.size(); ++i) {
@@ -490,12 +504,6 @@ public abstract class CatalogSchemaTools {
             }
             sb.append(')');
         }
-        sb.append(" ON ERROR ")
-                .append(task.getOnerror()).append(" RUN ON ").append(task.getScope());
-        if (task.getUser() != null) {
-            sb.append(" AS USER ").append(task.getUser());
-        }
-        sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
     }
 
     /**
