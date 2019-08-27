@@ -1740,7 +1740,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                checkExportStreamMastership();
+                checkExportStreamLeadership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1847,14 +1847,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    // Check to see if stream master is colocated with partition leader, if not ask stream master to
-    // move back to partition leader's node.
-    private void checkExportStreamMastership() {
+    // Check to see if stream master is co-located with partition leader.
+    private void checkExportStreamLeadership() {
         for (Initiator initiator : m_iv2Initiators.values()) {
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    ExportManager.instance().takeMastership(spInitiator.getPartitionId());
+                    ExportManager.instance().becomeLeader(spInitiator.getPartitionId());
                 }
             }
         }
@@ -2279,7 +2278,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
-                checkExportStreamMastership();
+                checkExportStreamLeadership();
             }
         }, 0, 1, TimeUnit.MINUTES));
 

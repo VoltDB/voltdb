@@ -535,10 +535,10 @@ JNITopend::~JNITopend() {
 
 void JNITopend::pushExportBuffer(
         int32_t partitionId,
-        string signature,
+        string tableName,
         StreamBlock *block,
         bool sync) {
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
@@ -550,7 +550,7 @@ void JNITopend::pushExportBuffer(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
                 partitionId,
-                signatureString,
+                tableNameString,
                 block->startExportSequenceNumber(),
                 block->getRowCountforExport(),
                 block->lastSpUniqueId(),
@@ -563,7 +563,7 @@ void JNITopend::pushExportBuffer(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
                 partitionId,
-                signatureString,
+                tableNameString,
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
@@ -571,7 +571,7 @@ void JNITopend::pushExportBuffer(
                 NULL,
                 sync ? JNI_TRUE : JNI_FALSE);
     }
-    m_jniEnv->DeleteLocalRef(signatureString);
+    m_jniEnv->DeleteLocalRef(tableNameString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();
@@ -580,15 +580,15 @@ void JNITopend::pushExportBuffer(
 
 void JNITopend::pushEndOfStream(
         int32_t partitionId,
-        string signature) {
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+        string tableName) {
+    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
     //std::cout << "Block is null" << std::endl;
     m_jniEnv->CallStaticVoidMethod(
                     m_exportManagerClass,
                     m_pushExportEOFMID,
                     partitionId,
-                    signatureString);
-    m_jniEnv->DeleteLocalRef(signatureString);
+                    tableNameString);
+    m_jniEnv->DeleteLocalRef(tableNameString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();

@@ -222,7 +222,7 @@ public class SnapshotSiteProcessor {
             }
 
             long[] usoAndSequenceNumber =
-                    context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
+                    context.getSiteProcedureConnection().getUSOForExportTable(t.getTypeName());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             Pair.of(

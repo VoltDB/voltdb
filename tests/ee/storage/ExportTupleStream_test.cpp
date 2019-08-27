@@ -90,7 +90,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new ExportTupleStream(1, 1, 0, "sign", m_tableName, m_columnNames);
+        m_wrapper = new ExportTupleStream(1, 1, 0, m_tableName, m_columnNames);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacityForTest(BUFFER_SIZE);

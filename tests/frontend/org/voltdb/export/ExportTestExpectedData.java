@@ -40,7 +40,7 @@ public class ExportTestExpectedData {
     // hash table name + partition to verifier
     public final Map<String, ExportToSocketTestVerifier> m_verifiers = new HashMap<>();
     public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
-    public final Map<String, Integer> m_count = new HashMap<>();
+    public final Map<String, Integer> m_expectedRowCount = new HashMap<>();
 
     private final Map<String, ServerListener> m_severSockets;
     private final boolean m_replicated;
@@ -67,12 +67,12 @@ public class ExportTestExpectedData {
             m_seen_verifiers.put(tableName + partition, Boolean.TRUE);
         }
         verifier.addRow(data);
-        Integer count = m_count.get(tableName);
+        Integer count = m_expectedRowCount.get(tableName);
         if (count == null) {
-            m_count.put(tableName,1);
+            m_expectedRowCount.put(tableName,1);
         }
          else {
-            m_count.put(tableName,count+1);
+            m_expectedRowCount.put(tableName,count+1);
         }
     }
 
@@ -85,7 +85,10 @@ public class ExportTestExpectedData {
             System.out.println("Processing Table:" + tableName);
 
             String next[] = null;
-            assertEquals(getSize(tableName), f.getValue().getSize());
+            assertEquals(getExpectedRowCount(tableName), f.getValue().getSize());
+            if (!m_exact) {
+                continue;
+            }
             while ((next = f.getValue().getNext()) != null) {
                 final int partitionId = Integer.valueOf(next[3]);
                 StringBuilder sb = new StringBuilder();
@@ -97,17 +100,26 @@ public class ExportTestExpectedData {
                 Long rowSeq = Long.parseLong(next[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
 
                 // verify occurrence if replicated
-                if (m_replicated && m_exact) {
+                if (m_replicated) {
                     assertEquals(m_copies, f.getValue().getCount(rowSeq));
                 }
 
-                assertThat( next, verifier.isExpectedRow(m_verifySequenceNumber));
+                if (verifier != null) {
+                    assertThat( next, verifier.isExpectedRow(m_verifySequenceNumber));
+                }
             }
         }
     }
 
-    private int getSize(String tableName) {
-        return m_count.containsKey(tableName) ? m_count.get(tableName) : 0;
+    public synchronized void ignoreRow(String tableName, long rowId) {
+        ServerListener listener = m_severSockets.get(tableName);
+        if (listener != null) {
+            listener.ignoreRow(rowId);
+        }
+    }
+
+    private int getExpectedRowCount(String tableName) {
+        return m_expectedRowCount.containsKey(tableName) ? m_expectedRowCount.get(tableName) : 0;
     }
 
     public long getExportedDataCount() {

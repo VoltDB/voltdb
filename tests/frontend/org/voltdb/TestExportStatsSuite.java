@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
@@ -257,10 +256,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         }
         System.out.println("testExportSnapshotTruncatesExportData");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         for (int i = 0; i < 40; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -280,7 +275,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -288,7 +282,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
@@ -309,13 +302,10 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
         waitForStreamedTargetAllocatedMemoryZero(client);
         m_config.shutDown();
+
+        // Restore the snapshot
         m_config.startUp(false);
         client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
-
         client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
         client.drain();
 
@@ -323,8 +313,9 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesceAndVerifyTarget(client, m_verifier);
 
         //Allocated memory should go to 0
+        //SnapshotRestore resets export sequence number
         //If this is failing watch out for ENG-5708
-        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16, false);
+        checkForExpectedStats(client, "NO_NULLS", 0, 0, 0, 0, false);
     }
 
     public TestExportStatsSuite(final String name) {

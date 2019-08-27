@@ -144,6 +144,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return m_queue.size();
         }
 
+        public void ignoreRow(long rowId) {
+            m_seenIds.remove(rowId);
+            m_data.remove(rowId);
+            m_queue.remove(rowId);
+        }
+
         private class ClientConnectionHandler extends Thread {
             private final Socket m_clientSocket;
             private boolean m_closed = false;
@@ -306,7 +312,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -319,6 +324,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 st = System.currentTimeMillis();
             }
             long ts = 0;
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (stats.advanceRow()) {
                 Long tts = stats.getLong("TIMESTAMP");
                 // Get highest timestamp and watch is change
@@ -374,7 +380,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -387,6 +392,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 st = System.currentTimeMillis();
             }
             long ts = 0;
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
                 String ttable = stats.getString("TABLE_NAME");
