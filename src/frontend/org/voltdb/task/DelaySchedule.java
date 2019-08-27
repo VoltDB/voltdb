@@ -17,21 +17,22 @@
 
 package org.voltdb.task;
 
-import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
- * {@link Scheduler} implementation which executes a single procedure with a static set of parameters with a fixed delay
- * between execution times. Delay can either be a number of seconds or {@link Duration} string representation
+ * {@link ActionSchedule} implementation which executes actions at fixed delay between execution times
  */
-public class DelayScheduler extends DurationScheduler {
+public final class DelaySchedule extends DurationSchedule {
+    private ActionDelay m_delay;
+
     @Override
-    public void initialize(TaskHelper helper, int interval, String timeUnit, String procedure,
-            String[] procedureParameters) {
-        super.initialize(helper, interval, timeUnit, procedure, procedureParameters);
+    public void initialize(TaskHelper helper, int interval, String timeUnit) {
+        super.initialize(helper, interval, timeUnit);
+        m_delay = new ActionDelay(m_durationNs, TimeUnit.NANOSECONDS, r -> m_delay);
     }
 
     @Override
-    long getNextDelayNs() {
-        return m_durationNs;
+    public ActionDelay getFirstDelay() {
+        return m_delay;
     }
 }

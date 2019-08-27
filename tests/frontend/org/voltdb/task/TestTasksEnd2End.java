@@ -286,7 +286,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         return client.callProcedure("@Statistics", "TASK", 0).getResults()[0];
     }
 
-    public static class CustomScheduler implements Scheduler {
+    public static class CustomScheduler implements ActionScheduler {
         private int m_delayMs;
         private String m_status;
 
@@ -296,13 +296,13 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
 
         @Override
-        public Action getFirstAction() {
+        public DelayedAction getFirstDelayedAction() {
             return getNextAction(null);
         }
 
-        @Override
-        public Action getNextAction(ActionResult result) {
-            return Action.createRerun(m_delayMs, TimeUnit.MILLISECONDS).setStatusMessage(m_status);
+        public DelayedAction getNextAction(ActionResult result) {
+            return DelayedAction.createCallback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
+                    .setStatusMessage(m_status);
         }
 
     }

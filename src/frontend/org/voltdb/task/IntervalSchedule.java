@@ -21,33 +21,34 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A {@link Scheduler} which tries to execute a procedure with a fixed amount of time between procedure start times
+ * A {@link ActionSchedule} which tries to execute actions with a fixed amount of time between action start times
  */
-public class IntervalScheduler extends DurationScheduler {
+public final class IntervalSchedule extends DurationSchedule {
     private long m_lastRunNs = System.nanoTime();
 
     @Override
-    public void initialize(TaskHelper helper, int interval, String timeUnit, String procedure,
-            String[] procedureParameters) {
-        super.initialize(helper, interval, timeUnit, procedure, procedureParameters);
+    public void initialize(TaskHelper helper, int interval, String timeUnit) {
+        super.initialize(helper, interval, timeUnit);
         // Introduce some jitter to first start time
         m_lastRunNs = System.nanoTime()
                 - ThreadLocalRandom.current().nextLong(Math.min((m_durationNs / 2), TimeUnit.MINUTES.toNanos(5)));
     }
 
     @Override
-    long getNextDelayNs() {
+    public ActionDelay getFirstDelay() {
         long nextRun = m_lastRunNs + m_durationNs;
         long now = System.nanoTime();
         long delay = nextRun - now;
 
         if (delay < 0) {
-            m_helper.logWarning(
-                    "Desired execution time is in the past. Resetting interval start to now. Interval might be too short for procedure.");
+            m_helper.logWarning("Desired execution time is in the past. Resetting interval start to now. "
+                    + "Interval might be too short for procedure.");
             m_lastRunNs = now;
-            return 0;
+            delay = 0;
+        } else {
+            m_lastRunNs = nextRun;
         }
-        m_lastRunNs = nextRun;
-        return delay;
+
+        return new ActionDelay(delay, TimeUnit.NANOSECONDS, r -> getFirstDelay());
     }
 }

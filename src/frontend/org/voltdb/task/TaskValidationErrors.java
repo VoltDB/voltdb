@@ -23,7 +23,8 @@ import java.util.List;
 import com.google_voltpatches.common.base.Joiner;
 
 /**
- * Used to collect errors that are encountered while validating the parameters of a {@link Scheduler}.
+ * Helper that can be used to collect errors that are encountered while validating the parameters of any
+ * {@link Initializable} class.
  */
 public final class TaskValidationErrors {
     private List<String> m_errors = null;
@@ -50,6 +51,12 @@ public final class TaskValidationErrors {
         return m_errors != null;
     }
 
+    /**
+     * Creates an error message comprised of all of the error messages added to this instance by calling
+     * {@link #addErrorMessage(String)}. If no error messages were added then {@code null} is returned.
+     *
+     * @return An error message or {@code null} if {@link #hasErrors()} returns {@code false}
+     */
     public String getErrorMessage() {
         if (m_errors == null) {
             return null;

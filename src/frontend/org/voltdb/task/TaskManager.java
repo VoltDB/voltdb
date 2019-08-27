@@ -40,10 +40,12 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.handler.ScopedHandler;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.AuthSystem;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext;
@@ -91,7 +93,7 @@ import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
  * All manager operations will be executed in the {@link #m_managerExecutor} as well as {@link TaskHandler} methods. The
  * execution of {@link SchedulerWrapper} instances will be split between the {@link #m_managerExecutor} and and the
  * handlers assigned executor. Pure management calls will be executed in the {@link #m_managerExecutor} while scheduled
- * procedures, results and calls to {@link Scheduler}s will be handled in the assigned executor.
+ * procedures, results and calls to {@link ActionScheduler}s will be handled in the assigned executor.
  */
 public final class TaskManager {
     static final VoltLogger log = new VoltLogger("TASK");
@@ -217,7 +219,7 @@ public final class TaskManager {
      * @param configuration      Global configuration for all tasks
      * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
+     * @param classLoader        {@link ClassLoader} to use to load configured classes
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
@@ -250,7 +252,7 @@ public final class TaskManager {
      * @param configuration      Global configuration for all tasks
      * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
+     * @param classLoader        {@link ClassLoader} to use to load configured classes
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
@@ -280,7 +282,7 @@ public final class TaskManager {
      * @param configuration      Global configuration for all tasks
      * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured {@link Scheduler}s
+     * @param classLoader        {@link ClassLoader} to use to load configured classes
      * @param classesUpdated     If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
@@ -335,7 +337,7 @@ public final class TaskManager {
     }
 
     private void updatePartitionedThreadPoolSize() {
-        if (m_handlers.values().stream().filter(h -> h instanceof PartitionedTaskHandler).findAny().isPresent()) {
+        if (m_handlers.values().stream().anyMatch(h -> h instanceof PartitionedTaskHandler)) {
             m_partitionedExecutor.setDynamicThreadCount(calculatePartitionedThreadPoolSize());
         }
     }
@@ -366,118 +368,187 @@ public final class TaskManager {
     }
 
     /**
-     * Create a factory supplier for instances of {@link Scheduler} as defined by the provided {@link Task}. If an
-     * instance of {@link Scheduler} cannot be constructed using the provided configuration {@code null} is returned and
-     * a detailed error message will be logged.
+     * Create a factory supplier for instances of {@link ActionScheduler} as defined by the provided {@link Task}. If an
+     * instance of {@link SchedulerFactory} cannot be constructed using the provided configuration the returned
+     * {@link TaskValidationResult} will have an appropriate error message.
      *
      * @param definition  {@link Task} defining the configuration of the schedule
-     * @param classLoader {@link ClassLoader} to use when loading the {@link Scheduler} in {@code definition}
-     * @return {@link TaskValidationResult} describing any problems encountered
+     * @param classLoader {@link ClassLoader} to use when loading the classes in {@code definition}
+     * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
+     */
+    public TaskValidationResult validateTask(Task definition, ClassLoader classLoader) {
+
+        String schedulerClassName = definition.getSchedulerclass();
+        SchedulerFactory factory;
+        if (!StringUtils.isBlank(schedulerClassName)) {
+            // Construct scheduler from the provided class
+            try {
+                Pair<String, InitializableFactory<ActionScheduler>> result = createFactory(definition,
+                        ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), classLoader);
+                String errorMessage = result.getFirst();
+                if (errorMessage != null) {
+                    return new TaskValidationResult(errorMessage);
+                }
+                factory = new SchedulerFactoryImpl(result.getSecond());
+            } catch (Exception e) {
+                return new TaskValidationResult(
+                        String.format("Could not load and construct class: %s", schedulerClassName), e);
+            }
+        } else {
+            // Construct the scheduler by combining a generator with a schedule
+            String actionGeneratorClass = definition.getActiongeneratorclass();
+            String actionScheduleClass = definition.getScheduleclass();
+
+            if (StringUtils.isBlank(actionGeneratorClass) || StringUtils.isBlank(actionScheduleClass)) {
+                return new TaskValidationResult(
+                        "If an ActionScheduler is not defined then both an ActionGenerator and ActionSchedule must be defined.");
+            }
+
+            InitializableFactory<ActionGenerator> actionGeneratorFactory;
+            InitializableFactory<ActionSchedule> actionScheduleFactory;
+            try {
+                Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition,
+                        ActionGenerator.class, actionGeneratorClass, definition.getActiongeneratorparameters(),
+                        classLoader);
+                String errorMessage = result.getFirst();
+                if (errorMessage != null) {
+                    return new TaskValidationResult(errorMessage);
+                }
+                actionGeneratorFactory = result.getSecond();
+            } catch (Exception e) {
+                return new TaskValidationResult(
+                        String.format("Could not load and construct class: %s", actionGeneratorClass), e);
+            }
+
+            try {
+                Pair<String, InitializableFactory<ActionSchedule>> result = createFactory(definition,
+                        ActionSchedule.class, actionScheduleClass, definition.getScheduleparameters(),
+                        classLoader);
+                String errorMessage = result.getFirst();
+                if (errorMessage != null) {
+                    return new TaskValidationResult(errorMessage);
+                }
+                actionScheduleFactory = result.getSecond();
+            } catch (Exception e) {
+                return new TaskValidationResult(
+                        String.format("Could not load and construct class: %s", actionScheduleClass), e);
+            }
+
+            factory = new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory);
+        }
+
+        return new TaskValidationResult(factory);
+    }
+
+    /**
+     * Create a factory for constructing {@code className} which implements {@code interfaceClass}. The returned
+     * {@link Pair} will have one of an error message or {@link InitializableFactory} and the other will be {@code null}
+     *
+     * @param <T>                   Type of class the factory will create
+     * @param definition            {@link Task} which this factory is associated with
+     * @param interfaceClass        Class of the interface which {@code className} should implement
+     * @param className             Name of class the factory should construct
+     * @param initializerParameters Parameters which are to be passed to constructed instance
+     * @param classLoader           {@link ClassLoader} to use to find the class instance of {@code className}
+     * @return A {@link Pair} of an errorMessage or {@link InitializableFactory}
+     * @throws NoSuchAlgorithmException
      */
     @SuppressWarnings("unchecked")
-    public TaskValidationResult validateTask(Task definition, ClassLoader classLoader) {
-        String schedulerClassString = definition.getSchedulerclass();
+    private <T extends Initializable> Pair<String, InitializableFactory<T>> createFactory(Task definition,
+            Class<T> interfaceClass, String className, CatalogMap<TaskParameter> initializerParameters,
+            ClassLoader classLoader) throws NoSuchAlgorithmException {
+        Class<?> initializableClass;
         try {
-            Class<?> schedulerClass;
-            try {
-                schedulerClass = classLoader.loadClass(schedulerClassString);
-            } catch (ClassNotFoundException e) {
-                return new TaskValidationResult("Scheduler class does not exist: " + schedulerClassString);
+            initializableClass = classLoader.loadClass(className);
+        } catch (ClassNotFoundException e) {
+            return Pair.of("Class does not exist: " + className, null);
+        }
+        if (!interfaceClass.isAssignableFrom(initializableClass)) {
+            return Pair.of(String.format("Class %s is not an instance of %s", className, interfaceClass.getName()),
+                    null);
+        }
+
+        Constructor<T> constructor;
+        try {
+            constructor = (Constructor<T>) initializableClass.getConstructor();
+        } catch (NoSuchMethodException e) {
+            return Pair.of(String.format("Class should have a public no argument constructor: %s", className), null);
+        }
+        Method initMethod = null;
+        for (Method method : initializableClass.getMethods()) {
+            if ("initialize".equals(method.getName())) {
+                initMethod = method;
+                break;
             }
-            if (!Scheduler.class.isAssignableFrom(schedulerClass)) {
-                return new TaskValidationResult(String.format("Class %s is not an instance of %s", schedulerClassString,
-                        Scheduler.class.getName()));
+        }
+
+        Object[] parameters;
+        boolean takesHelper = false;
+        if (initMethod == null) {
+            if (!initializerParameters.isEmpty()) {
+                return Pair.of(String.format(
+                        "Class does not have an initialize method and parameters were provided: %s", className), null);
+            }
+            parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
+        } else {
+            if (initMethod.getReturnType() != void.class) {
+                return Pair.of(String.format("Class initialization method is not void: %s", className), null);
             }
 
-            Constructor<Scheduler> constructor;
-            try {
-                constructor = (Constructor<Scheduler>) schedulerClass.getConstructor();
-            } catch (NoSuchMethodException e) {
-                return new TaskValidationResult(String.format(
-                        "Scheduler class should have a public no argument constructor: %s", schedulerClassString));
-            }
-            Method initMethod = null;
-            for (Method method : schedulerClass.getMethods()) {
-                if ("initialize".equals(method.getName())) {
-                    initMethod = method;
-                    break;
-                }
+            Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
+            takesHelper = TaskHelper.class.isAssignableFrom(initMethodParamTypes[0]);
+
+            int actualParamCount = initializerParameters.size() + (takesHelper ? 1 : 0);
+            int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
+                    : Integer.MAX_VALUE;
+            if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
+                return Pair.of(String.format(
+                        "Class, %s, constructor paremeter count %d does not match provided parameter count %d",
+                        className, initMethod.getParameterCount(), initializerParameters.size()), null);
             }
 
-            Object[] parameters;
-            boolean takesHelper = false;
-            if (initMethod == null) {
-                if (!definition.getParameters().isEmpty()) {
-                    return new TaskValidationResult(String.format(
-                            "Scheduler class does not have an initialize method and parameters were provided: %s",
-                            schedulerClassString));
-                }
+            if (actualParamCount == 0) {
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
-                if (initMethod.getReturnType() != void.class) {
-                    return new TaskValidationResult(
-                            String.format("Scheduler initialization method is not void: %s", schedulerClassString));
+                parameters = new Object[initMethod.getParameterCount()];
+                int indexOffset = takesHelper ? 1 : 0;
+                String[] varArgParams = null;
+                if (minVarArgParamCount < Integer.MAX_VALUE) {
+                    varArgParams = new String[actualParamCount - minVarArgParamCount];
+                    parameters[parameters.length - 1] = varArgParams;
                 }
-
-                CatalogMap<TaskParameter> taskParams = definition.getParameters();
-                Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
-                takesHelper = TaskHelper.class.isAssignableFrom(initMethodParamTypes[0]);
-
-                int actualParamCount = (taskParams == null ? 0 : taskParams.size()) + (takesHelper ? 1 : 0);
-                int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
-                        : Integer.MAX_VALUE;
-                if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
-                    return new TaskValidationResult(String.format(
-                            "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                            schedulerClassString, initMethod.getParameterCount(), taskParams.size()));
-                }
-
-                if (actualParamCount == 0) {
-                    parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
-                } else {
-                    parameters = new Object[initMethod.getParameterCount()];
-                    int indexOffset = takesHelper ? 1 : 0;
-                    String[] varArgParams = null;
-                    if (minVarArgParamCount < Integer.MAX_VALUE) {
-                        varArgParams = new String[actualParamCount - minVarArgParamCount];
-                        parameters[parameters.length - 1] = varArgParams;
-                    }
-                    for (TaskParameter sp : taskParams) {
-                        int index = sp.getIndex() + indexOffset;
-                        if (index < minVarArgParamCount) {
-                            try {
-                                parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
-                                        sp.getParameter());
-                            } catch (Exception e) {
-                                return new TaskValidationResult(String.format(
-                                        "Could not convert parameter %d with the value \"%s\" to type %s: %s",
-                                        sp.getIndex(), sp.getParameter(), initMethodParamTypes[index].getName(),
-                                        e.getMessage()));
-                            }
-                        } else {
-                            varArgParams[index - minVarArgParamCount] = sp.getParameter();
+                for (TaskParameter sp : initializerParameters) {
+                    int index = sp.getIndex() + indexOffset;
+                    if (index < minVarArgParamCount) {
+                        try {
+                            parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
+                                    sp.getParameter());
+                        } catch (Exception e) {
+                            return Pair.of(
+                                    String.format("Could not convert parameter %d with the value \"%s\" to type %s: %s",
+                                            sp.getIndex(), sp.getParameter(), initMethodParamTypes[index].getName(),
+                                            e.getMessage()),
+                                    null);
                         }
+                    } else {
+                        varArgParams[index - minVarArgParamCount] = sp.getParameter();
                     }
                 }
-
-                String parameterErrors = validateSchedulerParameters(definition, initMethod, parameters, takesHelper);
-                if (parameterErrors != null) {
-                    return new TaskValidationResult("Error validating scheduler parameters: " + parameterErrors);
-                }
             }
 
-            byte[] hash = null;
-            if (classLoader instanceof InMemoryJarfile.JarLoader) {
-                InMemoryJarfile jarFile = ((InMemoryJarfile.JarLoader) classLoader).getInMemoryJarfile();
-                hash = jarFile.getClassHash(schedulerClassString, HASH_ALGO);
+            String parameterErrors = validateInitializeParameters(definition, initMethod, parameters, takesHelper);
+            if (parameterErrors != null) {
+                return Pair.of("Error validating scheduler parameters: " + parameterErrors, null);
             }
-
-            return new TaskValidationResult(
-                    new SchedulerFactory(constructor, initMethod, parameters, takesHelper, hash));
-        } catch (Exception e) {
-            return new TaskValidationResult(
-                    String.format("Could not load and construct class: %s", schedulerClassString), e);
         }
+
+        byte[] hash = null;
+        if (classLoader instanceof InMemoryJarfile.JarLoader) {
+            InMemoryJarfile jarFile = ((InMemoryJarfile.JarLoader) classLoader).getInMemoryJarfile();
+            hash = jarFile.getClassHash(className, HASH_ALGO);
+        }
+
+        return Pair.of(null, new InitializableFactory<>(constructor, initMethod, parameters, takesHelper, hash));
     }
 
     ListenableFuture<?> execute(Runnable runnable) {
@@ -526,7 +597,7 @@ public final class TaskManager {
      * @param configuration      Global configuration for all tasks
      * @param procedureSchedules {@link Collection} of configured {@link Task}
      * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load {@link Scheduler} classes
+     * @param classLoader        {@link ClassLoader} to use to load classes
      */
     private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
@@ -657,12 +728,12 @@ public final class TaskManager {
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
      * @param definition  Instance of {@link Task} defining the schedule
-     * @param initMethod  initialize {@link Method} instance for the {@link Scheduler}
+     * @param initMethod  initialize {@link Method} instance for the {@link Initializable}
      * @param parameters  that are going to be passed to the constructor
      * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private String validateSchedulerParameters(Task definition, Method initMethod, Object[] parameters,
+    private String validateInitializeParameters(Task definition, Method initMethod, Object[] parameters,
             boolean takesHelper) {
         Class<?> schedulerClass = initMethod.getDeclaringClass();
 
@@ -746,8 +817,8 @@ public final class TaskManager {
 
     /**
      * Result object returned by {@link TaskManager#validateTask(Task, ClassLoader)}. Used to determine if the
-     * {@link Scheduler} and {@link Task#getParameters()} in a {@link Task} are valid. If they are not valid then an
-     * error message and potential exception are contained within this result describing the problem.
+     * configuration in {@link Task} is valid and all referenced classes can be constructed and initialized. If any are
+     * not valid then an error message and potential exception are contained within this result describing the problem.
      */
     public static final class TaskValidationResult {
         final String m_errorMessage;
@@ -812,15 +883,20 @@ public final class TaskManager {
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
         boolean isSameSchedule(Task definition, SchedulerFactory factory, boolean checkHashes) {
-            return isSameDefinition(definition) && (!checkHashes || m_factory.hashesMatch(factory));
+            return isSameDefinition(definition) && (!checkHashes || m_factory.doHashesMatch(factory));
         }
 
         private boolean isSameDefinition(Task definition) {
             return Objects.equals(m_definition.getName(), definition.getName())
                     && Objects.equals(m_definition.getScope(), definition.getScope())
-                    && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
                     && Objects.equals(m_definition.getUser(), definition.getUser())
-                    && Objects.equals(m_definition.getParameters(), definition.getParameters());
+                    && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
+                    && Objects.equals(m_definition.getSchedulerparameters(), definition.getSchedulerparameters())
+                    && Objects.equals(m_definition.getActiongeneratorclass(), definition.getActiongeneratorclass())
+                    && Objects.equals(m_definition.getActiongeneratorparameters(),
+                            definition.getActiongeneratorparameters())
+                    && Objects.equals(m_definition.getScheduleclass(), definition.getScheduleclass())
+                    && Objects.equals(m_definition.getScheduleparameters(), definition.getScheduleparameters());
         }
 
         String getName() {
@@ -882,7 +958,7 @@ public final class TaskManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        Scheduler constructScheduler(TaskHelper helper) {
+        ActionScheduler constructScheduler(TaskHelper helper) {
             return m_factory.construct(helper);
         }
 
@@ -1037,7 +1113,7 @@ public final class TaskManager {
     }
 
     /**
-     * Base class which wraps the execution and handling of a single {@link Scheduler} instance.
+     * Base class which wraps the execution and handling of a single {@link ActionScheduler} instance.
      * <p>
      * On start {@link Scheduler#getNextAction(ScheduledAction)} is invoked with a null {@link ScheduledAction}
      * argument. If the result has a status of {@link Action.Type#PROCEDURE} then the provided procedure will be
@@ -1057,7 +1133,7 @@ public final class TaskManager {
         final H m_handler;
 
         private final ListeningScheduledExecutorService m_executor;
-        private Scheduler m_scheduler;
+        private ActionScheduler m_scheduler;
         private Future<?> m_scheduledFuture;
         private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
         private TaskStatsSource m_stats;
@@ -1103,7 +1179,7 @@ public final class TaskManager {
          * NOTE: method is not synchronized so the lock is not held during the scheduler execution
          */
         private void handleNextRun() {
-            Scheduler scheduler;
+            ActionScheduler scheduler;
             synchronized (this) {
                 if (m_state != SchedulerWrapperState.RUNNING) {
                     return;
@@ -1117,10 +1193,11 @@ public final class TaskManager {
                 log.trace(generateLogMessage("Calling scheduler"));
             }
 
-            Action action;
+            DelayedAction action;
             try {
-                action = m_scheduledAction == null ? scheduler.getFirstAction()
-                        : scheduler.getNextAction(m_scheduledAction);
+                action = m_scheduledAction == null ? scheduler.getFirstDelayedAction()
+                        : m_scheduledAction.callCallback();
+
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
@@ -1150,7 +1227,7 @@ public final class TaskManager {
                 case ERROR:
                     errorOccurred(Level.WARN, action.getStatusMessage(), null);
                     return;
-                case RERUN:
+                case CALLBACK:
                     runnable = this::handleNextRun;
                     break;
                 case PROCEDURE:
@@ -1160,7 +1237,7 @@ public final class TaskManager {
                     throw new IllegalStateException("Unknown status: " + action.getType());
                 }
 
-                m_scheduledAction = action.getScheduledAction();
+                m_scheduledAction = new ScheduledAction(action);
 
                 try {
                     long delay = calculateDelay();
@@ -1406,7 +1483,7 @@ public final class TaskManager {
                 long rateLimitDelayNs = TimeUnit.MICROSECONDS.toNanos(m_rateLimiter.reserve(1));
                 minDelayNs = Math.max(minDelayNs, rateLimitDelayNs);
             }
-            return Math.max(m_scheduledAction.getRequestedDelayNs(), minDelayNs);
+            return Math.max(m_scheduledAction.getDelay(TimeUnit.NANOSECONDS), minDelayNs);
         }
 
         /**
@@ -1542,19 +1619,37 @@ public final class TaskManager {
         }
     }
 
+    private interface SchedulerFactory {
+        /**
+         * @param helper which can be passed to the constructed classes
+         * @return New instance of an {@link ActionScheduler}
+         */
+        ActionScheduler construct(TaskHelper helper);
+
+        /**
+         * Compare the hashes of the classes used to construct the {@link ActionScheduler} returned by this factory and
+         * {@code other}
+         *
+         * @param other {@link SchedulerFactory} to compare with
+         * @return {@code true} if this factory and {@code other} are using the same classes
+         */
+        boolean doHashesMatch(SchedulerFactory other);
+    }
+
     /**
-     * Factory which is used to construct a {@link Scheduler} with a fixed set of parameters. Also, is used to track the
-     * hash of the {@Link Scheduler} class and any explicitly declared dependencies.
+     * Class for constructing class which implement {@link Initializable}
+     *
+     * @param <T> Type of class being constructed
      */
-    private static final class SchedulerFactory {
-        private final Constructor<Scheduler> m_constructor;
+    private static class InitializableFactory<T extends Initializable> {
+        private final Constructor<T> m_constructor;
         private final Method m_initMethod;
         private final Object[] m_parameters;
         private final boolean m_takesHelper;
         private final byte[] m_classHash;
         Collection<String> m_classDeps = null;
 
-        SchedulerFactory(Constructor<Scheduler> constructor, Method initMethod, Object[] parameters,
+        InitializableFactory(Constructor<T> constructor, Method initMethod, Object[] parameters,
                 boolean takesHelper, byte[] classHash) {
             super();
             this.m_constructor = constructor;
@@ -1564,9 +1659,9 @@ public final class TaskManager {
             this.m_classHash = classHash;
         }
 
-        Scheduler construct(TaskHelper helper) {
+        public T construct(TaskHelper helper) {
             try {
-                Scheduler scheduler = m_constructor.newInstance();
+                T scheduler = m_constructor.newInstance();
                 if (m_initMethod != null) {
                     if (m_takesHelper) {
                         m_parameters[0] = helper;
@@ -1582,7 +1677,7 @@ public final class TaskManager {
             }
         }
 
-        boolean hashesMatch(SchedulerFactory other) {
+        public boolean doHashesMatch(InitializableFactory<T> other) {
             if (other == null || !Arrays.equals(m_classHash, other.m_classHash)) {
                 return false;
             }
@@ -1613,6 +1708,61 @@ public final class TaskManager {
                 return jarFile.getClassesHash(deps, HASH_ALGO);
             }
             return null;
+        }
+    }
+
+    /**
+     * Factory for directly constructing a {@link ActionScheduler}
+     */
+    private static final class SchedulerFactoryImpl implements SchedulerFactory {
+        private final InitializableFactory<ActionScheduler> m_factory;
+
+        SchedulerFactoryImpl(InitializableFactory<ActionScheduler> factory) {
+            m_factory = factory;
+        }
+
+        @Override
+        public ActionScheduler construct(TaskHelper helper) {
+            return m_factory.construct(helper);
+        }
+
+        @Override
+        public boolean doHashesMatch(SchedulerFactory other) {
+            if (getClass() != other.getClass()) {
+                return false;
+            }
+            return m_factory.doHashesMatch(((SchedulerFactoryImpl) other).m_factory);
+        }
+    }
+
+    /**
+     * Factory for constructing a {@link ActionScheduler} from an {@link ActionGenerator} and {@link ActionSchedule}
+     */
+    private static final class CompositeSchedulerFactory implements SchedulerFactory {
+        private final InitializableFactory<ActionGenerator> m_actionGeneratorFactory;
+        private final InitializableFactory<ActionSchedule> m_actionScheduleFactory;
+
+        CompositeSchedulerFactory(InitializableFactory<ActionGenerator> actionGeneratorFactory,
+                InitializableFactory<ActionSchedule> actionScheduleFactory) {
+            super();
+            m_actionGeneratorFactory = actionGeneratorFactory;
+            m_actionScheduleFactory = actionScheduleFactory;
+        }
+
+        @Override
+        public ActionScheduler construct(TaskHelper helper) {
+            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper),
+                    m_actionScheduleFactory.construct(helper));
+        }
+
+        @Override
+        public boolean doHashesMatch(SchedulerFactory other) {
+            if (getClass() != other.getClass()) {
+                ;
+            }
+            CompositeSchedulerFactory otherFactory = (CompositeSchedulerFactory) other;
+            return m_actionGeneratorFactory.doHashesMatch(otherFactory.m_actionGeneratorFactory)
+                    && m_actionScheduleFactory.doHashesMatch(otherFactory.m_actionScheduleFactory);
         }
     }
 

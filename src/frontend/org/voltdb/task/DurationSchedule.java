@@ -23,13 +23,12 @@ import java.util.concurrent.TimeUnit;
  * Simple abstract class to handle the common duration parsing and validation of schedulers which use a static duration
  * in the form of &lt;interval&gt; &lt;timeUnit&gt;
  */
-abstract class DurationScheduler extends SingleProcScheduler {
+abstract class DurationSchedule implements ActionSchedule {
+    TaskHelper m_helper;
     long m_durationNs = -1;
 
-    public static String validateParameters(TaskHelper helper, int interval, String timeUnit, String procedure,
-            String... procedureParameters) {
+    public static String validateParameters(TaskHelper helper, int interval, String timeUnit) {
         TaskValidationErrors errors = new TaskValidationErrors();
-        SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
         if (interval <= 0) {
             errors.addErrorMessage("Interval must be greater than 0: " + interval);
         }
@@ -48,9 +47,8 @@ abstract class DurationScheduler extends SingleProcScheduler {
         return errors.getErrorMessage();
     }
 
-    void initialize(TaskHelper helper, int interval, String timeUnit, String procedure,
-            String[] procedureParameters) {
-        super.initialize(helper, procedure, procedureParameters);
+    void initialize(TaskHelper helper, int interval, String timeUnit) {
+        m_helper = helper;
         m_durationNs = TimeUnit.valueOf(timeUnit).toNanos(interval);
     }
 }
