@@ -103,6 +103,7 @@ Command succeeded.
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -149,6 +150,7 @@ Command succeeded.
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -263,6 +265,7 @@ Command succeeded.
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -323,6 +326,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -369,6 +373,7 @@ Command succeeded.
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -489,6 +494,7 @@ Command succeeded.
 @Pause                    
 @Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
