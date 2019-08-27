@@ -210,7 +210,7 @@ public class SQLCommand {
         }
     }
 
-    public static void getInteractiveQueries(SQLConsoleReader interactiveReader) throws Exception {
+    private static void getInteractiveQueries(SQLConsoleReader interactiveReader) throws Exception {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
@@ -218,8 +218,8 @@ public class SQLCommand {
         boolean isRecall = false;
 
         while (true) {
-            String stmtContinuationStr = (statement.length() > 0 ? "  " : "");
-            String prompt = isRecall ? "" : ( stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
+            String stmtContinuationStr = statement.length() > 0 ? "  " : "";
+            String prompt = isRecall ? "" : (stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
             if (line == null) {
@@ -551,7 +551,6 @@ public class SQLCommand {
         // QUERYSTATS
         String queryStatsArgs = SQLParser.parseQueryStatsStatement(line);
         if (queryStatsArgs != null) {
-            System.out.println("<<<" + queryStatsArgs + ">>>");
             printResponse(m_client.callProcedure("@QueryStats", queryStatsArgs), false);
             return true;
         }
@@ -759,7 +758,6 @@ public class SQLCommand {
 
             FileInfo fileInfo = filesInfo.get(ii);
             adapter = null;
-            reader = null;
 
             if (fileInfo.getOption() == FileOption.INLINEBATCH) {
                 // File command is a "here document" so pass in the current
@@ -1120,7 +1118,7 @@ public class SQLCommand {
         // and multiple valid statements.
         m_exitCode = -1;
         if (m_stopOnError) {
-            if ( ! m_interactive ) {
+            if (! m_interactive ) {
                 throw new SQLCmdEarlyExitException();
             }
             // Setting this member to drive a fast stack unwind from
@@ -1202,8 +1200,7 @@ public class SQLCommand {
                         .put( 1, Arrays.asList("varchar"))
                         .put( 3, Arrays.asList("varchar", "varchar", "bit")).build());
         Procedures.put("@SnapshotScan",
-                ImmutableMap.<Integer, List<String>>builder().put( 1,
-                Arrays.asList("varchar")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Statistics",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("statisticscomponent", "bit")).build());
         Procedures.put("@SystemCatalog",
@@ -1738,7 +1735,7 @@ public class SQLCommand {
             }
             if (m_interactive) {
                 // Print out welcome message
-                System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
+                System.out.printf("SQL Command :: %s%s:%d\n", (user.isEmpty() ? "" : user + "@"), serverList, port);
                 interactWithTheUser();
             }
         } catch (SQLCmdEarlyExitException e) {

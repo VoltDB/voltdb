@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -76,6 +77,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.SQLCommand;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
@@ -84,6 +86,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltdb.volttableutil.VoltTableUtil;
+import scala.collection.immutable.StreamIterator;
 
 public final class InvocationDispatcher {
 
@@ -158,7 +161,7 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder clientInterfaceHandleManagerMap(ConcurrentMap<Long, ClientInterfaceHandleManager> cihm) {
+        Builder clientInterfaceHandleManagerMap(ConcurrentMap<Long, ClientInterfaceHandleManager> cihm) {
             m_cihm = checkNotNull(cihm, "given client interface handler manager lookup map is null");
             return this;
         }
@@ -173,7 +176,7 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder snapshotDaemon(SnapshotDaemon snapshotDaemon) {
+        Builder snapshotDaemon(SnapshotDaemon snapshotDaemon) {
             m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
             return this;
         }
@@ -189,7 +192,7 @@ public final class InvocationDispatcher {
         }
     }
 
-    public static final Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -207,8 +210,7 @@ public final class InvocationDispatcher {
         m_catalogContext = checkNotNull(catalogContext, "given catalog context is null");
         m_cihm = checkNotNull(cihm, "given client interface handler manager lookup map is null");
         m_invocationValidator = new InvocationValidator(
-                checkNotNull(replicationRole, "given replication role is null")
-                );
+                checkNotNull(replicationRole, "given replication role is null"));
         m_cartographer = checkNotNull(cartographer, "given cartographer is null");
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
@@ -299,8 +301,7 @@ public final class InvocationDispatcher {
             String errorMessage = "Procedure " + procName + " was not found";
             RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(),
                             60, TimeUnit.SECONDS, authLog, Level.WARN,
-                            errorMessage + ". This message is rate limited to once every 60 seconds."
-                            );
+                            errorMessage + ". This message is rate limited to once every 60 seconds.");
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
 
@@ -311,11 +312,8 @@ public final class InvocationDispatcher {
                 (bypass == null || !bypass.skipAdmimCheck)) {
             return error;
         } else if ((error = m_permissionValidator.shouldAccept(procName, user, task, catProc)) != null &&
-                (bypass == null || !bypass.skipPermissionCheck)) {
-            //Check permissions
-            return error;
-        } else if ((error = m_invocationValidator.shouldAccept(procName, user, task, catProc)) != null &&
-                (bypass == null || !bypass.skipInvocationCheck)) { //Check param deserialization policy for sysprocs
+                (bypass == null || !bypass.skipPermissionCheck || !bypass.skipInvocationCheck)) {
+            //Check permissions and param deserialization policy for sysprocs
             return error;
         }
         //Check individual query timeout value settings with privilege
@@ -357,7 +355,6 @@ public final class InvocationDispatcher {
 
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
-
             // ping just responds as fast as possible to show the connection is alive
             // nb: ping is not a real procedure, so this is checked before other "sysprocs"
             switch (procName) {
@@ -395,8 +392,7 @@ public final class InvocationDispatcher {
                 case "@SnapshotStatus":
                     // SnapshotStatus is really through @Statistics now, but preserve the
                     // legacy calling mechanism
-                    Object[] params = new Object[] { "SNAPSHOTSTATUS" };
-                    task.setParams(params);
+                    task.setParams("SNAPSHOTSTATUS");
                     return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
                 case "@SnapshotScan":
                     return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
@@ -406,15 +402,17 @@ public final class InvocationDispatcher {
                     ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                     if (retval != null) {
                         return retval;
-                    }
-                    if (m_isInitialRestore.compareAndSet(true, false) && shouldLoadSchemaFromSnapshot()) {
+                    } else if (m_isInitialRestore.compareAndSet(true, false) &&
+                            shouldLoadSchemaFromSnapshot()) {
                         m_NTProcedureService.isRestoring = true;
                         return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                     }
+                    break;
                 case "@Shutdown":
                     if (task.getParams().size() == 1) {
                         return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                     }
+                    break;
                 case "@UpdateLogging":
                     task = appendAuditParams(task, ccxn, user);
                 default:
@@ -424,8 +422,7 @@ public final class InvocationDispatcher {
             if (!MiscUtils.isPro()) {
                 SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
                 if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0],
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
                             procName + " is available in the Enterprise Edition of VoltDB only.",
                             task.clientHandle);
                 }
@@ -433,17 +430,18 @@ public final class InvocationDispatcher {
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            if ("@Pause".equals(procName)
-                 || "@Resume".equals(procName)
-                 || "@PrepareShutdown".equals(procName)
-                 || "@CancelShutdown".equals(procName)) {
-                if (!handler.isAdmin()) {
-                    return unexpectedFailureResponse(
-                            procName + " is not available to this client",
-                            task.clientHandle);
-                }
-                // Log the invocation with user name and ip information
-                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
+            switch (procName) {
+                case "@Pause":
+                case "@Resume":
+                case "@PrepareShutdown":
+                case "@CancelShutdown":
+                    if (!handler.isAdmin()) {
+                        return unexpectedFailureResponse(
+                                procName + " is not available to this client", task.clientHandle);
+                    }
+                    // Log the invocation with user name and ip information
+                    CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
+                default:
             }
         }
         // If you're going to copy and paste something, CnP the pattern
@@ -453,45 +451,36 @@ public final class InvocationDispatcher {
         do {
             try {
                 partitions = getPartitionsForProcedure(catProc, task);
-            } catch (Exception e) {
-                // unable to hash to a site, return an error
+            } catch (Exception e) { // unable to hash to a site, return an error
                 return getMispartitionedErrorResponse(task, catProc, e);
             }
             CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
                     catProc.getSinglepartition(), catProc.getEverysite(), partitions, task.getSerializedSize(),
                     nowNanos);
             switch (result) {
-            case SUCCESS:
-                return null;
-            case NO_CLIENT_HANDLER:
-                /*
-                 * when VoltDB.crash... is called, we close off the client interface and it might not be possible to
-                 * create new transactions. Return an error. Another case is when elastic shrink, the target partition
-                 * may be removed in between the transaction is created
-                 */
-                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
-                        "VoltDB failed to create the transaction internally.  It is possible this "
-                                + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
-                                + "it should be safe to resend the work, as the work was never started.",
-                        task.clientHandle);
-            case PARTITION_REMOVED:
-                // Loop back around and try to figure out the partitions again
-                Thread.yield();
+                case SUCCESS:
+                    return null;
+                case NO_CLIENT_HANDLER:
+                    /*
+                     * when VoltDB.crash... is called, we close off the client interface and it might not be possible to
+                     * create new transactions. Return an error. Another case is when elastic shrink, the target partition
+                     * may be removed in between the transaction is created
+                     */
+                    return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                            "VoltDB failed to create the transaction internally.  It is possible this "
+                                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                                    + "it should be safe to resend the work, as the work was never started.",
+                            task.clientHandle);
+                case PARTITION_REMOVED:
+                    // Loop back around and try to figure out the partitions again
+                    Thread.yield();
             }
         } while (true);
     }
 
     private boolean shouldLoadSchemaFromSnapshot() {
-        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-        if(tables.size() == 0) {
-            return true;
-        }
-        for(Table t : tables) {
-            if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR")) {
-                return false;
-            }
-        }
-        return true;
+        return StreamSupport.stream(m_catalogContext.get().database.getTables().spliterator(), false)
+                .allMatch(tbl -> tbl.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR"));
     }
 
     public static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -540,7 +529,7 @@ public final class InvocationDispatcher {
     }
 
     private static ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
+        Object[] params = task.getParams().toArray();
         String typeString = "the type of partition key to return and can be one of " +
                             "INTEGER, STRING or VARCHAR (equivalent), or VARBINARY";
         if (params.length != 1 || params[0] == null) {
@@ -581,7 +570,7 @@ public final class InvocationDispatcher {
     }
 
     private static ClientResponseImpl dispatchJstack(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
+        Object[] params = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return gracefulFailureResponse(
                     "@JStack must provide hostId",
@@ -595,8 +584,7 @@ public final class InvocationDispatcher {
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         if (ihid >=0 && !liveHids.contains(ihid)) {
-            return gracefulFailureResponse(
-                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
+            return gracefulFailureResponse("Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
 
@@ -627,7 +615,7 @@ public final class InvocationDispatcher {
 
     private ClientResponseImpl dispatchSubscribe(InvocationClientHandler handler, StoredProcedureInvocation task) {
         final ParameterSet ps = task.getParams();
-        final Object params[] = ps.toArray();
+        final Object[] params = ps.toArray();
         String err = null;
         final ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
         //Not sure if it can actually be null, not really important if it is
@@ -658,18 +646,18 @@ public final class InvocationDispatcher {
             OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
             if (agent != null) {
                 agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
+                return null;
             } else {
                 return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
                         "Unknown OPS selector", null, true);
             }
-            return null;
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
         }
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
+        Object[] params = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return gracefulFailureResponse("@StopNode must provide hostId", task.clientHandle);
         } else if (!(params[0] instanceof Integer)) {
@@ -700,11 +688,9 @@ public final class InvocationDispatcher {
     }
 
     private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
+        Object[] params = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
-            return gracefulFailureResponse(
-                    "@PrepareStopNode must provide hostId",
-                    task.clientHandle);
+            return gracefulFailureResponse("@PrepareStopNode must provide hostId", task.clientHandle);
         } else if (!(params[0] instanceof Integer)) {
             return gracefulFailureResponse(
                     "@PrepareStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
@@ -724,12 +710,10 @@ public final class InvocationDispatcher {
 
        // The host has partition masters, go ahead to move them
        if (m_cartographer.getMasterCount(ihid) > 0) {
-
            // shutdown partition leader migration
            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
            for (Integer integer : liveHids) {
-               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer,
-                           HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
            }
 
            // start leader migration on this node
@@ -742,7 +726,8 @@ public final class InvocationDispatcher {
        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    public ClientResponseImpl dispatchQueryStats(StoredProcedureInvocation task) {
+    private ClientResponseImpl dispatchQueryStats(StoredProcedureInvocation task) {
+        // NOTE: this is the core part for SQLCMD "QUERYSTATS". It is not implemented as a procedure.
         String tempTableAlias = "TT";
         Pattern stats_proc = Pattern.compile("(\\(\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
         String sql = (String) task.getParams().getParam(0);
@@ -756,19 +741,15 @@ public final class InvocationDispatcher {
             String proc = m.group(1);
             m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
             String[] statsParam = proc.split("[,]");
-
             try {
                 JSONObject obj = new JSONObject();
-                Pattern subselector = Pattern.compile("[a-zA-Z]+");
                 obj.put("selector", "STATISTICS");
-
                 for (StatsSelector proc_type : proc_types) {
                     if (proc.toUpperCase().contains(proc_type.name())) {
                         obj.put("subselector", proc_type.name());
                         break;
                     }
                 }
-
                 boolean interval = false;
                 if (statsParam.length == 3) {
                     interval = Integer.parseInt(statsParam[2]) == 1;
@@ -777,25 +758,18 @@ public final class InvocationDispatcher {
                 tables.add(new Pair<>(tempTableAlias + tables.size(),
                 VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
             } catch (Exception e) {
-                return new ClientResponseImpl(ClientResponse.SUCCESS,
-                        new VoltTable[0],
-                        "SQL error while compiling query.",
-                        task.clientHandle);
+                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0],
+                        "SQL error while compiling query.", task.clientHandle);
             }
         }
-
         m.appendTail(buf);
-        VoltTable[] vt = new VoltTable[1];
         try {
+            VoltTable[] vt = new VoltTable[1];
             vt[0] = VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables);
+            return new ClientResponseImpl(ClientResponse.SUCCESS, vt, "SUCCESS", task.clientHandle);
         } catch (Exception e) {
-            return new ClientResponseImpl(ClientResponse.SUCCESS,
-                    new VoltTable[0],
-                    "SQL error while compiling query.",
-                    task.clientHandle);
+            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], e.getMessage(), task.clientHandle);
         }
-
-        return new ClientResponseImpl(ClientResponse.SUCCESS, vt, "SUCCESS", task.clientHandle);
     }
 
     public final ClientResponseImpl dispatchNTProcedure(
@@ -813,8 +787,7 @@ public final class InvocationDispatcher {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
             // Return an error.
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                     + "it should be safe to resend the work, as the work was never started.",
@@ -878,10 +851,10 @@ public final class InvocationDispatcher {
     private final void sendSentinel(long uniqueId, long initiatorHSId, long ciHandle,
                                     long connectionId, boolean forReplay) {
         //The only field that is relevant is txnid, and forReplay.
-        MultiPartitionParticipantMessage mppm =
-                new MultiPartitionParticipantMessage(m_siteId, initiatorHSId, uniqueId, ciHandle,
-                        connectionId, false,  // isReadOnly
-                        forReplay);  // isForReplay
+        MultiPartitionParticipantMessage mppm = new MultiPartitionParticipantMessage(
+                m_siteId, initiatorHSId, uniqueId, ciHandle,
+                connectionId, false,  // isReadOnly
+                forReplay);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
     }
 
@@ -892,7 +865,7 @@ public final class InvocationDispatcher {
      */
     private final ClientResponseImpl dispatchLoadSinglepartitionTable(
             Procedure catProc, StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn) {
-        int partition = -1;
+        int partition;
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
             int partitionParamType = getLoadSinglePartitionTablePartitionParamType(tables, task);
@@ -901,7 +874,7 @@ public final class InvocationDispatcher {
         } catch (Exception e) {
             authLog.warn(e.getMessage());
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                          new VoltTable[0], e.getMessage(), task.clientHandle);
+                    new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(partition != -1);
         createTransaction(handler.connectionId(), task, catProc.getReadonly(), catProc.getSinglepartition(),
@@ -913,7 +886,7 @@ public final class InvocationDispatcher {
     /**
      * XXX: This should go away when we get rid of the legacy hashinator.
      */
-    private final static int getLoadSinglePartitionTablePartitionParamType(
+    private static int getLoadSinglePartitionTablePartitionParamType(
             CatalogMap<Table> tables, StoredProcedureInvocation spi) throws Exception {
         String tableName = (String) spi.getParameterAtIndex(1);
 
@@ -922,10 +895,9 @@ public final class InvocationDispatcher {
         if (catTable == null) {
             throw new Exception(String .format("Unable to find target table \"%s\" for LoadSinglepartitionTable.",
                     tableName));
+        } else {
+            return catTable.getPartitioncolumn().getType();
         }
-
-        Column pCol = catTable.getPartitioncolumn();
-        return pCol.getType();
     }
 
     public void setReplicationRole(ReplicationRole role) {
@@ -1029,26 +1001,22 @@ public final class InvocationDispatcher {
 
         task.setClientHandle(alternateAdapter.registerCallback(SimpleClientResponseAdapter.NULL_CALLBACK));
 
-        SnapshotUtil.SnapshotResponseHandler savCallback = new SnapshotUtil.SnapshotResponseHandler() {
-
-            @Override
-            public void handleResponse(ClientResponse r) {
-                if (r == null) {
-                    String msg = "Snapshot save failed. The database is paused and the shutdown has been cancelled";
-                    transmitResponseMessage(gracefulFailureResponse(msg, sourceHandle), ccxn, sourceHandle);
-                }
-                if (r.getStatus() != ClientResponse.SUCCESS) {
-                    String msg = "Snapshot save failed: "
-                               + r.getStatusString()
-                               + ". The database is paused and the shutdown has been cancelled";
-                    ClientResponseImpl resp = new ClientResponseImpl(
-                            ClientResponse.GRACEFUL_FAILURE, r.getResults(), msg, sourceHandle);
-                    transmitResponseMessage(resp, ccxn, sourceHandle);
-                }
-                consoleLog.info("Snapshot taken successfully");
-                task.setParams();
-                dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
+        SnapshotUtil.SnapshotResponseHandler savCallback = r -> {
+            if (r == null) {
+                String msg = "Snapshot save failed. The database is paused and the shutdown has been cancelled";
+                transmitResponseMessage(gracefulFailureResponse(msg, sourceHandle), ccxn, sourceHandle);
             }
+            if (r.getStatus() != ClientResponse.SUCCESS) {
+                String msg = "Snapshot save failed: "
+                           + r.getStatusString()
+                           + ". The database is paused and the shutdown has been cancelled";
+                ClientResponseImpl resp = new ClientResponseImpl(
+                        ClientResponse.GRACEFUL_FAILURE, r.getResults(), msg, sourceHandle);
+                transmitResponseMessage(resp, ccxn, sourceHandle);
+            }
+            consoleLog.info("Snapshot taken successfully");
+            task.setParams();
+            dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
         };
 
         // network threads are blocked from making zookeeper calls
@@ -1146,8 +1114,7 @@ public final class InvocationDispatcher {
             //A connection with positive id will be thrown into live client statistics. The connection does not support stats.
             //Thus make the connection id as a negative constant to skip the stats collection.
             final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                    ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update"
-                    );
+                    ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update");
             final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
                 @Override
                 public boolean isAdmin() {
@@ -1165,14 +1132,12 @@ public final class InvocationDispatcher {
             final ListenableFuture<ClientResponse> onRestoreComplete =
                     restoreCallback.getResponseFuture();
             onRestoreComplete.addListener(() -> {
-                ClientResponse r;
                 try {
-                    r = onRestoreComplete.get();
+                    ClientResponse r = onRestoreComplete.get();
+                    transmitResponseMessage(r, ccxn, sourceHandle);
                 } catch (ExecutionException|InterruptedException e) {
                     VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                    return;
                 }
-                transmitResponseMessage(r, ccxn, sourceHandle);
             },
             CoreUtils.SAMETHREADEXECUTOR);
             task.setClientHandle(alternateAdapter.registerCallback(restoreCallback));
@@ -1182,16 +1147,15 @@ public final class InvocationDispatcher {
             final ListenableFuture<ClientResponse> onCatalogUpdateComplete =
                     catalogUpdateCallback.getResponseFuture();
             onCatalogUpdateComplete.addListener(() -> {
-                ClientResponse r;
                 try {
-                    r = onCatalogUpdateComplete.get();
+                    ClientResponse r = onCatalogUpdateComplete.get();
+                    if (r.getStatus() != ClientResponse.SUCCESS) {
+                        transmitResponseMessage(r, ccxn, sourceHandle);
+                        log.error("Received error response for updating catalog " + r.getStatusString());
+                        return;
+                    }
                 } catch (ExecutionException|InterruptedException e) {
                     VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                    return;
-                }
-                if (r.getStatus() != ClientResponse.SUCCESS) {
-                    transmitResponseMessage(r, ccxn, sourceHandle);
-                    log.error("Received error response for updating catalog " + r.getStatusString());
                     return;
                 }
                 m_catalogContext.set(VoltDB.instance().getCatalogContext());
@@ -1317,7 +1281,7 @@ public final class InvocationDispatcher {
         return CreateTransactionResult.SUCCESS;
     }
 
-    final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
+    static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
         final CatalogContext.ProcedurePartitionInfo ppi =
                 (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
@@ -1328,7 +1292,7 @@ public final class InvocationDispatcher {
                 // but without partition params, since replicated table reads can
                 // be done on any partition, round-robin the procedure to local
                 // partitions to spread the traffic.
-                assert (task.getProcName().equals("@AdHoc_RO_SP")): task.getProcName();
+                assert task.getProcName().equals("@AdHoc_RO_SP") : task.getProcName();
 
                 List<Integer> partitionIds = m_partitionIds;
                 int partitionIdIndex = Math.abs(m_nextPartition.getAndIncrement()) % partitionIds.size();

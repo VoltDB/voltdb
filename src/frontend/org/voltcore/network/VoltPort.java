@@ -29,8 +29,7 @@ import java.util.concurrent.RejectedExecutionException;
 import org.voltcore.logging.VoltLogger;
 
 /** Encapsulates a socket registration for a VoltNetwork */
-public class VoltPort implements Connection
-{
+public class VoltPort implements Connection {
     /** The network this port participates in */
     protected final VoltNetwork m_network;
 
@@ -139,10 +138,7 @@ public class VoltPort implements Connection
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
-        m_writeStream = new VoltNIOWriteStream(
-                this,
-                m_handler.offBackPressure(),
-                m_handler.onBackPressure(),
+        m_writeStream = new VoltNIOWriteStream(this, m_handler.offBackPressure(), m_handler.onBackPressure(),
                 m_handler.writestreamMonitor());
         m_interestOps = key.interestOps();
     }
@@ -153,7 +149,7 @@ public class VoltPort implements Connection
      */
     void lockForHandlingWork() {
         synchronized(m_lock) {
-            assert m_running == false;
+            assert !m_running;
             m_running = true;
             m_readyOps = 0;
             m_readyOps = m_selectionKey.readyOps();      // runnable.run() doesn't accept parameters
@@ -191,7 +187,7 @@ public class VoltPort implements Connection
             drainWriteStream();
         } finally {
             synchronized(m_lock) {
-                assert(m_running == true);
+                assert(m_running);
                 m_running = false;
             }
         }
@@ -245,8 +241,7 @@ public class VoltPort implements Connection
             /*
              * If there is something to write always give it a whirl.
              */
-            if (!m_writeStream.isEmpty())
-            {
+            if (!m_writeStream.isEmpty()) {
                 m_writeStream.drainTo(m_channel);
             }
 

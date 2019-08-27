@@ -75,9 +75,6 @@ public final class VoltTableUtil {
 
         String uuid = UUID.randomUUID().toString();
         VoltTableData.SCHEMA.put(uuid, db);
-
-        String connectString = String.format("jdbc:calcite:");
-
         Properties info = new Properties();
 
         info.setProperty("schemaFactory", "org.voltdb.volttableutil.VoltTableSchemaFactory");
@@ -85,14 +82,10 @@ public final class VoltTableUtil {
 
         try {
             final Driver driver = new Driver();
-            CalciteConnection connection = (CalciteConnection)
-                driver.connect(connectString, info);
-
+            CalciteConnection connection = (CalciteConnection) driver.connect("jdbc:calcite:", info);
             Statement st = connection.createStatement();
             ResultSet result = st.executeQuery(sql);
             return resultSetToVoltTable(result);
-        } catch (SQLException e) {
-            throw e;
         } finally {
             VoltTableData.SCHEMA.remove(uuid);
         }
