@@ -39,13 +39,12 @@ class ExportTupleStream : public voltdb::TupleStreamBase {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
-                      const std::string &tableName, const std::vector<std::string> &columnNames);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName, const std::vector<std::string> &columnNames);
 
     virtual ~ExportTupleStream() {
     }
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setGeneration(int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -76,7 +75,7 @@ public:
 
     int64_t debugAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
-        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
+        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId);
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
@@ -115,7 +114,6 @@ private:
 
     // This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
     bool m_new;
-    std::string m_signature;
     int64_t m_generation;
     const std::string &m_tableName;
     const std::vector<std::string> &m_columnNames;

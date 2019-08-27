@@ -21,8 +21,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -36,13 +36,6 @@ import org.voltcore.utils.Pair;
 public interface ExportDataProcessor  {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
-
-    /**
-     * Allow the processor access to the Export logger. Processor may
-     * log to this logger to produce Export category output.
-     * @param logger log4j logger created from VoltDB logger factory.
-     */
-    void addLogger(VoltLogger logger);
 
     void setExportGeneration(ExportGeneration generation);
 
@@ -73,4 +66,5 @@ public interface ExportDataProcessor  {
      */
     public void checkProcessorConfig(Properties config);
 
+    public ExportClientBase getExportClient(final String tableName);
 }

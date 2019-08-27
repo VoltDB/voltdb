@@ -891,4 +891,8 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public boolean isJoining() {return false;}
+
+    public boolean isClusterComplete() {
+        return true;
+    }
 }

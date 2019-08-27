@@ -28,7 +28,6 @@ import org.voltdb.VoltType;
 public class AdvertisedDataSource
 {
     final public int partitionId;
-    final public String signature;
     final public String tableName;
     //Set to other than partition column in case of kafka.
     private String m_partitionColumnName = "";
@@ -51,7 +50,7 @@ public class AdvertisedDataSource
 
     @Override
     public int hashCode() {
-        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + signature.hashCode();
+        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId;
     }
 
     @Override
@@ -59,7 +58,6 @@ public class AdvertisedDataSource
         if (o instanceof AdvertisedDataSource) {
             AdvertisedDataSource other = (AdvertisedDataSource)o;
             if (other.m_generation == m_generation &&
-                    other.signature.equals(signature) &&
                     other.partitionId == partitionId) {
                 return true;
                     }
@@ -67,7 +65,7 @@ public class AdvertisedDataSource
         return false;
     }
 
-    public AdvertisedDataSource(int p_id, String t_signature, String t_name,
+    public AdvertisedDataSource(int p_id, String t_name,
             String partitionColumnName,
             long systemStartTimestamp,
             long generation,
@@ -77,7 +75,6 @@ public class AdvertisedDataSource
             ExportFormat exportFormat)
     {
         partitionId = p_id;
-        signature = t_signature;
         tableName = t_name;
         m_partitionColumnName = partitionColumnName;
         m_generation = generation;
@@ -119,7 +116,6 @@ public class AdvertisedDataSource
     @Override
     public String toString() {
         return "Generation: " + m_generation + " Table: " + tableName
-                + " partition " + partitionId + " signature " + signature
-                + " partitionColumn " + m_partitionColumnName;
+                + " partition " + partitionId + " partitionColumn " + m_partitionColumnName;
     }
 }

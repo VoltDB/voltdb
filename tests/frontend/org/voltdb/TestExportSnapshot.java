@@ -72,19 +72,17 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         closeClientAndServer();
     }
 
-    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
-        System.out.println("testExportSnapshotPreservesSequenceNumber");
+    public void testExportSnapshotResetsSequenceNumber() throws Exception {
+        System.out.println("testExportSnapshotResetsSequenceNumber");
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            m_verifier.addRow(client, "NO_NULLS_GRP", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             final Object[] paramsGrp = convertValsToParams("NO_NULLS_GRP", i, rowdata);
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         quiesce(client);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -109,15 +107,16 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
+        // Ignore first 10 rows received before restart, make sure the sequence number of
+        // remaining rows start from beginning.
+        for (int i = 0; i < 10; i++) {
+            m_verifier.ignoreRow("NO_NULLS", i);
+            m_verifier.ignoreRow("NO_NULLS_GRP", i);
+        }
         System.out.println("Insert Data is done...........");
 
         // must still be able to verify the export data.
-        // ENG-570
-        client.drain();
-        Thread.sleep(2000);
-        quiesce(client);
-        Thread.sleep(2000);
-        quiesceAndVerifyStream(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportSnapshot(final String name) {

@@ -54,7 +54,7 @@
 
     <!-- logger name="EXPORT">
         <level value="INFO"/>
-    </logger -->
+    </logger-->
 
     <!-- logger name="REJOIN">
         <level value="INFO"/>

@@ -17,8 +17,11 @@
 
 package org.voltdb.export;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 
 import com.google_voltpatches.common.collect.BoundType;
@@ -27,7 +30,7 @@ import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
-public class ExportSequenceNumberTracker {
+public class ExportSequenceNumberTracker implements DeferredSerialization {
     protected RangeSet<Long> m_map;
     // Is the first sequence a sentinel? Sentinel doesn't count into the total sequence size of tracker.
     private boolean m_hasSentinel = false;
@@ -332,5 +335,71 @@ public class ExportSequenceNumberTracker {
 
     public boolean isEmpty() {
         return m_map.isEmpty();
+    }
+
+    @Override
+    public void serialize(ByteBuffer buf) throws IOException {
+
+        // Entry count (int) + 2 Long per entry
+        if (isEmpty()) {
+            buf.putInt(0);
+        } else {
+            int trackSize = size();
+            buf.putInt(trackSize);
+
+            for (Range<Long> entry : m_map.asRanges()) {
+                buf.putLong(start(entry));
+                buf.putLong(end(entry));
+            }
+        }
+
+        // Sentinel (byte)
+        buf.put(m_hasSentinel ? (byte) 1 : (byte) 0);
+    }
+
+    @Override
+    public void cancel() {
+        // *void*
+    }
+
+    @Override
+    public int getSerializedSize() throws IOException {
+        int count = 0;
+
+        // Entry count (int) + 2 Long per entry
+        if (isEmpty()) {
+            count += 4;
+        } else {
+            count += 4;
+            count += 2 * 8 * size();
+        }
+
+        // Sentinel (byte)
+        return count + 1;
+    }
+
+    public ExportSequenceNumberTracker duplicate() {
+
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+
+        for (Range<Long> entry : m_map.asRanges()) {
+            tracker.append(start(entry), end(entry));
+        }
+        tracker.m_hasSentinel = m_hasSentinel;
+        return tracker;
+    }
+
+    public static ExportSequenceNumberTracker deserialize(ByteBuffer buf) throws IOException {
+
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+
+        int count = buf.getInt();
+        for (int i = 0; i < count; i++) {
+            long start = buf.getLong();
+            long end = buf.getLong();
+            tracker.append(start, end);
+        }
+        tracker.m_hasSentinel = buf.get() == 1;
+        return tracker;
     }
 }

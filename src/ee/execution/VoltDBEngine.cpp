@@ -684,7 +684,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
     else {
         // Error handling
-        string errorMsg = udfResultIn.readTextString();
+        std::string errorMsg = udfResultIn.readTextString();
         throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
     }
 }
@@ -962,13 +962,13 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             }
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
-                const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp);
+                const std::string streamName = streamedtable->name();
+                streamedtable->setGeneration(timestamp);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
-                purgedStreams[signature] = streamedtable->getWrapper();
+                purgedStreams[streamName] = streamedtable->getWrapper();
                 //Unset wrapper so it can be deleted after last push.
                 streamedtable->setWrapper(NULL);
-                m_exportingTables.erase(signature);
+                m_exportingTables.erase(streamName);
             }
             if (isReplicatedTable) {
                 VOLT_TRACE("delete a REPLICATED table %s", tcd->getTable()->name().c_str());
@@ -1089,14 +1089,15 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     }
                     assert(tcd->getStreamedTable() == NULL);
                 }
-                continue;
+                if (!tcd) {
+                    continue;
+                }
             }
             else {
                 if (updateReplicated) {
                     continue;
                 }
-                tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                               m_compactionThreshold, this);
+                tcd = new TableCatalogDelegate(catalogTable->signature(), m_compactionThreshold, this);
                 // use the delegate to init the table and create indexes n' stuff
                 tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                 m_catalogDelegates[catalogTable->path()] = tcd;
@@ -1107,21 +1108,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             // set export info on the new table
             auto streamedtable = tcd->getStreamedTable();
             if (streamedtable) {
-                streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                m_exportingTables[catalogTable->signature()] = streamedtable;
+                const std::string& streamName = streamedtable->name();
                 if (tcd->exportEnabled()) {
-                    ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                    if (wrapper == NULL) {
-                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                streamedtable->name(), streamedtable->getColumnNames());
-                        m_exportingStreams[catalogTable->signature()] = wrapper;
-                    } else {
-                        // If stream was dropped in UAC and the added back we should not purge the wrapper.
-                        // A case when exact same stream is dropped and added.
-                        purgedStreams[catalogTable->signature()] = NULL;
-                    }
-                    streamedtable->setWrapper(wrapper);
+                    attachTupleStream(streamedtable, streamName, purgedStreams, timestamp);
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -1181,27 +1170,15 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
                 if (isStreamUpdate) {
-                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    streamedTable->setGeneration(timestamp);
                     if (!tcd->exportEnabled()) {
                         // Evaluate export enabled or not and cache it on the tcd.
                         tcd->evaluateExport(*m_database, *catalogTable);
                         // If enabled hook up streamer
                         if (tcd->exportEnabled()) {
                             //Reset generation after stream wrapper is created.
-                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                            m_exportingTables[catalogTable->signature()] = streamedTable;
-                            ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                            if (wrapper == NULL) {
-                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                        m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                        streamedTable->name(), streamedTable->getColumnNames());
-                                m_exportingStreams[catalogTable->signature()] = wrapper;
-                            } else {
-                                //If stream was altered in UAC and the added back we should not purge the wrapper.
-                                //A case when alter has not changed anything that changes table signature.
-                                purgedStreams[catalogTable->signature()] = NULL;
-                            }
-                            streamedTable->setWrapper(wrapper);
+                            const std::string& streamName = streamedTable->name();
+                            attachTupleStream(streamedTable, streamName, purgedStreams, timestamp);
                         }
                     }
                 }
@@ -1455,6 +1432,32 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
     return true;
 }
 
+void VoltDBEngine::attachTupleStream(
+        StreamedTable* streamedTable,
+        const std::string& streamName,
+        std::map<std::string, ExportTupleStream*> & purgedStreams,
+        int64_t timestamp) {
+    m_exportingTables[streamName] = streamedTable;
+    ExportTupleStream* wrapper = streamedTable->getWrapper();
+    if (wrapper == NULL) {
+        wrapper = purgedStreams[streamName];
+        if (wrapper == NULL) {
+            wrapper = new ExportTupleStream(
+                    m_executorContext->m_partitionId, m_executorContext->m_siteId,
+                    timestamp, streamName, streamedTable->getColumnNames());
+        } else {
+            purgedStreams[streamName] = NULL;
+        }
+        streamedTable->setWrapper(wrapper);
+        m_exportingStreams[streamName] = wrapper;
+        VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
+    } else {
+        // If stream was dropped in UAC and the added back we should not purge the wrapper.
+        // A case when exact same stream is dropped and added.
+        assert(purgedStreams[streamName] == NULL);
+    }
+    streamedTable->setGeneration(timestamp);
+}
 
 /*
  * Accept a list of catalog commands expressing a diff between the
@@ -1539,11 +1542,9 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 void
 VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams) {
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
-        //Do delete later
         if (entry.second) {
             m_exportingStreams[entry.first] = NULL;
-            m_exportingDeletedStreams[entry.first] = entry.second;
-            entry.second->pushEndOfStream();
+            delete entry.second;
         }
     }
 }
@@ -2172,15 +2173,6 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
-    //On Tick do cleanup of dropped streams.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
-        if (entry.second) {
-            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            delete entry.second;
-        }
-    }
-    m_exportingDeletedStreams.clear();
-
     m_executorContext->drStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
@@ -2189,18 +2181,11 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
+    VOLT_DEBUG("quiesce");
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
-    //On quiesce do cleanup of dropped streams.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
-        if (entry.second) {
-            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            delete entry.second;
-        }
-    }
-    m_exportingDeletedStreams.clear();
     m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->periodicFlush(-1L, lastCommittedSpHandle);
