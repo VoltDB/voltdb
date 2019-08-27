@@ -281,7 +281,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
                 }
-                ExportManager.instance().takeMastership(m_partitionId);
+                ExportManager.instance().becomeLeader(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

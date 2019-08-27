@@ -46,14 +46,18 @@ import org.voltdb.iv2.UniqueIdGenerator;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
+    // start seq number(8) + row count(4) + uniqueId (8)
+    public static final int HEADER_SIZE = 20;
+    public static final int SEQUENCE_NUMBER_OFFSET = 0;
+    public static final int ROW_NUMBER_OFFSET = 8;
+    public static final int UNIQUE_ID_OFFSET = 12;
 
     StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
         m_buffer = cont;
         m_startSequenceNumber = startSequenceNumber;
         m_rowCount = rowCount;
         m_uniqueId = uniqueId;
-        // The first 12 bytes are space for us to store the sequence number and row count if we end up persisting
+        // The first 20 bytes are space for us to store the sequence number and row count if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
         //The first 8 bytes are space for us to store the sequence number if we end up persisting
@@ -167,9 +171,9 @@ public class StreamBlock {
      */
     BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
-        m_buffer.b().putLong(0, startSequenceNumber());
-        m_buffer.b().putInt(8, rowCount());
-        m_buffer.b().putLong(12, uniqueId());
+        m_buffer.b().putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
+        m_buffer.b().putInt(ROW_NUMBER_OFFSET, rowCount());
+        m_buffer.b().putLong(UNIQUE_ID_OFFSET, uniqueId());
         m_buffer.b().position(0);
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());

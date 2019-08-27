@@ -1382,8 +1382,6 @@ public abstract class CatalogUtil {
             throw new DeploymentCheckException("Unable to instantiate export processor", e);
         }
         try {
-            processor.addLogger(hostLog);
-
             processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
@@ -3178,5 +3176,41 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
+        if (!logger.isDebugEnabled()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        logger.debug(sb.toString());
     }
 }

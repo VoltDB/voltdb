@@ -89,6 +89,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
@@ -104,7 +105,6 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -1484,8 +1484,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     m_partitionId,
                     catalogTable.getSignature());
             // assign the stats to the other partition's value
-            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getSignature(),
-                    false, true, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
+            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
+                    StreamStartAction.REJOIN, tableEntry.getValue());
         }
 
         if (drSequenceNumbers != null) {
