@@ -110,6 +110,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.ThreadPool;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -619,6 +620,12 @@ public abstract class CatalogUtil {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         return db.getConnectors();
+    }
+
+    public static CatalogMap<ThreadPool> getThreadPools(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Deployment deployment = cluster.getDeployment().get("deployment");
+        return deployment.getThreadpools();
     }
 
     public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
@@ -1310,6 +1317,7 @@ public abstract class CatalogUtil {
         }
 
         setSystemSettings(deployment, catDeploy);
+        setThreadPools(deployment, catDeploy);
 
         catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
 
@@ -1339,6 +1347,21 @@ public abstract class CatalogUtil {
         syssettings.setElasticduration(deployment.getSystemsettings().getElastic().getDuration());
         syssettings.setElasticthroughput(deployment.getSystemsettings().getElastic().getThroughput());
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
+    }
+
+    private static void setThreadPools(DeploymentType deployment, Deployment catDeployment) {
+        ThreadPoolsType threadPoolsType = deployment.getThreadpools();
+        if (threadPoolsType == null) {
+            return;
+        }
+
+        // build the ThreadPool catalog from scratch.
+        catDeployment.getThreadpools().clear();
+        for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
+            ThreadPool catalogThreadPool = catDeployment.getThreadpools().add(threadPool.getName());
+            catalogThreadPool.setName(threadPool.getName());
+            catalogThreadPool.setSize(threadPool.getSize());
+        }
     }
 
     public static void validateDirectory(String type, File path) {
@@ -1816,7 +1839,6 @@ public abstract class CatalogUtil {
             catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
             catconn.setEnabled(connectorEnabled);
             catconn.setThreadpoolname(exportConfiguration.getThreadpool());
-            catconn.setThreadpoolsize(threadPoolSize);
 
             if (!connectorEnabled) {
                 hostLog.info("Export configuration for export target " + targetName + " is present and is " +
