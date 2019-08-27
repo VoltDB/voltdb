@@ -384,8 +384,6 @@ public final class InvocationDispatcher {
                 case "@PrepareStopNode":
                     CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                     return dispatchPrepareStopNode(task);
-                case "@QueryStats":
-                    return dispatchQueryStats(task);
                 case "@SnapshotSave":
                     m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                     return null;
@@ -638,7 +636,7 @@ public final class InvocationDispatcher {
             }
         }
         return new ClientResponseImpl(err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] {}, err, task.clientHandle);
+                new VoltTable[0], err, task.clientHandle);
     }
 
     static ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn) {
@@ -724,52 +722,6 @@ public final class InvocationDispatcher {
        }
 
        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
-    }
-
-    private ClientResponseImpl dispatchQueryStats(StoredProcedureInvocation task) {
-        // NOTE: this is the core part for SQLCMD "QUERYSTATS". It is not implemented as a procedure.
-        String tempTableAlias = "TT";
-        Pattern stats_proc = Pattern.compile("(\\(\\s*@Statistics\\s*[a-zA-Z]+\\s*,\\s*\\d+\\s*\\))");
-        String sql = (String) task.getParams().getParam(0);
-
-        StatsSelector[] proc_types = StatsSelector.getAllStatsCollector();
-        List<Pair<String, VoltTable>> tables = new LinkedList<>();
-        StringBuffer buf = new StringBuffer();
-        Matcher m = stats_proc.matcher(sql);
-
-        while (m.find()) {
-            String proc = m.group(1);
-            m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
-            String[] statsParam = proc.split("[,]");
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("selector", "STATISTICS");
-                for (StatsSelector proc_type : proc_types) {
-                    if (proc.toUpperCase().contains(proc_type.name())) {
-                        obj.put("subselector", proc_type.name());
-                        break;
-                    }
-                }
-                boolean interval = false;
-                if (statsParam.length == 3) {
-                    interval = Integer.parseInt(statsParam[2]) == 1;
-                }
-                obj.put("interval", interval);
-                tables.add(new Pair<>(tempTableAlias + tables.size(),
-                VoltDB.instance().getStatsAgent().collectDistributedStats(obj)[0], false));
-            } catch (Exception e) {
-                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0],
-                        "SQL error while compiling query.", task.clientHandle);
-            }
-        }
-        m.appendTail(buf);
-        try {
-            VoltTable[] vt = new VoltTable[1];
-            vt[0] = VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables);
-            return new ClientResponseImpl(ClientResponse.SUCCESS, vt, "SUCCESS", task.clientHandle);
-        } catch (Exception e) {
-            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], e.getMessage(), task.clientHandle);
-        }
     }
 
     public final ClientResponseImpl dispatchNTProcedure(

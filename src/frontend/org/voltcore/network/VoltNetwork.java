@@ -94,15 +94,14 @@ import io.netty_voltpatches.NinjaKeySet;
 import jsr166y.ThreadLocalRandom;
 
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable, IOStatsIntf
-{
+class VoltNetwork implements Runnable, IOStatsIntf {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
+    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<>();
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
-    private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final HashSet<VoltPort> m_ports = new HashSet<>();
     private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
     private final String m_coreBindId;
@@ -124,7 +123,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
      **/
     VoltNetwork(int networkId, String coreBindId, String networkName) {
         m_thread = new Thread(this, "Volt " + networkName + " Network - " + networkId);
-        networkThreadName = new String("Volt " + networkName + " Network - " + networkId);
+        networkThreadName = "Volt " + networkName + " Network - " + networkId;
         m_thread.setDaemon(true);
         m_coreBindId = coreBindId;
         try {
@@ -140,7 +139,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
         m_thread = null;
         m_selector = s;
         m_coreBindId = null;
-        networkThreadName = new String("Test Selector Thread");
+        networkThreadName = "Test Selector Thread";
         m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
     }
 
@@ -223,7 +222,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             }
         };
 
-        FutureTask<Connection> ft = new FutureTask<Connection>(registerTask);
+        FutureTask<Connection> ft = new FutureTask<>(registerTask);
         m_tasks.offer(ft);
         m_selector.wakeup();
 
@@ -269,7 +268,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
      * @param c
      */
     Future<?> unregisterChannel (Connection c) {
-        FutureTask<Object> ft = new FutureTask<Object>(getUnregisterRunnable(c), null);
+        FutureTask<Object> ft = new FutureTask<>(getUnregisterRunnable(c), null);
         m_tasks.offer(ft);
         m_selector.wakeup();
         return ft;
@@ -308,9 +307,9 @@ class VoltNetwork implements Runnable, IOStatsIntf
             //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
-            while (m_shouldStop == false) {
+            while (!m_shouldStop) {
                 try {
-                    while (m_shouldStop == false) {
+                    while (!m_shouldStop) {
                         LatencyWatchdog.pet();
 
                         final int readyKeys = m_selector.select();
@@ -392,7 +391,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                 getUnregisterRunnable(port).run();
                 try {
                     port.m_selectionKey.channel().close();
-                } catch (IOException e) {}
+                } catch (IOException ignored) {}
             } else {
                 resumeSelection(port);
             }
@@ -477,7 +476,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
     protected void optimizedInvokeCallbacks(ThreadLocalRandom r) {
         final int numKeys = m_ninjaSelectedKeys.size();
         final int startIndex = r.nextInt(numKeys);
-        final SelectionKey keys[] = m_ninjaSelectedKeys.keys();
+        final SelectionKey[] keys = m_ninjaSelectedKeys.keys();
         for (int ii = startIndex; ii < numKeys; ii++) {
             final Object obj = keys[ii].attachment();
             if (obj == null) {
@@ -500,14 +499,14 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
     private Map<Long, Pair<String, long[]>> getIOStatsImpl(boolean interval) {
         final HashMap<Long, Pair<String, long[]>> retval =
-                new HashMap<Long, Pair<String, long[]>>();
+                new HashMap<>();
         long totalRead = 0;
         long totalMessagesRead = 0;
         long totalWritten = 0;
         long totalMessagesWritten = 0;
         for (VoltPort p : m_ports) {
             final long read = p.readStream().getBytesRead(interval);
-            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
+            final long[] writeInfo = p.writeStream().getBytesAndMessagesWritten(interval);
             final long messagesRead = p.getMessagesRead(interval);
             totalRead += read;
             totalMessagesRead += messagesRead;
@@ -544,7 +543,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             }
         };
 
-        FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
+        FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<>(task);
 
         m_tasks.offer(ft);
         m_selector.wakeup();

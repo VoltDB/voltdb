@@ -176,11 +176,13 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         NTNestedProcedureCallback cb = new NTNestedProcedureCallback();
-        m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout, cb, procName, params);
+        m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout,
+                cb, procName, params);
         return cb.fut();
     }
 
-    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(final String procedureName, final Object... params) {
+    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(
+            final String procedureName, final Object... params) {
         final Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
 
@@ -188,7 +190,8 @@ public class ProcedureRunnerNT {
         VoltTable keys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
 
         @SuppressWarnings("unchecked")
-        final CompletableFuture<ClientResponse>[] futureList = (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
+        final CompletableFuture<ClientResponse>[] futureList =
+                (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
         final int[] keyList = new int[keys.getRowCount()];
 
         // get a list of all keys and call the procedure for each
@@ -246,7 +249,8 @@ public class ProcedureRunnerNT {
     protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
         // only one of these at a time
         if (!m_outstandingAllHostProc.compareAndSet(false, true)) {
-            throw new VoltAbortException(new IllegalStateException("Only one AllNodeNTProcedure operation can be running at a time."));
+            throw new VoltAbortException(new IllegalStateException(
+                    "Only one AllNodeNTProcedure operation can be running at a time."));
         }
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
@@ -315,9 +319,8 @@ public class ProcedureRunnerNT {
             m_perCallStats.setResultSize(response.getResults());
         }
         m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
-                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
-                                      (response.getStatus() != ClientResponse.SUCCESS),
-                                      m_perCallStats);
+                response.getStatus() != ClientResponse.USER_ABORT && response.getStatus() != ClientResponse.SUCCESS,
+                m_perCallStats);
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
 
@@ -345,9 +348,8 @@ public class ProcedureRunnerNT {
             m_perCallStats.setResultSize(response.getResults());
         }
         m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
-                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
-                                      (response.getStatus() != ClientResponse.SUCCESS),
-                                      m_perCallStats);
+                response.getStatus() != ClientResponse.USER_ABORT && response.getStatus() != ClientResponse.SUCCESS,
+                m_perCallStats);
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
 
@@ -373,7 +375,7 @@ public class ProcedureRunnerNT {
         Object[] paramList = paramListIn;
 
         try {
-            if ((m_paramTypes.length > 0) && (m_paramTypes[0] == ParameterSet.class)) {
+            if (m_paramTypes.length > 0 && m_paramTypes[0] == ParameterSet.class) {
                 assert(m_paramTypes.length == 1);
                 paramList = new Object[] { ParameterSet.fromArrayNoCopy(paramListIn) };
             }
@@ -408,15 +410,14 @@ public class ProcedureRunnerNT {
                         //
                         // Happy path. No exceptions thrown. Procedure work is complete.
                         //
-                        Object innerRawResult = null;
-                        ClientResponseImpl response = null;
+                        Object innerRawResult;
+                        ClientResponseImpl response;
                         try {
                             innerRawResult = fut.get();
                         } catch (InterruptedException | ExecutionException e) {
                             assert(false);
                             // this is a bad place to be, but it's hard to know if it's crash bad...
-                            innerRawResult = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                    new VoltTable[0],
+                            innerRawResult = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE, new VoltTable[0],
                                     "Future returned from NTProc " + m_procedureName + " failed to complete.",
                                     m_clientHandle);
                         }
@@ -429,8 +430,7 @@ public class ProcedureRunnerNT {
                                 response = responseFromTableArray(r);
                             } catch (Exception e) {
                                 // this is a bad place to be, but it's hard to know if it's crash bad...
-                                response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                        new VoltTable[0],
+                                response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
                                         "Type " + innerRawResult.getClass().getName() +
                                             " returned from NTProc \"" + m_procedureName +
                                             "\" was not an acceptible VoltDB return type.",
@@ -465,7 +465,6 @@ public class ProcedureRunnerNT {
                 throw new InvocationTargetException(e);
             }
         } catch (InvocationTargetException itex) {
-            //itex.printStackTrace();
             Throwable ex = itex.getCause();
             if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                 // If the stored procedure attempted to do something other than linklibrary or instantiate

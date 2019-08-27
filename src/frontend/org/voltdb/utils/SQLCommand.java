@@ -1241,8 +1241,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Trace",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>())
-                        .put( 1, Arrays.asList("varchar"))
-                        .put( 2, Arrays.asList("varchar", "varchar")).build());
+                        .put(1, Arrays.asList("varchar"))
+                        .put(2, Arrays.asList("varchar", "varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
@@ -1250,16 +1250,21 @@ public class SQLCommand {
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
-        String connectionErrorMessages = "";
+        StringBuilder connectionErrorMessages = new StringBuilder();
 
         for (String server : servers) {
             try {
                 client.createConnection(server.trim(), port);
                 connectedAnyServer = true;
             } catch (UnknownHostException e) {
-                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
+                connectionErrorMessages.append("\n    ")
+                        .append(server.trim())
+                        .append(":").append(port)
+                        .append(" - UnknownHostException");
             } catch (IOException e) {
-                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
+                connectionErrorMessages.append("\n    ")
+                        .append(server.trim()).append(":")
+                        .append(port).append(" - ").append(e.getMessage());
             }
         }
 
