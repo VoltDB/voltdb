@@ -551,6 +551,7 @@ public class SQLCommand {
         // QUERYSTATS
         String queryStatsArgs = SQLParser.parseQueryStatsStatement(line);
         if (queryStatsArgs != null) {
+            System.out.println("<<<" + queryStatsArgs + ">>>");
             printResponse(m_client.callProcedure("@QueryStats", queryStatsArgs), false);
             return true;
         }
