@@ -17,52 +17,63 @@
 
 package org.voltdb;
 
+import static com.google_voltpatches.common.base.MoreObjects.firstNonNull;
+
 import org.voltdb.catalog.Procedure;
 
 /**
  * Partition data for a procedure
  */
 public class ProcedurePartitionData {
-    public String m_tableName;
-    public String m_columnName;
-    public String m_paramIndex;
+    public final boolean m_singlePartition;
+    public final String m_tableName;
+    public final String m_columnName;
+    public final String m_paramIndex;
 
     // the next extra fields are for 2P transactions
-    public String m_tableName2;
-    public String m_columnName2;
-    public String m_paramIndex2;
+    public final String m_tableName2;
+    public final String m_columnName2;
+    public final String m_paramIndex2;
 
     // constructor for NULL partition data
     public ProcedurePartitionData () {
-        init(null, null, null, null, null, null);
+        this(null, null, null, null, null, null);
     }
 
     public ProcedurePartitionData(String tableName, String columnName) {
-        init(tableName, columnName, "0", null, null, null);
+        this(tableName, columnName, "0");
     }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex) {
-        init(tableName, columnName, paramIndex, null, null, null);
+        this(tableName, columnName, paramIndex, null, null, null);
     }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex,
             String tableName2, String columnName2, String paramIndex2) {
-        init(tableName, columnName, paramIndex, tableName2, columnName2, paramIndex2);
-    }
-
-    private void init(String tableName, String columnName, String paramIndex,
-            String tableName2, String columnName2, String paramIndex2) {
         m_tableName = tableName;
         m_columnName = columnName;
-        m_paramIndex = paramIndex;
+        m_paramIndex = firstNonNull(paramIndex, "0");
 
         m_tableName2 = tableName2;
         m_columnName2 = columnName2;
-        m_paramIndex2 = paramIndex2;
+        // Only set a default if table is not null and the first column is using the default
+        m_paramIndex2 = m_tableName2 == null || m_paramIndex != "0" ? paramIndex2 : firstNonNull(paramIndex2, "1");
+
+        m_singlePartition = m_tableName != null && m_tableName2 == null;
+    }
+
+    public ProcedurePartitionData(boolean singlePartition) {
+        m_singlePartition = singlePartition;
+        m_tableName = null;
+        m_columnName = null;
+        m_paramIndex = null;
+        m_tableName2 = null;
+        m_columnName2 = null;
+        m_paramIndex2 = null;
     }
 
     public boolean isSinglePartition() {
-        return m_tableName != null && m_tableName2 == null;
+        return m_singlePartition;
     }
 
     public boolean isTwoPartitionProcedure() {
@@ -109,15 +120,13 @@ public class ProcedurePartitionData {
             return new ProcedurePartitionData();
         }
 
-        String[] partitionInfoParts = new String[0];
-        partitionInfoParts = partitionInfoString.split(",");
+        String[] partitionInfoParts = partitionInfoString.split(",");
 
         assert(partitionInfoParts.length <= 2);
         if (partitionInfoParts.length == 2) {
             ProcedurePartitionData partitionInfo = fromPartitionInfoString(partitionInfoParts[0]);
             ProcedurePartitionData partitionInfo2 = fromPartitionInfoString(partitionInfoParts[1]);
-            partitionInfo.addSecondPartitionInfo(partitionInfo2);
-            return partitionInfo;
+            return partitionInfo.addSecondPartitionInfo(partitionInfo2);
         }
 
         String subClause = partitionInfoParts[0];
@@ -140,11 +149,8 @@ public class ProcedurePartitionData {
         return new ProcedurePartitionData(tableName, columnName, paramIndex);
     }
 
-    public void addSecondPartitionInfo (ProcedurePartitionData infoData) {
-        m_tableName2 = infoData.m_tableName;
-        m_columnName2 = infoData.m_columnName;
-        m_paramIndex2 = infoData.m_paramIndex;
+    private ProcedurePartitionData addSecondPartitionInfo(ProcedurePartitionData infoData) {
+        return new ProcedurePartitionData(m_tableName, m_columnName, m_paramIndex, infoData.m_tableName,
+                infoData.m_columnName, m_paramIndex);
     }
-
-
 }

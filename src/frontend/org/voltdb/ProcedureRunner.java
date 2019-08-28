@@ -178,7 +178,11 @@ public class ProcedureRunner {
         m_isSinglePartition = m_catProc.getSinglepartition();
         if (m_isSinglePartition) {
             m_partitionColumn = m_catProc.getPartitionparameter();
-            m_partitionColumnType = VoltType.get((byte) m_catProc.getPartitioncolumn().getType());
+            if (m_partitionColumn == -1) {
+                m_partitionColumnType = null;
+            } else {
+                m_partitionColumnType = VoltType.get((byte) m_catProc.getPartitioncolumn().getType());
+            }
         } else {
             m_partitionColumn = 0;
             m_partitionColumnType = null;

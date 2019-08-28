@@ -71,15 +71,18 @@ public abstract class CreateProcedure extends StatementProcessor {
                         descriptor.m_authGroups.add(roleNameFixed);
                     }
                 }
-            }
-            else {
+            } else {
                 // Add partition info if it's a PARTITION clause. Only one is allowed.
                 if (data != null) {
                     throw m_compiler.new VoltCompilerException(
                         "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
                 }
-                data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
-                        matcher.group(5), matcher.group(6), matcher.group(7));
+                if (matcher.group(8) != null) {
+                    data = new ProcedurePartitionData(true);
+                } else {
+                    data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
+                            matcher.group(5), matcher.group(6), matcher.group(7));
+                }
             }
         }
 
@@ -97,26 +100,20 @@ public abstract class CreateProcedure extends StatementProcessor {
 
         // Check the identifiers.
         checkIdentifierStart(procName, statement);
-        checkIdentifierStart(data.m_tableName, statement);
-        checkIdentifierStart(data.m_columnName, statement);
+        if (data.m_tableName != null) {
+            checkIdentifierStart(data.m_tableName, statement);
+            checkIdentifierStart(data.m_columnName, statement);
 
-        // if not specified default parameter index to 0
-        if (data.m_paramIndex == null) {
-            data.m_paramIndex = "0";
-        }
+            // two partition procedure
+            if (data.m_tableName2 != null) {
+                checkIdentifierStart(data.m_tableName2, statement);
+                checkIdentifierStart(data.m_columnName2, statement);
 
-        // two partition procedure
-        if (data.m_tableName2 != null) {
-            checkIdentifierStart(data.m_tableName2, statement);
-            checkIdentifierStart(data.m_columnName2, statement);
-
-            if (data.m_paramIndex2 == null) {
-                if (data.m_paramIndex != "0") {
-                    String exceptionMsg = String.format("Two partition parameter must specify index for  " +
-                            "second partitioning parameter if the first partitioning parameter index is non-zero.");
+                if (data.m_paramIndex2 == null) {
+                    String exceptionMsg = String.format("Two partition parameter must specify index for  "
+                            + "second partitioning parameter if the first partitioning parameter index is non-zero.");
                     throw m_compiler.new VoltCompilerException(exceptionMsg);
                 }
-                data.m_paramIndex2 = "1";
             }
         }
 

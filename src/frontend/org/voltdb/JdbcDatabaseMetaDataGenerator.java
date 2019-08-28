@@ -645,7 +645,11 @@ public class JdbcDatabaseMetaDataGenerator
                 jsObj.put(JSON_SINGLE_PARTITION, proc.getSinglepartition());
                 if (proc.getSinglepartition()) {
                     jsObj.put(JSON_PARTITION_PARAMETER, proc.getPartitionparameter());
-                    jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
+                    if (proc.getPartitionparameter() == -1) {
+                        jsObj.put(JSON_PARTITION_PARAMETER_TYPE, -1);
+                    } else {
+                        jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
+                    }
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {

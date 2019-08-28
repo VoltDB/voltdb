@@ -642,13 +642,18 @@ public class ReportMaker {
 
         // output partitioning parameter info
         if (procedure.getSinglepartition()) {
-            String pTable = procedure.getPartitioncolumn().getParent().getTypeName();
-            String pColumn = procedure.getPartitioncolumn().getTypeName();
-            int pIndex = procedure.getPartitionparameter();
+            if (procedure.getPartitiontable() == null) {
+                sb.append("<p>Partitioned on partition id.</p>");
+            } else {
+                String pTable = procedure.getPartitioncolumn().getParent().getTypeName();
+                String pColumn = procedure.getPartitioncolumn().getTypeName();
+                int pIndex = procedure.getPartitionparameter();
 
-            sb.append(String.format("<p>Partitioned on parameter %d which maps to column %s" +
-                                    " of table <a class='invert' href='#s-%s'>%s</a>.</p>",
-                                    pIndex, pColumn, pTable, pTable));
+                sb.append(String.format(
+                        "<p>Partitioned on parameter %d which maps to column %s"
+                                + " of table <a class='invert' href='#s-%s'>%s</a>.</p>",
+                        pIndex, pColumn, pTable, pTable));
+            }
         }
 
         // get the annotation or ensure it's there
