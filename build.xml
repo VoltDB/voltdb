@@ -1164,8 +1164,7 @@ JAR BUILDING
     </ant>
 </target>
 
-<target name="voltdbthin.jar" depends="compile"
-    description="used by testability-explorer">
+<target name="voltdbthin.jar" depends="compile" description="used by testability-explorer">
     <jar destfile="${build.prod.dir}/voltdbthin.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
