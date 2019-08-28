@@ -769,4 +769,106 @@ public class TestLogicalRules extends Plannerv2TestCase {
                     "  VoltLogicalTableScan(table=[[public, R1]])\n")
         .pass();
     }
+
+    // Test OUTER Join simplification (from FilterJoinTransposeRule)
+    public void testRightToInnerJoin1() {
+        m_tester.sql("select R2.i, R1.i from R1 right join R2 using(i) where R1.I = 0")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t1], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testRightToInnerJoin2() {
+        m_tester.sql("select R2.i, R1.i from R1 right join R2 using(i) where R1.I = 0 and R1.bi is null")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t2], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $2)], joinType=[inner])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], expr#8=[IS NULL($t3)], expr#9=[AND($t7, $t8)], I=[$t0], BI=[$t3], $condition=[$t9])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testNotSimplifiedRightJoin1() {
+        m_tester.sql("select R2.i, R1.i from R1 right join R2 using(i) where R1.bi is null")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[IS NULL($t1)], I=[$t2], I0=[$t0], $condition=[$t3])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $2)], joinType=[right])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testNotSimplifiedRightJoin2() {
+        m_tester.sql("SELECT R1.I, R2.si FROM R1 RIGHT JOIN R2 ON R1.I = R2.I" +
+                " where COALESCE(R1.I, 10) > 4")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[IS NOT NULL($t0)], expr#4=[10], expr#5=[CASE($t3, $t0, $t4)], expr#6=[4], expr#7=[>($t5, $t6)], I=[$t0], SI=[$t2], $condition=[$t7])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[right])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testLeftToInnerJoin1() {
+        m_tester.sql("select R2.i, R1.i from R1 left join R2 using(i) where R2.I = 0")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t1], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testNotSimplifiedLeftJoin1() {
+        m_tester.sql("select R2.i, R1.i from R1 left join R2 using(i) where R2.I = 0 or R2.si is null")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[0], expr#4=[=($t1, $t3)], expr#5=[IS NULL($t2)], expr#6=[OR($t4, $t5)], I=[$t1], I0=[$t0], $condition=[$t6])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[left])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullToRightJoin() {
+        m_tester.sql("select R2.i, R1.i from R1 full join R2 using(i) where R2.si = 5")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t1], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[right])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[5], expr#8=[=($t6, $t7)], proj#0..1=[{exprs}], $condition=[$t8])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullToLeftJoin() {
+        m_tester.sql("select R2.i, R1.i from R1 full join R2 using(i) where R1.si = 5")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t2], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $2)], joinType=[left])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[5], expr#8=[=($t6, $t7)], proj#0..1=[{exprs}], $condition=[$t8])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullToInnerJoin() {
+        m_tester.sql("select R2.i, R1.i from R1 full join R2 using(i) where R1.si = 5 and R2.si = 8")
+        .transform("VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t2], I0=[$t0])\n" +
+                   "  VoltLogicalJoin(condition=[=($0, $2)], joinType=[inner])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[5], expr#8=[=($t6, $t7)], proj#0..1=[{exprs}], $condition=[$t8])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                   "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t6, $t7)], proj#0..1=[{exprs}], $condition=[$t8])\n" +
+                   "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
 }
