@@ -114,8 +114,33 @@ import org.voltdb.catalog.ThreadPool;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.DrType;
+import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
+import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
+import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
+import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
@@ -1350,17 +1375,31 @@ public abstract class CatalogUtil {
     }
 
     private static void setThreadPools(DeploymentType deployment, Deployment catDeployment) {
+        // build the ThreadPool catalog from scratch.
+        catDeployment.getThreadpools().clear();
         ThreadPoolsType threadPoolsType = deployment.getThreadpools();
         if (threadPoolsType == null) {
             return;
         }
+        int targetCnt = 0;
+        if (deployment.getExport() != null && deployment.getExport().getConfiguration() != null) {
+            targetCnt = deployment.getExport().getConfiguration().size();
+        }
+        // the max thread pool size should be the max of 4 and target count / 3
+        int threadPoolSizeUpperBound = Math.max(4, targetCnt / 3);
 
-        // build the ThreadPool catalog from scratch.
-        catDeployment.getThreadpools().clear();
         for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
             ThreadPool catalogThreadPool = catDeployment.getThreadpools().add(threadPool.getName());
             catalogThreadPool.setName(threadPool.getName());
-            catalogThreadPool.setSize(threadPool.getSize());
+            if (threadPool.getSize() > threadPoolSizeUpperBound) {
+                String msg = "The thread pool size setting for thread pool: " + threadPool.getName() +
+                        " is larger than the upper bound, will use the max size: " + threadPoolSizeUpperBound + " instead.";
+                hostLog.warn(msg);
+                catalogThreadPool.setSize(threadPoolSizeUpperBound);
+            }
+            else {
+                catalogThreadPool.setSize(threadPool.getSize());
+            }
         }
     }
 
@@ -1793,7 +1832,7 @@ public abstract class CatalogUtil {
 
             Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             // Check if the thread pool name set in the export target configuration exists
-            int threadPoolSize = checkExportThreadPoolConfiguration(exportConfiguration, threadPoolsType);
+            getConfiguredThreadPoolSize(exportConfiguration, threadPoolsType);
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
@@ -3299,34 +3338,29 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Check if the thread pool name set in the export target configuration exists, return the size of
-     * the named thread pool.
+     * Check if the thread pool name set in the export target configuration exists
      * @param exportConfiguration
      * @param threadPoolsType
-     * @return The size of the named thread pool. 0 if the thread pool name is not assigned(use the auto-generated thread pool).
      */
-    private static int checkExportThreadPoolConfiguration(ExportConfigurationType exportConfiguration, ThreadPoolsType threadPoolsType) {
+    private static void getConfiguredThreadPoolSize(ExportConfigurationType exportConfiguration, ThreadPoolsType threadPoolsType) {
         if (threadPoolsType == null) {
-            return 0;
+            return;
         }
         String threadPoolName = exportConfiguration.getThreadpool();
         // check if the thread-pool-name exists in the deployment file <threadpools> section
         if (!StringUtil.isEmpty(threadPoolName)) {
             for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
                 if (threadPool.getName().equals(threadPoolName)) {
-                    return threadPool.getSize();
+                    return;
                 }
             }
 
-            String msg =
-                    "Export target: " + exportConfiguration.getTarget() +
-                            " failed to configure, failed to find" +
-                            " thread pool name: " + threadPoolName +
-                            " Disabling export.";
-            hostLog.error(msg);
+            String msg = String.format("Export target %s is configured to use a thread pool named %s, " +
+                    "which does not exist in the configuration: the export target will be disabled",
+                    exportConfiguration.getTarget(), threadPoolName);
             throw new DeploymentCheckException(msg);
         }
-        return 0;
+        return;
     }
 
     private static void validateThreadPoolsConfiguration(ThreadPoolsType threadPoolsType) {

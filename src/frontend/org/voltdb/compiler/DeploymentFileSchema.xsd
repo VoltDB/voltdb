@@ -348,7 +348,7 @@
     <!-- <threadpools> -->
     <xs:complexType name="threadPoolsType">
         <xs:sequence>
-            <xs:element name="pool" minOccurs="1" maxOccurs="unbounded">
+            <xs:element name="pool" minOccurs="0" maxOccurs="unbounded">
                 <xs:complexType>
                     <xs:attribute name="name" type="xs:string" use="required"/>
                     <xs:attribute name="size" type="threadPoolSize" use="required"/>

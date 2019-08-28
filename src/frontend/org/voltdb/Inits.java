@@ -671,12 +671,9 @@ public class Inits {
             try {
                 String exportMgrName = "org.voltdb.export.ExportManager";
                 // UNDEFINED is the default value for m_exporterVersion
-                if (m_config.m_exporterVersion == ExporterVersion.UNDEFINED) {
-                    // if we don't explicitly specify the exporter version, we use E2 in community and E3 in pro.
-                    if (m_config.m_isEnterprise) {
-                        exportMgrName = "org.voltdb.e3.E3ExportManager";
-                    }
-                } else if (m_config.m_exporterVersion == ExporterVersion.E3) {
+                // if we don't explicitly specify the exporter version, we use E3 in pro.
+                // and in community we always use E2
+                if (m_config.m_isEnterprise && m_config.m_exporterVersion != ExporterVersion.E2) {
                     exportMgrName = "org.voltdb.e3.E3ExportManager";
                 }
                 Class<?> exportMgrClass = Class.forName(exportMgrName);
