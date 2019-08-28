@@ -18,7 +18,6 @@
 package org.voltdb.export;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +28,13 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.deploymentfile.FeatureType;
+import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 
@@ -44,6 +44,41 @@ import org.voltdb.sysprocs.ExportControl.OperationMode;
  * Generic Export Manager Interface, also exposes singleton ExportManager instance.
  */
 public interface ExportManagerInterface {
+
+    public static final String EXPORT_FEATURE = "export";
+
+    public static enum ExportMode {
+        BASIC("org.voltdb.export.ExportManager"),
+        ADVANCED("org.voltdb.e3.E3ExportManager");
+
+        private String m_mgrClassName;
+
+        private ExportMode(String mgrClassName) {
+            m_mgrClassName = mgrClassName;
+        }
+    }
+
+    static ExportMode getExportFeatureMode(FeaturesType features) throws SetupException {
+        if (features == null) {
+            return ExportMode.BASIC;
+        }
+        for (FeatureType feature : features.getFeature()) {
+            if (feature.getName().equalsIgnoreCase(EXPORT_FEATURE)) {
+                String mode = feature.getOption();
+                for (ExportMode modeEnum : ExportMode.values()) {
+                    if (mode.equalsIgnoreCase(modeEnum.name())) {
+                        if (!VoltDB.instance().getConfig().m_isEnterprise && modeEnum == ExportMode.ADVANCED) {
+                            throw new SetupException("Cannot use ADVANCED export mode in community edition");
+                        }
+                        return modeEnum;
+                    }
+                }
+                throw new SetupException("Unknown export feature mode: " + mode);
+            }
+        }
+
+        return ExportMode.BASIC;
+    }
 
     static AtomicReference<ExportManagerInterface> m_self = new AtomicReference<>();
 
@@ -61,18 +96,21 @@ public interface ExportManagerInterface {
      * @param myHostId
      * @param catalogContext
      * @throws ExportManager.SetupException
+     * @throws ReflectiveOperationException
      */
-    // FIXME - this synchronizes on the ExportManager class, but everyone else synchronizes on the instance.
     public static void initialize(
-            Constructor<?> constructor,
+            FeaturesType deploymentFeatures,
             int myHostId,
             CatalogContext catalogContext,
             boolean isRejoin,
             boolean forceCreate,
             HostMessenger messenger,
             List<Pair<Integer, Integer>> partitions)
-            throws ExportManagerInterface.SetupException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException
+            throws ExportManagerInterface.SetupException, ReflectiveOperationException
     {
+        ExportMode mode = getExportFeatureMode(deploymentFeatures);
+        Class<?> exportMgrClass = Class.forName(mode.m_mgrClassName);
+        Constructor<?> constructor = exportMgrClass.getConstructor(int.class, CatalogContext.class, HostMessenger.class);
         ExportManagerInterface em = (ExportManagerInterface) constructor.newInstance(myHostId, catalogContext, messenger);
         m_self.set(em);
         if (forceCreate) {
@@ -80,8 +118,7 @@ public interface ExportManagerInterface {
         }
         em.initialize(catalogContext, partitions, isRejoin);
 
-        RealVoltDB db=(RealVoltDB)VoltDB.instance();
-        db.getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
                 myHostId, // m_siteId,
                 em.getExportStats());
     }
@@ -148,6 +185,8 @@ public interface ExportManagerInterface {
 
     public void clientInterfaceStarted(ClientInterface clientInterface);
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb);
+
+    public ExportMode getExportMode();
 
     default public void onDrainedSource(String tableName, int partition) {
         // No-op

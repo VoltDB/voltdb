@@ -121,6 +121,11 @@ public class ExportManager implements ExportManagerInterface
     private SimpleClientResponseAdapter m_adapter;
     private ClientInterface m_ci;
 
+    @Override
+    public ExportManagerInterface.ExportMode getExportMode() {
+        return ExportManagerInterface.ExportMode.BASIC;
+    }
+
     /**
      * Indicate to associated {@link ExportGeneration}s to become
      * leaders for the given partition id
@@ -150,6 +155,7 @@ public class ExportManager implements ExportManagerInterface
             HostMessenger messenger)
     throws ExportManager.SetupException
     {
+        exportLog.info("Export starting in BASIC mode");
         m_hostId = myHostId;
         m_messenger = messenger;
         m_exportStats = new ExportStats();

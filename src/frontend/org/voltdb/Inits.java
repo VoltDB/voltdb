@@ -50,6 +50,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
@@ -669,17 +670,9 @@ public class Inits {
         public void run() {
             // Let the Export system read its configuration from the catalog.
             try {
-                String exportMgrName = "org.voltdb.export.ExportManager";
-                // UNDEFINED is the default value for m_exporterVersion
-                // if we don't explicitly specify the exporter version, we use E3 in pro.
-                // and in community we always use E2
-                if (m_config.m_isEnterprise && m_config.m_exporterVersion != ExporterVersion.E2) {
-                    exportMgrName = "org.voltdb.e3.E3ExportManager";
-                }
-                Class<?> exportMgrClass = Class.forName(exportMgrName);
-                Constructor<?> constructor = exportMgrClass.getConstructor(int.class, CatalogContext.class, HostMessenger.class);
+                FeaturesType features = m_rvdb.m_catalogContext.getDeployment().getFeatures();
                 ExportManagerInterface.initialize(
-                        constructor,
+                        features,
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,

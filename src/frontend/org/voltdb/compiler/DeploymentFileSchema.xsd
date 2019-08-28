@@ -52,6 +52,7 @@
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="scheduler" minOccurs="0" type="schedulerType"/>
+      <xs:element name="features" minOccurs="0" type="featuresType"/>
     </xs:all>
   </xs:complexType>
 
@@ -527,6 +528,17 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name="featuresType">
+    <xs:sequence>
+        <xs:element name="feature" type="featureType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="featureType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="option" type="xs:string" use="required"/>
   </xs:complexType>
 
 </xs:schema>
