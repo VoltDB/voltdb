@@ -22,6 +22,12 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
+/**
+ * Class allowing invoking the migrating rows deletion logic.
+ * <p>
+ * This implementation is THREAD-SAFE.
+ *
+ */
 public class MigrateRowsDeleter {
 
     private static final VoltLogger logger = new VoltLogger("EXPORT");
