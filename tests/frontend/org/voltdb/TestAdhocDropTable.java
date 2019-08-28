@@ -124,7 +124,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             m_client.callProcedure("@AdHoc", "drop table DROPME;");
         } catch (ProcCallException pce) {
             final String msg = pce.getMessage();
-            final String pat = "Table DROPME not found";
+            final String pat = "object not found: DROPME in statement [drop table DROPME]";
             assertTrue(String.format("Message \"%s\" does not include \"%s: DROPME\"", msg, pat), msg.contains(pat));
             threw = true;
         }
@@ -284,7 +284,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             fail("expected an exception!");
         } catch (ProcCallException pce) {
             final String msg = pce.getMessage();
-            final String pat = "Cannot drop table T_ENG12816: stored procedure(s) proc1 depend on it";
+            final String pat = "object not found: T_ENG12816";
             assertTrue(String.format("Message \"%s\" does not contain \"%s\"", msg, pat), msg.contains(pat));
         }
 

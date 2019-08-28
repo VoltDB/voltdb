@@ -347,8 +347,10 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
     // This should only be called from inlined insert executors because we have to change contexts every time
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
             m_replicatedTableOperation, m_engine->isLowestSite(),
-            &s_modifiedTuples, int64_t(-1),
-            s_errorMessage, std::string{});
+            []() {
+            s_modifiedTuples = -1l;
+            s_errorMessage.clear();
+            });
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         p_execute_tuple_internal(tuple);
         if (m_replicatedTableOperation) {
@@ -393,7 +395,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
    const TupleSchema *inputSchema = m_inputTable->schema();
    if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
       ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-            m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+            m_replicatedTableOperation, m_engine->isLowestSite(),
+            []() { s_modifiedTuples = -1l; });
       if (possiblySynchronizedUseMpMemory.okToExecute()) {
          //
          // An insert is quite simple really. We just loop through our m_inputTable

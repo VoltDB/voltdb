@@ -51,6 +51,13 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     }
 
     public void testUniqueWin1() {
+        // Unique Index RI5_UNIQUE_IND_I wins over the non-unique one RI5_IND_I_II_III
+        m_tester.sql("SELECT * FROM RI5 where I = 5 and II = 8 and III = 9")
+                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[5], expr#4=[=($t0, $t3)], expr#5=[8], expr#6=[=($t1, $t5)], expr#7=[9], expr#8=[=($t2, $t7)], expr#9=[AND($t4, $t6, $t8)], proj#0..2=[{exprs}], $condition=[$t9], index=[RI5_UNIQUE_IND_I_INVALIDEQ1_1])\n")
+                .pass();
+    }
+
+    public void testUniqueWin2() {
         // Unique Index RI5_UNIQUE_IND_I wins over the non-unique one RI5_IND_I
         m_tester.sql("SELECT * FROM RI5 where I > 8")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[8], " +
@@ -84,14 +91,21 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
                 .pass();
     }
 
-    // This tests recognition of covering parameters to prefer a hash index that would use a
-    // greater number of key components than a competing tree index.
-    // Not sure how this relates to ENG-931?
     public void testEng931Plan() {
-        // TODO: Volt Planner picks IDX_1_HASH index
+        // IDX_1_HASH index is selected because it uses a greater number of key components
+        // Note. "HASH" index is backed by the same Binary tree implementation
         m_tester.sql("select a from t where a = ? and b = ? and c = ? and d = ? " +
                 "and e >= ? and e <= ?")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, T]], split=[1], expr#0..4=[{inputs}], expr#5=[?0], expr#6=[=($t0, $t5)], expr#7=[?1], expr#8=[=($t1, $t7)], expr#9=[?2], expr#10=[=($t2, $t9)], expr#11=[?3], expr#12=[=($t3, $t11)], expr#13=[?4], expr#14=[>=($t4, $t13)], expr#15=[?5], expr#16=[<=($t4, $t15)], expr#17=[AND($t6, $t8, $t10, $t12, $t14, $t16)], A=[$t0], $condition=[$t17], index=[IDX_1_HASH_INVALIDEQ4_4])\n")
+                .pass();
+    }
+
+    public void testEng931Plan1() {
+        // cover2_TREE on t (a, b) exactly matches the ORDER collation
+        m_tester.sql("select a from t order by a, b")
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
+                    "  VoltPhysicalTableIndexScan(table=[[public, T]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}], index=[COVER2_TREE_ASCEQ0_0])\n")
+                .pass();
     }
 
     // This tests recognition of prefix parameters and constants to prefer an index that
@@ -222,21 +236,22 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     }
 
     public void testPartialIndexNULLPredicate2() {
-        // TODO: Volt planner picks PARTIAL_IDX_NULL_E, Calcite - Z_FULL_IDX_A
         m_tester.sql("select * from c where a > 0 and e is NULL")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[IS NULL($t4)], expr#10=[AND($t8, $t9)], proj#0..6=[{exprs}], " +
-                        "$condition=[$t10], index=[PARTIAL_IDX_NULL_E_INVALIDGT1_0])\n");
+                        "$condition=[$t10], index=[PARTIAL_IDX_NULL_E_INVALIDGT1_0])\n")
+                .pass();
+    }
 
-        // TODO: Volt planner picks A_PARTIAL_IDX_NOT_NULL_E, Calcite - Z_FULL_IDX_A
+    public void testPartialIndexNULLPredicate3() {
         m_tester.sql("select * from c where a > 0 and e is not NULL")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[IS NOT NULL($t4)], expr#10=[AND($t8, $t9)], proj#0..6=[{exprs}], " +
-                        "$condition=[$t10], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n");
+                        "$condition=[$t10], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testPartialIndexNULLPredicate4() {
-        // TODO: Volt planner picks A_PARTIAL_IDX_NOT_NULL_E vs Calcite's Z_FULL_IDX_A
         // Filter e = 0 does satisfy the partial index's predicate E IS NOT NULL
         // but this index predicate does not eliminate the need for the filter
         // and the partial index does not get any additional discount.
@@ -245,11 +260,11 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         m_tester.sql("select * from c where a > 0 and e = 0")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[0], expr#10=[=($t4, $t9)], expr#11=[AND($t8, $t10)], " +
-                        "proj#0..6=[{exprs}], $condition=[$t11], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n");
+                        "proj#0..6=[{exprs}], $condition=[$t11], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n")
+                .pass();;
     }
 
     public void testPartialIndexNULLPredicate5() {
-        // TODO: Volt planner picks A_PARTIAL_IDX_NOT_NULL_E vs Calcite's Z_FULL_IDX_A
         // Filter e = 0 does satisfy the partial index's predicate E IS NOT NULL
         // but this index predicate does not eliminate the need for the filter
         // and the partial index does not get any additional discount.
@@ -259,14 +274,15 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[0], expr#10=[+($t4, $t1)], expr#11=[ABS($t10)], " +
                         "expr#12=[=($t9, $t11)], expr#13=[AND($t8, $t12)], proj#0..6=[{exprs}], $condition=[$t13], " +
-                        "index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n");
+                        "index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testPartialIndexNULLPredicate6() {
         m_tester.sql("select * from c where a = 0 and e = 0")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[=($t0, $t7)], expr#9=[=($t4, $t7)], expr#10=[AND($t8, $t9)], proj#0..6=[{exprs}], " +
-                        "$condition=[$t10], index=[Z_FULL_IDX_A_INVALIDEQ1_1])\n")
+                        "$condition=[$t10], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDEQ1_1])\n")
                 .pass();
     }
 
@@ -340,18 +356,18 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     }
 
     public void testPartialIndexComparisonPredicateExactMatch6() {
-        // TODO: Volt planner picks PARTIAL_IDX_4, Calcite - Z_FULL_IDX_A
         // CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f; PARTIAL_IDX_4
         // Is it necessarily a poorer plan? Since even if partial_idx_4's condition is f > 0, it still picks Z_FULL_IDX_A.
         m_tester.sql("select * from c where a > 0 and b > 0 and f > 0")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], expr#8=[>($t0, $t7)], expr#9=[>($t1, $t7)], expr#10=[>($t5, $t7)], expr#11=[AND($t8, $t9, $t10)], proj#0..6=[{exprs}], $condition=[$t11], index=[PARTIAL_IDX_4_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testPartialIndexComparisonPredicateExactMatch7() {
-        // TODO: Volt planner picks PARTIAL_IDX_4, Calcite - Z_FULL_IDX_A
         // CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f; PARTIAL_IDX_4
         m_tester.sql("select * from c where a > 0 and b > 0 and 0 < f")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], expr#8=[>($t0, $t7)], expr#9=[>($t1, $t7)], expr#10=[<($t7, $t5)], expr#11=[AND($t8, $t9, $t10)], proj#0..6=[{exprs}], $condition=[$t11], index=[PARTIAL_IDX_4_INVALIDGT1_0])\n")
+                .pass();
     }
 
     public void testPartialIndexComparisonPredicateExactMatch8() {
@@ -426,13 +442,11 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     }
 
     public void testParameterizedQueryPartialIndex1() {
-        // Volt picks A_PARTIAL_IDX_NOT_NULL_E, Calcite - Z_FULL_IDX_A
         // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
-        // range-scan covering from (A > 0) to end Z_FULL_IDX_A has higher cost
         m_tester.sql("select * from c where a > 0 and e = ?")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[?0], expr#10=[=($t4, $t9)], expr#11=[AND($t8, $t10)], " +
-                        "proj#0..6=[{exprs}], $condition=[$t11], index=[Z_FULL_IDX_A_INVALIDGT1_0])\n")
+                        "proj#0..6=[{exprs}], $condition=[$t11], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGT1_0])\n")
                 .pass();
     }
 
@@ -446,23 +460,38 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     }
 
     public void testParameterizedQueryPartialIndex3() {
-        // TODO: Volt picks Z_FULL_IDX_A Calcite - A_PARTIAL_IDX_NOT_NULL_E
+        // Volt gives the same estimates to the Z_FULL_IDX_A and A_PARTIAL_IDX_NOT_NULL_E
+        // (Z_FULL_IDX_A is added as a micro-optimization) and simply picks the first one
+        // Calcite favors A_PARTIAL_IDX_NOT_NULL_E because it's the only index
+        // available (no micro-optimization phase)
         // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1; not selected because of the parameter
         m_tester.sql("select * from c where abs(b) = 1 and abs(e) > ?")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[ABS($t1)], expr#8=[1], expr#9=[=($t7, $t8)], expr#10=[ABS($t4)], expr#11=[?0], expr#12=[>($t10, $t11)], expr#13=[AND($t9, $t12)], proj#0..6=[{exprs}], $condition=[$t13], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGTE0_0])\n")
+                .pass();
     }
 
     public void testPartialIndexComparisonPredicateNonExactMatch1() {
         // TODO: At the moment an index filter must exactly match a
         // query filter expression (or sub-expression) to be selected
 
-        // Volt - Z_FULL_IDX_A, Calcite - A_PARTIAL_IDX_NOT_NULL_E
+        // Volt gives the same estimates to the Z_FULL_IDX_A and A_PARTIAL_IDX_NOT_NULL_E
+        // (Z_FULL_IDX_A is added as a micro-optimization) and simply picks the first one
+        // Calcite favors A_PARTIAL_IDX_NOT_NULL_E because it's the only index
+        // available (no micro-optimization phase)
         // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1; Not exact match
         m_tester.sql("select * from c where abs(b) > 1 and 2 <  abs(e)")
-                .transform("");
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[ABS($t1)], expr#8=[1], expr#9=[>($t7, $t8)], expr#10=[2], expr#11=[ABS($t4)], expr#12=[<($t10, $t11)], expr#13=[AND($t9, $t12)], proj#0..6=[{exprs}], $condition=[$t13], index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGTE0_0])\n")
+                .pass();
     }
 
     public void testPartialIndexComparisonPredicateNonExactMatch2() {
+        // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1; Not exact match
+        m_tester.sql("select * from c where abs(b) > 1 and 1 <  abs(e)")
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[ABS($t1)], expr#8=[1], expr#9=[>($t7, $t8)], expr#10=[ABS($t4)], expr#11=[<($t8, $t10)], expr#12=[AND($t9, $t11)], proj#0..6=[{exprs}], $condition=[$t12], index=[PARTIAL_IDX_1_INVALIDGT1_0])\n")
+                .pass();
+    }
+
+    public void testPartialIndexComparisonPredicateNonExactMatch3() {
         // Volt - Z_FULL_IDX_A (micro-optimization, Calcite - Sequential scan
         // CREATE INDEX partial_idx_3 ON c (b) where d > 0; Not exact match
         m_tester.sql("select * from c where b > 0 and d > 3")
@@ -472,7 +501,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testPartialIndexComparisonPredicateNonExactMatch3() {
+    public void testPartialIndexComparisonPredicateNonExactMatch4() {
         // Volt - Z_FULL_IDX_A (micro-optimization, Calcite - Sequential scan
         // CREATE INDEX partial_idx_5 ON c (b) where d > f;  Not exact match
         m_tester.sql("select * from c where b > 0 and f + 1 < d")

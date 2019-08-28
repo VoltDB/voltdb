@@ -818,10 +818,31 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
                 "CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
                 ImmutableMap.of("name", "blah", "cron", "*/5 ? 1-4,7 L W 1,3#", "procedure",
                         "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+
+        // Positive test cases of interval scheduler
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES ON ERROR ABORT AS proc;", ImmutableMap
+                .of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "onError", "ABORT"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS EVERY 5 MINUTES AS proc;",
+                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "interval", "5", "timeUnit",
+                        "MINUTES"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS USER me AS proc;", ImmutableMap
+                .of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "asUser", "me"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES DISABLED AS proc;", ImmutableMap.of("name",
+                "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "disabled", "DISABLED"));
+
+        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
+                ImmutableMap.of("name", "blah", "interval", "5", "timeUnit", "MINUTES", "procedure",
+                        "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
     }
 
     private static final Set<String> s_allCreateScheduleGroups = ImmutableSet.of("name", "scope", "class",
-            "asUser", "disabled", "parameters", "procedure", "delay", "cron", "onError");
+            "asUser", "disabled", "parameters", "procedure", "delay", "cron", "onError", "interval", "timeUnit");
 
     private static void validateCreateScheduleMatcher(String statement, Map<String, String> expectedGroupValues) {
         Matcher matcher = SQLParser.matchCreateSchedule(statement);

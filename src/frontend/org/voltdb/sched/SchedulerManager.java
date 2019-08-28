@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.eclipse.jetty.server.handler.ScopedHandler;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -48,6 +49,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientInterfaceRepairCallback;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
@@ -68,6 +70,8 @@ import org.voltdb.compiler.deploymentfile.SchedulerType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.base.MoreObjects;
+import com.google_voltpatches.common.base.MoreObjects.ToStringHelper;
 import com.google_voltpatches.common.math.DoubleMath;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -128,11 +132,11 @@ public final class SchedulerManager {
         return String.format("%s: %s", name, body);
     }
 
-    private static boolean isLastParamaterVarArgs(Constructor<Scheduler> constructor) {
-        if (constructor.getParameterCount() == 0) {
+    private static boolean isLastParamaterVarArgs(Method method) {
+        if (method.getParameterCount() == 0) {
             return false;
         }
-        Parameter[] params = constructor.getParameters();
+        Parameter[] params = method.getParameters();
         Parameter lastParam = params[params.length - 1];
         return lastParam.getType() == String[].class || lastParam.getType() == Object[].class;
     }
@@ -253,6 +257,7 @@ public final class SchedulerManager {
      */
     ListenableFuture<?> promoteToLeader(SchedulerType configuration, Iterable<ProcedureSchedule> procedureSchedules,
             AuthSystem authSystem, ClassLoader classLoader) {
+        log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
             m_leader = true;
             processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
@@ -295,6 +300,9 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> promotedPartition(int partitionId) {
+        if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Promoting partition: " + partitionId);
+        }
         return execute(() -> {
             if (m_locallyLedPartitions.add(partitionId)) {
                 updatePartitionedThreadPoolSize();
@@ -313,6 +321,9 @@ public final class SchedulerManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<Boolean> demotedPartition(int partitionId) {
+        if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Demoting partition: " + partitionId);
+        }
         return execute(() -> {
             if (!m_locallyLedPartitions.remove(partitionId)) {
                 return false;
@@ -365,6 +376,7 @@ public final class SchedulerManager {
      * @param classLoader {@link ClassLoader} to use when loading the {@link Scheduler} in {@code definition}
      * @return {@link SchedulerValidationResult} describing any problems encountered
      */
+    @SuppressWarnings("unchecked")
     public SchedulerValidationResult validateScheduler(ProcedureSchedule definition, ClassLoader classLoader) {
         String schedulerClassString = definition.getSchedulerclass();
         try {
@@ -379,56 +391,81 @@ public final class SchedulerManager {
                         schedulerClassString, Scheduler.class.getName()));
             }
 
-            Constructor<?>[] constructors = schedulerClass.getConstructors();
-            if (constructors.length != 1) {
-                return new SchedulerValidationResult(
-                        String.format("Scheduler class should have 1 constructor %s has %d", schedulerClassString,
-                                constructors.length));
-            }
-
-            @SuppressWarnings("unchecked")
-            Constructor<Scheduler> constructor = (Constructor<Scheduler>) constructors[0];
-            CatalogMap<SchedulerParam> schedulerParams = definition.getParameters();
-            int actualParamCount = schedulerParams == null ? 0 : schedulerParams.size();
-            int minVarArgParamCount = isLastParamaterVarArgs(constructor) ? constructor.getParameterCount() - 1
-                    : Integer.MAX_VALUE;
-            if (constructor.getParameterCount() != actualParamCount && minVarArgParamCount > actualParamCount) {
+            Constructor<Scheduler> constructor;
+            try {
+                constructor = (Constructor<Scheduler>) schedulerClass.getConstructor();
+            } catch (NoSuchMethodException e) {
                 return new SchedulerValidationResult(String.format(
-                        "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                        schedulerClassString, constructor.getParameterCount(), schedulerParams.size()));
+                        "Scheduler class should have a public no argument constructor: %s", schedulerClassString));
+            }
+            Method initMethod = null;
+            for (Method method : schedulerClass.getMethods()) {
+                if ("initialize".equals(method.getName())) {
+                    initMethod = method;
+                    break;
+                }
             }
 
             Object[] parameters;
-            if (schedulerParams == null || schedulerParams.isEmpty()) {
+            boolean takesHelper = false;
+            if (initMethod == null) {
+                if(!definition.getParameters().isEmpty()) {
+                    return new SchedulerValidationResult(String.format(
+                            "Scheduler class does not have an initialize method and parameters were provided: %s",
+                            schedulerClassString));
+                }
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
-                Class<?>[] parameterTypes = constructor.getParameterTypes();
-                parameters = new Object[constructor.getParameterCount()];
-                String[] varArgParams = null;
-                if (minVarArgParamCount < Integer.MAX_VALUE) {
-                    parameters[parameters.length
-                            - 1] = varArgParams = new String[actualParamCount - minVarArgParamCount];
+                if (initMethod.getReturnType() != void.class) {
+                    return new SchedulerValidationResult(
+                            String.format("Scheduler initialization method is not void: %s", schedulerClassString));
                 }
-                for (SchedulerParam sp : schedulerParams) {
-                    int index = sp.getIndex();
-                    if (index < minVarArgParamCount) {
-                        try {
-                            parameters[index] = ParameterConverter.tryToMakeCompatible(parameterTypes[index],
-                                    sp.getParameter());
-                        } catch (Exception e) {
-                            return new SchedulerValidationResult(String.format(
-                                    "Could not convert parameter %d with the value \"%s\" to type %s: %s",
-                                    sp.getIndex(), sp.getParameter(), parameterTypes[index].getName(), e.getMessage()));
+
+                CatalogMap<SchedulerParam> schedulerParams = definition.getParameters();
+                Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
+                takesHelper = SchedulerHelper.class.isAssignableFrom(initMethodParamTypes[0]);
+
+                int actualParamCount = (schedulerParams == null ? 0 : schedulerParams.size()) + (takesHelper ? 1 : 0);
+                int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
+                        : Integer.MAX_VALUE;
+                if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
+                    return new SchedulerValidationResult(String.format(
+                            "Scheduler class, %s, constructor paremeter count %d does not match provided parameter count %d",
+                            schedulerClassString, initMethod.getParameterCount(), schedulerParams.size()));
+                }
+
+                if (actualParamCount == 0) {
+                    parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
+                } else {
+                    parameters = new Object[initMethod.getParameterCount()];
+                    int indexOffset = takesHelper ? 1 : 0;
+                    String[] varArgParams = null;
+                    if (minVarArgParamCount < Integer.MAX_VALUE) {
+                        varArgParams = new String[actualParamCount - minVarArgParamCount];
+                        parameters[parameters.length - 1] = varArgParams;
+                    }
+                    for (SchedulerParam sp : schedulerParams) {
+                        int index = sp.getIndex() + indexOffset;
+                        if (index < minVarArgParamCount) {
+                            try {
+                                parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
+                                        sp.getParameter());
+                            } catch (Exception e) {
+                                return new SchedulerValidationResult(String.format(
+                                        "Could not convert parameter %d with the value \"%s\" to type %s: %s",
+                                        sp.getIndex(), sp.getParameter(), initMethodParamTypes[index].getName(),
+                                        e.getMessage()));
+                            }
+                        } else {
+                            varArgParams[index - minVarArgParamCount] = sp.getParameter();
                         }
-                    } else {
-                        varArgParams[index - minVarArgParamCount] = sp.getParameter();
                     }
                 }
-            }
 
-            String parameterErrors = validateSchedulerParameters(definition, constructor, parameters);
-            if (parameterErrors != null) {
-                return new SchedulerValidationResult("Error validating scheduler parameters: " + parameterErrors);
+                String parameterErrors = validateSchedulerParameters(definition, initMethod, parameters, takesHelper);
+                if (parameterErrors != null) {
+                    return new SchedulerValidationResult("Error validating scheduler parameters: " + parameterErrors);
+                }
             }
 
             byte[] hash = null;
@@ -437,7 +474,8 @@ public final class SchedulerManager {
                 hash = jarFile.getClassHash(schedulerClassString, HASH_ALGO);
             }
 
-            return new SchedulerValidationResult(new SchedulerFactory(constructor, parameters, hash));
+            return new SchedulerValidationResult(
+                    new SchedulerFactory(constructor, initMethod, parameters, takesHelper, hash));
         } catch (Exception e) {
             return new SchedulerValidationResult(
                     String.format("Could not load and construct class: %s", schedulerClassString), e);
@@ -470,7 +508,7 @@ public final class SchedulerManager {
         return m_authSystem.getUser(userName);
     }
 
-    <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future) {
+    static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future) {
         future.addListener(() -> {
             try {
                 if (!future.isCancelled()) {
@@ -502,8 +540,17 @@ public final class SchedulerManager {
         m_authSystem = authSystem;
 
         if (configuration == null) {
+            if (log.isDebugEnabled()) {
+                log.debug("MANAGER: Using default schedules configuration");
+            }
             // No configuration provided so use defaults
             configuration = new SchedulerType();
+        } else if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Applying schedule configuration: "
+                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMinDelayMs())
+                            .add("maxRunFrequency", configuration.getMaxRunFrequency())
+                            .add("hostThreadCount", configuration.getHostThreadCount())
+                            .add("partitionedThreadCount", configuration.getPartitionedThreadCount()).toString());
         }
 
         m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMinDelayMs());
@@ -519,12 +566,24 @@ public final class SchedulerManager {
         boolean hasPartitionedSchedule = false;
 
         for (ProcedureSchedule procedureSchedule : procedureSchedules) {
+            if (log.isDebugEnabled()) {
+                ToStringHelper toString = MoreObjects.toStringHelper(procedureSchedule);
+                for (String field : procedureSchedule.getFields()) {
+                    toString.add(field, procedureSchedule.getField(field));
+                }
+                log.debug(generateLogMessage(procedureSchedule.getName(),
+                        "Applying schedule configuration: " + toString()));
+            }
             SchedulerHandler handler = m_handlers.remove(procedureSchedule.getName());
             SchedulerValidationResult result = validateScheduler(procedureSchedule, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
                 if (handler.isSameSchedule(procedureSchedule, result.m_factory, classesUpdated)) {
+                    if (log.isDebugEnabled()) {
+                        log.debug(generateLogMessage(procedureSchedule.getName(),
+                                "Schedule is running and does not need to be restarted"));
+                    }
                     newHandlers.put(procedureSchedule.getName(), handler);
                     handler.updateDefinition(procedureSchedule);
                     if (frequencyChanged) {
@@ -537,6 +596,10 @@ public final class SchedulerManager {
                     }
                     continue;
                 }
+                if (log.isDebugEnabled()) {
+                    log.debug(generateLogMessage(procedureSchedule.getName(),
+                            "Schedule is running and needs to be restarted"));
+                }
                 handler.cancel();
             }
 
@@ -547,6 +610,11 @@ public final class SchedulerManager {
                     log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
                             result.getException());
                     continue;
+                }
+
+                if (log.isDebugEnabled()) {
+                    log.debug(generateLogMessage(procedureSchedule.getName(),
+                            "Creating handler for scope: " + procedureSchedule.getScope()));
                 }
 
                 SchedulerHandler definition;
@@ -593,13 +661,14 @@ public final class SchedulerManager {
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
      * @param definition  Instance of {@link ProcedureSchedule} defining the schedule
-     * @param constructor {@link Constructor} instance for the {@link Scheduler}
+     * @param initMethod  initialize {@link Method} instance for the {@link Scheduler}
      * @param parameters  that are going to be passed to the constructor
+     * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private String validateSchedulerParameters(ProcedureSchedule definition, Constructor<Scheduler> constructor,
-            Object[] parameters) {
-        Class<Scheduler> schedulerClass = constructor.getDeclaringClass();
+    private String validateSchedulerParameters(ProcedureSchedule definition, Method initMethod,
+            Object[] parameters, boolean takesHelper) {
+        Class<?> schedulerClass = initMethod.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
             // Find method declared as: public static void validateParameters
@@ -613,40 +682,25 @@ public final class SchedulerManager {
                                 + " defines a 'validateParameters' method but it does not return a String"));
             }
 
-            Class<?>[] methodParameterTypes = m.getParameterTypes();
-
-            Class<?>[] constructorParameterTypes = constructor.getParameterTypes();
-            boolean takesHelper = SchedulerValidationHelper.class.isAssignableFrom(methodParameterTypes[0]);
-            int expectedParameterCount = constructorParameterTypes.length + (takesHelper ? 1 : 0);
-
-            if (methodParameterTypes.length != expectedParameterCount) {
+            if (m.getParameterCount() != initMethod.getParameterCount()) {
                 log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
                         + " defines a 'validateParameters' method but parameter count is not correct. It should be the same as constructor with possibly an optional "
-                        + SchedulerValidationHelper.class.getSimpleName() + " first"));
+                        + SchedulerHelper.class.getSimpleName() + " first"));
                 continue;
             }
-            Class<?> validatorParameterTypes[] = new Class<?>[expectedParameterCount];
-            System.arraycopy(constructorParameterTypes, 0, validatorParameterTypes,
-                    expectedParameterCount - constructorParameterTypes.length, constructorParameterTypes.length);
-            if (takesHelper) {
-                validatorParameterTypes[0] = SchedulerValidationHelper.class;
-            }
 
-            if (!Arrays.equals(validatorParameterTypes, methodParameterTypes)) {
+            if (!Arrays.equals(initMethod.getParameterTypes(), m.getParameterTypes())) {
                 log.warn(generateLogMessage(definition.getName(), schedulerClass.getName()
                         + " defines a 'validateParameters' method but parameters do not match constructor parameters"));
                 continue;
             }
 
             // Construct the parameter array to be passed to the validate method
-            Object[] validatorParameters = new Object[expectedParameterCount];
-            System.arraycopy(parameters, 0, validatorParameters, expectedParameterCount - parameters.length,
-                    parameters.length);
+            Object[] validatorParameters = parameters.clone();
 
             if (takesHelper) {
-                validatorParameters[0] = (SchedulerValidationHelper) (errors, restrictProcedureByScope, procedureName,
-                        procedureParameters) -> validateProcedureWithParameters(errors, definition.getScope(),
-                                restrictProcedureByScope, procedureName, procedureParameters);
+                validatorParameters[0] = new SchedulerHelper(b -> generateLogMessage(definition.getName(), b),
+                        definition.getScope(), m_clientInterface);
             }
 
             try {
@@ -658,68 +712,6 @@ public final class SchedulerManager {
         }
 
         return null;
-    }
-
-    /**
-     * @see SchedulerValidationHelper#validateProcedureAndParams(SchedulerValidationErrors, String, Object[])
-     * @param errors        {@link SchedulerValidationErrors} instance to collect errors
-     * @param procedureName Name of procedure to validate
-     * @param parameters    that will be passed to {@code procedureName}
-     */
-    private void validateProcedureWithParameters(SchedulerValidationErrors errors, String scope,
-            boolean restrictProcedureByScope, String procedureName,
-            Object[] parameters) {
-        Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
-        if (procedure == null) {
-            errors.addErrorMessage("Procedure does not exist: " + procedureName);
-            return;
-        }
-
-        if (procedure.getSystemproc()) {
-            // System procedures do not have parameter types in the procedure definition
-            return;
-        }
-
-        if (restrictProcedureByScope) {
-            String error = isProcedureValidForScope(scope, procedure);
-            if (error != null) {
-                errors.addErrorMessage(error);
-                return;
-            }
-        }
-
-        CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
-
-        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
-            if (procedure.getPartitionparameter() != 0) {
-                errors.addErrorMessage(String.format(
-                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
-                        procedureName));
-                return;
-            }
-
-            Object[] newParameters = new Object[parameters.length + 1];
-            newParameters[0] = 0;
-            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
-            parameters = newParameters;
-        }
-
-        if (parameterTypes.size() != parameters.length) {
-            errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,
-                    procedure.getParameters().size(), parameters.length));
-            return;
-        }
-
-        for (ProcParameter pp : parameterTypes) {
-            Class<?> parameterClass = VoltType.classFromByteValue((byte) pp.getType());
-            try {
-            ParameterConverter.tryToMakeCompatible(parameterClass, parameters[pp.getIndex()]);
-            } catch (Exception e) {
-                errors.addErrorMessage(
-                        String.format("Could not convert parameter %d with the value \"%s\" to type %s: %s",
-                                pp.getIndex(), parameters[pp.getIndex()], parameterClass.getName(), e.getMessage()));
-            }
-        }
     }
 
     /**
@@ -896,8 +888,8 @@ public final class SchedulerManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        Scheduler constructScheduler() {
-            return m_factory.construct();
+        Scheduler constructScheduler(SchedulerHelper helper) {
+            return m_factory.construct(helper);
         }
 
         String generateLogMessage(String body) {
@@ -1068,7 +1060,7 @@ public final class SchedulerManager {
      * @param <H> Type of {@link SchedulerHandler} which created this wrapper
      */
     private abstract class SchedulerWrapper<H extends SchedulerHandler> {
-        ScheduledAction m_procedure;
+        ScheduledAction m_scheduledAction;
 
         final H m_handler;
 
@@ -1092,9 +1084,17 @@ public final class SchedulerManager {
          */
         synchronized void start() {
             if (m_state != SchedulerWrapperState.INITIALIZED) {
+                if (log.isTraceEnabled()) {
+                    log.trace(generateLogMessage("Ignoring start on already initialized schedule"));
+                }
                 return;
             }
-            m_scheduler = m_handler.constructScheduler();
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Starting schedule"));
+            }
+            m_scheduler = m_handler
+                    .constructScheduler(new SchedulerHelper(this::generateLogMessage, getScope(), m_clientInterface));
             if (m_stats == null) {
                 m_stats = ScheduleStatsSource.create(m_handler.getName(), getScope(), getSiteId());
                 m_stats.register(m_statsAgent);
@@ -1121,9 +1121,14 @@ public final class SchedulerManager {
             long startTime = System.nanoTime();
             long waitTime = startTime - m_expectedExecutionTime;
 
+            if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Calling scheduler"));
+            }
+
             Action action;
             try {
-                action = m_procedure == null ? scheduler.getFirstAction() : scheduler.getNextAction(m_procedure);
+                action = m_scheduledAction == null ? scheduler.getFirstAction()
+                        : scheduler.getNextAction(m_scheduledAction);
             } catch (RuntimeException e) {
                 errorOccurred("Scheduler encountered unexpected error", e);
                 return;
@@ -1135,6 +1140,10 @@ public final class SchedulerManager {
             }
 
             m_stats.addSchedulerCall(System.nanoTime() - startTime, waitTime, action.getStatusMessage());
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Scheduler returned action: " + action));
+            }
 
             synchronized (this) {
                 if (m_state != SchedulerWrapperState.RUNNING) {
@@ -1159,18 +1168,22 @@ public final class SchedulerManager {
                     throw new IllegalStateException("Unknown status: " + action.getType());
                 }
 
-                m_procedure = action.getScheduledAction();
+                m_scheduledAction = action.getScheduledAction();
 
                 try {
                     long delay = calculateDelay();
+                    if (log.isTraceEnabled()) {
+                        log.trace(generateLogMessage("Scheduling action with delay " + delay));
+                    }
+
                     m_expectedExecutionTime = System.nanoTime() + delay;
-                    m_procedure.setExpectedExecutionTime(m_expectedExecutionTime);
+                    m_scheduledAction.setExpectedExecutionTime(m_expectedExecutionTime);
                     m_scheduledFuture = addExceptionListener(
                             m_executor.schedule(runnable, delay, TimeUnit.NANOSECONDS));
                 } catch (RejectedExecutionException e) {
                     if (log.isDebugEnabled()) {
                         log.debug(generateLogMessage(
-                                "Could not schedule next procedure scheduler shutdown: " + m_procedure.getProcedure()));
+                                "Could not schedule next procedure scheduler shutdown: " + m_scheduledAction.getProcedure()));
                     }
                 }
             }
@@ -1197,11 +1210,16 @@ public final class SchedulerManager {
                 return;
             }
 
-            m_procedure.setStarted();
+            if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Executing procedure " + m_scheduledAction.getProcedure() + ' '
+                        + Arrays.toString(procedureParameters)));
+            }
+
+            m_scheduledAction.setStarted();
             if (!m_clientInterface.getInternalConnectionHandler().callProcedure(user, false,
-                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_procedure.getProcedure(),
+                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_scheduledAction.getProcedure(),
                     procedureParameters)) {
-                errorOccurred("Could not call procedure %s", m_procedure.getProcedure());
+                errorOccurred("Could not call procedure %s", m_scheduledAction.getProcedure());
             }
         }
 
@@ -1211,17 +1229,17 @@ public final class SchedulerManager {
             }
 
             boolean failed = response.getStatus() != ClientResponse.SUCCESS;
-            m_procedure.setResponse(response);
-            m_stats.addProcedureCall(m_procedure.getExecutionTime(), m_procedure.getWaitTime(), failed);
+            m_scheduledAction.setResponse(response);
+            m_stats.addProcedureCall(m_scheduledAction.getExecutionTime(), m_scheduledAction.getWaitTime(), failed);
 
             if (failed) {
                 String onError = m_handler.getOnError();
 
                 boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
                 if (!isIgnore || log.isDebugEnabled()) {
-                    String message = "Procedure " + m_procedure.getProcedure() + " with parameters "
-                            + Arrays.toString(m_procedure.getProcedureParameters()) + " failed: "
-                            + m_procedure.getResponse().getStatusString();
+                    String message = "Procedure " + m_scheduledAction.getProcedure() + " with parameters "
+                            + Arrays.toString(m_scheduledAction.getProcedureParameters()) + " failed: "
+                            + m_scheduledAction.getResponse().getStatusString();
 
                     if (isIgnore || "LOG".equalsIgnoreCase(onError)) {
                         log.log(isIgnore ? Level.DEBUG : Level.INFO, generateLogMessage(message), null);
@@ -1230,6 +1248,11 @@ public final class SchedulerManager {
                         return;
                     }
                 }
+            } else if (log.isTraceEnabled()) {
+                log.trace(generateLogMessage("Received response: " + ((ClientResponseImpl) response).toJSONString()));
+            } else if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage(
+                        "Received response: " + ((ClientResponseImpl) response).toStatusJSONString()));
             }
 
             submitHandleNextRun();
@@ -1250,6 +1273,9 @@ public final class SchedulerManager {
          * Shutdown the scheduler with a cancel state
          */
         void cancel() {
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Canceling schedule"));
+            }
             shutdown(SchedulerWrapperState.CANCELED);
             m_stats.deregister(m_statsAgent);
         }
@@ -1284,15 +1310,15 @@ public final class SchedulerManager {
          *         parameters
          */
         Object[] getProcedureParameters(Procedure procedure) {
-            return m_procedure.getProcedureParameters();
+            return m_scheduledAction.getRawProcedureParameters();
         }
 
         /**
-         * @return The {@link Procedure} definition for the procedure in {@link #m_procedure} or {@code null} if an
+         * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if an
          *         error was encountered.
          */
         private Procedure getProcedureDefinition() {
-            String procedureName = m_procedure.getProcedure();
+            String procedureName = m_scheduledAction.getProcedure();
             Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
 
             if (procedure == null) {
@@ -1375,7 +1401,7 @@ public final class SchedulerManager {
             setState(state);
 
             m_scheduler = null;
-            m_procedure = null;
+            m_scheduledAction = null;
 
             if (m_scheduledFuture != null) {
                 m_scheduledFuture.cancel(false);
@@ -1389,7 +1415,7 @@ public final class SchedulerManager {
                 long rateLimitDelayNs = TimeUnit.MICROSECONDS.toNanos(m_rateLimiter.reserve(1));
                 minDelayNs = Math.max(minDelayNs, rateLimitDelayNs);
             }
-            return Math.max(m_procedure.getDelay(TimeUnit.NANOSECONDS), minDelayNs);
+            return Math.max(m_scheduledAction.getRequestedDelayNs(), minDelayNs);
         }
 
         /**
@@ -1531,20 +1557,31 @@ public final class SchedulerManager {
      */
     private static final class SchedulerFactory {
         private final Constructor<Scheduler> m_constructor;
+        private final Method m_initMethod;
         private final Object[] m_parameters;
+        private final boolean m_takesHelper;
         private final byte[] m_classHash;
         Collection<String> m_classDeps = null;
 
-        SchedulerFactory(Constructor<Scheduler> constructor, Object[] parameters, byte[] classHash) {
+        SchedulerFactory(Constructor<Scheduler> constructor, Method initMethod, Object[] parameters,
+                boolean takesHelper, byte[] classHash) {
             super();
             this.m_constructor = constructor;
+            this.m_initMethod = initMethod;
             this.m_parameters = parameters;
+            this.m_takesHelper = takesHelper;
             this.m_classHash = classHash;
         }
 
-        Scheduler construct() {
+        Scheduler construct(SchedulerHelper helper) {
             try {
-                Scheduler scheduler = m_constructor.newInstance(m_parameters);
+                Scheduler scheduler = m_constructor.newInstance();
+                if (m_initMethod != null) {
+                    if (m_takesHelper) {
+                        m_parameters[0] = helper;
+                    }
+                    m_initMethod.invoke(scheduler, m_parameters);
+                }
                 if (m_classDeps == null) {
                     m_classDeps = scheduler.getDependencies();
                 }
@@ -1593,12 +1630,13 @@ public final class SchedulerManager {
      * count or a dynamic thread count.
      */
     static private final class ScheduledExecutorHolder {
+        private final String m_name;
         private final ScheduledThreadPoolExecutor m_rawExecutor;
         private final ListeningScheduledExecutorService m_executor;
         private boolean m_dynamicThreadCount = true;
 
         ScheduledExecutorHolder(String name) {
-            super();
+            m_name = name;
             m_rawExecutor = CoreUtils.getScheduledThreadPoolExecutor("Scheduler-" + name, 0,
                     CoreUtils.SMALL_STACK_SIZE);
             m_executor = MoreExecutors.listeningDecorator(m_rawExecutor);
@@ -1634,6 +1672,9 @@ public final class SchedulerManager {
          */
         void setDynamicThreadCount(int threadCount) {
             if (m_dynamicThreadCount) {
+                if (log.isTraceEnabled()) {
+                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
+                }
                 setCorePoolSize(threadCount);
             }
         }
@@ -1641,6 +1682,7 @@ public final class SchedulerManager {
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
                 m_rawExecutor.setCorePoolSize(threadCount);
+                m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
             }
         }
     }

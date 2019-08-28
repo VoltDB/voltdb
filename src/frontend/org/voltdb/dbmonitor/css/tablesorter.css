@@ -9,6 +9,12 @@ table.tablesorter {
 	background-position: center right;
 	cursor: pointer;
 }
+#exporter table.tablesorter th {
+
+	padding-right: 45px;
+	background: url(../images/bg.gif) no-repeat center right;
+	cursor: pointer;
+}
 table.tablesorter td {
 	
 }

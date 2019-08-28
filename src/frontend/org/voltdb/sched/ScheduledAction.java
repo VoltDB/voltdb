@@ -17,6 +17,7 @@
 
 package org.voltdb.sched;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -110,6 +111,13 @@ final class ScheduledAction implements ActionResult {
     @Override
     public ClientResponse getResponse() {
         return m_response;
+    }
+
+    @Override
+    public String toString() {
+        return "ScheduledAction [m_type=" + m_type + ", m_requestedDelayNs=" + m_requestedDelayNs + ", m_procedure="
+                + m_procedure + ", m_procedureParameters=" + Arrays.toString(m_procedureParameters) + ", m_response="
+                + m_response + ", m_attachment=" + m_attachment + "]";
     }
 
     long getRequestedDelayNs() {

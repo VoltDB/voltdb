@@ -38,7 +38,7 @@ import java.util.Random;
 import java.util.zip.GZIPInputStream;
 
 import com.google_voltpatches.common.collect.Sets;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.After;
 import org.junit.Before;

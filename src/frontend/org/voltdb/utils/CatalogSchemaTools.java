@@ -478,7 +478,13 @@ public abstract class CatalogSchemaTools {
         CatalogMap<SchedulerParam> params = schedule.getParameters();
         String delimiter = " WITH ";
         for (int i = 0; i < params.size(); ++i) {
-            sb.append(delimiter).append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+            String param = params.get(Integer.toString(i)).getParameter();
+            sb.append(delimiter);
+            if (param == null) {
+                sb.append("NULL");
+            } else {
+                sb.append('\'').append(params.get(Integer.toString(i)).getParameter()).append('\'');
+            }
             delimiter = ", ";
         }
         sb.append(";\n");

@@ -20,16 +20,28 @@ package org.voltdb.sched;
 import java.util.Collection;
 
 /**
- * Interface used to create a custom scheduler. All parameters passed to a Scheduler instance are done through the
- * Scheduler's constructor. Only valid column types are allowed as constructor parameters with one exception the last
- * parameter can be either {@code String[]} or {@code Object[]}. If the last parameter is an array then it will be
- * treated as a var args parameter.
+ * Interface used to create a custom scheduler.
+ * <p>
+ * A scheduler instance can have external parameters supplied by the DDL. If a scheduler needs to have procedure
+ * parameters passed in it is done through a {@code public void initialize} method. Only valid column types are allowed
+ * as initialize parameters with two exceptions. The first one being that the first argument may be an instance of
+ * {@link SchedulerHelper}, but this is optional. The other exception is that the last parameter can be either
+ * {@code String[]} or {@code Object[]}. If the last parameter is an array then it will be treated as a var args
+ * parameter.
+ * <p>
+ * Example initialize methods:
+ *
+ * <pre>
+ * public void initialize(int interval, String timeUnit)
+ * public void initialize(SchedulerHelper helper, int interval, String timeUnit)
+ * public void initialize(int interval, String timeUnit, String procedureName, Object... procedureParameters)
+ * public void initialize(SchedulerHelper helper, int interval, String timeUnit, String procedureName, Object... procedureParameters)
+ * </pre>
  * <p>
  * Optionally an implementation can implement a {@code validateParameters} method which will be invoked during the DDL
- * validation phase. If a {@code validateParameters} is provided the first parameter may be a
- * {@link SchedulerValidationHelper}. All other parameters must match exactly the type of parameters of the constructor
- * of the Scheduler implementation. The return of {@code validateParameters} must be a {@link String} which is
- * {@code null} if no error is detected otherwise an appropriate error message should be returned.
+ * validation phase. All parameters must match exactly the type of parameters passed to the initialize method of the
+ * Scheduler implementation. The return of {@code validateParameters} must be a {@link String} which is {@code null} if
+ * no error is detected otherwise an appropriate error message should be returned.
  */
 public interface Scheduler {
 

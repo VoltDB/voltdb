@@ -32,17 +32,19 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 
 public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
+    // SQL on "replicated_table"
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM replicated_table WHERE rowid = ?");
     public final SQLStmt update = new SQLStmt("UPDATE replicated_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM replicated_table WHERE rowid = ?");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    String template = "INSERT INTO export_replicated_table_%s (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
-    public final SQLStmt export_kafka = new SQLStmt(String.format(template, "kafka"));
-    public final SQLStmt export_rabbit = new SQLStmt(String.format(template, "rabbit"));
-    public final SQLStmt export_file = new SQLStmt(String.format(template, "file"));
-    public final SQLStmt export_jdbc = new SQLStmt(String.format(template, "jdbc"));
+    // templated sql on "export_replicated_table_<target>"
+    String template = "INSERT INTO export_replicated_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
 
-    public final SQLStmt insert = new SQLStmt("INSERT INTO replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?);");
+    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
+    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
+    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
+    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
 
     public VoltTable[] run(long rowid, long ignore)
     {
@@ -143,7 +145,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                             , record.type_null_bigint
                             , record.type_not_null_bigint
                             , record.type_null_timestamp
-                            , record.type_not_null_timestamp
+                            // , record.type_not_null_timestamp
                             , record.type_null_float
                             , record.type_not_null_float
                             , record.type_null_decimal

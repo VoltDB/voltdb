@@ -439,11 +439,12 @@ public class SQLParser extends SQLPatternFactory
                 SPF.oneOf(
                     SPF.clause(SPF.token("using"), SPF.capture("class", SPF.className())),
                     SPF.clause(SPF.oneOf(
-                    SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
-                    SPF.clause(SPF.token("cron"),
-                        SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                            SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))))
-                    )),
+                        SPF.clause(SPF.token("delay"), SPF.capture("delay", SPF.token("[\\w\\.\\-$]+"))),
+                        SPF.clause(SPF.token("cron"),
+                            SPF.capture("cron", SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD))),
+                        SPF.clause(SPF.token("every"), SPF.capture("interval", SPF.integer()),
+                            SPF.capture("timeUnit", SPF.oneOf("milliseconds", "seconds", "minutes", "hours", "days")))))),
                 SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
                         SPF.capture("onError", SPF.oneOf(SPF.token("abort"), SPF.token("log"), SPF.token("ignore"))))),
                 SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
@@ -712,6 +713,19 @@ public class SQLParser extends SQLPatternFactory
             "\\s+" +        // required preceding whitespace
             "([^\\s;]+)" +  // a string of characters not containing semis or spaces
             "\\s*;?\\s*",   // an optional semicolon surrounded by whitespace
+            Pattern.CASE_INSENSITIVE);
+
+    // QUERYSTATS is followed by a SQL query. Capture group 2 is the query.
+    private static final Pattern QueryStatsToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "querystats" +          // required QUERYSTATS command token
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that help
+            // command diagnostics can "own" any line starting with the word
+            // help.
+            "\\s*" +          // optional whitespace before subcommand
+            "([^;\\s]*)" +    // optional subcommand (group 2)
+            InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
 
     // Query Execution
@@ -2346,6 +2360,33 @@ public class SQLParser extends SQLPatternFactory
      */
     public static String parseDescribeStatement(String statement) {
         Matcher matcher = DescribeToken.matcher(statement);
+        if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    // Return the subcommand keyword -- possibly a valid one.
+                    return matcher.group(2);
+                }
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                return matcher.group(2) + " " + trailings;
+            }
+            if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                return commandWordTerminator; // EOL or ; reached before subcommand
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parse QUERYSTATS statement for sqlcmd.
+     * @param statement  statement to parse
+     * @return           String containing full SQL query
+     */
+    public static String parseQueryStatsStatement(String statement) {
+        Matcher matcher = QueryStatsToken.matcher(statement);
         if (matcher.matches()) {
             String commandWordTerminator = matcher.group(1);
             if (OneWhitespace.matcher(commandWordTerminator).matches()) {

@@ -54,28 +54,8 @@ private:
 
 class ConditionalSynchronizedExecuteWithMpMemory {
 public:
-    template<class ExceptionTracker>
-    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-                                               bool isLowestSite,
-                                               ExceptionTracker* tracker,
-                                               const ExceptionTracker& initValue)
-    : m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite)
-    , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread)
-    {
-        if (needMpMemoryOnLowestThread) {
-            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
-                VOLT_DEBUG("Entering UseMPmemory");
-                SynchronizedThreadLock::assumeMpMemoryContext();
-                // This must be done in here to avoid a race with the non-MP path.
-                *tracker = initValue;
-            }
-        }
-    }
-
-    template<typename ExceptionTracker, typename T2>
-    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread, bool isLowestSite,
-            ExceptionTracker* tracker, const ExceptionTracker& initValue,
-            T2& tracker2, const T2& initValue2)
+    ConditionalSynchronizedExecuteWithMpMemory(
+            bool needMpMemoryOnLowestThread, bool isLowestSite, std::function<void()> initiator)
     : m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite)
     , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread) {
         if (needMpMemoryOnLowestThread) {
@@ -83,16 +63,14 @@ public:
                 VOLT_DEBUG("Entering UseMPmemory");
                 SynchronizedThreadLock::assumeMpMemoryContext();
                 // This must be done in here to avoid a race with the non-MP path.
-                *tracker = initValue;
-                tracker2 = initValue2;
+                initiator();
             }
         }
     }
-
     ~ConditionalSynchronizedExecuteWithMpMemory();
-
-    bool okToExecute() { return m_okToExecute; }
-
+    bool okToExecute() const {
+        return m_okToExecute;
+    }
 private:
     bool m_usingMpMemoryOnLowestThread;
     bool m_okToExecute;
