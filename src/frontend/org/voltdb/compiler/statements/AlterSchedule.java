@@ -52,15 +52,22 @@ public class AlterSchedule extends StatementProcessor {
         }
 
         String action = matcher.group("action");
-        boolean enable = "ENABLE".equalsIgnoreCase(action);
+        if (action != null) {
+            boolean enable = "ENABLE".equalsIgnoreCase(action);
 
-        assert enable || "DISABLE".equalsIgnoreCase(action);
+            assert enable || "DISABLE".equalsIgnoreCase(action);
 
-        if (enable == schedule.getEnabled()) {
-            throw m_compiler.new VoltCompilerException(
-                    String.format("Schedule \"%s\" is already %s", name, enable ? "enabled" : "disabled"));
+            if (enable == schedule.getEnabled()) {
+                throw m_compiler.new VoltCompilerException(
+                        String.format("Schedule \"%s\" is already %s", name, enable ? "enabled" : "disabled"));
+            }
+            schedule.setEnabled(enable);
         }
-        schedule.setEnabled(enable);
+
+        String onError = matcher.group("onError");
+        if (onError != null) {
+            schedule.setOnerror(onError);
+        }
 
         return true;
     }

@@ -32,7 +32,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     if (type == VALUE_TYPE_VARCHAR) {
         if (isNull()) {
              throw SQLException(SQLException::dynamic_sql_error,
-                                "Must not ask for object length on sql null object.");
+                     "Must not ask for object length on sql null object.");
         }
         int32_t length;
         const char* buf = getObject_withoutNull(length);

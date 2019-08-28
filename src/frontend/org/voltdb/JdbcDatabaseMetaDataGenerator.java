@@ -839,7 +839,7 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getSchedules() {
         VoltTable results = new VoltTable(SCHEDULES_SCHEMA);
         for (ProcedureSchedule schedule : m_database.getProcedureschedules()) {
-            results.addRow(schedule.getName(), schedule.getRunlocation(), schedule.getSchedulerclass(),
+            results.addRow(schedule.getName(), schedule.getScope(), schedule.getSchedulerclass(),
                     schedule.getUser(), Boolean.toString(schedule.getEnabled()),
                     getParamsString(schedule));
 

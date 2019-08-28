@@ -32,6 +32,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.HTTPAdminListener;
@@ -347,4 +348,9 @@ public interface VoltDBInterface
     public boolean isJoining();
 
     public ElasticService getElasticService();
+
+    /**
+     * @return The instance of {@link SchedulerManager} which is running in this instance
+     */
+    public SchedulerManager getSchedulerManager();
 }

@@ -1048,7 +1048,7 @@ public class CatalogDiffEngine {
             }
         }
 
-        if (suspect instanceof ProcedureSchedule && field.equals("enabled")) {
+        if (suspect instanceof ProcedureSchedule && (field.equals("enabled") || field.equals("onError"))) {
             return null;
         }
 

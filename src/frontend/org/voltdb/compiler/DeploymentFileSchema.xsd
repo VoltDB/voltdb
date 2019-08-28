@@ -513,10 +513,17 @@
   <xs:complexType name="schedulerType">
     <xs:attribute name="min-delay-ms" type="xs:int" default="0"/>
     <xs:attribute name="max-run-frequency" type="xs:double" default="0"/>
-    <xs:attribute name="thread-count" default="1">
+    <xs:attribute name="host-thread-count" default="0">
       <xs:simpleType>
 	<xs:restriction base="xs:int">
-          <xs:minInclusive value="1"/>
+          <xs:minInclusive value="0"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="partitioned-thread-count" default="0">
+      <xs:simpleType>
+        <xs:restriction base="xs:int">
+          <xs:minInclusive value="0"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>

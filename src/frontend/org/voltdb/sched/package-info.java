@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,16 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "BinaryLogSinkWrapper.h"
-
-#include "storage/DRTupleStream.h"
-#include "common/serializeio.h"
-
-using namespace std;
-using namespace voltdb;
-
-int64_t BinaryLogSinkWrapper::apply(const char *logs,
-        std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-        int32_t remoteClusterId, int64_t localUniqueId) {
-    return m_sink.apply(logs, tables, pool, engine, remoteClusterId, localUniqueId);
-}
+/**
+ * Provides classes and interfaces for for supporting in-server scheduling of procedures
+ */
+package org.voltdb.sched;

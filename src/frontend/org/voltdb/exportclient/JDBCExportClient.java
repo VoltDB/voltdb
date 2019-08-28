@@ -379,6 +379,10 @@ public class JDBCExportClient extends ExportClientBase {
                 identifierQuoteTemp = "";
                 supportsUpsert = true;
                 m_disableAutoCommits = false;
+            } else if (dbName.contains("HSQL")) {
+                identifierQuoteTemp = "";
+                m_dbType = DatabaseType.UNRECOGNIZED;
+                ignoreGenerations = true;
             } else if (m_dbType == null) {
                 m_dbType = DatabaseType.UNRECOGNIZED;
                 identifierQuoteTemp = "\"";

@@ -72,6 +72,23 @@ public:
         }
     }
 
+    template<typename ExceptionTracker, typename T2>
+    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread, bool isLowestSite,
+            ExceptionTracker* tracker, const ExceptionTracker& initValue,
+            T2& tracker2, const T2& initValue2)
+    : m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite)
+    , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread) {
+        if (needMpMemoryOnLowestThread) {
+            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
+                VOLT_DEBUG("Entering UseMPmemory");
+                SynchronizedThreadLock::assumeMpMemoryContext();
+                // This must be done in here to avoid a race with the non-MP path.
+                *tracker = initValue;
+                tracker2 = initValue2;
+            }
+        }
+    }
+
     ~ConditionalSynchronizedExecuteWithMpMemory();
 
     bool okToExecute() { return m_okToExecute; }
