@@ -802,54 +802,48 @@ public abstract class ProcedureCompiler {
                     + "for procedure: " + procedure.getClassname());
         }
 
-        int paramCount = procedure.getParameters().size();
         boolean twoPartitionTxn = info.isTwoPartitionProcedure();
         procedure.setSinglepartition(info.isSinglePartition());
 
         if (info.isSinglePartition() || twoPartitionTxn) {
             setCatalogProcedurePartitionInfo(compiler, db, procedure, info);
-            if (procedure.getPartitionparameter() >= paramCount) {
-                String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
-                throw compiler.new VoltCompilerException(msg);
-            }
             // TODO: The planner does not currently validate that a single-statement plan declared as single-partition correctly uses
             // the designated parameter as a partitioning filter, maybe some day.
             // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
             // or if the partition key was determined to be some other hard-coded constant (expression?) it might display a warning
             // message that the passed parameter is assumed to be equal to that constant (expression).
-        } else {
-            if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
-                if (statementPartitionExpression != null) {
-                    // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
-                    String tableName = "tableName", partitionColumnName = "partitionColumnName";
-                    try {
-                        assert(partitioning.getFullColumnName() != null);
-                        String array[] = partitioning.getFullColumnName().split("\\.");
-                        tableName = array[0];
-                        partitionColumnName = array[1];
-                    } catch(Exception ex) {
-                    }
-
-                    if (statementPartitionExpression instanceof ParameterValueExpression) {
-                        paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
-                    } else {
-                        String valueDescription = null;
-                        Object partitionValue = partitioning.getInferredPartitioningValue();
-                        if (partitionValue == null) {
-                            // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                            valueDescription = "of " + statementPartitionExpression.explain("");
-                        } else {
-                            valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
-                        }
-                        msg += "adding a parameter to be passed the value " + valueDescription + " and ";
-                    }
-                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
-                            partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
-                            "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
-                    compiler.addWarn(msg);
+        } else if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
+            AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
+            if (statementPartitionExpression != null) {
+                // The planner has uncovered an overlooked opportunity to run the statement SP.
+                String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
+                String tableName = "tableName", partitionColumnName = "partitionColumnName";
+                try {
+                    assert(partitioning.getFullColumnName() != null);
+                    String array[] = partitioning.getFullColumnName().split("\\.");
+                    tableName = array[0];
+                    partitionColumnName = array[1];
+                } catch(Exception ex) {
                 }
+
+                int paramCount = procedure.getParameters().size();
+                if (statementPartitionExpression instanceof ParameterValueExpression) {
+                    paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
+                } else {
+                    String valueDescription = null;
+                    Object partitionValue = partitioning.getInferredPartitioningValue();
+                    if (partitionValue == null) {
+                        // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
+                        valueDescription = "of " + statementPartitionExpression.explain("");
+                    } else {
+                        valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
+                    }
+                    msg += "adding a parameter to be passed the value " + valueDescription + " and ";
+                }
+                msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
+                        partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
+                        "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+                compiler.addWarn(msg);
             }
         }
 
@@ -860,14 +854,20 @@ public abstract class ProcedureCompiler {
     }
 
     static class ParititonDataReturnType {
-        Table partitionTable = null;
-        Column partitionColumn = null;
-        int partitionParamIndex = -1;
+        final Table partitionTable;
+        final Column partitionColumn;
+        final int partitionParamIndex;
 
         public ParititonDataReturnType(Table table, Column col, int paramIndex) {
             partitionTable = table;
             partitionColumn = col;
             partitionParamIndex = paramIndex;
+        }
+
+        public ParititonDataReturnType() {
+            partitionTable = null;
+            partitionColumn = null;
+            partitionParamIndex = -1;
         }
     }
 
@@ -896,6 +896,11 @@ public abstract class ProcedureCompiler {
 
     static public ParititonDataReturnType resolvePartitionData(VoltCompiler compiler, Database db, Procedure procedure,
             String tableName, String columnName, String paramIndexString) throws VoltCompilerException {
+        if (tableName == null) {
+            // Partitioned procedure which does not use a parameter
+            return new ParititonDataReturnType();
+        }
+
         // check parameter index range
         int paramIndex = Integer.parseInt(paramIndexString);
         int paramCount = procedure.getParameters().size();
