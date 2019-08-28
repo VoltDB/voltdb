@@ -55,14 +55,12 @@ public final class VoltTableUtil {
      * @return A result set represented in {@link VoltTable}.
      */
     public static VoltTable executeSql(String sql, List<String> tableNames, List<VoltTable> tables) throws Exception {
-        return run(sql,
-                new VoltTableData.Database(asTable(tableNames, tables)));
+        return run(sql, new VoltTableData.Database(asTable(tableNames, tables)));
     }
 
     public static VoltTable executeSql(String sql, String tableName, VoltTable table) throws Exception {
-        return run(sql,
-                new VoltTableData.Database(
-                        Collections.singletonList(new VoltTableData.Table(tableName, table))));
+        return run(sql, new VoltTableData.Database(
+                Collections.singletonList(new VoltTableData.Table(tableName, table))));
     }
 
     private static VoltTable run(String sql, VoltTableData.Database db) throws Exception {

@@ -24,7 +24,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.json_voltpatches.JSONObject;
-import org.voltcore.utils.Pair;
 import org.voltdb.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.volttableutil.VoltTableUtil;
@@ -68,24 +67,29 @@ public class QueryStats extends AdHocNTBase {
     @Override
     protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         assert params.size() == 1 : "Sysproc QueryStats accepts a single query string";
-        /*ClientResponse response;
-        try {
-            response = dispatchQueryStats((String) params.getParam(0));
-        } catch (Exception e) {
-            System.err.println(e.getMessage());
-            response = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.getMessage());
-        }
-        CompletableFuture<ClientResponse> result = new CompletableFuture<>();
-        result.complete(response);
-        return result;*/
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return dispatchQueryStats((String) params.getParam(0));
             } catch (Exception e) {
-                System.err.println(e.getMessage());
-                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], e.getMessage());
+                // NOTE: we cannot give back GRACEFUL_FAILURE, since that would quit sqlcmd.
+                // Instead, we give back empty table, and print error message.
+                // This is not perfect, but it works much of the time.
+                final String msg = truncated(e.getMessage()); // truncate error message if too long
+                System.err.println(msg);
+                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], msg);
             }
         });
+    }
+
+    /**
+     * Truncate a message that is too long, i.e. over 5 lines, to 5 lines.
+     * @param src source message
+     * @return truncated message if source is too long; or source message as provided.
+     */
+    private static String truncated(String src) {
+        final String[] lines = src.split("\n");
+        return lines.length <= 5 ? src :
+                String.join("\n", Arrays.copyOfRange(lines, 0, 5));
     }
 
     private static ClientResponse dispatchQueryStats(String sql) throws Exception {

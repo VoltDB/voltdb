@@ -551,6 +551,7 @@ public class SQLCommand {
         // QUERYSTATS
         String queryStatsArgs = SQLParser.parseQueryStatsStatement(line);
         if (queryStatsArgs != null) {
+            m_startTime = System.nanoTime();    // needs to reset timer here
             printResponse(m_client.callProcedure("@QueryStats", queryStatsArgs), false);
             return true;
         }
