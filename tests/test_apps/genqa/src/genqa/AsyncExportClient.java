@@ -522,6 +522,21 @@ public class AsyncExportClient
                       // old & new on each update so either = total updates, not the sum of the 2
                       // +TransactionCounts.get(UPDATE_NEW)
                       );
+                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
+                System.out.println("EXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
+                long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
+                System.out.println("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
+
+                // do some sanity checks on the counts...
+                long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
+                if (table_with_metadata_count != meta_data_expected) {
+                    System.err.println("Metadata counts don't match with table count: " + table_with_metadata_count);
+                }
+                long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
+                if (export_table_count != export_table_expected) {
+                    System.err.println("Insert and delete counts don't match export table count: " + export_table_count);
+                }
+
             }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             log.info(
@@ -551,6 +566,18 @@ public class AsyncExportClient
             log.error("No successful transactions");
             System.exit(-1);
         }
+    }
+
+    private static long get_table_count(String sqlTable) {
+        long count = 0;
+        try {
+            count = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
+        }
+        catch (Exception e) {
+            System.err.println("Exception in get_table_count: " + e);
+            System.err.println("SELECT COUNT from table " + sqlTable + " failed");
+        }
+        return count;
     }
 
     /**
