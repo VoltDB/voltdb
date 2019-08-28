@@ -19,75 +19,34 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.FileDescriptor;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.LongBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.Queue;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.LinkedTransferQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.zip.CRC32;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
-import org.apache.zookeeper_voltpatches.AsyncCallback;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DBBPool.RefCountedDirectBBContainer;
-import org.voltcore.utils.InstanceId;
-import org.voltcore.utils.LatencyWatchdog;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
-import org.voltdb.iv2.TransactionTask;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.PosixAdvise;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Stopwatch;
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.ImmutableSortedMap;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
+import com.google.common.collect.ImmutableSortedMap;
 
 public final class DurableCursor {
     private static final VoltLogger log = new VoltLogger("HOST");
@@ -95,39 +54,37 @@ public final class DurableCursor {
     private final File m_targetPath;
     private final long m_syncInterval;
     private boolean m_initialized = false;
-    private int m_checksum = 0;
-    private int m_currentWriter = 0;
+    private SymmetricLongChecksum m_checksum = new SymmetricLongChecksum();
+    private int m_currentSequence = 0;
+    private int m_lastWrittenChecksum = 0;
     private ReadWriteLock m_checksumLock = new ReentrantReadWriteLock();
-    private SlotMapper m_slotManager;
-    private DurabilityMarkerFile m0;
-    private DurabilityMarkerFile m1;
+    SlotMapper m_slotManager;
+    private boolean m_staleSlotMapper = true;
+    private byte[] m_lastestOpaque = null;
+    private BBContainer m_cursorBuffer;
+    private LongBuffer m_lb;
+    DurabilityMarkerFile m_0 = null;
+    DurabilityMarkerFile m_1 = null;
 
-    private static final int MIN_SUPPORTED_PAGE_SIZE = 1024;
+    static final int MIN_SUPPORTED_PAGE_SIZE = 4096;
     // Checksum of all slots to verify file integrity (4 Bytes), File sequence number (2 Bytes)
     // and offset in 4k byte pages to the slot mapper data in the file (2 Bytes)
     private static final int FILE_HEADER_SIZE = 8;
     private static final short FILE_VERSION = 1;
-    private static final int CURSOR_SIZE = 8;
+    static final int CURSOR_SIZE = 8;
+    // slotMapBuffer needs a Buffer CRC(4), bufferSize including names(4), opaque size(4),
+    // version(2), partitionCount(2), and maxStreamCount(4).
+    private static final int FIXED_TRAILER_SPACE = 4 + 4 + 4 + 2 + 2 + 4;
 
-    private static class DurabilityMarkerFile {
-        private File m_durabilityMarker;
+    static class DurabilityMarkerFile {
+        File m_durabilityMarker;
         private FileDescriptor m_fd;
         private FileChannel m_channel;
         private boolean m_createdFile;
-        private volatile boolean m_staleSlotMapper = true;
 
-        DurabilityMarkerFile(File marker) throws IOException {
-            if (!marker.isDirectory()) {
-                throw new IOException("Path " + marker + " does not exist");
-            }
-            if (!marker.canRead()) {
-                throw new IOException("Path " + marker + " is not readable");
-            }
-            if (!marker.canWrite()) {
-                throw new IOException("Path " + marker + " is not writable");
-            }
-            if (!marker.canExecute()) {
-                throw new IOException("Path " + marker + " is not executable");
+        DurabilityMarkerFile(File marker, boolean create) throws IOException {
+            if (create) {
+                marker.delete();
             }
             m_durabilityMarker = marker;
             RandomAccessFile ras;
@@ -135,16 +92,6 @@ public final class DurableCursor {
             m_channel = ras.getChannel();
             m_fd = ras.getFD();
             m_createdFile = m_channel.size() == 0;
-        }
-
-        void writeSlots() {
-            if (m_staleSlotMapper) {
-
-            }
-        }
-
-        void markSlotMapperStale() {
-            m_staleSlotMapper = true;
         }
 
         void closeFile() {
@@ -156,26 +103,32 @@ public final class DurableCursor {
         }
     }
 
-    interface SymmetricChecksum {
+    static class SymmetricChecksum {
         final AtomicInteger m_checksum = new AtomicInteger(0);
 
-        default void initFromFile(int value) {
+        void initFromFile(int value) {
             m_checksum.set(value);
         }
 
-        int get();
+        int get() {
+            return m_checksum.get();
+        }
     }
 
-    static class SymmetricLongChecksum implements SymmetricChecksum {
+    static class SymmetricLongChecksum extends SymmetricChecksum {
+        SymmetricLongChecksum() {
+            super();
+        }
 
         void swap(long oldVal, long newVal) {
-            long diff = newVal-oldVal;
-            if (diff == 0) {
+            if (oldVal == newVal) {
                 return;
             }
-            assert(diff > 0 && diff < (1 << 31));
-            int collapsed = (int) (diff & 0xffffffff);
-            m_checksum.addAndGet(collapsed);
+            int collapsedOld = (int) (oldVal & 0xffffffff);
+            collapsedOld += ((oldVal >>> 32) & 0xffffffff);
+            int collapsedNew = (int) (newVal & 0xffffffff);
+            collapsedNew += ((newVal >>> 32) & 0xffffffff);
+            m_checksum.addAndGet(collapsedNew-collapsedOld);
         }
 
         // Used to reset the slot after the stream is dropped
@@ -184,14 +137,9 @@ public final class DurableCursor {
             collapsed += ((oldVal >>> 32) & 0xffffffff);
             m_checksum.addAndGet(-collapsed);
         }
-
-        @Override
-        public int get() {
-            return m_checksum.get();
-        }
     }
 
-    private class SlotMapper {
+    class SlotMapper {
         private final int m_slotBlockSize;
         private int m_cursorSpace;
         private int m_basePageCount;
@@ -199,28 +147,37 @@ public final class DurableCursor {
         private int m_nonNamesTrailerSize;
         private int m_nameTrailerSize;
         int m_maxStreams;
-        volatile RefCountedDirectBBContainer m_slotMapBuffer;
+        private BBContainer m_slotMapBuffer;
         int m_sparseStreamCount;
         TreeMap<String, Integer> m_streamnameToSlotBlock = new TreeMap<>();
         TreeMap<Integer, String> m_slotBlockToStreamname = new TreeMap<>();
-        Set<Integer> m_localPartitionIds;
+        Map<Integer, Integer> m_localPartitionIds;
         TreeSet<Integer> m_freeSlots = new TreeSet<>();
 
-        SlotMapper(int streamCount, Set<Integer> partitionIds, int opaqueDataSize) {
-            assert(CURSOR_SIZE % 4 == 0);
-            m_slotBlockSize = CURSOR_SIZE * partitionIds.size();
-            updatePageTable(streamCount);
-            m_sparseStreamCount = 0;
-            m_nameTrailerSize = 0;
-            m_localPartitionIds = ImmutableSortedSet.copyOf(partitionIds);
-            m_opaqueDataSize = opaqueDataSize;
-
-            // At a minimum the slotMapBuffer needs a Buffer CRC(4), bufferSize including names(4), opaque(4 + ?),
-            // version(2), partitionCount(2), partitionList(2 * partitionCount), maxStreamCount(4) and name sizes.
-            m_nonNamesTrailerSize = 4 + 4 + 4 + opaqueDataSize + 2 + (2 * partitionIds.size()) + 4 + (m_maxStreams * 4);
+        void updateNonNamesTrailerSize() {
+            // At a minimum the slotMapBuffer needs a FIXED_TRAILER_SPACE, opaque(?),
+            // partitionList(2 * partitionCount), and name sizes.
+            m_nonNamesTrailerSize = FIXED_TRAILER_SPACE + m_opaqueDataSize + (2 * m_localPartitionIds.size()) + (m_maxStreams * 4);
         }
 
-        SlotMapper(RefCountedDirectBBContainer mapBuff) {
+        SlotMapper(int streamCount, TreeSet<Integer> partitionIds, int opaqueDataSize) {
+            assert(CURSOR_SIZE % 4 == 0);
+            m_slotBlockSize = CURSOR_SIZE * partitionIds.size();
+            m_sparseStreamCount = 0;
+            m_nameTrailerSize = 0;
+            int offset = 0;
+            ImmutableSortedMap.Builder<Integer, Integer> builder = ImmutableSortedMap.<Integer, Integer>naturalOrder();
+            for (Integer pid: partitionIds) {
+                builder.put(pid, offset++);
+            }
+            m_localPartitionIds = builder.build();
+            m_opaqueDataSize = opaqueDataSize;
+            updatePageTable(streamCount);
+            // Dummy Buffer to deallocate after first file write
+            m_slotMapBuffer = DBBPool.allocateDirect(8);
+        }
+
+        SlotMapper(BBContainer mapBuff, int cursorBufferSize) {
             ByteBuffer buff = mapBuff.b();
             buff.position(8);
             m_opaqueDataSize = buff.getInt();
@@ -228,13 +185,18 @@ public final class DurableCursor {
             short fileVersion = buff.getShort();
             assert(fileVersion == FILE_VERSION);
             short partitionCount = buff.getShort();
+            assert(buff.remaining() >= (partitionCount * 2) + 4);
+            m_cursorSpace = cursorBufferSize;
             m_slotBlockSize = CURSOR_SIZE * partitionCount;
-            ArrayList<Integer> partitions = new ArrayList<>();
+            int offset = 0;
+            ImmutableSortedMap.Builder<Integer, Integer> builder = ImmutableSortedMap.<Integer, Integer>naturalOrder();
             for (int ii = 0; ii < partitionCount; ii++) {
-                partitions.add(new Integer(buff.getShort()));
+                builder.put(new Integer(buff.getShort()), offset++);
             }
-            m_localPartitionIds = ImmutableSortedSet.copyOf(partitions);
+            m_localPartitionIds = builder.build();
             m_maxStreams = buff.getInt();
+            assert((m_cursorSpace - FILE_HEADER_SIZE) / m_slotBlockSize == m_maxStreams);
+            assert(buff.remaining() >= m_maxStreams * 4);
             Map<Integer, Integer> slotsToLen = new TreeMap<>();
             for (int ii = 0; ii < m_maxStreams; ii++) {
                 Integer nameLen = new Integer(buff.getInt());
@@ -259,7 +221,7 @@ public final class DurableCursor {
 
         void updateSlotMapBuffer(byte[] opaque) {
             assert(opaque.length == m_opaqueDataSize);
-            RefCountedDirectBBContainer cont = DBBPool.allocateRefCountedDirect(m_nonNamesTrailerSize + m_nameTrailerSize);
+            BBContainer cont = DBBPool.allocateDirect(m_nonNamesTrailerSize + m_nameTrailerSize);
             ByteBuffer buff = cont.b();
             buff.putInt(0); // CRC
             buff.putInt(0); // total size
@@ -267,14 +229,14 @@ public final class DurableCursor {
             buff.put(opaque);
             buff.putShort(FILE_VERSION);
             buff.putShort((short)m_localPartitionIds.size());
-            for (int pid : m_localPartitionIds) {
+            for (int pid : m_localPartitionIds.keySet()) {
                 buff.putShort((short)pid);
             }
             buff.putInt(m_maxStreams);
             Iterator<Integer> nextFree = m_freeSlots.iterator();
             Integer nextFreeSlot = nextFree.hasNext() ? nextFree.next() : new Integer(-1);
             for (int ii=0; ii < m_maxStreams; ii++) {
-                if (ii == nextFreeSlot.intValue()) {
+                if (ii >= m_sparseStreamCount || ii == nextFreeSlot.intValue()) {
                     nextFreeSlot = nextFree.hasNext() ? nextFree.next() : new Integer(-1);
                     buff.putInt(0);
                 }
@@ -282,23 +244,27 @@ public final class DurableCursor {
                     buff.putInt(m_slotBlockToStreamname.get(ii).length());
                 }
             }
+            assert(buff.position() == m_nonNamesTrailerSize);
             for (String streamname : m_slotBlockToStreamname.values()) {
                 buff.put(streamname.getBytes(Constants.UTF8ENCODING));
             }
             assert(buff.position() == buff.limit());
             applyCRC(buff);
-            RefCountedDirectBBContainer oldBuff = m_slotMapBuffer;
+            BBContainer oldBuff = m_slotMapBuffer;
             m_slotMapBuffer = cont;
-            oldBuff.release();
+            oldBuff.discard();
         }
 
         private void updatePageTable(int streamCount) {
             int pages = Bits.numPages(streamCount * m_slotBlockSize + FILE_HEADER_SIZE);
             // 8 bytes at beginning of the file is offset to simple checksum (4), SeqNo (2) and pages (2)
+            assert(pages * Bits.pageSize() > m_cursorSpace);
             m_cursorSpace = pages * Bits.pageSize();
+
             // Multiples of 4096
-            m_basePageCount = m_cursorSpace / 4064;
-            m_maxStreams = m_cursorSpace - FILE_HEADER_SIZE / m_slotBlockSize;
+            m_basePageCount = m_cursorSpace / MIN_SUPPORTED_PAGE_SIZE;
+            m_maxStreams = (m_cursorSpace - FILE_HEADER_SIZE) / m_slotBlockSize;
+            updateNonNamesTrailerSize();
         }
 
         void applyCRC(ByteBuffer buff) {
@@ -313,30 +279,27 @@ public final class DurableCursor {
             buff.putInt(0, (int)crc.getValue());
         }
 
-        void increasePageCount(int streamCount) {
-            updatePageTable(streamCount);
-        }
-
-        int addStream(String streamName) {
+        boolean addStream(String streamName) {
+            boolean expandedCursorBuffer = false;
             Integer block;
-            m_nameTrailerSize += streamName.length();
             block = m_streamnameToSlotBlock.get(streamName);
-            if (block != null) {
-                // streamName already added by another partition
-                return block;
-            }
-            if (!m_freeSlots.isEmpty()) {
-                block = m_freeSlots.pollFirst();
-            }
-            else {
-                block = new Integer(m_sparseStreamCount++);
-                if (m_sparseStreamCount >= m_maxStreams) {
-                    increasePageCount(m_sparseStreamCount);
+            if (block == null) {
+                m_nameTrailerSize += streamName.length();
+
+                if (!m_freeSlots.isEmpty()) {
+                    block = m_freeSlots.pollFirst();
                 }
+                else {
+                    block = new Integer(m_sparseStreamCount++);
+                    if (m_sparseStreamCount > m_maxStreams) {
+                        updatePageTable(m_sparseStreamCount);
+                        expandedCursorBuffer = true;
+                    }
+                }
+                m_streamnameToSlotBlock.put(streamName, block);
+                m_slotBlockToStreamname.put(block, streamName);
             }
-            m_streamnameToSlotBlock.put(streamName, block);
-            m_slotBlockToStreamname.put(block, streamName);
-            return block;
+            return expandedCursorBuffer;
         }
 
         void dropStream(String streamName) {
@@ -347,14 +310,24 @@ public final class DurableCursor {
             m_freeSlots.add(block);
         }
 
+        int blockOffset(String streamName) {
+            Integer block = m_streamnameToSlotBlock.get(streamName);
+            return block*m_localPartitionIds.size();
+        }
+
+        int slotForBlockId(int partitionId, String streamName) {
+            Integer partitionOffset = m_localPartitionIds.get(partitionId);
+            if (partitionOffset == null) {
+                return -1;
+            }
+
+            // There is a 8 byte header at the beginning of the cursor section so add 1
+            return blockOffset(streamName) + partitionOffset + 1;
+        }
+
         void writeSlotBuffer(FileChannel channel) {
-            RefCountedDirectBBContainer targetBuff;
-            do {
-                targetBuff = m_slotMapBuffer;
-            } while (!targetBuff.acquire());
             try {
-                channel.write(targetBuff.b(), m_cursorSpace);
-                targetBuff.release();
+                channel.write(m_slotMapBuffer.b(), m_cursorSpace);
             }
             catch (IOException e) {
             }
@@ -362,49 +335,68 @@ public final class DurableCursor {
 
         void shutdown() {
             m_slotMapBuffer.discard();
-            assert(!m_slotMapBuffer.acquire());
             m_slotMapBuffer = null;
         }
     }
 
     private final Object m_writeThreadCondition = new Object();
 
+    void writeNextSequencedFile() throws IOException {
+        DurabilityMarkerFile target;
+        if ((m_currentSequence & 1) == 1) {
+            target = m_1;
+        }
+        else {
+            target = m_0;
+        }
+        writeFile(target);
+        try {
+            long retval =
+                    PosixAdvise.fadvise(target.m_fd,
+                                        0,
+                                        target.m_channel.size(),
+                                        PosixAdvise.POSIX_FADV_DONTNEED);
+            if (retval != 0) {
+                m_writeCollisionLogger.log("Failed to fadvise DONTNEED completed Export Cursor file, this is harmless: " + retval,
+                        System.currentTimeMillis());
+            }
+        } catch (Throwable t) {
+            VoltDB.crashLocalVoltDB("Unexpected exception in Export's Durable Cursor file write",
+                    true, t);
+        }
+    }
+
     private final Thread m_periodicWriteThread = new Thread(new Runnable() {
         @Override
         public void run() {
             try {
-                long lastCurrentTime = System.currentTimeMillis();
+                long lastWriteTime = System.currentTimeMillis();
                 do {
                     long currentTime = System.currentTimeMillis();
                     try {
                         synchronized (m_writeThreadCondition) {
-                            m_writeThreadCondition.wait(m_syncInterval + lastCurrentTime - currentTime);
+                            m_writeThreadCondition.wait(Math.max(1, m_syncInterval + lastWriteTime - currentTime));
                         }
                     } catch (InterruptedException e) {
                         return;
                     }
                     if (m_initialized) {
-                        if (m_currentWriter == 0) {
-                            m_currentWriter = 1;
-                        }
-                        else {
-                            m_currentWriter = 0;
-                        }
+                        writeNextSequencedFile();
                     }
-                    lastCurrentTime = currentTime;
+                    lastWriteTime = currentTime;
                 } while (true);
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unexpected exception in log sync thread", true, e);
+                VoltDB.crashLocalVoltDB("Unexpected exception in Export's Durable Cursor write thread", true, e);
             }
 
         }
     }, "Export Cursor Sync Scheduler");
 
     private static class CursorScanResult {
-        final RefCountedDirectBBContainer m_cursorBuff;
-        final RefCountedDirectBBContainer m_mapBuff;
+        final BBContainer m_cursorBuff;
+        final BBContainer m_mapBuff;
         final int m_seqNum;
-        CursorScanResult(RefCountedDirectBBContainer cursorBuff, RefCountedDirectBBContainer mapBuff, int seqNum) {
+        CursorScanResult(BBContainer cursorBuff, BBContainer mapBuff, int seqNum) {
             m_cursorBuff = cursorBuff;
             m_mapBuff = mapBuff;
             m_seqNum = seqNum;
@@ -412,17 +404,32 @@ public final class DurableCursor {
     }
 
     // returns the sequence number of the file if valid and -1 if the file is corrupt
-    private static CursorScanResult ValidCursorFile(FileChannel ch) throws IOException {
+    private static CursorScanResult ValidateCursorFile(FileChannel ch) throws IOException {
+        if (ch.size() < FILE_HEADER_SIZE) {
+            return new CursorScanResult(null, null, -1);
+        }
         ByteBuffer buff = ByteBuffer.allocate(FILE_HEADER_SIZE);
-        ch.read(buff);
+        ch.read(buff, 0);
         SymmetricLongChecksum checksum = new SymmetricLongChecksum();
-        checksum.initFromFile(buff.getInt());
+        buff.position(0);
+        int cs = buff.getInt();
         int seqNum = buff.getShort() & 0xFFFF;
-        int trailerOffset = (buff.getShort() & 0xFFFF) * 4086;
+        int basePageCount = buff.getShort() & 0xFFFF;
+        int trailerOffset = basePageCount * MIN_SUPPORTED_PAGE_SIZE;
+        // include the header in the checksum
+        int field = seqNum;
+        field <<= 16;
+        field |= basePageCount;
+        cs -= field;
+        checksum.initFromFile(cs);
         assert(trailerOffset % Bits.pageSize() == 0);
-        RefCountedDirectBBContainer cursorBuff = DBBPool.allocateRefCountedDirect(trailerOffset - FILE_HEADER_SIZE);
+        if (ch.size() < trailerOffset) {
+            return new CursorScanResult(null, null, -1);
+        }
+        BBContainer cursorBuff = DBBPool.allocateDirect(trailerOffset - FILE_HEADER_SIZE);
         ByteBuffer cur = cursorBuff.b();
-        ch.read(cur);
+        ch.read(cur, FILE_HEADER_SIZE);
+        cur.position(0);
         // We only know how to handle 8 byte cursors right now.
         int onlySupportedCursorSize = 8;
         assert(CURSOR_SIZE == onlySupportedCursorSize);
@@ -435,10 +442,14 @@ public final class DurableCursor {
             return new CursorScanResult(null, null, -1);
         }
 
-        assert(ch.position() == trailerOffset);
-        RefCountedDirectBBContainer mapBuff = DBBPool.allocateRefCountedDirect((int)ch.size() - trailerOffset);
+        if ((int)ch.size() - trailerOffset <= FIXED_TRAILER_SPACE) {
+            cursorBuff.discard();
+            return new CursorScanResult(null, null, -1);
+        }
+        BBContainer mapBuff = DBBPool.allocateDirect((int)ch.size() - trailerOffset);
         ByteBuffer b = mapBuff.b();
         ch.read(b, trailerOffset);
+        b.position(0);
         int trailerCRC = b.getInt();
         CRC32 crc = new CRC32();
         crc.reset();
@@ -448,47 +459,79 @@ public final class DurableCursor {
             mapBuff.discard();
             return new CursorScanResult(null, null, -1);
         }
+        cursorBuff.b().position(0);
         return new CursorScanResult(cursorBuff, mapBuff, seqNum);
     }
 
     // Create and Rejoin constructor (create new cursor files)
-    public DurableCursor(long syncInterval, String targetPath, String targetPrefix,
-            int cursorsPerPartition, Set<Integer> partitionIds, byte[] opaque) {
+    public DurableCursor(long syncInterval, File targetPath, String targetPrefix,
+            int cursorsPerPartition, TreeSet<Integer> partitionIds, byte[] opaque) throws IOException {
+        assert(Bits.pageSize() % MIN_SUPPORTED_PAGE_SIZE == 0);
         m_syncInterval = syncInterval;
-        m_targetPath = new VoltFile(targetPath);
+        m_targetPath = targetPath;
         m_slotManager = new SlotMapper(cursorsPerPartition, partitionIds, opaque.length);
         m_slotManager.updateSlotMapBuffer(opaque);
+        m_cursorBuffer = DBBPool.allocateDirect(m_slotManager.m_cursorSpace);
+        m_lb = m_cursorBuffer.bD().asLongBuffer();
+        try {
+            m_0 = new DurabilityMarkerFile(new VoltFile(m_targetPath, targetPrefix + "_0"), true);
+            m_1 = new DurabilityMarkerFile(new VoltFile(m_targetPath, targetPrefix + "_1"), true);
+        }
+        catch (IOException e) {
+            m_cursorBuffer.discard();
+            m_slotManager.shutdown();
+            m_slotManager = null;
+            throw e;
+        }
+        m_lastestOpaque = opaque;
+        m_initialized = true;
     }
 
     private DurableCursor(CursorScanResult buffers, File targetPath) {
+        assert(Bits.pageSize() % MIN_SUPPORTED_PAGE_SIZE == 0);
         m_targetPath = targetPath;
         m_syncInterval = -1;
-        m_slotManager = new SlotMapper(buffers.m_mapBuff);
+        m_cursorBuffer = buffers.m_cursorBuff;
+        m_slotManager = new SlotMapper(buffers.m_mapBuff, m_cursorBuffer.b().remaining());
+        m_cursorBuffer.b().position(0);
+        m_lb = m_cursorBuffer.bD().asLongBuffer();
+        m_currentSequence = buffers.m_seqNum;
     }
 
     // Recover path (validate existing cursor files)
-    static DurableCursor RecoverBestCursor(String targetPath, String targetPrefix) throws IOException {
-        File target = new VoltFile(targetPath);
-        DurabilityMarkerFile dmf0 = new DurabilityMarkerFile(new VoltFile(target, targetPrefix + "_0"));
-        DurabilityMarkerFile dmf1 = new DurabilityMarkerFile(new VoltFile(target, targetPrefix + "_1"));
+    static DurableCursor RecoverBestCursor(File target, String targetPrefix) throws IOException {
+        DurabilityMarkerFile dmf0 = new DurabilityMarkerFile(new VoltFile(target, targetPrefix + "_0"), false);
+        DurabilityMarkerFile dmf1 = new DurabilityMarkerFile(new VoltFile(target, targetPrefix + "_1"), false);
         CursorScanResult dmf0Result;
         CursorScanResult dmf1Result;
         if (!dmf0.m_createdFile) {
-            dmf0Result = ValidCursorFile(dmf0.m_channel);
+            dmf0Result = ValidateCursorFile(dmf0.m_channel);
         }
         else {
             dmf0Result = new CursorScanResult(null, null, -1);
         }
         if (!dmf1.m_createdFile) {
-            dmf1Result = ValidCursorFile(dmf1.m_channel);
+            dmf1Result = ValidateCursorFile(dmf1.m_channel);
         }
         else {
             dmf1Result = new CursorScanResult(null, null, -1);
         }
-        if (dmf0Result.m_seqNum > dmf1Result.m_seqNum) {
+        // if dmf0 == -1, any value of dmf1 will be less then 0
+        // if dmf0 is positive and dmf1 == -1 or dmf1 < dmf0, dmf0 will be used
+        if (dmf0Result.m_seqNum - dmf1Result.m_seqNum > 0) {
+            if (dmf1Result.m_seqNum >= 0) {
+                dmf1Result.m_cursorBuff.discard();
+                dmf1Result.m_mapBuff.discard();
+            }
             return new DurableCursor(dmf0Result, target);
         }
-        else if (dmf1Result.m_seqNum > dmf0Result.m_seqNum) {
+        // if dmf1 == -1, any value of dmf0 will be less then 0
+        // if dmf1 is positive and dmf0 == -1 or dmf0 < dmf1, dmf1 will be used
+        else if (dmf1Result.m_seqNum - dmf0Result.m_seqNum > 0) {
+            if (dmf0Result.m_seqNum >= 0) {
+                dmf0Result.m_cursorBuff.discard();
+                dmf0Result.m_mapBuff.discard();
+            }
             return new DurableCursor(dmf1Result, target);
         }
         else {
@@ -500,13 +543,117 @@ public final class DurableCursor {
 
     private final RateLimitedLogger m_writeCollisionLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(5), log, Level.INFO);
 
+    // Returns a BlockId for each new stream. The actual slot is specified by calling
+    // slotForBlocId() with a PartitionId and BlockId
+    public void addCursorBlock(String streamName, byte[] opaque) {
+        m_checksumLock.writeLock().lock();
+        m_lastestOpaque = opaque;
+        boolean expandCursorBuff = m_slotManager.addStream(streamName);
+        m_staleSlotMapper = true;
+        if (expandCursorBuff) {
+            // update the cursor page
+            BBContainer newCursorBuff = DBBPool.allocateDirect(m_slotManager.m_cursorSpace);
+            ByteBuffer b = m_cursorBuffer.b();
+            assert(b.position() == 0);
+            newCursorBuff.b().put(b);
+            newCursorBuff.b().position(0);
+            m_lb = newCursorBuff.bD().asLongBuffer();
+            m_cursorBuffer.discard();
+            m_cursorBuffer = newCursorBuff;
+        }
+        m_checksumLock.writeLock().unlock();
+    }
+
+    public void removeCursorBlock(String streamName, byte[] opaque) {
+        m_checksumLock.writeLock().lock();
+        m_lastestOpaque = opaque;
+        m_slotManager.dropStream(streamName);
+        m_staleSlotMapper = true;
+        m_checksumLock.writeLock().unlock();
+    }
+
+    public int slotForBlockId(int partitionId, String streamName) {
+       int offset = m_slotManager.slotForBlockId(partitionId, streamName);
+       assert(offset != -1);
+       return offset;
+    }
+
+    public void updateCursor(int slot, long cursor) {
+        m_checksumLock.readLock().lock();
+        long oldCursor = m_lb.get(slot);
+        m_lb.put(slot, cursor);
+        m_checksum.swap(oldCursor, cursor);
+        m_checksumLock.readLock().unlock();
+    }
+
+    public Map<Integer, Long> getCursors(String streamName) {
+        // This should only be called to find the old cursors and send out acks after a recover
+        assert(m_0 == null);
+        Map<Integer, Long> result = new TreeMap<>();
+        // add 1 long for the buffer header of 8 bytes
+        int blockOffset = m_slotManager.blockOffset(streamName);
+        for(Integer pid : m_slotManager.m_localPartitionIds.keySet()) {
+            result.put(pid, m_lb.get(blockOffset));
+            blockOffset++;
+        }
+        return result;
+    }
+
+    void writeFile(DurabilityMarkerFile dmf) throws IOException {
+        m_checksumLock.writeLock().lock();
+        ByteBuffer cursorBuf = m_cursorBuffer.b();
+        cursorBuf.putShort(4, (short)m_currentSequence);
+        cursorBuf.putShort(6, (short)m_slotManager.m_basePageCount);
+        int checksum = m_checksum.get();
+        m_lastWrittenChecksum = checksum;
+        int field = m_currentSequence;
+        field <<= 16;
+        field |= m_slotManager.m_basePageCount;
+        checksum += field;
+        cursorBuf.putInt(0, checksum);
+        m_currentSequence = m_currentSequence + 1 & 0xFFFF;
+        assert(cursorBuf.position() == 0);
+        dmf.m_channel.write(cursorBuf, 0);
+        cursorBuf.position(0);
+        if (m_staleSlotMapper) {
+            m_slotManager.updateSlotMapBuffer(m_lastestOpaque);
+            m_slotManager.writeSlotBuffer(dmf.m_channel);
+        }
+        m_checksumLock.writeLock().unlock();
+    }
+
+    public void startupScheduledWriter() {
+        m_periodicWriteThread.start();
+    }
+
     public void shutdown() throws InterruptedException {
         if (m_periodicWriteThread.getState() != Thread.State.NEW) {
             m_periodicWriteThread.interrupt();
             m_periodicWriteThread.join();
-
-            //Discard io buffer memory
-            m_slotManager.shutdown();
         }
+        if (m_checksum.get() != m_lastWrittenChecksum && m_0.m_channel.isOpen() && m_1.m_channel.isOpen()) {
+            try {
+                writeNextSequencedFile();
+            }
+            catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unexpected exception in Export's DurableCursor Shutdown", true, e);
+            }
+        }
+        if (m_0 != null) {
+            m_0.closeFile();
+        }
+        if (m_1 != null) {
+            m_1.closeFile();
+        }
+        //Release io buffer memory
+        if (m_slotManager != null) {
+            m_slotManager.shutdown();
+            m_slotManager = null;
+            m_cursorBuffer.discard();
+        }
+    }
+
+    public int getCurrentSequence() {
+        return m_currentSequence;
     }
 }
