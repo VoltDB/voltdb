@@ -18,7 +18,6 @@
 package org.voltdb.volttableutil;
 
 import com.google.common.collect.ImmutableList;
-import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
 
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The utility class that represent the Schemas and Tables in VoltTable.
+ * @author Chao Zhou
  */
 public final class VoltTableData {
     private VoltTableData() {
@@ -35,20 +35,18 @@ public final class VoltTableData {
     public static final Map<String, Database> SCHEMA = new ConcurrentHashMap<>();
 
     public static class Database {
-        public List<Table> tables = ImmutableList.of();
+        public final List<Table> tables;
+        Database(List<Table> tables) {
+            this.tables = ImmutableList.copyOf(tables);
+        }
     }
 
     public static class Table {
         public final String tableName;
         public final VoltTable table;
-
         public Table(String tableName, VoltTable voltTable) {
             this.tableName = tableName.toUpperCase();
             table = voltTable;
-        }
-
-        public Table(Pair<String, VoltTable> pair) {
-            this(pair.getFirst(), pair.getSecond());
         }
     }
 }

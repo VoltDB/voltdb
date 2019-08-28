@@ -68,6 +68,16 @@ public class QueryStats extends AdHocNTBase {
     @Override
     protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         assert params.size() == 1 : "Sysproc QueryStats accepts a single query string";
+        /*ClientResponse response;
+        try {
+            response = dispatchQueryStats((String) params.getParam(0));
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+            response = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.getMessage());
+        }
+        CompletableFuture<ClientResponse> result = new CompletableFuture<>();
+        result.complete(response);
+        return result;*/
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return dispatchQueryStats((String) params.getParam(0));
@@ -79,7 +89,8 @@ public class QueryStats extends AdHocNTBase {
     }
 
     private static ClientResponse dispatchQueryStats(String sql) throws Exception {
-        final List<Pair<String, VoltTable>> tables = new LinkedList<>();
+        final List<String> tableNames = new LinkedList<>();
+        final List<VoltTable> tables = new LinkedList<>();
         final StringBuffer buf = new StringBuffer();
         final Matcher m = PROC_PATTERN.matcher(sql);
         while (m.find()) {
@@ -87,22 +98,21 @@ public class QueryStats extends AdHocNTBase {
             if (STATISTICS.containsKey(procName)) {
                 final int procArg = Integer.parseInt(m.group(2));
                 m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
-                tables.add(new Pair<>(tempTableAlias + tables.size(),
-                        VoltDB.instance().getStatsAgent().collectDistributedStats(
-                                new JSONObject(new HashMap<String, Object>(){{
-                                    put("selector", "STATISTICS");
-                                    put("subselector", procName);
-                                    put("interval", procArg == 1);
-                                }}))[0],
-                        false));
+                tableNames.add(tempTableAlias + tables.size());
+                tables.add(VoltDB.instance().getStatsAgent().collectDistributedStats(
+                        new JSONObject(new HashMap<String, Object>(){{
+                            put("selector", "STATISTICS");
+                            put("subselector", procName);
+                            put("interval", procArg == 1);
+                        }}))[0]);
             } else {
                 throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
             }
         }
         m.appendTail(buf);
+        final String query = buf.toString().replaceAll(";", " ");
         return new ClientResponseImpl(ClientResponse.SUCCESS,
-                new VoltTable[] {
-                        VoltTableUtil.executeSql(buf.toString().replaceAll(";", " "), tables)
-                }, "SUCCESS");
+                new VoltTable[] {VoltTableUtil.executeSql(query, tableNames, tables)},
+                "SUCCESS");
     }
 }

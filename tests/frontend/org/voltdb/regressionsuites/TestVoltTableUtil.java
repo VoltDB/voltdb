@@ -24,12 +24,13 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.Collections;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.volttableutil.VoltTableUtil;
 
@@ -47,7 +48,7 @@ public class TestVoltTableUtil extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
+        VoltServerConfig config;
         MultiConfigSuiteBuilder builder =
                 new MultiConfigSuiteBuilder(TestVoltTableUtil.class);
         boolean success;
@@ -141,37 +142,43 @@ public class TestVoltTableUtil extends RegressionSuite {
                 9,              2018-07-18 11:00:00.000000,     9,              8
          */
 
-//        VoltTable vt = VoltTableUtil.executeSql(
-//                "select * from activity where STATION_ID = 5",
-//                "activity", activity);
-
-//        VoltTable vt = VoltTableUtil.executeSql(
-//                "select stations.station_id, stations.name, activity.date_time, activity.card_id, activity.amount " +
-//                        "from stations, activity where stations.station_id = activity.station_id",
-//                "stations", stations, "activity", activity);
-//
-//        VoltTable vt = VoltTableUtil.executeSql(
-//                "select stations.station_id, count(activity.card_id) " +
-//                        "from stations, activity where stations.station_id = activity.station_id " +
-//                        "group by stations.station_id",
-//                "stations", stations, "activity", activity);
-
         VoltTable vt = VoltTableUtil.executeSql(
+                "select * from activity where STATION_ID = 5 order by card_id",
+                Collections.singletonList("activity"), Collections.singletonList(activity));
+        assertEquals(3, vt.getRowCount());
+
+        vt = VoltTableUtil.executeSql(
+                "select stations.station_id, stations.name, activity.date_time, activity.card_id, activity.amount " +
+                        "from stations, activity where stations.station_id = activity.station_id order by stations.station_id",
+                Lists.newArrayList("stations", "activity"),
+                Lists.newArrayList(stations, activity));
+        assertEquals(7, vt.getRowCount());
+
+        vt = VoltTableUtil.executeSql(
+                "select stations.station_id, count(activity.card_id) " +
+                        "from stations, activity where stations.station_id = activity.station_id " +
+                        "group by stations.station_id",
+                Lists.newArrayList("stations", "activity"),
+                Lists.newArrayList(stations, activity));
+        assertEquals(3, vt.getRowCount());
+
+        vt = VoltTableUtil.executeSql(
                 "select station_id, card_id, date_time, rank()" +
                         "OVER (partition by station_id order by date_time) " +
                         "from activity where station_id <> 7",
-                "stations", stations, "activity", activity);
+                Lists.newArrayList("stations", "activity"),
+                Lists.newArrayList(stations, activity));
+        assertEquals(6, vt.getRowCount());
 
-//        cr = client.callProcedure("@SystemInformation", "overview");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        VoltTable statistics= cr.getResults()[0];
-//
-//        VoltTable vt = VoltTableUtil.executeSql(
-//          "select * from sta where KEY LIKE '%HTTP%' ",
-//          "sta", statistics
-//        );
+        cr = client.callProcedure("@SystemInformation", "overview");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        final VoltTable statistics= cr.getResults()[0];
 
-        System.out.println("Result:\n"+vt);
+        vt = VoltTableUtil.executeSql(
+          "select * from sta where KEY LIKE '%HTTP%' ",
+          "sta", statistics
+        );
+        assertEquals(2, vt.getRowCount());
     }
 
 }

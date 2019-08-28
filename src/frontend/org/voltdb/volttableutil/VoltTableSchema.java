@@ -40,7 +40,7 @@ public class VoltTableSchema extends AbstractSchema {
         if (database == null)
             return tables;
         for (VoltTableData.Table table : database.tables) {
-            tables.put(table.tableName, new VoltTableTable(table.table));
+            tables.put(table.tableName, new VoltScannableTable(table.table));
         }
         return tables;
     }

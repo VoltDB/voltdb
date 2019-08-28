@@ -32,12 +32,12 @@ import org.voltdb.plannerv2.ColumnTypes;
 /**
  * An adaptor between a {@link VoltTable} and a {@link ScannableTable}.
  */
-public class VoltTableTable extends AbstractTable implements ScannableTable {
-    private VoltTable m_table;
+public class VoltScannableTable extends AbstractTable implements ScannableTable {
+    private final VoltTable m_table;
 
     private RelDataType m_dataType;
 
-    public VoltTableTable(VoltTable table) {
+    VoltScannableTable(VoltTable table) {
         m_table = table;
         m_dataType = null;
     }

@@ -17,25 +17,24 @@
 
 package org.voltdb.volttableutil;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.jdbc.Driver;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.jdbc.CalciteConnection;
-import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
 import org.voltdb.plannerv2.ColumnTypes;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.LinkedList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
 /**
  * The utility class that allow user to run SQL query on {@link VoltTable}.
+ * @author Chao Zhou
  */
 public final class VoltTableUtil {
     private VoltTableUtil() {
@@ -51,71 +50,75 @@ public final class VoltTableUtil {
      * "stations", stations, "activity", activity);</code>
      *
      * @param sql  The SQL string.
-     * @param args a list of {@link String} table_name and {@link VoltTable}
-     *             volt_table pairs. The table_name is always followed by
-     *             the volt_table it assigned to.
+     * @param tableNames a list of {@link String} table names.
+     * @param tables a list of {@link VoltTable} volt tables. Then sizes of tables and tableNames must equal.
      * @return A result set represented in {@link VoltTable}.
      */
-    public static VoltTable executeSql(String sql, Object... args) throws Exception {
-        if (args.length % 2 == 1) {
-            throw new IllegalArgumentException("Argument number not correct");
-        }
-        List<Pair<String, VoltTable>> tables = new LinkedList<>();
-        for (int i = 0; i < args.length; i += 2) {
-            tables.add(new Pair<>((String) args[i], (VoltTable) args[i + 1], false));
-        }
-        return executeSql(sql, tables);
+    public static VoltTable executeSql(String sql, List<String> tableNames, List<VoltTable> tables) throws Exception {
+        return run(sql,
+                new VoltTableData.Database(asTable(tableNames, tables)));
     }
 
-    public static VoltTable executeSql(String sql, List<Pair<String, VoltTable>> tables) throws Exception {
-        VoltTableData.Database db = new VoltTableData.Database();
-        ImmutableList.Builder<VoltTableData.Table> builder = ImmutableList.builder();
-        tables.forEach(pair -> builder.add(new VoltTableData.Table(pair)));
-        db.tables = builder.build();
+    public static VoltTable executeSql(String sql, String tableName, VoltTable table) throws Exception {
+        return run(sql,
+                new VoltTableData.Database(
+                        Collections.singletonList(new VoltTableData.Table(tableName, table))));
+    }
 
-        String uuid = UUID.randomUUID().toString();
+    private static VoltTable run(String sql, VoltTableData.Database db) throws Exception {
+        final String uuid = UUID.randomUUID().toString();
         VoltTableData.SCHEMA.put(uuid, db);
-        Properties info = new Properties();
+        final Properties info = new Properties();
 
         info.setProperty("schemaFactory", "org.voltdb.volttableutil.VoltTableSchemaFactory");
         info.setProperty("schema.id", uuid);
-
-        try {
-            final Driver driver = new Driver();
-            CalciteConnection connection = (CalciteConnection) driver.connect("jdbc:calcite:", info);
-            Statement st = connection.createStatement();
-            ResultSet result = st.executeQuery(sql);
-            return resultSetToVoltTable(result);
+        try {       // mimic what a transaction block does: clean schema afterwards
+            return asVoltTable(new Driver().connect("jdbc:calcite:", info).createStatement().executeQuery(sql));
         } finally {
             VoltTableData.SCHEMA.remove(uuid);
         }
     }
 
-    private static VoltTable resultSetToVoltTable(ResultSet resultSet) throws SQLException {
+    private static List<VoltTableData.Table> asTable(List<String> tableNames, List<VoltTable> tables) {
+        Preconditions.checkArgument(tables.size() == tableNames.size(),
+                "Length of table names must equal to length of tables");
+        ImmutableList.Builder<VoltTableData.Table> builder = ImmutableList.builder();
+        for (int i = 0; i < tableNames.size(); ++i) {
+            builder.add(new VoltTableData.Table(tableNames.get(i), tables.get(i)));
+        }
+        return builder.build();
+    }
+
+    private static VoltTable asVoltTable(ResultSet resultSet) throws SQLException {
         if (resultSet == null) {
             return null;
-        }
-        ResultSetMetaData resultSetMetaData = resultSet.getMetaData();
-        VoltTable.ColumnInfo[] columnInfoArray = new VoltTable.ColumnInfo[resultSetMetaData.getColumnCount()];
-        for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
-            // TODO: verify the type convert
-            columnInfoArray[i] = new VoltTable.ColumnInfo(resultSetMetaData.getColumnName(i + 1),
-                    ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1))));
-        }
-        VoltTable vt = new VoltTable(columnInfoArray);
-        while (resultSet.next()) {
-            Object[] row = new Object[resultSetMetaData.getColumnCount()];
-            for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
-                Object value = resultSet.getObject(i + 1);
-                if (resultSet.wasNull()) {
-                    value = ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1)))
-                            .getNullValue();
+        } else {
+            try {
+                final ResultSetMetaData resultSetMetaData = resultSet.getMetaData();
+                VoltTable.ColumnInfo[] columnInfoArray = new VoltTable.ColumnInfo[resultSetMetaData.getColumnCount()];
+                for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
+                    // TODO: verify the type convert
+                    columnInfoArray[i] = new VoltTable.ColumnInfo(resultSetMetaData.getColumnName(i + 1),
+                            ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(resultSetMetaData.getColumnType(i + 1))));
                 }
-                row[i] = value;
+                final VoltTable vt = new VoltTable(columnInfoArray);
+                while (resultSet.next()) {
+                    Object[] row = new Object[resultSetMetaData.getColumnCount()];
+                    for (int i = 0; i < resultSetMetaData.getColumnCount(); i++) {
+                        Object value = resultSet.getObject(i + 1);
+                        if (resultSet.wasNull()) {
+                            value = ColumnTypes.getVoltType(SqlTypeName.getNameForJdbcType(
+                                    resultSetMetaData.getColumnType(i + 1)))
+                                    .getNullValue();
+                        }
+                        row[i] = value;
+                    }
+                    vt.addRow(row);
+                }
+                return vt;
+            } finally {
+                resultSet.close();
             }
-            vt.addRow(row);
         }
-        resultSet.close();
-        return vt;
     }
 }
