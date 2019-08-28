@@ -24,6 +24,7 @@
 package org.voltdb.sched;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,7 +89,7 @@ public class TestSchedulerManager {
     private static final String PROCEDURE_NAME = "SomeProcedure";
 
     @Rule
-    public final TestName name = new TestName();
+    public final TestName m_name = new TestName();
 
     private AuthSystem m_authSystem;
     private ClientInterface m_clientInterface;
@@ -253,18 +254,14 @@ public class TestSchedulerManager {
         ProcedureSchedule schedule = createProcedureSchedule(TestSchedulerParams.class,
                 SchedulerManager.SCOPE_SYSTEM, 5, "TESTING", "ZZZ");
 
-        startSync();
-        assertEquals(0, s_firstSchedulerCallCount.get());
-
-        promoteToLeaderSync(schedule);
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertFalse(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
 
         schedule.getParameters().get("0").setParameter("NAN");
         schedule.getParameters().get("2").setParameter("7894");
-        processUpdateSync(schedule);
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertFalse(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
 
-        assertEquals(0, s_postRunSchedulerCallCount.get());
+        schedule.setSchedulerclass(TestScheduler.class.getName());
+        assertFalse(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
     }
 
     /*
@@ -276,7 +273,7 @@ public class TestSchedulerManager {
 
         ProcedureSchedule schedule1 = createProcedureSchedule(TestScheduler.class,
                 SchedulerManager.SCOPE_SYSTEM);
-        ProcedureSchedule schedule2 = createProcedureSchedule(name.getMethodName() + "_p", TestScheduler.class,
+        ProcedureSchedule schedule2 = createProcedureSchedule(m_name.getMethodName() + "_p", TestScheduler.class,
                 SchedulerManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
@@ -512,6 +509,27 @@ public class TestSchedulerManager {
         validateStats("ERROR", r -> assertTrue(r.getString("SCHEDULER_STATUS").startsWith("Procedure ")));
     }
 
+    /*
+     * Test that the validate parameters method is being called correctly
+     */
+    @Test
+    public void testValidateParameters() throws Exception {
+        ProcedureSchedule schedule = createProcedureSchedule(
+                TestSchedulerValidateParams.class, SchedulerManager.SCOPE_HOSTS, new Object[1]);
+
+        assertTrue(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
+
+        schedule.setSchedulerclass(TestSchedulerValidateParamsWithHelper.class.getName());
+        assertTrue(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
+
+        // Parameter fails validation
+        schedule.getParameters().get("0").setParameter("FAIL");
+        assertFalse(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
+
+        schedule.setSchedulerclass(TestSchedulerValidateParams.class.getName());
+        assertFalse(m_schedulerManager.validateScheduler(schedule, getClass().getClassLoader()).isValid());
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -539,7 +557,7 @@ public class TestSchedulerManager {
 
     private ProcedureSchedule createProcedureSchedule(Class<? extends Scheduler> clazz, String scope,
             Object... params) {
-        return createProcedureSchedule(name.getMethodName(), clazz, scope, params);
+        return createProcedureSchedule(m_name.getMethodName(), clazz, scope, params);
     }
 
     private ProcedureSchedule createProcedureSchedule(String scheduleName, Class<? extends Scheduler> clazz, String scope,
@@ -555,7 +573,7 @@ public class TestSchedulerManager {
         for (int i = 0;i<params.length;++i) {
             SchedulerParam sp = paramMap.add(Integer.toString(i));
             sp.setIndex(i);
-            sp.setParameter(params[i].toString());
+            sp.setParameter(params[i] == null ? null : params[i].toString());
         }
         return ps;
     }
@@ -643,7 +661,7 @@ public class TestSchedulerManager {
     }
 
     public static class TestSchedulerParams implements Scheduler {
-        public TestSchedulerParams(int arg1, String arg2, byte[] arg3) {}
+        public void initialize(int arg1, String arg2, byte[] arg3) {}
 
         @Override
         public Action getFirstAction() {
@@ -659,10 +677,10 @@ public class TestSchedulerManager {
     }
 
     public static class TestSchedulerRerun implements Scheduler {
-        private final int m_maxRunCount;
+        private int m_maxRunCount;
         private int m_runCount = 0;
 
-        public TestSchedulerRerun(int maxRunCount) {
+        public void initialize(int maxRunCount) {
             m_maxRunCount = maxRunCount;
         }
 
@@ -681,6 +699,34 @@ public class TestSchedulerManager {
 
             return ++m_runCount < m_maxRunCount ? Action.createRerun(100, TimeUnit.MICROSECONDS)
                     : Action.createExit(null);
+        }
+    }
+
+    public static class TestSchedulerValidateParams implements Scheduler {
+        public static String validateParameters(String value) {
+            return value;
+        }
+
+        public void initialize(String value) {}
+
+        @Override
+        public Action getFirstAction() {
+            return null;
+        }
+
+        @Override
+        public Action getNextAction(ActionResult result) {
+            return null;
+        }
+    }
+
+    public static class TestSchedulerValidateParamsWithHelper extends TestSchedulerValidateParams {
+        public static String validateParameters(SchedulerHelper helper, String value) {
+            return TestSchedulerValidateParams.validateParameters(value);
+        }
+
+        public void initialize(SchedulerHelper helper, String value) {
+            super.initialize(value);
         }
     }
 }

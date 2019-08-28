@@ -25,15 +25,17 @@ import java.util.concurrent.TimeUnit;
  * parameters repeatedly.
  */
 abstract class SingleProcScheduler implements Scheduler {
-    final String m_procedure;
-    final Object[] m_procedureParameters;
+    SchedulerHelper m_helper;
+    private String m_procedure;
+    private Object[] m_procedureParameters;
 
-    static void validateParameters(SchedulerValidationErrors errors, SchedulerValidationHelper helper, String procedure,
+    static void validateParameters(SchedulerValidationErrors errors, SchedulerHelper helper, String procedure,
             String... procedureParameters) {
-        helper.validateProcedureAndParams(errors, true, procedure, procedureParameters);
+        helper.validateProcedure(errors, true, procedure, procedureParameters);
     }
 
-    SingleProcScheduler(String procedure, String... procedureParameters) {
+    void initialize(SchedulerHelper helper, String procedure, String... procedureParameters) {
+        m_helper = helper;
         m_procedure = procedure;
         m_procedureParameters = procedureParameters;
     }

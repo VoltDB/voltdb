@@ -141,7 +141,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                []() { s_modifiedTuples = -1l; });
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // determine which indices are updated by this executor
             // iterate through all target table indices and see if they contain

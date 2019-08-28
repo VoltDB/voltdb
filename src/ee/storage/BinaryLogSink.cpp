@@ -863,7 +863,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, std::unordered_map<int64_t, Pers
 int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, std::unordered_map<int64_t, PersistentTable*> &tables,
         Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId) {
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(true, engine->isLowestSite(),
-            &s_replicatedApplySuccess, false);
+            []() { s_replicatedApplySuccess = false; });
 
     long rowCount = 0;
     if (possiblySynchronizedUseMpMemory.okToExecute()) {

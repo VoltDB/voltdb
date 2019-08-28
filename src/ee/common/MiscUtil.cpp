@@ -17,11 +17,9 @@
 
 #include "common/MiscUtil.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
-std::vector<std::string> MiscUtil::splitString(const std::string &str, char delimiter)
-{
+std::vector<std::string> MiscUtil::splitString(const std::string &str, char delimiter) {
     std::vector<std::string> vec;
     size_t begin = 0;
     while (true) {
@@ -38,8 +36,7 @@ std::vector<std::string> MiscUtil::splitString(const std::string &str, char deli
     return vec;
 }
 
-std::vector<std::string> MiscUtil::splitToTwoString(const std::string &str, char delimiter)
-{
+std::vector<std::string> MiscUtil::splitToTwoString(const std::string &str, char delimiter) {
     std::vector<std::string> vec;
     size_t end = str.find(delimiter);
     if (end == std::string::npos) {

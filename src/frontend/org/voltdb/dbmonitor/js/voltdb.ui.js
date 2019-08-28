@@ -1,4 +1,4 @@
-﻿
+
 var ispopupRevoked = false;
 var table = '';
 var isMobile = false; //initiate as false
@@ -106,6 +106,9 @@ $(document).ready(function () {
             if (json["ImporterGraphView"] != undefined && json["ImporterGraphView"] != "")
                 saveInLocalStorage("importer-graph-view", json["ImporterGraphView"]);
 
+            if (json["ExporterGraphView"] != undefined && json["ExporterGraphView"] != "")
+                saveInLocalStorage("exporter-graph-view", json["ExporterGraphView"]);
+
             if (json["CurrentServer"] != undefined && json["CurrentServer"] != "")
                 saveCurrentServer(json["CurrentServer"]);
 
@@ -173,7 +176,7 @@ $(document).ready(function () {
     $("ul.tabs li:first").addClass("active").show(); //Activate first tab
     $(".tab_content:first").show(); //Show first tab content
 
-    // Show Hide Graph Block
+    // Show Hide Graph Block for cluster lantency
     $('#showHideGraphBlock').click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
@@ -193,7 +196,7 @@ $(document).ready(function () {
         }
     });
 
-    //Show Hide Graph Block
+    //Show Hide Graph Block for importer
     $('#showHideImporterGraphBlock').click(function () {
         var graphState = $("#mainImporterGraphBlock").css('display');
         if (graphState == 'none') {
@@ -206,6 +209,29 @@ $(document).ready(function () {
         $('#mainImporterGraphBlock').slideToggle();
     });
 
+    //Show Hide Graph Block for exporter
+    $('#showHideExporterGraphBlock').click(function () {
+        var graphState = $("#mainExporterGraphBlock").css('display');
+        if (graphState == 'none') {
+            $(".showhideExporterIcon").removeClass('collapsed');
+            $(".showhideExporterIcon").addClass('expanded');
+        } else {
+            $(".showhideExporterIcon").removeClass('expanded');
+            $(".showhideExporterIcon").addClass('collapsed');
+        }
+        $('#mainExporterGraphBlock').slideToggle();
+
+        var graphState = $("#queuedGraphBlock").css('display');
+        if (graphState == 'none') {
+            $(".showhideExporterIcon").removeClass('collapsed');
+            $(".showhideExporterIcon").addClass('expanded');
+        } else {
+            $(".showhideExporterIcon").removeClass('expanded');
+            $(".showhideExporterIcon").addClass('collapsed');
+        }
+        $('#queuedGraphBlock').slideToggle();
+
+    });
 
     //DR Show/hide toggle
     // Show Hide Graph Block
@@ -259,7 +285,7 @@ $(document).ready(function () {
 
     var refreshCss = function () {
         //Enable Schema specific css only for Schema Tab.
-        if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
+        if (VoltDbUI.CurrentTab == NavigationTabs.Schema || NavigationTabs.Exporter) {
             $('#styleBootstrapMin').removeAttr('disabled');
             $('#styleBootstrapResponsive').removeAttr('disabled');
             $('#styleThemeBootstrap').removeAttr('disabled');
@@ -358,6 +384,10 @@ $(document).ready(function () {
             }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Importer){
                 showHelpTopic("#VDBImportHelp","Importer Help");
                 MonitorGraphUI.RefreshImporterGraph();
+            }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Exporter){
+                showHelpTopic("#VDBExportHelp","Exporter Help");
+                MonitorGraphUI.RefreshThroughputGraph();
+                MonitorGraphUI.RefreshQueuedGraph();
             }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Analysis){
                 showHelpTopic("#VDBAnalysisHelp","Analysis Help");
              }
@@ -432,6 +462,7 @@ function downloadCSV(event,args,whichChart, chartId) {
     var graphView = $("#graphView").val()
     var drGraphVIew = $("#drGraphView").val()
     var importGraphView = $("#importerGraphView").val()
+    var exportGraphView = $("#exporterGraphView").val()
     var chartData = {}
 
     if (whichChart == "cpu"){
@@ -491,7 +522,6 @@ function downloadCSV(event,args,whichChart, chartId) {
         else if (graphView == "Days"){
             chartData = convertPartitionData(JSON.parse(localStorage.partitionDetailsDay))
         }
-
     }
     else if (whichChart == "dataReplication"){
         if (drGraphVIew == "Seconds"){
@@ -514,6 +544,26 @@ function downloadCSV(event,args,whichChart, chartId) {
         }
         else if (graphView == "Days"){
             chartData =  JSON.parse(localStorage.cmdLogDay)
+        }
+    } else if(whichChart == "throughput"){
+        if (exportGraphView == "Seconds"){
+            chartData = convertExporterData(JSON.parse(localStorage.throughputDetails))
+        }
+        else if (exportGraphView == "Minutes"){
+            chartData = convertExporterData(JSON.parse(localStorage.throughputDetailsMin))
+        }
+        else if (exportGraphView == "Days"){
+            chartData = convertExporterData(JSON.parse(localStorage.throughputDetailsDay))
+        }
+    } else if(whichChart == "queued"){
+        if (exportGraphView == "Seconds"){
+            chartData = convertExporterData(JSON.parse(localStorage.queuedDetails))
+        }
+        else if (exportGraphView == "Minutes"){
+            chartData = convertExporterData(JSON.parse(localStorage.queuedDetailsMin))
+        }
+        else if (exportGraphView == "Days"){
+            chartData = convertExporterData(JSON.parse(localStorage.queuedDetailsDay))
         }
     } else if(whichChart == "outTrans"){
         if (importGraphView == "Seconds"){
@@ -581,6 +631,20 @@ function convertPartitionData(data){
 }
 
 function convertImporterData(data){
+    var chartData = [];
+    for (var i=0; i< data.length; i++){
+        for(var j=0 ; j< data[i].values.length; j++){
+            chartData.push({
+                "key": data[i].key.replace(" ", ""),
+                "timestamp": data[i].values[j].x,
+                "value": data[i].values[j].y
+            })
+        }
+    }
+    return chartData;
+}
+
+function convertExporterData(data){
     var chartData = [];
     for (var i=0; i< data.length; i++){
         for(var j=0 ; j< data[i].values.length; j++){
@@ -827,7 +891,7 @@ var loadPage = function (serverName, portid) {
             //hide loading icon
             $("#overlay").hide();
 
-            $('#serversList >  tbody > tr > td.active > a').click(function () {
+            $('#serversList > tbody > tr > td.active > a').click(function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
 
@@ -859,6 +923,7 @@ var loadPage = function (serverName, portid) {
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
+                    ExporterGraphVIew: VoltDbUI.getFromLocalStorage("exporter-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -899,6 +964,7 @@ var loadPage = function (serverName, portid) {
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
+                    ExporterGraphVIew: VoltDbUI.getFromLocalStorage("exporter-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -1072,7 +1138,8 @@ var loadPage = function (serverName, portid) {
         }
     };
 
-
+	var previousTupleCount = {};
+	var throughput = {};
     var refreshGraphAndData = function (graphView, currentTab) {
 
         voltDbRenderer.GetExportProperties(function (rawData) {
@@ -1121,7 +1188,6 @@ var loadPage = function (serverName, portid) {
                     }
                 });
 
-
                 MonitorGraphUI.RefreshOutTransGraph(importerDetails["OUTSTANDING_REQUESTS"], graphView, curTab);
                 MonitorGraphUI.RefreshSuccessRateGraph(importerDetails["SUCCESSES"], graphView, curTab);
                 MonitorGraphUI.RefreshFailureRateGraph(importerDetails["FAILURES"], graphView, curTab);
@@ -1130,6 +1196,138 @@ var loadPage = function (serverName, portid) {
                 if($("#navImporter").hasClass('active'))
                     setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
                 $('#navImporter').hide()
+            }
+        });
+        
+        voltDbRenderer.getExportTableInformation(function(exporterDetails){
+            if(!$.isEmptyObject(exporterDetails)){
+                Object.keys(exporterDetails["TUPLE_COUNT"]).forEach(key => {
+                    var tupleCountDetails = exporterDetails["TUPLE_COUNT"];
+                    
+                    if($('#'+key).length == 0 && key != "TIMESTAMP"){
+                        var newRow = '<tr id=' + key + '>' + 
+                        '<td>' + key + 
+                        '</td><td>' + exporterDetails["TARGET"][key] +
+                        '</td><td>' + 0 +
+                        '</td><td>' + exporterDetails["TUPLE_PENDING"][key] +
+                        '</td></tr>';         
+                        $('#exportTable').append(newRow);
+                    }
+                    
+                    if(!previousTupleCount.hasOwnProperty(key)){
+                        previousTupleCount[key] = tupleCountDetails[key];
+                    }
+                    
+                    if(previousTupleCount.hasOwnProperty(key) && key != "TIMESTAMP") {
+                        if(tupleCountDetails[key] >= previousTupleCount[key]){
+                            tupleCountDetails[key] = tupleCountDetails[key] - previousTupleCount[key];                           
+                        }
+                    }
+                    
+                    $('#'+key+' td:nth-child(3)').html(tupleCountDetails[key]);
+                    $('#'+key+' td:nth-child(4)').html(exporterDetails["TUPLE_PENDING"][key]);
+                    
+                    if(exporterDetails["ACTIVE"][key] == "FALSE"){
+                        $('#'+key).css('color', 'red');
+                    }
+                    else{
+                        $('#'+key).css('color', 'black');
+                    }
+                    
+                })
+            } else {
+                if($("#navExporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navExporter').hide()
+            }
+        });
+
+        voltDbRenderer.getThroughputGraphInformation(function(exporterDetails){
+            if(!$.isEmptyObject(exporterDetails)){
+
+                var curTab = VoltDbUI.getCookie("current-tab");
+                var tupleCount = exporterDetails["TUPLE_COUNT"];
+
+                graphView = $("#exporterGraphView").val();
+                $('#navExporter').show();
+                if(curTab == NavigationTabs.Exporter && !$("#navExporter").hasClass('active')){
+                    $("#overlay").show();
+                    setTimeout(function () { $("#navExporter> a").trigger("click"); }, 100);
+                }
+
+                if(VoltDbUI.isFirstThroughputLoad){
+                    MonitorGraphUI.SetThroughputData(exporterDetails);
+                    MonitorGraphUI.AddThroughputGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"), $('#chartThroughput'));
+                    VoltDbUI.isFirstThroughputLoad = false;
+                }
+
+                Object.keys(tupleCount).forEach(key => {
+                    if (previousTupleCount.hasOwnProperty(key) && key != "TIMESTAMP") {
+                        if(!throughput.hasOwnProperty(key)){
+                            throughput[key] = 0;
+                        }
+                    throughput[key] = tupleCount[key] - previousTupleCount[key];
+                    }
+                })
+                throughput.TIMESTAMP = tupleCount.TIMESTAMP;
+                previousTupleCount = tupleCount;
+
+                var dataMapper = MonitorGraphUI.getExportMapperData();
+                var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
+                var dataArray = ["throughputData_second", "throughputDataMin_minute", "throughputDataDay_day"];
+                $.each(throughput, function(key, value){
+                    if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
+                        for(var i = 0; i < dataArray.length; i++){
+                            var dataSplit = dataArray[i].split('_');
+                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex);
+                        }
+                    }
+                });
+
+                MonitorGraphUI.RefreshThroughputExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"));
+                MonitorGraphUI.RefreshThroughputGraph(throughput, graphView, curTab);
+
+            } else {
+                if($("#navExporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navExporter').hide()
+            }
+        });
+
+        voltDbRenderer.getQueuedGraphInformation(function(exporterDetails){
+            if(!$.isEmptyObject(exporterDetails)){
+                var curTab = VoltDbUI.getCookie("current-tab");
+                graphView = $("#exporterGraphView").val();
+                $('#navExporter').show();
+                if(curTab == NavigationTabs.Exporter && !$("#navExporter").hasClass('active')){
+                    $("#overlay").show();
+                    setTimeout(function () { $("#navExporter> a").trigger("click"); }, 100);
+                }
+
+                if(VoltDbUI.isFirstQueuedLoad){
+                    MonitorGraphUI.SetQueuedData(exporterDetails);
+                    MonitorGraphUI.AddQueuedGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"), $('#chartQueued'));
+                    VoltDbUI.isFirstQueuedLoad = false;
+                }
+
+                var dataMapper = MonitorGraphUI.getExportMapperData();
+                var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
+                var dataArray = ["queuedData_second", "queuedDataMin_minute", "queuedDataDay_day"]
+                $.each(exporterDetails["TUPLE_PENDING"], function(key, value){
+                    if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
+                        for(var i = 0; i < dataArray.length; i++){
+                            var dataSplit = dataArray[i].split('_');
+                            MonitorGraphUI.AddExporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex);
+                        }
+                    }
+                });
+
+                MonitorGraphUI.RefreshQueuedExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"));
+                MonitorGraphUI.RefreshQueuedGraph(exporterDetails["TUPLE_PENDING"], graphView, curTab);
+            } else {
+                if($("#navExporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navExporter').hide()
             }
         });
 
@@ -2264,6 +2462,9 @@ var loadPage = function (serverName, portid) {
     if (VoltDbUI.getFromLocalStorage("importer-graph-view") == undefined || VoltDbUI.getFromLocalStorage("importer-graph-view") == null)
         saveInLocalStorage("importer-graph-view", $("#importerGraphView").val());
 
+    if (VoltDbUI.getFromLocalStorage("exporter-graph-view") == undefined || VoltDbUI.getFromLocalStorage("exporter-graph-view") == null)
+        saveInLocalStorage("exporter-graph-view", $("#exporterGraphView").val());
+
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
     $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
     $("#importerGraphView").val(VoltDbUI.getFromLocalStorage("importer-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("importer-graph-view"): "Seconds");
@@ -2289,6 +2490,14 @@ var loadPage = function (serverName, portid) {
         saveInLocalStorage("importer-graph-view", graphView);
         MonitorGraphUI.RefreshImporterGraph(graphView);
         MonitorGraphUI.UpdateImporterCharts();
+    });
+
+    $("#exporterGraphView").on("change", function () {
+        var graphView = $("#exporterGraphView").val();
+        saveInLocalStorage("exporter-graph-view", graphView);
+        MonitorGraphUI.RefreshThroughputExporterGraph(graphView);
+        MonitorGraphUI.RefreshQueuedExporterGraph(graphView);
+        MonitorGraphUI.UpdateExporterCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
@@ -2333,7 +2542,7 @@ var loadPage = function (serverName, portid) {
 
     refreshClusterHealth();
     MonitorGraphUI.setStartTime()
-    refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab);
+    refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab); // This is not working, causing a 5 second hang up before graphs load
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab);
@@ -2342,6 +2551,7 @@ var loadPage = function (serverName, portid) {
     configureUserPreferences();
     adjustGraphSpacing();
     adjustImporterGraphSpacing();
+    adjustExporterGraphSpacing();
     saveThreshold();
 
     $('#showMyHelp').popup();
@@ -2960,7 +3170,8 @@ var NavigationTabs = {
     SQLQuery: 4,
     DR: 5,
     Importer: 6,
-    Analysis: 7
+    Exporter: 7,
+    Analysis: 8
 };
 
 var getCurrentTab = function () {
@@ -2984,6 +3195,9 @@ var getCurrentTab = function () {
     } else if (activeLinkId ==  "navImporter"){
         $(".nvtooltip").show();
         return NavigationTabs.Importer;
+    } else if (activeLinkId ==  "navExporter"){
+        $(".nvtooltip").show();
+        return NavigationTabs.Exporter;
     } else if(activeLinkId == "navAnalysis"){
         VoltDbAnalysis.refreshChart();
         $(".nvtooltip").show();
@@ -3187,6 +3401,21 @@ var adjustImporterGraphSpacing = function() {
     }
 };
 
+var adjustExporterGraphSpacing = function() {
+    var graphList = [$('#chartThroughput'), $('#chartQueued')];
+    var css = "left";
+    for (var i = 0; i < graphList.length; i++) {
+        if (graphList[i].is(':visible')) {
+            graphList[i].removeClass("left right");
+            graphList[i].addClass(css);
+            if (css == "left")
+                css = "right";
+            else
+                css = "left";
+        }
+    }
+};
+
 (function (window) {
     var iVoltDbUi = (function () {
         this.prevDrRoleDetail = {}
@@ -3201,6 +3430,8 @@ var adjustImporterGraphSpacing = function() {
         this.isCommandLogEnabled = false;
         this.isFirstDRLoad = true;
         this.isFirstImporterLoad = true;
+        this.isFirstThroughputLoad = true;
+        this.isFirstQueuedLoad = true;
         this.DASHBOARD_PROGRESS_STATES = {
             REFRESHMEMORY: 0,
             REFRESHMEMORY_NONE: 1,

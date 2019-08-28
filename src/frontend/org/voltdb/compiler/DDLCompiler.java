@@ -424,16 +424,12 @@ public class DDLCompiler {
         final StringBuilder ddls = new StringBuilder();
         boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
-            final String encodedDropTable;
-            if (isBatch) {      // We cannot query previous database for existing tables in batch mode, as
-                encodedDropTable = null;    // current DDL batch may contain CREATE statements, that is later dropped.
-            } else {
-                encodedDropTable = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
-            }
-            if (encodedDropTable == null) {
+            if (isBatch || ! AdHocNTBase.USING_CALCITE) {      // We cannot query previous database for existing tables in batch mode, as
+                // current DDL batch may contain CREATE statements, that is later dropped.
                 processVoltDBStatements(db, whichProcs, stmt);
-            } else {        // matched & executed DROP TABLE stmt
-                ddls.append(encodedDropTable);
+            } else {        // ENG-17075: Until Calcite can handle all DDL statements,
+                // this could throw SqlParserException, that gets printed and transformed into FallbackException.
+                ddls.append(DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler));
             }
             stmt = getNextStatement(reader, m_compiler, stmt.endLineNo, newDdl);
             isBatch = true;

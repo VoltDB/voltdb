@@ -101,4 +101,8 @@ public enum StatsSelector {
     StatsSelector[] subSelectors() {
         return m_subSelctors;
     }
+
+    public static StatsSelector[] getAllStatsCollector() {
+        return StatsSelector.class.getEnumConstants();
+    }
 }

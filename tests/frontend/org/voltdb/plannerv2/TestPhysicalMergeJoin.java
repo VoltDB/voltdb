@@ -61,10 +61,10 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         m_tester.sql("select RI1.ti from RI1 inner join RI2 on RI1.TI = RI2.TI where RI1.si > 0")
                 .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], TI=[$t2], split=[1])\n" +
                         "  VoltPhysicalMergeJoin(condition=[=($2, $0)], joinType=[inner], split=[1], " +
-                        "outerIndex=[RI2_IND1], innerIndex=[RI1_IND1])\n" +
+                        "outerIndex=[RI2_IND5_HASH], innerIndex=[RI1_IND1])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t3], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI2_IND1_ASCEQ0_0])\n" +
+                        "proj#0..3=[{exprs}], index=[RI2_IND5_HASH_ASCEQ0_0])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[0], expr#5=[>($t1, $t4)], SI=[$t1], " +
                         "TI=[$t3], $condition=[$t5], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
@@ -76,11 +76,11 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         m_tester.sql("select RI1.ti from RI1 inner join RI2 on RI1.TI = RI2.TI where RI2.si > 0")
                 .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], TI=[$t2], split=[1])\n" +
                         "  VoltPhysicalMergeJoin(condition=[=($2, $1)], joinType=[inner], split=[1], " +
-                        "outerIndex=[RI2_IND1], innerIndex=[RI1_IND1])\n" +
+                        "outerIndex=[RI2_IND5_HASH], innerIndex=[RI1_IND1])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[0], expr#5=[>($t1, $t4)], SI=[$t1], " +
                         "TI=[$t3], $condition=[$t5], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI2_IND1_ASCEQ0_0])\n" +
+                        "proj#0..3=[{exprs}], index=[RI2_IND5_HASH_ASCEQ0_0])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t3], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
                         "proj#0..3=[{exprs}], index=[RI1_IND1_ASCEQ0_0])\n")
@@ -93,13 +93,13 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         m_tester.sql("select RI1.ti from RI1 inner join RI3 on RI3.II = RI1.I")
                 .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], TI=[$t1], split=[1])\n" +
                         "  VoltPhysicalMergeJoin(condition=[=($2, $0)], joinType=[inner], split=[1], " +
-                        "outerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I], innerIndex=[RI3_IND2])\n" +
+                        "outerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I], innerIndex=[RI3_IND1_HASH])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], " +
                         "proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_ASCEQ0_0])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], II=[$t2], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI3]], split=[1], expr#0..3=[{inputs}], " +
-                        "proj#0..3=[{exprs}], index=[RI3_IND2_ASCEQ0_0])\n")
+                        "proj#0..3=[{exprs}], index=[RI3_IND1_HASH_ASCEQ0_0])\n")
                 .pass();
     }
 

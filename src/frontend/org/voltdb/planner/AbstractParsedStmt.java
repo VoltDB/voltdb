@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;

@@ -130,6 +130,12 @@ public final class Action {
         return this;
     }
 
+    @Override
+    public String toString() {
+        return "Action [m_type=" + m_type + ", m_statusMessage=" + m_statusMessage + ", m_scheduledAction="
+                + m_scheduledAction + "]";
+    }
+
     ScheduledAction getScheduledAction() {
         return m_scheduledAction;
     }
