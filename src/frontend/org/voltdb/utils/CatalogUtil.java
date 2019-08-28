@@ -1381,25 +1381,12 @@ public abstract class CatalogUtil {
         if (threadPoolsType == null) {
             return;
         }
-        int targetCnt = 0;
-        if (deployment.getExport() != null && deployment.getExport().getConfiguration() != null) {
-            targetCnt = deployment.getExport().getConfiguration().size();
-        }
-        // the max thread pool size should be the max of 4 and target count / 3
-        int threadPoolSizeUpperBound = Math.max(4, targetCnt / 3);
 
         for (ThreadPoolsType.Pool threadPool : threadPoolsType.getPool()) {
             ThreadPool catalogThreadPool = catDeployment.getThreadpools().add(threadPool.getName());
             catalogThreadPool.setName(threadPool.getName());
-            if (threadPool.getSize() > threadPoolSizeUpperBound) {
-                String msg = "The thread pool size setting for thread pool: " + threadPool.getName() +
-                        " is larger than the upper bound, will use the max size: " + threadPoolSizeUpperBound + " instead.";
-                hostLog.warn(msg);
-                catalogThreadPool.setSize(threadPoolSizeUpperBound);
-            }
-            else {
-                catalogThreadPool.setSize(threadPool.getSize());
-            }
+            // TODO: thread pool size upper-bound?
+            catalogThreadPool.setSize(threadPool.getSize());
         }
     }
 

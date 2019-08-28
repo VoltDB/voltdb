@@ -1724,7 +1724,8 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpNameNotExist = VoltProjectBuilder.writeStringToTempFile(nameNotExist);
         msg = CatalogUtil.compileDeployment(catalog, tmpNameNotExist.getPath(), false);
-        assertTrue(msg.contains("failed to find thread pool name: tp5"));
+        assertTrue(msg.contains("Export target test is configured to use a thread pool named tp5, " +
+                "which does not exist in the configuration: the export target will be disabled"));
 
         final String nameDuplicate =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
@@ -1746,6 +1747,28 @@ public class TestCatalogUtil extends TestCase {
         final File tmpNameDuplicate = VoltProjectBuilder.writeStringToTempFile(nameDuplicate);
         msg = CatalogUtil.compileDeployment(catalog, tmpNameDuplicate.getPath(), false);
         assertTrue(msg.contains("Thread pool name: tp2 is not unique"));
+
+
+        final String poolSizeOverFlow =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test\" type=\"kafka\" threadpool=\"tp2\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "    <threadpools>\n" +
+                        "        <pool name=\"tp2\" size=\"2\"/>\n" +
+                        "        <pool name=\"tp2\" size=\"9999999999999999\"/>\n" +
+                        "    </threadpools>\n" +
+                        "</deployment>";
+
+        final File tmpPoolSizeOverFlow = VoltProjectBuilder.writeStringToTempFile(poolSizeOverFlow);
+        msg = CatalogUtil.compileDeployment(catalog, tmpPoolSizeOverFlow.getPath(), false);
+        assertTrue(msg.contains("Error parsing deployment file"));
 
         final String sharedThreadPool =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
