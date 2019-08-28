@@ -325,7 +325,8 @@ public class MpScheduler extends Scheduler
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters,
-                    message);
+                    message,
+                    localId);
             safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
@@ -515,17 +516,15 @@ public class MpScheduler extends Scheduler
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(message.getTxnId());
-                advanceRepairTruncationHandle(message);
-                m_outstandingTxns.remove(message.getTxnId());
-                m_mailbox.send(counter.m_destinationId, message);
+                if (counter.allResponsesMismatched()) {
+                    m_duplicateCounters.remove(message.getTxnId());
+                    advanceRepairTruncationHandle(message);
+                    m_outstandingTxns.remove(message.getTxnId());
+                    m_mailbox.send(counter.m_destinationId, message);
+                } else {
+                    VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+                }
             }
-            else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
-            } else if (result == DuplicateCounter.ABORT) {
-                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT running every-site system procedure.", true, null);
-            }
-            // doing duplicate suppresion: all done.
         }
         else {
             advanceRepairTruncationHandle(message);

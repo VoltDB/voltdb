@@ -45,9 +45,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            TransactionInfoBaseMessage message)
+            TransactionInfoBaseMessage message,
+            long leaderHSID)
     {
-        super(destinationHSId, realTxnId, expectedHSIds, message);
+        super(destinationHSId, realTxnId, expectedHSIds, message, leaderHSID);
     }
 
     /**
