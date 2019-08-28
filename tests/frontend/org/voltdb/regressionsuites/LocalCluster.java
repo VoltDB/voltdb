@@ -59,6 +59,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.export.ExporterVersion;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
@@ -147,6 +148,10 @@ public class LocalCluster extends VoltServerConfig {
     boolean m_hasLocalServer = true;
     public void setHasLocalServer(boolean hasLocalServer) {
         m_hasLocalServer = hasLocalServer;
+    }
+
+    public void setExporterVersion(ExporterVersion exporterVersion) {
+        templateCmdLine.m_exporterVersion = exporterVersion;
     }
 
     ArrayList<PipeToFile> m_pipes = null;
@@ -1229,7 +1234,6 @@ public class LocalCluster extends VoltServerConfig {
                     }
                 }
             }
-
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
             String fileName = testoutputdir
