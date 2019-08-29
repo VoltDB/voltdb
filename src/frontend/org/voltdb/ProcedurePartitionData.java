@@ -81,7 +81,7 @@ public class ProcedurePartitionData {
     }
 
     public boolean isMultiPartitionProcedure() {
-        return m_tableName == null && m_tableName2 == null;
+        return !(isSinglePartition() || isTwoPartitionProcedure());
     }
 
     public static ProcedurePartitionData extractPartitionData(Procedure proc) {

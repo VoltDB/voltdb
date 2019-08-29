@@ -429,6 +429,10 @@ public abstract class ProcedureCompiler {
         }
 
         setCatalogProcedurePartitionInfo(compiler, db, procedure, partitionData);
+        if (procedure.getPartitionparameter() == -1) {
+            return;
+        }
+
         if (procedure.getPartitionparameter() >= paramTypes.length) {
             String msg = "Partition parameter is not a valid parameter for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
