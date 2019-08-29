@@ -117,7 +117,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   Table? partitiontable2    "The second table that contains the partition column for this procedure"
   Column? partitioncolumn   "Which column in the partitioned table is this procedure mapped on?"
   Column? partitioncolumn2  "If two part, which column is this proc also partitioned on?"
-  int partitionparameter    "Which parameter identifies the partition column?"
+  int partitionparameter    "Which parameter identifies the partition column. Will be -1 if single partition but not partitioned on a parameter"
   int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
   // Note that UDF dependences are recorded on the

@@ -519,6 +519,10 @@ public class ProcedureRunner {
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_isSinglePartition) {
+            if (m_partitionColumn == -1) {
+                // Procedure doesn't have a partition column so this is always the correct partition
+                return true;
+            }
             // can happen when a proc changes from multi-to-single after it's routed
             if (hashinator == null) {
                 return false; // this will kick it back to CI for re-routing
@@ -532,6 +536,12 @@ public class ProcedureRunner {
             StoredProcedureInvocation invocation = txnState.getInvocation();
             VoltType parameterType;
             Object parameterAtIndex;
+
+            if (invocation.hasPartitionDestination()
+                    && invocation.getPartitionDestination() != m_site.getCorrespondingPartitionId()) {
+                // Was not supposed to get here
+                return false;
+            }
 
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {

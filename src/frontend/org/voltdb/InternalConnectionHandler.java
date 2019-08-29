@@ -144,6 +144,10 @@ public class InternalConnectionHandler {
         int[] partitions = null;
         try {
             partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
+            if (partitions == null) {
+                m_logger.debug("Destination partition for task " + task + " does not exist");
+                return false;
+            }
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
@@ -193,6 +197,10 @@ public class InternalConnectionHandler {
         int[] partitions = null;
         try {
             partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
+            if (partitions == null) {
+                m_logger.debug("Destination partition for task " + task + " does not exist");
+                return false;
+            }
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);

@@ -73,6 +73,7 @@ import org.voltdb.common.Constants;
 import com.google_voltpatches.common.base.Strings;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -140,7 +141,8 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
                                 new AtomicReference<ImmutableSortedMap<String, Procedure>>();
-    private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
+    private final AtomicReference<ImmutableMap<Integer, Integer>> m_partitionKeys = new AtomicReference<>();
+
     private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
     private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
 
@@ -1182,11 +1184,13 @@ class Distributer {
                 if (procedures != null) {
                     procedureInfo = procedures.get(invocation.getProcName());
                 }
-                Integer hashedPartition = -1;
+                Integer hashedPartition = invocation.getPartitionDestination();
 
                 if (procedureInfo != null) {
                     hashedPartition = Constants.MP_INIT_PID;
-                    if (( ! procedureInfo.multiPart) &&
+                    if (invocation.hasPartitionDestination()) {
+                        hashedPartition = invocation.getPartitionDestination();
+                    } else if ((!procedureInfo.multiPart) &&
                         // User may have passed too few parameters to allow dispatching.
                         // Avoid an indexing error here to fall through to the proper ProcCallException.
                             (procedureInfo.partitionParameter < invocation.getPassedParamCount())) {
@@ -1211,26 +1215,29 @@ class Distributer {
                                     }
                                 }
                             }
-                            if (!cxn.hadBackPressure() || ignoreBackpressure) {
-                                backpressure = false;
-                            }
                         }
                     } else {
                         /*
                          * For writes or SAFE reads, this is the best way to go
                          */
                         cxn = m_partitionMasters.get(hashedPartition);
-                        if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
-                            backpressure = false;
-                        }
+
+                    }
+                } else if (invocation.hasPartitionDestination()) {
+                    cxn = m_partitionMasters.get(hashedPartition);
+                }
+
+                if (cxn != null) {
+                    if (!cxn.m_isConnected) {
+                        // Would be nice to log something here
+                        // Client affinity picked a connection that was actually disconnected. Reset to null
+                        // and let the round-robin choice pick a connection
+                        cxn = null;
+                    } else if (!cxn.hadBackPressure() || ignoreBackpressure) {
+                        backpressure = false;
                     }
                 }
-                if (cxn != null && !cxn.m_isConnected) {
-                    // Would be nice to log something here
-                    // Client affinity picked a connection that was actually disconnected.  Reset to null
-                    // and let the round-robin choice pick a connection
-                    cxn = null;
-                }
+
                 ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
                 if (stats == null) {
                     stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
@@ -1531,15 +1538,16 @@ class Distributer {
     }
 
     private void updatePartitioning(VoltTable vt) {
-        List<Integer> keySet = new ArrayList<Integer>();
+        ImmutableMap.Builder<Integer, Integer> builder = ImmutableMap.builder();
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
+                Integer partitionId = (int) vt.getLong("PARTITION_ID");
                 Integer key = (int)(vt.getLong("PARTITION_KEY"));
-                keySet.add(key);
+                builder.put(partitionId, key);
             }
         }
-        m_partitionKeys.set(ImmutableSet.copyOf(keySet));
+        m_partitionKeys.set(builder.build());
     }
 
     /**
@@ -1578,7 +1586,7 @@ class Distributer {
         return m_procedureCallTimeoutNanos;
     }
 
-    ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
+    ImmutableMap<Integer, Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
         refreshPartitionKeys(false);
 
         if (m_partitionUpdateStatus.get().getStatus() != ClientResponse.SUCCESS) {
