@@ -52,6 +52,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.decode.BatchDecoder.BulkException;
 import org.voltdb.exportclient.decode.ElasticSearchJsonEntityDecoder;
 import org.voltdb.exportclient.decode.EndpointExpander;
@@ -330,9 +332,13 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
                 m_jsonStringDecoder = builder.build();
                 m_entityDecoder = null;
             }
-            // TODO: how to make it named unique
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Elastic Export Decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                // TODO: how to make it named unique
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "Elastic Export Decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         void populateExportPath(String tableName, int partitionId, long generation) {
@@ -456,11 +462,13 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
             if (m_entityDecoder != null) {
                 m_entityDecoder.discard(0L);
             }
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
