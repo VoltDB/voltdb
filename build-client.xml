@@ -13,16 +13,13 @@
     </sequential>
 </macrodef>
 
-<macrodef name="invoke-javac17">
+<macrodef name="invoke-javac-client">
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.client.dir}"/>
     <attribute name="excludes" default=""/>
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.7"
-            source="1.7"
-            bootclasspath="${vendor.lib.dir}/classes-java1.7.jar:${vendor.lib.dir}/bouncy-castle-jce.jar"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -336,9 +333,7 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
     </copy>
 
-    <invoke-javac17 srcdir="${build.clientsrc.dir}">
-    </invoke-javac17>
-
+    <invoke-javac-client srcdir="${build.clientsrc.dir}"/>
 </target>
 
 <!-- END PROJECT -->
