@@ -670,7 +670,7 @@ public:
                  uniqueId); // fake uniqueid
         m_spHandleReplica++;
 
-        boost::unordered_map<int64_t, PersistentTable*> tables;
+        std::unordered_map<int64_t, PersistentTable*> tables;
         tables[42] = m_tableReplica;
         tables[43] = m_otherTableWithIndexReplica;
         tables[44] = m_otherTableWithoutIndexReplica;

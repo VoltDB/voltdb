@@ -165,13 +165,11 @@ public class CatalogContext {
             DefaultProcedureManager defaultProcManager,
             PlannerTool plannerTool,
             HostMessenger messenger,
-            boolean hasSchemaChange)
-    {
+            boolean hasSchemaChange) {
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
-        }
-        if (settings == null) {
+        } else if (settings == null) {
             throw new IllegalArgumentException("Cant't create CatalogContext with null cluster settings");
         }
 
@@ -236,8 +234,7 @@ public class CatalogContext {
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
-            HostMessenger messenger)
-    {
+            HostMessenger messenger) {
         this(catalog, settings, version, genId,
              new CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes),
              null, null, messenger, true);
@@ -280,8 +277,7 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
             HostMessenger messenger,
-            boolean hasSchemaChange)
-    {
+            boolean hasSchemaChange) {
         Catalog newCatalog = null;
         assert(catalogBytes != null);
 
@@ -353,8 +349,7 @@ public class CatalogContext {
      * @param name
      * @throws IOException
      */
-    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException
-    {
+    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException {
         File catalogFile = new VoltFile(path, name);
         File catalogTmpFile = new VoltFile(path, name + ".tmp");
 
@@ -416,8 +411,7 @@ public class CatalogContext {
     // Generate helpful status messages based on configuration present in the
     // catalog.  Used to generated these messages at startup and after an
     // @UpdateApplicationCatalog
-    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose)
-    {
+    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose) {
         SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology

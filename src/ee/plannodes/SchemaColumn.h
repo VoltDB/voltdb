@@ -14,8 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef VOLTDBSCHEMACOLUMN_H
-#define VOLTDBSCHEMACOLUMN_H
+#pragma once
 
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
@@ -23,10 +22,7 @@
 
 #include "boost/shared_ptr.hpp"
 
-#include <string>
-
-namespace voltdb
-{
+namespace voltdb {
 
 /**
  * Convenience class to deserialize a SchemaColumn object from the JSON
@@ -35,8 +31,7 @@ namespace voltdb
  * stored, or expected to be valid outside the scope of the initial
  * JSON deserialization.
  */
-class SchemaColumn
-{
+class SchemaColumn {
 public:
     SchemaColumn(PlannerDomValue colObject, int idx);
     ~SchemaColumn();
@@ -58,4 +53,3 @@ private:
 
 }
 
-#endif

@@ -343,6 +343,7 @@ static void raiseFunctionFactoryError(
          "Internal Error: SQL function '%s' with ID (%d) with (%lu) parameters is not implemented "
          "in VoltDB (or may have been incorrectly parsed)",
          nameString.c_str(), functionId, args.size());
+   fn_message[sizeof fn_message - 1] = '\0';
    DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
    throw SerializableEEException(fn_message);
 }

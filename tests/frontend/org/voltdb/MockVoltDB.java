@@ -68,6 +68,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -953,5 +954,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean isClusterComplete() {
         return true;
+    }
+
+    @Override
+    public TaskManager getTaskManager() {
+        return null;
     }
 }

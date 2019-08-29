@@ -137,12 +137,12 @@ typedef std::pair<std::string, ExportTupleStream*> LabeledStreamWrapper;
  * The set of plan bytes is explicitly maintained in MRU-first order,
  * while also indexed by the plans' bytes. Here lie boost-related dragons.
  */
-typedef boost::multi_index::multi_index_container<
+using PlanSet = boost::multi_index::multi_index_container<
     boost::shared_ptr<ExecutorVector>,
     boost::multi_index::indexed_by<
         boost::multi_index::sequenced<>,
         boost::multi_index::hashed_unique<
-            boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>>>> PlanSet;
+            boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>>>>;
 
 int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
 
@@ -153,44 +153,23 @@ VoltEEExceptionType VoltDBEngine::s_loadTableException =
     VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE;
 int VoltDBEngine::s_drHiddenColumnSize = 0;
 
-VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
-    : m_currentIndexInBatch(-1),
-      m_currentUndoQuantum(NULL),
-      m_siteId(-1),
-      m_isLowestSite(false),
-      m_partitionId(-1),
-      m_hashinator(NULL),
-      m_oldestExportStreamWithPendingRows(NULL),
-      m_newestExportStreamWithPendingRows(NULL),
-      m_isActiveActiveDREnabled(false),
-      m_currentInputDepId(-1),
-      m_stringPool(16777216, 2),
-      m_numResultDependencies(0),
-      m_logManager(logProxy),
-      m_templateSingleLongTable(NULL),
-      m_topend(topend),
-      m_executorContext(NULL),
-      m_drPartitionedConflictStreamedTable(NULL),
-      m_drReplicatedConflictStreamedTable(NULL),
-      m_drStream(NULL),
-      m_drReplicatedStream(NULL),
-      m_currExecutorVec(NULL) {
+VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(logProxy), m_topend(topend) {
     loadBuiltInJavaFunctions();
 }
 
 void
 VoltDBEngine::initialize(int32_t clusterIndex,
-                         int64_t siteId,
-                         int32_t partitionId,
-                         int32_t sitesPerHost,
-                         int32_t hostId,
-                         std::string hostname,
-                         int32_t drClusterId,
-                         int32_t defaultDrBufferSize,
-                         int64_t tempTableMemoryLimit,
-                         bool isLowestSiteId,
-                         int32_t compactionThreshold,
-                         int32_t exportFlushTimeout) {
+        int64_t siteId,
+        int32_t partitionId,
+        int32_t sitesPerHost,
+        int32_t hostId,
+        std::string const& hostname,
+        int32_t drClusterId,
+        int32_t defaultDrBufferSize,
+        int64_t tempTableMemoryLimit,
+        bool isLowestSiteId,
+        int32_t compactionThreshold,
+        int32_t exportFlushTimeout) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_isLowestSite = isLowestSiteId;
@@ -213,21 +192,9 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[14] = 1;  // number of columns
     m_templateSingleLongTable[15] = VALUE_TYPE_BIGINT; // column type
     m_templateSingleLongTable[19] = 15; // column name length:  "modified_tuples" == 15
-    m_templateSingleLongTable[20] = 'm';
-    m_templateSingleLongTable[21] = 'o';
-    m_templateSingleLongTable[22] = 'd';
-    m_templateSingleLongTable[23] = 'i';
-    m_templateSingleLongTable[24] = 'f';
-    m_templateSingleLongTable[25] = 'i';
-    m_templateSingleLongTable[26] = 'e';
-    m_templateSingleLongTable[27] = 'd';
-    m_templateSingleLongTable[28] = '_';
-    m_templateSingleLongTable[29] = 't';
-    m_templateSingleLongTable[30] = 'u';
-    m_templateSingleLongTable[31] = 'p';
-    m_templateSingleLongTable[32] = 'l';
-    m_templateSingleLongTable[33] = 'e';
-    m_templateSingleLongTable[34] = 's';
+
+    strcpy(&m_templateSingleLongTable[20], "modified_tuples");
+
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
@@ -265,12 +232,9 @@ VoltDBEngine::~VoltDBEngine() {
     m_undoLog.clear();
 
     // clean up memory for the template memory for the single long (int) table
-    if (m_templateSingleLongTable) {
-        delete[] m_templateSingleLongTable;
-    }
+    delete[] m_templateSingleLongTable;
 
     // Delete table delegates and release any table reference counts.
-    typedef std::pair<int64_t, Table*> TID;
 
     if (m_partitionId != 16383) {
         for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
@@ -303,7 +267,7 @@ VoltDBEngine::~VoltDBEngine() {
         if (m_isLowestSite) {
             SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
         }
-        for (TID tid : m_snapshottingTables) {
+        for (auto tid : m_snapshottingTables) {
             tid.second->decrementRefcount();
         }
 
@@ -315,8 +279,7 @@ VoltDBEngine::~VoltDBEngine() {
 
         delete m_drReplicatedStream;
         delete m_drStream;
-    }
-    else {
+    } else {
         delete m_executorContext;
     }
     VOLT_DEBUG("finished deallocate for partition %d", m_partitionId);
@@ -326,7 +289,7 @@ VoltDBEngine::~VoltDBEngine() {
 // OBJECT ACCESS FUNCTIONS
 // ------------------------------------------------------------------
 catalog::Catalog* VoltDBEngine::getCatalog() const {
-    return (m_catalog.get());
+    return m_catalog.get();
 }
 
 Table* VoltDBEngine::getTableById(int32_t tableId) const {
@@ -358,7 +321,7 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
 void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
     // Just look in our list of tables
     Table* table = getTableById(tableId);
-    if ( ! table) {
+    if (! table) {
         throwFatalException("Unable to find table for TableId '%d'", (int) tableId);
     }
     table->serializeTo(out);
@@ -398,8 +361,16 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
  * @param traceOn               True to turn per-transaction tracing on.
  */
 int VoltDBEngine::executePlanFragments(
-      int32_t numFragments, int64_t planfragmentIds[], int64_t inputDependencyIds[], ReferenceSerializeInputBE &serialInput,
-      int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, int64_t undoToken, bool traceOn) {
+      int32_t numFragments,
+      int64_t planfragmentIds[],
+      int64_t inputDependencyIds[],
+      ReferenceSerializeInputBE &serialInput,
+      int64_t txnId,
+      int64_t spHandle,
+      int64_t lastCommittedSpHandle,
+      int64_t uniqueId,
+      int64_t undoToken,
+      bool traceOn) {
     // count failures
     int failures = 0;
 
@@ -494,8 +465,8 @@ int VoltDBEngine::executePlanFragments(
         VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog,
                    static_cast<int32_t> (drBufferChange));
         m_resultOutput.writeIntAt(m_startOfResultBuffer + 5,
-                                  static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) -
-                                  sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
+                static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) -
+                sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
 
     }
     m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
@@ -579,7 +550,8 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId, int64_t inputDepen
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified) {
+UniqueTempTableResult VoltDBEngine::executePlanFragment(
+        ExecutorVector* executorVector, int64_t* tuplesModified) {
     UniqueTempTableResult result;
     // set this to zero for dml operations
     m_executorContext->pushNewModifiedTupleCounter();
@@ -663,22 +635,27 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-// Four parameters for this function:
-// * functionId is the id of the user-defined aggregate function
-// * argument is a value in the table for the specified column (assemble method), or it can be the byte array
-// that represents the output from a worker (combine method), or it can be NULL value (end method)
-// * type is similar to argument. It can be the type for the specified column (assemble method), or it can be
-// varbinary (combine method), or invalid (end method)
-// * udafIndex represents the index for the same user-defined aggregate function in a query.
-// For example, for "SELECT udf(b), avg(c), udf(a) FROM t", udf(b) has an udafIndex of 1,
-// udf(a) has an udafIndex of 1
+/**
+ * This function serialize the following information to the buffer and pass them to the Java side
+ *
+ * @param  functionId      The id of the user-defined aggregate function
+ * @param  argument        This argument is a value in the table for the specified column (assemble method),
+ *                         or it can be the byte array that represents the output from a worker (combine method),
+ *                         or it can be NULL value (end method)
+ * @param  type            The type of the arguments in argVector
+ *                         It can be the type for the specified column (assemble method),
+ *                         or it can be varbinary (combine method), or invalid (end method)
+ * @param udafIndex        The index for the same user-defined aggregate function in a query.
+ *                         For example, for "SELECT udf(b), avg(c), udf(a) FROM t",
+ *                         udf(b) has an udafIndex of 0, and udf(a) has an udafIndex of 1.
+ */
 void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument,
-                                                ValueType type, int32_t udafIndex) {
+        ValueType type, int32_t udafIndex) {
     // Estimate the size of the buffer we need. We will put:
     //   * buffer size needed
     //   * function id (int32_t)
     //   * udaf index (int32_t)
-    //   * parameters.
+    //   * a single parameter (NValue).
 
     // three int32_t: size of the buffer, function id, and udaf index
     int32_t bufferSizeNeeded = 3 * sizeof(int32_t);
@@ -695,7 +672,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     }
     resetUDFOutputBuffer();
 
-    // Serialize buffer size, function ID.
+    // Serialize buffer size, function ID, and udaf index
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
     m_udfOutput.writeInt(udafIndex);
@@ -708,19 +685,78 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     assert(bufferSizeNeeded == m_udfOutput.position());
 }
 
+/**
+ * This function serialize the following information to the buffer and pass them to the Java side
+ *
+ * @param  functionId      The id of the user-defined aggregate function
+ * @param  argVector       An array of arguments.
+ *                         Each argument is a value in the table for the specified column (assemble method),
+ *                         or it can be the byte array that represents the output from a worker (combine method),
+ *                         or it can be NULL value (end method)
+ * @param  argCount        The number of arguments in the argVector.
+ *                         It is no larger than the size of argVector.
+ * @param  type            The type of the arguments in argVector
+ *                         It can be the type for the specified column (assemble method),
+ *                         or it can be varbinary (combine method), or invalid (end method)
+ * @param udafIndex        The index for the same user-defined aggregate function in a query.
+ *                         For example, for "SELECT udf(b), avg(c), udf(a) FROM t",
+ *                         udf(b) has an udafIndex of 0, and udf(a) has an udafIndex of 1.
+ */
+void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
+        vector<NValue> const& argVector, int32_t argCount, ValueType type, int32_t udafIndex) {
+    // Determined the buffer size needed.
+    // Information put in the buffer (sequentially)
+    // * buffer size needed (int32_t)
+    // * function id (int32_t)
+    // * udaf index (int32_t)
+    // * row count (int32_t)
+    // * a list of rows coresponding to a given column (NValue)
+
+    // Make sure the argCount is no larger than the size of argVector
+    assert(argCount <= argVector.size());
+
+    int32_t bufferSizeNeeded = 4 * sizeof(int32_t);
+    vector<NValue> cast_argument(argCount);
+    if (type != VALUE_TYPE_INVALID) {
+        for (int i = 0; i < argCount; i++) {
+            cast_argument[i] = argVector[i].castAs(type);
+            bufferSizeNeeded += cast_argument[i].serializedSize();
+        }
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    if (bufferSizeNeeded > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded);
+    }
+    resetUDFOutputBuffer();
+
+    // serialize data
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+    m_udfOutput.writeInt(udafIndex);
+    m_udfOutput.writeInt(argCount);
+
+    if (type != VALUE_TYPE_INVALID) {
+        for (int i = 0; i < argCount; i++) {
+            cast_argument[i].serializeTo(m_udfOutput);
+        }
+    }
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded == m_udfOutput.position());
+}
+
 void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, int32_t functionId) {
-    if (info == NULL) {
+    if (info == nullptr) {
         // There must be serious inconsistency in the catalog if this could happen.
-        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)",
+                functionId);
     }
 }
 
 void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
     if (returnCode != 0) {
-        char buf[128];
-        snprintf(buf, 128, "%s failed", name);
-        throw SQLException(SQLException::volt_user_defined_function_error,
-            buf);
+        throwSQLException(SQLException::volt_user_defined_function_error, "%s failed", name);
     }
 }
 
@@ -741,63 +777,52 @@ NValue VoltDBEngine::udfResultHelper(int32_t returnCode, bool partition_table, V
         }
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
         return retval;
-    }
-    else {
-        // Error handling
-        std::string errorMsg = udfResultIn.readTextString();
-        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    } else { // Error handling
+        throw SQLException(SQLException::volt_user_defined_function_error,
+                udfResultIn.readTextString());
     }
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
-    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkUserDefinedFunctionInfo(info, functionId);
-    // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
-    // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart(functionId);
-    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
+    checkUserDefinedFunctionInfo(findInMapOrNull(functionId, m_functionInfo), functionId);
+    checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateStart(functionId),
+            "callJavaUserDefinedAggregateStart");
 }
 
-void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument, int32_t udafIndex) {
+void VoltDBEngine::callJavaUserDefinedAggregateAssemble(
+        int32_t functionId, vector<NValue>& argVector, int32_t argCount, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front(), udafIndex);
-    // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
-    // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
-    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
+    serializeToUDFOutputBuffer(functionId, argVector, argCount,
+            info->paramTypes.front(), udafIndex);
+    checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateAssemble(),
+            "callJavaUserDefinedAggregateAssemble");
 }
 
-void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument, int32_t udafIndex) {
-    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-    checkUserDefinedFunctionInfo(info, functionId);
+void VoltDBEngine::callJavaUserDefinedAggregateCombine(
+        int32_t functionId, const NValue& argument, int32_t udafIndex) {
+    checkUserDefinedFunctionInfo(findInMapOrNull(functionId, m_functionInfo), functionId);
     // the argument here is of the type varbinary because this is the serialized byte
     // array after the worker end method
     serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY, udafIndex);
-    // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
-    // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
-    checkJavaFunctionReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
+    checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateCombine(),
+            "callJavaUserDefinedAggregateCombine");
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
-    // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
-    // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
-    return udfResultHelper(returnCode, true, info->returnType);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID),
+            VALUE_TYPE_VARBINARY, udafIndex);
+    return udfResultHelper(m_topend->callJavaUserDefinedAggregateWorkerEnd(), true, info->returnType);
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID, udafIndex);
-    // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
-    // Java user-defined function. It will return 0 if the execution is successful.
-    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
-    return udfResultHelper(returnCode, false, info->returnType);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID),
+            VALUE_TYPE_INVALID, udafIndex);
+    return udfResultHelper(m_topend->callJavaUserDefinedAggregateCoordinatorEnd(), false, info->returnType);
 }
 
 
@@ -810,18 +835,20 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
 
     if (isEmptyDRTxn) {
         if (m_executorContext->drStream()) {
-            m_executorContext->drStream()->rollbackDrTo(m_executorContext->drStream()->getCommittedUso(), SIZE_MAX);
+            m_executorContext->drStream()
+                ->rollbackDrTo(m_executorContext->drStream()->getCommittedUso(), SIZE_MAX);
         }
         if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->rollbackDrTo(m_executorContext->drReplicatedStream()->getCommittedUso(),
-                                                                SIZE_MAX);
+            m_executorContext->drReplicatedStream()
+                ->rollbackDrTo(m_executorContext->drReplicatedStream()->getCommittedUso(), SIZE_MAX);
         }
     } else {
         if (m_executorContext->drStream()) {
             m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
         }
         if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+            m_executorContext->drReplicatedStream()
+                ->endTransaction(m_executorContext->currentUniqueId());
         }
     }
 }
@@ -964,8 +991,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
  */
-void
-VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
+void VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         std::map<std::string, ExportTupleStream*> & purgedStreams) {
     std::vector<std::string> deletion_vector;
     m_catalog->getDeletedPaths(deletion_vector);
@@ -982,11 +1008,10 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         vassert(tcd);
         if (tcd) {
             Table* table = tcd->getTable();
-            PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
-            if (persistenttable) {
-                if (updateReplicated != persistenttable->isReplicatedTable()) {
-                    deletions.erase(path);
-                }
+            PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(table);
+            if (persistenttable &&
+                    updateReplicated != persistenttable->isReplicatedTable()) {
+                deletions.erase(path);
             }
         }
     }
@@ -1001,8 +1026,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         // skip export tables for now
         if (dynamic_cast<StreamedTable*>(table)) {
             continue;
-        }
-        if (table->activeTupleCount() == 0) {
+        } else if (table->activeTupleCount() == 0) {
             PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable) {
                 if (persistenttable->isReplicatedTable()) {
@@ -1010,11 +1034,9 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                         // identify empty tables and mark for deletion
                         deletions.insert(delegatePair.first);
                     }
-                } else {
-                    if (!updateReplicated) {
-                        // identify empty tables and mark for deletion
-                        deletions.insert(delegatePair.first);
-                    }
+                } else if (!updateReplicated) {
+                    // identify empty tables and mark for deletion
+                    deletions.insert(delegatePair.first);
                 }
             }
         }
@@ -1024,7 +1046,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
 
     // delete tables in the set
     bool isReplicatedTable;
-    BOOST_FOREACH (auto path, deletions) {
+    for (auto path : deletions) {
         // If the delete path is under the catalog functions item, drop the user-defined function.
         if (startsWith(path, catalogFunctions.path())) {
             catalog::Function* catalogFunction =
@@ -1079,8 +1101,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             if (persistenttable && persistenttable->isReplicatedTable()) {
                 isReplicatedTable = true;
                 ExecuteWithAllSitesMemory execAllSites;
-                for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                    EngineLocals& curr = engineIt->second;
+                for (auto engineIt : execAllSites) {
+                    EngineLocals& curr = engineIt.second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
                     SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_delegatesByName.erase(table->name());
@@ -1094,7 +1116,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
                 purgedStreams[name] = streamedtable->getWrapper();
                 //Unset wrapper so it can be deleted after last push.
-                streamedtable->setWrapper(NULL);
+                streamedtable->setWrapper(nullptr);
                 m_exportingTables.erase(name);
             }
             if (isReplicatedTable) {
@@ -1108,8 +1130,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         }
         if (isReplicatedTable) {
             ExecuteWithAllSitesMemory execAllSites;
-            for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                EngineLocals& curr = engineIt->second;
+            for (auto engineIt : execAllSites) {
+                EngineLocals& curr = engineIt.second;
                 VoltDBEngine* currEngine = curr.context->getContextEngine();
                 SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                 currEngine->m_catalogDelegates.erase(path);
@@ -1120,32 +1142,27 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
     }
 }
 
-static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetTable, bool targetIsPersistentTable) {
+static bool haveDifferentSchema(
+        catalog::Table* srcTable, voltdb::Table* targetTable, bool targetIsPersistentTable) {
     // covers column count
     if (srcTable->columns().size() != targetTable->columnCount()) {
         return true;
-    }
-
-    if (targetIsPersistentTable) {
-        PersistentTable* persistentTable = dynamic_cast<PersistentTable *>(targetTable);
-        if (srcTable->isDRed() != persistentTable->isDREnabled()) {
-            return true;
-        } else if ((static_cast<TableType>(srcTable->tableType())) != persistentTable->getTableType()) {
+    } else if (targetIsPersistentTable) {
+        auto* persistentTable = dynamic_cast<PersistentTable *>(targetTable);
+        if (srcTable->isDRed() != persistentTable->isDREnabled() ||
+                static_cast<TableType>(srcTable->tableType()) != persistentTable->getTableType()) {
            return true;
         }
     }
 
     // make sure each column has same metadata
-    std::map<std::string, catalog::Column*>::const_iterator outerIter;
-    for (outerIter = srcTable->columns().begin();
-         outerIter != srcTable->columns().end();
-         outerIter++) {
-        int index = outerIter->second->index();
-        int size = outerIter->second->size();
-        int32_t type = outerIter->second->type();
-        std::string name = outerIter->second->name();
-        bool nullable = outerIter->second->nullable();
-        bool inBytes = outerIter->second->inbytes();
+    for (auto outerIter : srcTable->columns()) {
+        int index = outerIter.second->index();
+        int size = outerIter.second->size();
+        int32_t type = outerIter.second->type();
+        std::string name = outerIter.second->name();
+        bool nullable = outerIter.second->nullable();
+        bool inBytes = outerIter.second->inbytes();
 
         if (targetTable->columnName(index).compare(name)) {
             return true;
@@ -1153,20 +1170,15 @@ static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetT
 
         auto columnInfo = targetTable->schema()->getColumnInfo(index);
 
-        if (columnInfo->allowNull != nullable) {
-            return true;
-        } else if (columnInfo->getVoltType() != type) {
+        if (columnInfo->allowNull != nullable || columnInfo->getVoltType() != type) {
             return true;
         }
 
         // check the size of types where size matters
-        if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (columnInfo->length != size) {
-                return true;
-            } else if (columnInfo->inBytes != inBytes) {
-                vassert(type == VALUE_TYPE_VARCHAR);
-                return true;
-            }
+        if ((type == VALUE_TYPE_VARCHAR || type == VALUE_TYPE_VARBINARY)  &&
+                (columnInfo->length != size || columnInfo->inBytes != inBytes)) {
+            vassert(columnInfo->inBytes == inBytes || type == VALUE_TYPE_VARCHAR);
+            return true;
         }
     }
 
@@ -1181,11 +1193,10 @@ static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetT
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool
-VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
+bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
         bool isStreamUpdate, std::map<std::string, ExportTupleStream*> & purgedStreams) {
     // iterate over all of the tables in the new catalog
-    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+    for (LabeledTable labeledTable : m_database->tables()) {
         // get the catalog's table object
         auto catalogTable = labeledTable.second;
         // get the delegate for the table... add the table if it's null
@@ -1206,8 +1217,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     VOLT_TRACE("add a REPLICATED completely new table or rebuild an empty table %s", tableName.c_str());
                     {
                         ExecuteWithAllSitesMemory execAllSites;
-                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                            EngineLocals &curr = engineIt->second;
+                        for (auto engineIt : execAllSites) {
+                            EngineLocals &curr = engineIt.second;
                             VoltDBEngine *currEngine = curr.context->getContextEngine();
                             currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
                             currEngine->m_delegatesByName[tableName] = tcd;
@@ -1222,8 +1233,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 if (updateReplicated) {
                     continue;
                 }
-                tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                               m_compactionThreshold, this);
+                tcd = new TableCatalogDelegate(catalogTable->signature(), m_compactionThreshold, this);
                 // use the delegate to init the table and create indexes n' stuff
                 tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                 m_catalogDelegates[catalogTable->path()] = tcd;
@@ -1381,6 +1391,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
@@ -1397,7 +1408,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 }
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
-                         catalogTable->name().c_str());
+                        catalogTable->name().c_str());
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
@@ -1568,10 +1580,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
         info->returnType = (ValueType) catalogFunction->returnType();
         catalog::CatalogMap<catalog::FunctionParameter> parameters = catalogFunction->parameters();
         info->paramTypes.resize(parameters.size());
-        for (catalog::CatalogMap<catalog::FunctionParameter>::field_map_iter iter = parameters.begin();
-                 iter != parameters.end(); iter++) {
-            int key = std::stoi(iter->first);
-            info->paramTypes[key] = (ValueType)iter->second->parameterType();
+        for (auto iter : parameters) {
+            int key = std::stoi(iter.first);
+            info->paramTypes[key] = (ValueType)iter.second->parameterType();
         }
 
         VOLT_DEBUG("UDFCAT: Adding function info (ID = %d)", catalogFunction->functionId());
@@ -1587,19 +1598,21 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
     return true;
 }
 
-void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable, const std::string& streamName,
-        std::map<std::string, ExportTupleStream*> & purgedStreams, int64_t timestamp) {
+void VoltDBEngine::attachTupleStream(
+        StreamedTable* streamedTable,
+        const std::string& streamName,
+        std::map<std::string, ExportTupleStream*> & purgedStreams,
+        int64_t timestamp) {
     m_exportingTables[streamName] = streamedTable;
     ExportTupleStream* wrapper = streamedTable->getWrapper();
-    if (wrapper == NULL) {
+    if (wrapper == nullptr) {
         wrapper = purgedStreams[streamName];
-        if (wrapper == NULL) {
-            wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                            m_executorContext->m_siteId,
-                                            timestamp,
-                                            streamName);
+        if (wrapper == nullptr) {
+            wrapper = new ExportTupleStream(
+                    m_executorContext->m_partitionId, m_executorContext->m_siteId,
+                    timestamp, streamName);
         } else {
-            purgedStreams[streamName] = NULL;
+            purgedStreams[streamName] = nullptr;
         }
         streamedTable->setWrapper(wrapper);
         VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
@@ -1715,16 +1728,14 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
     }
 
     Table* ret = getTableById(tableId);
-    if (ret == NULL) {
-        VOLT_ERROR("Table ID %d doesn't exist. Could not load data",
-                   (int) tableId);
+    if (ret == nullptr) {
+        VOLT_ERROR("Table ID %d doesn't exist. Could not load data", (int) tableId);
         return false;
     }
 
     PersistentTable* table = dynamic_cast<PersistentTable*>(ret);
-    if (table == NULL) {
-        VOLT_ERROR("Table ID %d(name '%s') is not a persistent table."
-                   " Could not load data",
+    if (table == nullptr) {
+        VOLT_ERROR("Table ID %d(name '%s') is not a persistent table. Could not load data",
                    (int) tableId, ret->name().c_str());
         return false;
     }
@@ -1751,8 +1762,9 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-            (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-             VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+            (table->isReplicatedTable(), isLowestSite(), []() {
+             s_loadTableException = VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE;
+             });
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         // Joined views are special. If any of the source table(s) are not empty, we cannot restore the view content
         // from a snapshot. The Java top-end has no way to know this so it still tries to tell the EE
@@ -1762,8 +1774,10 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
         auto handler = table->materializedViewHandler();
         if (handler && handler->snapshotable() && handler->isEnabled()) {
             char msg[256];
-            snprintf(msg, sizeof(msg), "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
-                     table->name().c_str());
+            snprintf(msg, sizeof(msg),
+                    "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
+                    table->name().c_str());
+            msg[sizeof msg - 1] = '\0';
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
             return true;
         }
@@ -1828,7 +1842,8 @@ bool VoltDBEngine::loadTable(int32_t tableId, ReferenceSerializeInputBE &seriali
         VOLT_DEBUG("%s", oss.str().c_str());
         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
                 oss.str().c_str());
-    } else if (s_loadTableException != VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
+    } else if (s_loadTableException != VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE) {
+        // some other kind of exception occurred on lowest site thread
         // This is fatal.
         std::ostringstream oss;
         oss << "An unknown exception occurred on another thread when loading table \"" << table->name() << "\".";
@@ -1860,7 +1875,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
     }
 
     // Walk through table delegates and update local table collections
-    BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
+    for (LabeledTCD cd : m_catalogDelegates) {
         auto tcd = cd.second;
         vassert(tcd);
         if (! tcd) {
@@ -1880,8 +1895,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             if (updateReplicated) {
                 // This engine is responsible for updating the catalog table maps for all sites.
                 ExecuteWithAllSitesMemory execAllSites;
-                for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                    EngineLocals& curr = engineIt->second;
+                for (auto engineIt : execAllSites) {
+                    EngineLocals& curr = engineIt.second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
                     SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
@@ -1902,8 +1917,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 if (catTable->isreplicated()) {
                     if (updateReplicated) {
                         ExecuteWithAllSitesMemory execAllSites;
-                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                            EngineLocals& curr = engineIt->second;
+                        for (auto engineIt : execAllSites) {
+                            EngineLocals& curr = engineIt.second;
                             VoltDBEngine* currEngine = curr.context->getContextEngine();
                             SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                             currEngine->m_tablesBySignatureHash[hash] = persistentTable;
@@ -1919,8 +1934,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             if (catTable->isreplicated()) {
                 if (updateReplicated) {
                     ExecuteWithAllSitesMemory execAllSites;
-                    for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
-                        EngineLocals& curr = engineIt->second;
+                    for (auto engineIt : execAllSites) {
+                        EngineLocals& curr = engineIt.second;
                         VoltDBEngine* currEngine = curr.context->getContextEngine();
                         SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                         if (! fromScratch) {
@@ -2007,8 +2022,10 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     if (m_executorContext->drStream()->drStreamStarted()) {
         m_executorContext->drStream()->generateDREvent(SWAP_TABLE, spHandle, uniqueId, payload);
     }
-    if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
-        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, spHandle, uniqueId, payload);
+    if (m_executorContext->drReplicatedStream() &&
+            m_executorContext->drReplicatedStream()->drStreamStarted()) {
+        m_executorContext->drReplicatedStream()->generateDREvent(
+                SWAP_TABLE, spHandle, uniqueId, payload);
     }
 }
 
@@ -2396,21 +2413,21 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
     try {
         switch (selector) {
-        case STATISTICS_SELECTOR_TYPE_TABLE:
-            resultTable = m_statsManager.getStats(
-                    (StatisticsSelectorType) selector,
-                    m_siteId, m_partitionId,
-                    locatorIds, interval, now);
-            break;
-        case STATISTICS_SELECTOR_TYPE_INDEX:
-            resultTable = m_statsManager.getStats(
-                    (StatisticsSelectorType) selector,
-                    m_siteId, m_partitionId,
-                    locatorIds, interval, now);
-            break;
-        default:
-            throwSerializableEEException(
-                    "getStats() called with an unrecognized selector %d", selector);
+            case STATISTICS_SELECTOR_TYPE_TABLE:
+                resultTable = m_statsManager.getStats(
+                        (StatisticsSelectorType) selector,
+                        m_siteId, m_partitionId,
+                        locatorIds, interval, now);
+                break;
+            case STATISTICS_SELECTOR_TYPE_INDEX:
+                resultTable = m_statsManager.getStats(
+                        (StatisticsSelectorType) selector,
+                        m_siteId, m_partitionId,
+                        locatorIds, interval, now);
+                break;
+            default:
+                throwSerializableEEException(
+                        "getStats() called with an unrecognized selector %d", selector);
         }
     } catch (const SerializableEEException &e) {
         serializeException(e);
@@ -2449,8 +2466,12 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
  *  string: predicate #2
  *  ...
  */
-bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType streamType,
-        HiddenColumnFilter::Type hiddenColumnFilter, int64_t undoToken, ReferenceSerializeInputBE &serializeIn) {
+bool VoltDBEngine::activateTableStream(
+        const CatalogId tableId,
+        TableStreamType streamType,
+        HiddenColumnFilter::Type hiddenColumnFilter,
+        int64_t undoToken,
+        ReferenceSerializeInputBE &serializeIn) {
     Table* found = getTableById(tableId);
     if (! found) {
         return false;
@@ -2464,7 +2485,8 @@ bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType 
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(streamType, hiddenColumnFilter, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(streamType, hiddenColumnFilter,
+                m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
@@ -2506,7 +2528,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             vassert(positions.size() <= std::numeric_limits<int32_t>::max());
             results.writeInt((int32_t)positions.size());
             // Copy the position vector's contiguous storage to the returned results buffer.
-            BOOST_FOREACH (int ipos, positions) {
+            for (int ipos : positions) {
                 results.writeInt(ipos);
             }
         }
@@ -2538,8 +2560,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 nBuffers);
     }
 
-    if (!tableStreamTypeIsValid(streamType)) {
-        // Failure
+    if (!tableStreamTypeIsValid(streamType)) { // Failure
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
@@ -2557,7 +2578,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // Java engine will always poll a fully serialized table one more
     // time (it doesn't see the hasMore return code).
     int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
-    PersistentTable *table = NULL;
+    PersistentTable *table = nullptr;
 
     if (tableStreamTypeIsSnapshot(streamType)) {
         // If a completed table is polled, return 0 bytes serialized. The
@@ -2565,7 +2586,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
-        if (table == NULL) {
+        if (table == nullptr) {
             return TABLE_STREAM_SERIALIZATION_ERROR;
         }
 
@@ -2582,12 +2603,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
     } else if (tableStreamTypeIsStreamIndexing(streamType)) {
         Table* found = getTableById(tableId);
-        if (found == NULL) {
+        if (found == nullptr) {
             return TABLE_STREAM_SERIALIZATION_ERROR;
         }
 
         PersistentTable* currentTable = dynamic_cast<PersistentTable*>(found);
-        vassert(currentTable != NULL);
+        vassert(currentTable != nullptr);
         // An ongoing TABLE STREAM INDEXING needs to continue indexing the
         // original table from before the first table truncate.
         PersistentTable* originalTable = currentTable->tableForStreamIndexing();
@@ -2609,7 +2630,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
     } else {
         Table* found = getTableById(tableId);
-        if (found == NULL) {
+        if (found == nullptr) {
             return TABLE_STREAM_SERIALIZATION_ERROR;
         }
 
@@ -2646,8 +2667,13 @@ int64_t VoltDBEngine::exportAction(bool syncAction, int64_t uso,
     return 0;
 }
 
-bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
-        std::string tableName, int64_t deletableTxnId, int64_t undoToken) {
+bool VoltDBEngine::deleteMigratedRows(
+        int64_t txnId,
+        int64_t spHandle,
+        int64_t uniqueId,
+        std::string const& tableName,
+        int64_t deletableTxnId,
+        int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
         setUndoToken(undoToken);
@@ -2655,8 +2681,9 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
                 spHandle, -1, uniqueId, false);
 
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-                (table->isReplicatedTable(), isLowestSite(), &s_loadTableException,
-                 VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+                (table->isReplicatedTable(), isLowestSite(), []() {
+                 s_loadTableException = VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE;
+                 });
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             bool rowsToBeDeleted;
             try {
@@ -2694,8 +2721,10 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
     }
     if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
         char msg[512];
-        snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+        snprintf(msg, sizeof(msg),
+                "Attempted to delete migrated rows for a Table (%s) that has been removed.",
                 tableName.c_str());
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 
@@ -2703,23 +2732,19 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, int64_t &genId,
-        std::string streamName) {
+        std::string const& streamName) {
 
     // defaults mean failure
     ackOffset = 0;
     seqNo = -1;
     genId = 0;
 
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
-
+    auto const pos = m_exportingTables.find(streamName);
     // return no data and polled offset for unavailable tables.
-    if (pos == m_exportingTables.end()) {
-        return;
+    if (pos != m_exportingTables.cend()) {
+        Table *table_for_el = pos->second;
+        table_for_el->getExportStreamPositions(seqNo, ackOffset, genId);
     }
-
-    Table *table_for_el = pos->second;
-    table_for_el->getExportStreamPositions(seqNo, ackOffset, genId);
-    return;
 }
 
 size_t VoltDBEngine::tableHashCode(int32_t tableId) {
@@ -2755,7 +2780,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(ReferenceSerializeInputBE &t
     const char *config = taskInfo.getRawPointer();
     TheHashinator* hashinator = ElasticHashinator::newInstance(config, NULL, 0);
     // Delete at earliest convenience
-    boost::scoped_ptr<TheHashinator> hashinator_guard(hashinator);
+    std::unique_ptr<TheHashinator> hashinator_guard(hashinator);
 
     std::vector<int64_t> mispartitionedRowCounts;
 
@@ -2797,16 +2822,19 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     }
 }
 
-int64_t VoltDBEngine::applyBinaryLog(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
-        int64_t uniqueId, int32_t remoteClusterId, int64_t undoToken, const char *logs) {
+int64_t VoltDBEngine::applyBinaryLog(
+        int64_t txnId,
+        int64_t spHandle,
+        int64_t lastCommittedSpHandle,
+        int64_t uniqueId,
+        int32_t remoteClusterId,
+        int64_t undoToken,
+        const char *logs) {
     DRTupleStreamDisableGuard guard(m_executorContext, !m_isActiveActiveDREnabled);
     setUndoToken(undoToken);
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             spHandle,
-                                             lastCommittedSpHandle,
-                                             uniqueId,
-                                             false);
+    m_executorContext->setupForPlanFragments(
+            getCurrentUndoQuantum(), txnId, spHandle, lastCommittedSpHandle,
+            uniqueId, false);
     // Notice: We now get the consumer drProtocolVersion from its producer side (m_drStream).
     // This assumes that all consumers use same protocol as its producer.
     // However, once we start supporting promote dr protocol (e.g. upgrade dr protocol via promote event from one coordinator cluster),
@@ -2941,8 +2969,8 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     do {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
-        int64_t dummyExceptionTracker = 0;
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                updateReplicated, m_isLowestSite, [](){});
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {

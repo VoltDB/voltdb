@@ -50,17 +50,12 @@ DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t 
       m_lastParHash(LONG_MAX),
       m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
-      m_lastCommittedMpUniqueId(0)
-{
+      m_lastCommittedMpUniqueId(0) {
     extendBufferChain(m_defaultCapacity);
 }
 
-size_t DRTupleStream::truncateTable(char *tableHandle,
-                                    std::string tableName,
-                                    int partitionColumn,
-                                    int64_t spHandle,
-                                    int64_t uniqueId)
-{
+size_t DRTupleStream::truncateTable(char *tableHandle, std::string const& tableName,
+        int partitionColumn, int64_t spHandle, int64_t uniqueId) {
     if (m_guarded) return INVALID_DR_MARK;
 
     size_t startingUso = m_uso;
@@ -118,8 +113,7 @@ size_t DRTupleStream::truncateTable(char *tableHandle,
     return startingUso;
 }
 
-int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn)
-{
+int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
     if (partitionColumn != -1) {
         return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
     } else {
@@ -127,8 +121,7 @@ int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn
     }
 }
 
-bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
-{
+bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash) {
     if (isReplicatedTable) {
         // the initial value, which is TXN_PAR_HASH_REPLICATED
         vassert(m_hashFlag == m_initialHashFlag);
@@ -142,15 +135,12 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
         m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
         // no delimiter needed for first record
         return false;
-    }
-    else if (parHash != m_lastParHash) {
+    } else if (parHash != m_lastParHash) {
         m_lastParHash = parHash;
         // set to SPECIAL whenever we see a TRUNCATE_TABLE record
         if (parHash == LONG_MAX) {
             m_hashFlag = TXN_PAR_HASH_SPECIAL;
-        }
-        // set to MULTI if it was SINGLE
-        else if (m_hashFlag == TXN_PAR_HASH_SINGLE) {
+        } else if (m_hashFlag == TXN_PAR_HASH_SINGLE) { // set to MULTI if it was SINGLE
             m_hashFlag = TXN_PAR_HASH_MULTI;
         }
         // delimiter needed before the pending record
@@ -167,13 +157,8 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t DRTupleStream::appendTuple(char *tableHandle,
-                                  int partitionColumn,
-                                  int64_t spHandle,
-                                  int64_t uniqueId,
-                                  TableTuple &tuple,
-                                  DRRecordType type)
-{
+size_t DRTupleStream::appendTuple(char *tableHandle, int partitionColumn, int64_t spHandle,
+        int64_t uniqueId, TableTuple &tuple, DRRecordType type) {
     if (m_guarded) return INVALID_DR_MARK;
 
     size_t startingUso = m_uso;
@@ -201,7 +186,8 @@ size_t DRTupleStream::appendTuple(char *tableHandle,
             extendBufferChain(m_defaultCapacity);
         } catch (TupleStreamException &e) {
             char msg[64];
-            snprintf(msg, 64, " DR record type %d", type);
+            snprintf(msg, sizeof msg, " DR record type %d", type);
+            msg[sizeof msg - 1] = '\0';
             e.appendContextToMessage(msg);
             throw;
         }
@@ -212,14 +198,14 @@ size_t DRTupleStream::appendTuple(char *tableHandle,
             extendBufferChain(tupleMaxLength);
         } catch (TupleStreamException &e) {
             char msg[64];
-            snprintf(msg, 64, " DR record type %d", type);
+            snprintf(msg, sizeof msg, " DR record type %d", type);
+            msg[sizeof msg - 1] = '\0';
             e.appendContextToMessage(msg);
             throw;
         }
     }
 
-    ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
-                             m_currBlock->remaining());
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
@@ -244,13 +230,9 @@ size_t DRTupleStream::appendTuple(char *tableHandle,
     return startingUso;
 }
 
-size_t DRTupleStream::appendUpdateRecord(char *tableHandle,
-                                         int partitionColumn,
-                                         int64_t spHandle,
-                                         int64_t uniqueId,
-                                         TableTuple &oldTuple,
-                                         TableTuple &newTuple)
-{
+size_t DRTupleStream::appendUpdateRecord(
+        char *tableHandle, int partitionColumn, int64_t spHandle,
+        int64_t uniqueId, TableTuple &oldTuple, TableTuple &newTuple) {
     if (m_guarded) return INVALID_DR_MARK;
 
     size_t startingUso = m_uso;
@@ -322,8 +304,7 @@ size_t DRTupleStream::appendUpdateRecord(char *tableHandle,
     return startingUso;
 }
 
-bool DRTupleStream::transactionChecks(int64_t spHandle, int64_t uniqueId)
-{
+bool DRTupleStream::transactionChecks(int64_t spHandle, int64_t uniqueId) {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
@@ -341,27 +322,20 @@ bool DRTupleStream::transactionChecks(int64_t spHandle, int64_t uniqueId)
 
         if (m_enabled) {
             beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
-        }
-        else {
+        } else {
             openTransactionCommon(spHandle, uniqueId);
         }
         switchedToOpen = true;
-    }
-    else {
-        if (m_openUniqueId != uniqueId && m_enabled) {
-            fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %s does not match current Txn UniqueId %s",
-                    UniqueId::toString(UniqueId(m_openUniqueId)).c_str(), UniqueId::toString(UniqueId(uniqueId)).c_str());
-        }
+    } else if (m_openUniqueId != uniqueId && m_enabled) {
+        fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %s does not match current Txn UniqueId %s",
+                UniqueId::toString(UniqueId(m_openUniqueId)).c_str(), UniqueId::toString(UniqueId(uniqueId)).c_str());
     }
     vassert(m_opened);
     return switchedToOpen;
 }
 
 void DRTupleStream::writeRowTuple(TableTuple& tuple,
-        size_t rowHeaderSz,
-        size_t rowMetadataSz,
-        ExportSerializeOutput &io)
-{
+        size_t rowHeaderSz, size_t rowMetadataSz, ExportSerializeOutput &io) {
     size_t startPos = io.position();
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
@@ -382,10 +356,7 @@ void DRTupleStream::writeRowTuple(TableTuple& tuple,
 }
 
 size_t DRTupleStream::computeOffsets(DRRecordType &type,
-        TableTuple &tuple,
-        size_t &rowHeaderSz,
-        size_t &rowMetadataSz)
-{
+        TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz) {
     rowMetadataSz = sizeof(int32_t);
     int columnCount;
     switch (type) {
@@ -402,8 +373,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     return rowHeaderSz + tuple.maxDRSerializationSize();
 }
 
-void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
-{
+void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId) {
     vassert(!m_opened);
 
     if (!m_currBlock) {
@@ -458,8 +428,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
      openTransactionCommon(spHandle, uniqueId);
 }
 
-void DRTupleStream::endTransaction(int64_t uniqueId)
-{
+void DRTupleStream::endTransaction(int64_t uniqueId) {
     if (!m_opened) {
         return;
     }
@@ -502,8 +471,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
                 UniqueId::toString(UniqueId(m_openUniqueId)).c_str(),
                 (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
         return;
-    }
-    if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
+    } else if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
             m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
         m_opened = false;
         fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
@@ -530,8 +498,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     if (UniqueId::isMpUniqueId(uniqueId)) {
         m_lastCommittedMpUniqueId = uniqueId;
         m_currBlock->recordCompletedMpTxnForDR(uniqueId);
-    }
-    else {
+    } else {
         m_lastCommittedSpUniqueId = uniqueId;
         m_currBlock->recordCompletedSpTxn(uniqueId);
         // for sp, update the last Committed SpHandle
@@ -579,8 +546,8 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
-{
+bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength,
+        size_t& blockSize, size_t& uso) {
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
@@ -590,8 +557,9 @@ bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength, si
             blockSize = 0;
 
             char msg[256];
-            snprintf(msg, 256, "Transaction requiring %jd bytes exceeds max DR Buffer size of %jd bytes",
+            snprintf(msg, sizeof msg, "Transaction requiring %jd bytes exceeds max DR Buffer size of %jd bytes",
                      spaceNeeded, m_secondaryCapacity);
+            msg[sizeof msg - 1] = 0;
             throw TupleStreamException(SQLException::volt_output_buffer_overflow, msg);
         } else if (spaceNeeded > m_defaultCapacity) {
             blockSize = m_secondaryCapacity;

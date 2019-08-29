@@ -680,7 +680,6 @@
                             unit = " %"
                     }
                     else {
-                        unit = '%';
                         isPartitionIdleGraph = true;
                     }
                 }

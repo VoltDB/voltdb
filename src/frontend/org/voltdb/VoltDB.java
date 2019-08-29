@@ -813,6 +813,7 @@ public class VoltDB {
                         referToDocAndExit();
                     }
                     m_pathToCatalog = catalogFH.getAbsolutePath();
+                    return;
                 }
                 case LICENSE: {
                     if(!m_isEnterprise)

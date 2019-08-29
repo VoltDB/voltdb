@@ -246,7 +246,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          table.partitionColumn(),
                          m_skippedDirtyRows,
                          m_skippedInactiveRows);
-
+                message[sizeof message - 1] = '\0';
                 // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
                 // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
                 // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
@@ -455,7 +455,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     }
     if (m_tuplesRemaining != count1 + count2) {
         char errMsg[1024 * 16];
-        snprintf(errMsg, 1024 * 16,
+        snprintf(errMsg, sizeof errMsg,
                  "CopyOnWriteContext::%s remaining tuple count mismatch: "
                  "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
                  "expected=%jd compacted=%jd batch=%jd "
@@ -464,6 +464,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
                  count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
                  (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
                  (intmax_t)m_inserts, (intmax_t)m_updates);
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
     }
 }

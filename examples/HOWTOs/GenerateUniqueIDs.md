@@ -13,7 +13,7 @@ However, you may not want to add one of these technologies to your stack, and if
 Use the built-in getUniqueID() method within a procedure
 --------------------------------------------------------
 
-VoltDB provides an implementation of a similar algorithm within the [VoltProcedure](http://voltdb.com/docs/javadoc/procedure-api/org/voltdb/VoltProcedure.html) API, so that within a stored procedure the [getUniqueID()](http://voltdb.com/docs/javadoc/procedure-api/org/voltdb/VoltProcedure.html#getUniqueId()) method can be called to provide one unique ID within each transaction.  The id value is a 64-bit java long integer that is generated when transaction is enqueued. The 64-bits are made up of the transaction timestamp, the partition, and a sequential counter.  This provides a deterministic value, so that the result will be the same on multiple servers in a k-safe cluster, or on a replica cluster, or when playing back the transaction when recovering from disk.
+VoltDB provides an implementation of a similar algorithm within the [VoltProcedure](http://voltdb.com/docs/javadoc/server-api/org/voltdb/VoltProcedure.html) API, so that within a stored procedure the [getUniqueID()](http://voltdb.com/docs/javadoc/server-api/org/voltdb/VoltProcedure.html#getUniqueId()) method can be called to provide one unique ID within each transaction.  The id value is a 64-bit java long integer that is generated when transaction is enqueued. The 64-bits are made up of the transaction timestamp, the partition, and a sequential counter.  This provides a deterministic value, so that the result will be the same on multiple servers in a k-safe cluster, or on a replica cluster, or when playing back the transaction when recovering from disk.
 
 Here is an example schema (ddl.sql):
 

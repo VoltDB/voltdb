@@ -446,7 +446,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
@@ -590,7 +590,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
@@ -708,7 +708,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = customerTableReplica;
 
     //Fetch the generated block of log data

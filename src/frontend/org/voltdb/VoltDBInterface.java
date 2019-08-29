@@ -34,6 +34,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -347,4 +348,9 @@ public interface VoltDBInterface
     public boolean isJoining();
 
     public ElasticService getElasticService();
+
+    /**
+     * @return The instance of {@link TaskManager} which is running in this instance
+     */
+    public TaskManager getTaskManager();
 }

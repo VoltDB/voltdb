@@ -570,9 +570,9 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
-    <echo message="Building Stored Procedure JavaDoc"/>
+    <echo message="Building Server JavaDoc"/>
     <!-- populate selected server/compiler javadoc documentation -->
-    <javadoc destdir="doc/javadoc/procedure-api" Public="true" version="true" use="true"
+    <javadoc destdir="doc/javadoc/server-api" Public="true" version="true" use="true"
         failonerror="true" additionalparam="-quiet" Overview='${src.gpl.dir}/overview-public.html' Windowtitle='VoltDB Server APIs'>
         <link href="${j2se_api}"/>
         <classpath refid='project.classpath' />
@@ -589,6 +589,12 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
+            <include name="src/frontend/org/voltdb/task/package-info.java" />
+            <include name="src/frontend/org/voltdb/task/Scheduler.java" />
+            <include name="src/frontend/org/voltdb/task/Action.java" />
+            <include name="src/frontend/org/voltdb/task/ActionResult.java" />
+            <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
         </fileset>
     </javadoc>
 
@@ -975,7 +981,7 @@ CLEANING
     <arg line="-c 'rm -rf *.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
+    <arg line="-c 'rm -rf doc/javadoc/server-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
 </target>
 
@@ -1098,7 +1104,7 @@ JAR BUILDING
 		description = "makes extra .jar files that get pushed to maven repo"
 		depends="voltdb.jar">
     <jar destfile="${build.dir}/voltdb-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+        <fileset dir="${doc.dir}/javadoc/server-api" defaultexcludes="no" >
             <include name="**"/>
         </fileset>
         <manifest>
@@ -1158,8 +1164,7 @@ JAR BUILDING
     </ant>
 </target>
 
-<target name="voltdbthin.jar" depends="compile"
-    description="used by testability-explorer">
+<target name="voltdbthin.jar" depends="compile" description="used by testability-explorer">
     <jar destfile="${build.prod.dir}/voltdbthin.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />

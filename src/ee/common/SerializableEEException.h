@@ -37,7 +37,7 @@ namespace voltdb {
 
 class ReferenceSerializeOutput;
 
-enum class VoltEEExceptionType {
+enum class VoltEEExceptionType : int8_t {
     VOLT_EE_EXCEPTION_TYPE_NONE = 0,
     VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION = 1,
     VOLT_EE_EXCEPTION_TYPE_SQL = 2,
@@ -78,16 +78,17 @@ public:
     virtual ~SerializableEEException() {}
 
     void serialize (ReferenceSerializeOutput *output) const;
-    virtual std::string message() const { return m_message; }
-    VoltEEExceptionType getType() const { return m_exceptionType; }
-    void appendContextToMessage(const std::string& more) { m_message += more; }
+    virtual std::string message() const {
+        return m_message;
+    }
+    VoltEEExceptionType getType() const {
+        return m_exceptionType;
+    }
+    void appendContextToMessage(const std::string& more) {
+        m_message += more;
+    }
 };
 
-class UnexpectedEEException : public SerializableEEException {
-public:
-    UnexpectedEEException(std::string const& message)
-      : SerializableEEException(message)
-    { }
-};
+using UnexpectedEEException = SerializableEEException;
 
 } // end namespace voltdb

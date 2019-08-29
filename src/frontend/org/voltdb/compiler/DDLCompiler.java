@@ -66,7 +66,7 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.statements.AlterSchedule;
+import org.voltdb.compiler.statements.AlterTask;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -74,14 +74,14 @@ import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
-import org.voltdb.compiler.statements.CreateSchedule;
+import org.voltdb.compiler.statements.CreateTask;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
-import org.voltdb.compiler.statements.DropSchedule;
 import org.voltdb.compiler.statements.DropStream;
+import org.voltdb.compiler.statements.DropTask;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -99,6 +99,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -240,9 +241,9 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropStream(this))
                                 .addNextProcessor(new DRTable(this))
                                 .addNextProcessor(new SetGlobalParam(this))
-                                .addNextProcessor(new CreateSchedule(this))
-                                .addNextProcessor(new DropSchedule(this))
-                                .addNextProcessor(new AlterSchedule(this))
+                                .addNextProcessor(new CreateTask(this))
+                                .addNextProcessor(new DropTask(this))
+                                .addNextProcessor(new AlterTask(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -335,7 +336,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
-        protected static final String SCHEDULE = "SCHEDULE";
+        protected static final String TASK = "TASK";
         protected static final String AGGREGATE = "AGGREGATE";
     }
 
@@ -423,16 +424,12 @@ public class DDLCompiler {
         final StringBuilder ddls = new StringBuilder();
         boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
-            final String encodedDropTable;
-            if (isBatch) {      // We cannot query previous database for existing tables in batch mode, as
-                encodedDropTable = null;    // current DDL batch may contain CREATE statements, that is later dropped.
-            } else {
-                encodedDropTable = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
-            }
-            if (encodedDropTable == null) {
+            if (isBatch || ! AdHocNTBase.USING_CALCITE) {      // We cannot query previous database for existing tables in batch mode, as
+                // current DDL batch may contain CREATE statements, that is later dropped.
                 processVoltDBStatements(db, whichProcs, stmt);
-            } else {        // matched & executed DROP TABLE stmt
-                ddls.append(encodedDropTable);
+            } else {        // ENG-17075: Until Calcite can handle all DDL statements,
+                // this could throw SqlParserException, that gets printed and transformed into FallbackException.
+                ddls.append(DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler));
             }
             stmt = getNextStatement(reader, m_compiler, stmt.endLineNo, newDdl);
             isBatch = true;
@@ -1336,10 +1333,12 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-        // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
-        if (StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
-                .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
-            return;       // Code below this point is not executed any more.
+        if (AdHocNTBase.USING_CALCITE &&    // Skip "CREATE TABLE" if we have already added it using Calcite parser.
+                StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                        .anyMatch(tbl -> tbl.getTypeName().equals(name))) {
+            // Code below this point is not executed any more. See VoltCompiler#compileDatabase() for
+            // how CREATE TABLE statement is processed by Calcite.
+            return;
         }
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
