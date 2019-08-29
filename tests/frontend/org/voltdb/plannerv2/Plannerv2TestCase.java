@@ -252,7 +252,22 @@ public class Plannerv2TestCase extends PlannerTestCase {
         }
     }
 
-    public class PhysicalConversionRulesTester extends MPFallbackTester {
+    public class OuterJoinRulesTester extends MPFallbackTester {
+        @Override public void pass() throws AssertionError {
+            super.pass();
+            if (m_ruleSetIndex < 0) {
+                throw new AssertionError("Need to specify a planner phase.");
+            }
+
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.OUTER_JOIN, m_transformedNode);
+            if (m_ruleSetIndex == PlannerRules.Phase.OUTER_JOIN.ordinal() && m_expectedTransform != null) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                assertEquals(m_expectedTransform, actualTransform);
+            }
+        }
+    }
+
+    public class PhysicalConversionRulesTester extends OuterJoinRulesTester {
         @Override public void pass() throws AssertionError {
             super.pass();
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.

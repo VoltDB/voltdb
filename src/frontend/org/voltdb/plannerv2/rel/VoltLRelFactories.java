@@ -47,44 +47,44 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalHashAggregate;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalIntersect;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalMinus;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalUnion;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalValues;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalIntersect;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalMinus;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalUnion;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalValues;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;
 
 /**
- * Contains implementation for creating various VoltPhysical nodes.
+ * Contains implementation for creating various VoltLogical nodes.
  *
  */
-public class VoltPRelFactories {
+public class VoltLRelFactories {
 
-    public static ProjectFactory VOLT_PHYSICAL_PROJECT_FACTORY =
-        new VoltPProjectFactoryImpl();
+    public static ProjectFactory VOLT_LOGICAL_PROJECT_FACTORY =
+        new VoltLProjectFactoryImpl();
 
-    public static FilterFactory VOLT_PHYSICAL_FILTER_FACTORY =
-            new VoltPFilterFactoryImpl();
+    public static FilterFactory VOLT_LOGICAL_FILTER_FACTORY =
+            new VoltLFilterFactoryImpl();
 
-    public static final JoinFactory VOLT_PHYSICAL_JOIN_FACTORY =
-            new VoltPJoinFactoryImpl();
+    public static final JoinFactory VOLT_LOGICAL_JOIN_FACTORY =
+            new VoltLJoinFactoryImpl();
 
-    public static final SortFactory VOLT_PHYSICAL_SORT_FACTORY =
-            new VoltPSortFactoryImpl();
+    public static final SortFactory VOLT_LOGICAL_SORT_FACTORY =
+            new VoltLSortFactoryImpl();
 
-    public static final AggregateFactory VOLT_PHYSICAL_AGGREGATE_FACTORY =
-            new VoltPAggregateFactoryImpl();
+    public static final AggregateFactory VOLT_LOGICAL_AGGREGATE_FACTORY =
+            new VoltLAggregateFactoryImpl();
 
-    public static final SetOpFactory VOLT_PHYSICAL_SET_OP_FACTORY =
-            new VoltPSetOpFactoryImpl();
+    public static final SetOpFactory VOLT_LOGICAL_SET_OP_FACTORY =
+            new VoltLSetOpFactoryImpl();
 
-    public static final ValuesFactory VOLT_PHYSICAL_VALUES_FACTORY =
+    public static final ValuesFactory VOLT_LOGICAL_VALUES_FACTORY =
             new VoltPValuesFactoryImpl();
 
     // @TODO Scan Factory
@@ -93,9 +93,9 @@ public class VoltPRelFactories {
      * Implementation of ProjectFactory
      * {@link org.apache.calcite.rel.core.RelFactories.ProjectFactory}
      * that returns a VoltPhysicalCalc
-     * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc}.
+     * {@link org.voltdb.plannerv2.rel.logical.VoltLogicalCalc}.
      */
-    private static class VoltPProjectFactoryImpl implements ProjectFactory {
+    private static class VoltLProjectFactoryImpl implements ProjectFactory {
 
         public RelNode createProject(RelNode input,
                 List<? extends RexNode> childExprs, List<String> fieldNames) {
@@ -112,20 +112,19 @@ public class VoltPRelFactories {
                             outputRowType,
                             input.getCluster().getRexBuilder());
 
-            return new VoltPhysicalCalc(input.getCluster(),
-                    input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+            return new VoltLogicalCalc(input.getCluster(),
+                    input.getTraitSet().replace(VoltLogicalRel.CONVENTION),
                     input,
-                    program,
-                    1);
+                    program);
         }
     }
 
     /**
      * Implementation of {@link RelFactories.FilterFactory} that
      * that returns a VoltPhysicalCalc
-     * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc}.
+     * {@link org.voltdb.plannerv2.rel.logical.VoltLogicalCalc}.
      */
-    private static class VoltPFilterFactoryImpl implements FilterFactory {
+    private static class VoltLFilterFactoryImpl implements FilterFactory {
         public RelNode createFilter(RelNode input, RexNode condition) {
             // Create a program containing a filter.
             final RexBuilder rexBuilder = input.getCluster().getRexBuilder();
@@ -135,25 +134,24 @@ public class VoltPRelFactories {
             programBuilder.addIdentity();
             programBuilder.addCondition(condition);
             final RexProgram program = programBuilder.getProgram();
-            return new VoltPhysicalCalc(input.getCluster(),
-                    input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+            return new VoltLogicalCalc(input.getCluster(),
+                    input.getTraitSet().replace(VoltLogicalRel.CONVENTION),
                     input,
-                    program,
-                    1);
+                    program);
         }
     }
 
     /**
      * Implementation of {@link JoinFactory} that returns a VoltPhysicalNestLoopJoin
-     * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin}.
+     * {@link org.voltdb.plannerv2.rel.logical.VoltLogicalJoin}.
      */
-    private static class VoltPJoinFactoryImpl implements JoinFactory {
+    private static class VoltLJoinFactoryImpl implements JoinFactory {
       public RelNode createJoin(RelNode left, RelNode right,
           RexNode condition, Set<CorrelationId> variablesSet,
           JoinRelType joinType, boolean semiJoinDone) {
-          return new VoltPhysicalNestLoopJoin(
+          return new VoltLogicalJoin(
                   left.getCluster(),
-                  left.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+                  left.getTraitSet().replace(VoltLogicalRel.CONVENTION),
                   left,
                   right,
                   condition,
@@ -174,17 +172,16 @@ public class VoltPRelFactories {
 
     /**
      * Implementation of {@link RelFactories.SortFactory} that
-     * returns a vanilla {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalSort}.
+     * returns a vanilla {@link org.voltdb.plannerv2.rel.logical.VoltLogicalSort}.
      */
-    private static class VoltPSortFactoryImpl implements SortFactory {
+    private static class VoltLSortFactoryImpl implements SortFactory {
         public RelNode createSort(RelNode input, RelCollation collation,
                 RexNode offset, RexNode fetch) {
-            return new VoltPhysicalSort(
+            return new VoltLogicalSort(
                     input.getCluster(),
-                    input.getTraitSet().plus(collation).replace(VoltPhysicalRel.CONVENTION),
+                    input.getTraitSet().plus(collation).replace(VoltLogicalRel.CONVENTION),
                     input,
-                    collation,
-                    1);
+                    collation);
         }
 
         @Deprecated // to be removed before 2.0
@@ -197,65 +194,57 @@ public class VoltPRelFactories {
     /**
      * Implementation of {@link RelFactories.AggregateFactory}
      * that returns a VoltPhysicalHashAggregate
-     * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalHashAggregate}.
+     * {@link org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate}.
      */
-    private static class VoltPAggregateFactoryImpl implements AggregateFactory {
+    private static class VoltLAggregateFactoryImpl implements AggregateFactory {
         @SuppressWarnings("deprecation")
         public RelNode createAggregate(RelNode input, boolean indicator,
                 ImmutableBitSet groupSet, ImmutableList<ImmutableBitSet> groupSets,
                 List<AggregateCall> aggCalls) {
-            return new VoltPhysicalHashAggregate(
+            return new VoltLogicalAggregate(
                     input.getCluster(),
-                    // Hash destroys ORDERING
-                    input.getTraitSet().replace(RelCollations.EMPTY).replace(VoltPhysicalRel.CONVENTION),
+                    // Aggregation destroys ORDERING
+                    input.getTraitSet().replace(RelCollations.EMPTY).replace(VoltLogicalRel.CONVENTION),
                     input,
-                    indicator,
                     groupSet,
                     groupSets,
-                    aggCalls,
-                    null,
-                    1,
-                    false);
+                    aggCalls);
         }
     }
 
     /**
      * Implementation of {@link RelFactories.SetOpFactory} that
-     * returns a {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalUnion}
-     * or a {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalMinus}
-     * or a {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalIntersect}
+     * returns a {@link org.voltdb.plannerv2.rel.logical.VoltLogicalUnion}
+     * or a {@link org.voltdb.plannerv2.rel.logical.VoltLogicalMinus}
+     * or a {@link org.voltdb.plannerv2.rel.logical.VoltLogicalIntersect}
      * for the particular kind of set operation (UNION, EXCEPT, INTERSECT).
      */
-    private static class VoltPSetOpFactoryImpl implements SetOpFactory {
+    private static class VoltLSetOpFactoryImpl implements SetOpFactory {
         public RelNode createSetOp(SqlKind kind, List<RelNode> inputs,
                 boolean all) {
             Preconditions.checkArgument(!inputs.isEmpty());
             RelNode firstChild = inputs.get(0);
             RelTraitSet traits = firstChild.getTraitSet()
-                    .replace(RelCollations.EMPTY)
-                    .replace(VoltPhysicalRel.CONVENTION);
+                    .replace(RelCollations.EMPTY).replace(VoltLogicalRel.CONVENTION);
             switch (kind) {
             case UNION:
-                return new VoltPhysicalUnion(
+                return new VoltLogicalUnion(
                         firstChild.getCluster(),
                         traits,
                         inputs,
-                        all,
-                        1);
+                        all);
             case EXCEPT:
-                return new VoltPhysicalMinus(
+                return new VoltLogicalMinus(
                         firstChild.getCluster(),
                         traits,
                         inputs,
-                        all,
-                        1);
+                        all);
             case INTERSECT:
-                return new VoltPhysicalIntersect(
+                return new VoltLogicalIntersect(
                         firstChild.getCluster(),
                         traits,
                         inputs,
-                        all,
-                        1);
+                        all);
             default:
                 throw new AssertionError("not a set op: " + kind);
             }
@@ -264,21 +253,20 @@ public class VoltPRelFactories {
 
     /**
      * Implementation of {@link ValuesFactory} that returns a
-     * {@link VoltPhysicalValues}.
+     * {@link VoltLogicalValues}.
      */
     private static class VoltPValuesFactoryImpl implements ValuesFactory {
         public RelNode createValues(RelOptCluster cluster, RelDataType rowType,
                 List<ImmutableList<RexLiteral>> tuples) {
             RelTraitSet traitSet = cluster.traitSet()
-                    .plus(VoltPhysicalRel.CONVENTION)
+                    .plus(VoltLogicalRel.CONVENTION)
                     .plus(RelCollations.EMPTY)
                     .plus(RelDistributions.ANY);
-            return new VoltPhysicalValues(
+            return new VoltLogicalValues(
                     cluster,
                     traitSet,
                     rowType,
-                    ImmutableList.copyOf(tuples),
-                    1);
+                    ImmutableList.copyOf(tuples));
         }
     }
 

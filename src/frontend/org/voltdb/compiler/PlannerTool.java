@@ -262,6 +262,9 @@ public class PlannerTool {
             throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
+        // Transform RIGHT Outer joins to LEFT ones
+        transformed = VoltPlanner.transformHep(Phase.OUTER_JOIN, transformed);
+
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
         // See RelDistributions.RelDistributionImpl.satisfies()

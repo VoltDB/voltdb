@@ -41,6 +41,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
     public void tearDown() throws Exception {
         super.tearDown();
     }
+
     public void testNLIJ() {
         m_tester.sql("SELECT R1.si, RI2.ti FROM R1 INNER JOIN RI2 ON R1.i = RI2.i")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], split=[1])\n" +
@@ -100,6 +101,36 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         "{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"TARGET_TABLE_NAME\":\"RI1\",\"TARGET_TABLE_ALIAS\":\"RI1\"," +
                         "\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI1_IND1\"}]," +
                         "\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
+                .pass();
+    }
+
+    public void testRightNLJ() {
+        m_tester.sql("SELECT R1.si, RI2.ti FROM R1 RIGHT JOIN RI2 ON R1.i = RI2.i")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t3], TI=[$t1], split=[1])\n" +
+                           "  VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[left], split=[1])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n")
+                .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],"
+                        + "\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,"
+                        + "\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,"
+                        + "\"COLUMN_IDX\":1}}]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"NESTLOOP\",\"CHILDREN_IDS\":[3,5],"
+                        + "\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                        + "\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,"
+                        + "\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                        + "\"COLUMN_IDX\":0,\"TABLE_IDX\":1}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,"
+                        + "\"VALUE_TYPE\":4,\"COLUMN_IDX\":1,\"TABLE_IDX\":1}}],\"JOIN_TYPE\":\"INNER\","
+                        + "\"PRE_JOIN_PREDICATE\":null,\"JOIN_PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":"
+                        + "{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0,\"TABLE_IDX\":1},\"RIGHT\":{\"TYPE\":32,"
+                        + "\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},\"WHERE_PREDICATE\":null},{\"ID\":3,\"PLAN_NODE_TYPE\":"
+                        + "\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":"
+                        + "[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
+                        + "{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],"
+                        + "\"TARGET_TABLE_NAME\":\"RI2\",\"TARGET_TABLE_ALIAS\":\"RI2\"},{\"ID\":5,\"PLAN_NODE_TYPE\":"
+                        + "\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":6,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":"
+                        + "[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
+                        + "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}]}],"
+                        + "\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[3,5,2,1],"
+                        + "\"IS_LARGE_QUERY\":false}")
                 .pass();
     }
 

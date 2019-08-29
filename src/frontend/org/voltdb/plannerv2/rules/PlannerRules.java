@@ -52,6 +52,7 @@ import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
@@ -96,6 +97,11 @@ public class PlannerRules {
         MP_FALLBACK {
             @Override public RuleSet getRules() {
                 return PlannerRules.MP_FALLBACK;
+            }
+        },
+        OUTER_JOIN {
+            @Override public RuleSet getRules() {
+                return PlannerRules.HEP_OUTER_JOIN;
             }
         },
         PHYSICAL_CONVERSION {
@@ -202,6 +208,12 @@ public class PlannerRules {
             MPSetOpsQueryFallBackRule.INSTANCE
     );
 
+    private static final RuleSet HEP_OUTER_JOIN = RuleSets.ofList(
+            CalcMergeRule.INSTANCE,
+            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT
+    );
+
+
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
 
@@ -264,6 +276,7 @@ public class PlannerRules {
             Programs.listOf(
                     LOGICAL,
                     MP_FALLBACK,
+                    HEP_OUTER_JOIN,
                     PHYSICAL_CONVERSION,
                     PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
                     INLINE
