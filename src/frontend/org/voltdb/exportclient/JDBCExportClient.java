@@ -43,6 +43,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportRow.ROW_OPERATION;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -183,10 +185,13 @@ public class JDBCExportClient extends ExportClientBase {
 
             m_curGenId = source.m_generation;
             m_ds = ds;
-            m_es =
-                    CoreUtils.getListeningSingleThreadExecutor(
-                            "JDBC Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
-
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es =
+                        CoreUtils.getListeningSingleThreadExecutor(
+                                "JDBC Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         private String createTableString(DatabaseType dbType, String schemaAndTable, String identifierQuote,
@@ -815,11 +820,13 @@ public class JDBCExportClient extends ExportClientBase {
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(356, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(356, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
             closeConnection();
         }
