@@ -27,7 +27,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
@@ -155,8 +155,8 @@ public class TestExportGeneration {
         when(mock.isCoordinatorInitialized()).thenReturn(true);
         when(mock.isPartitionLeader()).thenReturn(true);
         when(mock.isMaster()).thenReturn(true);
-        when(mock.isSafePoint(any())).thenReturn(true);
-        when(mock.isExportMaster(any())).thenReturn(true);
+        when(mock.isSafePoint(anyLong())).thenReturn(true);
+        when(mock.isExportMaster(anyLong())).thenReturn(true);
         return mock;
     }
 

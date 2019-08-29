@@ -24,6 +24,7 @@
 package org.voltdb.export;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -99,8 +100,8 @@ public class TestExportDataSource extends TestCase {
         when(m_coordinator.isCoordinatorInitialized()).thenReturn(true);
         when(m_coordinator.isPartitionLeader()).thenReturn(true);
         when(m_coordinator.isMaster()).thenReturn(true);
-        when(m_coordinator.isSafePoint(any())).thenReturn(true);
-        when(m_coordinator.isExportMaster(any())).thenReturn(true);
+        when(m_coordinator.isSafePoint(anyLong())).thenReturn(true);
+        when(m_coordinator.isExportMaster(anyLong())).thenReturn(true);
     }
 }
 
@@ -146,6 +147,7 @@ public class TestExportDataSource extends TestCase {
     @Override
     public void tearDown() throws Exception {
         m_mockVoltDB.shutdown(null);
+        m_processor = null;
         System.gc();
         System.runFinalization();
         Thread.sleep(200);
@@ -182,7 +184,7 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+            ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
@@ -202,7 +204,7 @@ public class TestExportDataSource extends TestCase {
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -291,7 +293,7 @@ public class TestExportDataSource extends TestCase {
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -302,6 +304,8 @@ public class TestExportDataSource extends TestCase {
             s.setReadyForPolling(true);
             s.becomeLeader();
             waitForMaster(s);
+            // Set ready for polling to enable satisfying future on push
+            s.setReadyForPolling(true);
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
 
@@ -357,7 +361,7 @@ public class TestExportDataSource extends TestCase {
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -454,7 +458,7 @@ public class TestExportDataSource extends TestCase {
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -462,6 +466,8 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
+            s.setReadyForPolling(true);
+
             //Ack before push
             s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
@@ -524,7 +530,7 @@ public class TestExportDataSource extends TestCase {
     }
 
     // Test that gap release operates even when no further export rows are inserted
-    public void testGapRelease() throws Exception{
+    public void testGapAutoRelease() throws Exception{
         System.out.println("Running testGapRelease");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
@@ -562,12 +568,76 @@ public class TestExportDataSource extends TestCase {
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 2, cont.m_lastSeqNo);
             cont.discard();
+            // Poll once more, should hit the gap but later be released automatically
+            ListenableFuture<AckingContainer> fut1 = s.poll();
+            // Verify we can poll the 2 buffers past the gap
+            try {
+                // cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                cont = fut1.get(100,TimeUnit.DAYS);
+            }
+            catch( TimeoutException to) {
+                fail("did not expect timeout");
+            }
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(10, cont.m_lastSeqNo);
+            cont.discard();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(11, cont.m_lastSeqNo);
+            cont.discard();
+        } finally {
+            s.close();
+        }
+    }
+
+    // Test that gap release operates even when no further export rows are inserted
+    public void testGapNoAutoRelease() throws Exception{
+        System.out.println("Running testGapNoAutoRelease");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setNoAutoRelease();
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+            // Push 2 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 1, 0, foo, false);
+            // Push 2 more creating a gap
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(10, 1, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(11, 1, 0, foo, false);
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
             // Poll once more, should hit the gap (wait for the state to be changed)
             ListenableFuture<AckingContainer> fut1 = s.poll();
-            Thread.sleep(1000);
-            assertFalse(fut1.isDone());
-            assertEquals(ExportDataSource.StreamStatus.BLOCKED, s.getStatus());
+            // Wait until the stream updates status to blocked
+            while (ExportDataSource.StreamStatus.BLOCKED != s.getStatus()) {
+                Thread.sleep(500);
+            }
             // Do a release
+            System.out.println("Do a manual release");
             assertTrue(s.processStreamControl(OperationMode.RELEASE));
             // Verify we can poll the 2 buffers past the gap
             try {
@@ -588,6 +658,7 @@ public class TestExportDataSource extends TestCase {
             s.close();
         }
     }
+
     public void testPendingContainer() throws Exception{
         System.out.println("Running testPendingContainer");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -644,7 +715,6 @@ public class TestExportDataSource extends TestCase {
             s.close();
         }
     }
-
 
 //    /**
 //     * Test that releasing everything in steps and then polling results in

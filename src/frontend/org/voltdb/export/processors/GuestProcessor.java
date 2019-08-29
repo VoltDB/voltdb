@@ -463,7 +463,10 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                     } finally {
                         if (cont != null) {
-                            cont.discard();
+                            if (!cont.isDiscarded()) {
+                                cont.discard();
+                            }
+                            cont = null;
                         }
                     }
                 } catch (Exception e) {
@@ -475,7 +478,9 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 } finally {
                     if (cont != null) {
-                        cont.discard();
+                        if (!cont.isDiscarded()) {
+                            cont.discard();
+                        }
                         cont = null;
                     }
                 }

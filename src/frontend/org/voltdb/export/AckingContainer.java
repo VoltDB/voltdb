@@ -28,6 +28,7 @@ public class AckingContainer extends BBContainer {
     final BBContainer m_backingCont;
     // Note: the schema doesn't need an explicit discard
     long m_startTime = 0;
+    private boolean m_discarded;
     private static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     private AckingContainer(ExportDataSource source, BBContainer cont,
@@ -37,6 +38,7 @@ public class AckingContainer extends BBContainer {
         m_startSeqNo = startSeqNo;
         m_lastSeqNo = lastSeqNo;
         m_backingCont = cont;
+        m_discarded = false;
     }
 
     public static AckingContainer create(ExportDataSource source,
@@ -67,11 +69,16 @@ public class AckingContainer extends BBContainer {
             checkDoubleFree();
         }
         m_backingCont.discard();
+        m_discarded = true;
     }
 
     // Package private
     void internalDiscard() {
         internalDiscard(true);
+    }
+
+    public boolean isDiscarded() {
+        return m_discarded;
     }
 
     @Override

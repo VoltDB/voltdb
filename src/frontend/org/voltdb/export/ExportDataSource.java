@@ -150,6 +150,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Made package private for JUnit test support
     ExportCoordinator m_coordinator;
 
+    // for test only
+    private boolean m_shouldRelease = false;
+
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
 
     static enum StreamStatus {
@@ -538,7 +541,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public final int getPartitionId() {
+    public int getPartitionId() {
         return m_partitionId;
     }
 
@@ -550,7 +553,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return 0L;
     }
 
-    public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
+    public void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("tableName", getTableName());
@@ -1145,7 +1148,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Copying and sending the data will take place outside the critical section
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-//                long firstUnpolledSeq = m_firstUnpolledSeqNo;
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // If the block is already acked list it to be discarded
@@ -1524,6 +1526,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return sb.toString();
     }
 
+    public String toShortString() {
+        StringBuilder sb = new StringBuilder("ExportDataSource for table ")
+                .append(getTableName())
+                .append(" partition ")
+                .append(getPartitionId());
+        return sb.toString();
+    }
+
     // During rejoin it's possible that the stream is blocked by a gap before the export
     // sequence number carried by rejoin snapshot, so we couldn't trust the sequence number
     // in snapshot to find where to poll next buffer. The right thing to do should be setting
@@ -1551,6 +1561,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_exportTargetName;
     }
 
+    boolean shouldRelease() {
+        return DISABLE_AUTO_GAP_RELEASE || m_shouldRelease;
+    }
+
+    // for test only
+    void setNoAutoRelease() {
+        m_shouldRelease = true;
+    }
+
     private void blockOnGap(long start, long end) {
         // Set ourselves as blocked
         m_status = StreamStatus.BLOCKED;
@@ -1562,7 +1581,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Check whether we can auto-release
         VoltDBInterface voltdb = VoltDB.instance();
         if (voltdb.isClusterComplete()) {
-            if (DISABLE_AUTO_GAP_RELEASE) {
+            if (shouldRelease()) {
                 // Show warning only in full cluster.
                 String warnMsg = "Export is blocked, missing rows [" +
                         start + ", " + end + "] from " +
@@ -1591,11 +1610,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 if (m_gapTracker.getFirstGap() != null) {
                                     firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
                                     exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
-                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+                                            "] and cluster is complete. Skipping to next available transaction for " + ExportDataSource.this.toShortString());
                                 } else {
                                     firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
                                     exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
-                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+                                            "] and cluster is complete. Skipping to next available transaction for " + ExportDataSource.this.toShortString());
 
                                 }
                                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;

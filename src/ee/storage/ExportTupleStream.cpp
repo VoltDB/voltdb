@@ -43,12 +43,11 @@ const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4
 const size_t ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE = 13; // Size of header before schema: Version(1) + GenerationId(8) + SchemaLen(4)
 const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
-ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
+ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
                                      const std::string &tableName, const std::vector<std::string> &columnNames)
     : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames) + s_FIXED_BUFFER_HEADER_SIZE + s_EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
-      m_signature(signature),
       m_generation(generation),
       m_tableName(tableName),
       m_columnNames(columnNames),
@@ -57,11 +56,8 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
     m_new = true;
 }
 
-void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void ExportTupleStream::setGeneration(int64_t generation) {
     assert(generation > m_generation);
-    assert(signature == m_signature || m_signature == string(""));
-
-    m_signature = signature;
     m_generation = generation;
 }
 
@@ -176,9 +172,9 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
     m_currBlock->recordCompletedSpTxn(uniqueId);
-//    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-//            << " sequence number " << seqNo
-//            << " offset " << m_currBlock->offset() << std::endl;
+    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+            << " sequence number " << seqNo
+            << " offset " << m_currBlock->offset() << std::endl;
     //Not new anymore as we have new transaction after UAC
     m_new = false;
     return startingUso;
@@ -269,7 +265,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
-                    m_signature,
+                    m_tableName,
                     block,
                     sync);
 }
@@ -277,5 +273,5 @@ void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
 void ExportTupleStream::pushEndOfStream() {
     ExecutorContext::getPhysicalTopend()->pushEndOfStream(
                     m_partitionId,
-                    m_signature);
+                    m_tableName);
 }

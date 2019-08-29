@@ -70,7 +70,7 @@ public:
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setGeneration(int64_t generation);
 
     // The MatViewType typedef is required to satisfy initMaterializedViews
     // template code that needs to identify
