@@ -112,9 +112,9 @@ static std::map<int, ClusterCtx> s_clusterMap;
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
-                          const std::string &tableName, const std::vector<std::string> &columnNames)
-        : ExportTupleStream(partitionId, siteId, generation, signature, tableName, columnNames)
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName,
+            const std::vector<std::string> &columnNames)
+        : ExportTupleStream(partitionId, siteId, generation, tableName, columnNames)
     { }
 
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
@@ -201,7 +201,7 @@ public:
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
         const std::string tableName = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
 
-        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign", tableName, exportColumnName);
+        m_exportStream = new MockExportTupleStream(1, 1, 0, tableName, exportColumnName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
                 tableName,
                 m_exportSchema,
