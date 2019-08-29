@@ -75,13 +75,15 @@ public class DuplicateCounter
     Set<Long> m_replicas = Sets.newHashSet();
     Set<VoltMessage> m_failedReplicas = Sets.newHashSet();
 
+    final boolean m_counterForEverySiteProc;
+
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
             TransactionInfoBaseMessage openMessage,
-            long leaderHSID)
-    {
+            long leaderHSID,
+            boolean counterForEverySiteProc) {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
@@ -89,10 +91,19 @@ public class DuplicateCounter
         m_leaderHSID = leaderHSID;
         m_replicas.addAll(expectedHSIds);
         m_replicas.remove(m_leaderHSID);
+        m_counterForEverySiteProc = counterForEverySiteProc;
     }
 
-    long getTxnId()
-    {
+    DuplicateCounter(
+            long destinationHSId,
+            long realTxnId,
+            List<Long> expectedHSIds,
+            TransactionInfoBaseMessage openMessage,
+            long leaderHSID) {
+        this(destinationHSId, realTxnId, expectedHSIds, openMessage, leaderHSID, false);
+    }
+
+    long getTxnId() {
         return m_txnId;
     }
 
@@ -186,7 +197,22 @@ public class DuplicateCounter
     {
         if (!rejoining) {
             int pos = -1;
-            if (message.m_sourceHSId == m_leaderHSID) {
+
+            // Every partition sys proc InitiateResponseMessage
+            if (m_counterForEverySiteProc) {
+                if (m_responseHashes == null) {
+                    m_responseHashes = hashes;
+                    m_leaderTxnSucceed = txnSucceed;
+                } else if (m_leaderTxnSucceed != txnSucceed) {
+                    tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
+                    return ABORT;
+                } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
+                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
+                    return MISMATCH;
+                }
+            } else if (message.m_sourceHSId == m_leaderHSID) {
                 m_leaderResponseHashes = hashes;
                 m_leaderTxnSucceed = txnSucceed;
                 // Responses from replicas may have arrived earlier than partition master
@@ -213,7 +239,7 @@ public class DuplicateCounter
                         tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
                         logRelevantMismatchInformation("HASH MISMATCH", ZERO_HASHES, message, -1);
                     } else {
-                        if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
+                        if ((pos = DeterminismHash.compareHashes(m_leaderResponseHashes, hashes)) >= 0) {
                             tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
                             logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                             m_misMatchedSites.add(message.m_sourceHSId);
