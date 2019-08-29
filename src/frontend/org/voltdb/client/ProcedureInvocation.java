@@ -140,8 +140,12 @@ public class ProcedureInvocation {
 
         // there are two possible extensions, count which apply
         byte extensionCount = 0;
-        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
-        if (m_allPartition) ++extensionCount;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            ++extensionCount;
+        }
+        if (hasPartitionDestination()) {
+            extensionCount += 2;
+        }
         // write the count as one byte
         buf.put(extensionCount);
         // write any extensions that apply

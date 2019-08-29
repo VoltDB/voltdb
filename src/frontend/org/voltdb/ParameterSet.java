@@ -130,28 +130,32 @@ public class ParameterSet implements JSONString {
                 size +=  1 + 2;// component type, array length
                 switch (type) {
                     case SMALLINT:
-                        if (obj instanceof Short[])
+                        if (obj instanceof Short[]) {
                             size += 2 * ((Short[])obj).length;
-                        else
+                        } else {
                             size += 2 * ((short[])obj).length;
+                        }
                         break;
                     case INTEGER:
-                        if (obj instanceof Integer[])
+                        if (obj instanceof Integer[]) {
                             size += 4 * ((Integer[])obj).length;
-                        else
+                        } else {
                             size += 4 * ((int[])obj).length;
+                        }
                         break;
                     case BIGINT:
-                        if (obj instanceof Long[])
+                        if (obj instanceof Long[]) {
                             size += 8 * ((Long[])obj).length;
-                        else
+                        } else {
                             size += 8 * ((long[])obj).length;
+                        }
                         break;
                     case FLOAT:
-                        if (obj instanceof Double[])
+                        if (obj instanceof Double[]) {
                             size += 8 * ((Double[])obj).length;
-                        else
+                        } else {
                             size += 8 * ((double[])obj).length;
+                        }
                         break;
                     case STRING:
                         String strings[] = (String[]) obj;
@@ -394,8 +398,9 @@ public class ParameterSet implements JSONString {
         int nulls = 0;
 
         // handle empty arrays (too bad this is ints...)
-        if (array.length == 0)
+        if (array.length == 0) {
             return new int[0];
+        }
 
         // A note on Object[] null handling.  For most object array types, nulls can be bassed in as 'null' and/or
         // the VoltType Null equivalent.  Note that Object[] containing Strings supports null and VoltType nulls
@@ -404,28 +409,38 @@ public class ParameterSet implements JSONString {
         // support timestamp or varbinary in Object arrays.  Future work...
 
         // first pass counts value types
-        for (int i = 0; i < array.length; i++) {
-            if (array[i] instanceof VoltTable) tables++;
-            else if (array[i] instanceof Double) doubles++;
-            else if (array[i] instanceof Float) doubles++;
-            else if (array[i] instanceof Byte) integers++;
-            else if (array[i] instanceof Short) integers++;
-            else if (array[i] instanceof Integer) integers++;
-            else if (array[i] instanceof Long) integers++;
-            else if (array[i] instanceof String) strings++;
-            else if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) nulls++;
-            else if (null == array[i]) nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
-            else if (array[i] instanceof GeographyPointValue
-                    || array[i] instanceof GeographyValue
-                    || array[i] == VoltType.NULL_POINT
-                    || array[i] == VoltType.NULL_GEOGRAPHY) {
+        for (Object element : array) {
+            if (element instanceof VoltTable) {
+                tables++;
+            } else if (element instanceof Double) {
+                doubles++;
+            } else if (element instanceof Float) {
+                doubles++;
+            } else if (element instanceof Byte) {
+                integers++;
+            } else if (element instanceof Short) {
+                integers++;
+            } else if (element instanceof Integer) {
+                integers++;
+            } else if (element instanceof Long) {
+                integers++;
+            } else if (element instanceof String) {
+                strings++;
+            } else if (element == VoltType.NULL_STRING_OR_VARBINARY) {
+                nulls++;
+            } else if (null == element) {
+                nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
+            } else if (element instanceof GeographyPointValue
+                    || element instanceof GeographyValue
+                    || element == VoltType.NULL_POINT
+                    || element == VoltType.NULL_GEOGRAPHY) {
                 // Ticket ENG-9311 exists to make geo types work with Object[] arrays passed as parameters.
                 // Fixing that ticket will require updating the logic below.
                 throw new RuntimeException("GeographyPointValue or GeographyValue instances are not yet supported in "
                         + "Object arrays passed as parameters.  Try passing GeographyPointValue[] or GeographyValue[] instead.");
             } else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
-                                        array[i].getClass().toString());
+                                        element.getClass().toString());
                 throw new RuntimeException(msg);
             }
         }
@@ -439,16 +454,18 @@ public class ParameterSet implements JSONString {
             }
             assert(tables == array.length);
             VoltTable[] retval = new VoltTable[tables];
-            for (int i = 0; i < array.length; i++)
+            for (int i = 0; i < array.length; i++) {
                 retval[i] = (VoltTable) array[i];
+            }
             return retval;
         }
 
         // note: there can't be any tables past this point
 
         // Verify that we don't have all null values.
-        if (nulls == array.length)
+        if (nulls == array.length) {
             throw new RuntimeException("Unable to determine type. Parameter set array contains all NULL values.");
+        }
 
         if (strings > 0) {
             if ((integers + doubles) > 0) {
@@ -743,28 +760,32 @@ public class ParameterSet implements JSONString {
                 buf.put(type.getValue());
                 switch (type) {
                     case SMALLINT:
-                        if (obj instanceof Short[])
+                        if (obj instanceof Short[]) {
                             SerializationHelper.writeArray(ArrayUtils.toPrimitive((Short[])obj), buf);
-                        else
+                        } else {
                             SerializationHelper.writeArray((short[]) obj, buf);
+                        }
                         break;
                     case INTEGER:
-                        if (obj instanceof Integer[])
+                        if (obj instanceof Integer[]) {
                             SerializationHelper.writeArray(ArrayUtils.toPrimitive((Integer[])obj), buf);
-                        else
+                        } else {
                             SerializationHelper.writeArray((int[]) obj, buf);
+                        }
                         break;
                     case BIGINT:
-                        if (obj instanceof Long[])
+                        if (obj instanceof Long[]) {
                             SerializationHelper.writeArray(ArrayUtils.toPrimitive((Long[])obj), buf);
-                        else
+                        } else {
                             SerializationHelper.writeArray((long[]) obj, buf);
+                        }
                         break;
                     case FLOAT:
-                        if (obj instanceof Double[])
+                        if (obj instanceof Double[]) {
                             SerializationHelper.writeArray(ArrayUtils.toPrimitive((Double[])obj), buf);
-                        else
+                        } else {
                             SerializationHelper.writeArray((double[]) obj, buf);
+                        }
                         break;
                     case STRING:
                         if (m_encodedStringArrays[i] == null) {
@@ -798,8 +819,9 @@ public class ParameterSet implements JSONString {
                                byteBuf[ii] = ArrayUtils.toPrimitive(boxByteBuf[ii]);
                             }
                             SerializationHelper.writeArray(byteBuf, buf);
-                        } else
+                        } else {
                             SerializationHelper.writeArray((byte[][]) obj, buf);
+                        }
                         break;
                     case GEOGRAPHY_POINT:
                         SerializationHelper.writeArray((GeographyPointValue[]) obj, buf);
@@ -859,12 +881,13 @@ public class ParameterSet implements JSONString {
                     buf.putLong((Long) obj);
                     break;
                 case FLOAT:
-                    if (cls == Float.class)
+                    if (cls == Float.class) {
                         buf.putDouble(((Float) obj).doubleValue());
-                    else if (cls == Double.class)
+                    } else if (cls == Double.class) {
                         buf.putDouble((Double) obj);
-                    else
+                    } else {
                         throw new RuntimeException("Can't cast parameter type to Double");
+                    }
                     break;
                 case STRING:
                     if (m_encodedStrings[i] == null) {

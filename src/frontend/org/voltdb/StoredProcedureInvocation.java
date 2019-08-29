@@ -249,7 +249,7 @@ public class StoredProcedureInvocation implements JSONString {
                 4 + getProcNameBytes().length + // procname
                 8 + // client handle
                 1 + // extension count
-                batchExtensionSize + allPartitionExtensionSize + partitionDestinationSize;
+                        batchExtensionSize + allPartitionExtensionSize + partitionDestinationSize;
         return size;
     }
 
@@ -351,8 +351,15 @@ public class StoredProcedureInvocation implements JSONString {
 
         // there are two possible extensions, count which apply
         byte extensionCount = 0;
-        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
-        if (m_allPartition) ++extensionCount;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            ++extensionCount;
+        }
+        if (hasPartitionDestination()) {
+            ++extensionCount;
+        } else if (m_allPartition) {
+            ++extensionCount;
+        }
+
         // write the count as one byte
         buf.put(extensionCount);
         // write any extensions that apply
@@ -549,12 +556,13 @@ public class StoredProcedureInvocation implements JSONString {
     public String toString() {
         String retval = type.name() + " Invocation: " + procName + "(";
         ParameterSet params = getParams();
-        if (params != null)
+        if (params != null) {
             for (Object o : params.toArray()) {
                 retval += String.valueOf(o) + ", ";
             }
-        else
+        } else {
             retval += "null";
+        }
         retval += ")";
         retval += " type=" + String.valueOf(type);
         retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(m_batchTimeout);

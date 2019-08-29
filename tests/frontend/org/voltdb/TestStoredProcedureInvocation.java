@@ -27,14 +27,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.TreeMap;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.Pair;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ProcedureInvocation;
 import org.voltdb.client.ProcedureInvocationExtensions;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.utils.SerializationHelper;
+
+import junit.framework.TestCase;
 
 /**
  * Tests serialization and deserialization of a cross product of
