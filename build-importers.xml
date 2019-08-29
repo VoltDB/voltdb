@@ -97,7 +97,6 @@
         <fileset dir='${vendor.lib.dir}'>
             <exclude name='kafka-clients-0.8.2.2.jar' />
             <exclude name='ant.jar' />
-            <exclude name='classes-java1.7.jar' />
         </fileset>
         <fileset dir='${lib.dir}'>
             <include name='felix-framework-5.6.12.jar'/>
