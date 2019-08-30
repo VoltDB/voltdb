@@ -185,9 +185,6 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-        <exclude name='classes-java1.7.jar' />
- <!--         <exclude name='kafka-clients-0.10.2.1.jar' /> -->
-  <!--       <exclude name='kafka-clients-0.8.2.2.jar' /> -->
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
@@ -589,12 +586,12 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
-            <include name="src/frontend/org/voltdb/sched/package-info.java" />
-            <include name="src/frontend/org/voltdb/sched/Scheduler.java" />
-            <include name="src/frontend/org/voltdb/sched/Action.java" />
-            <include name="src/frontend/org/voltdb/sched/ActionResult.java" />
-            <include name="src/frontend/org/voltdb/sched/SchedulerValidationErrors.java" />
-            <include name="src/frontend/org/voltdb/sched/SchedulerValidationHelper.java" />
+            <include name="src/frontend/org/voltdb/task/package-info.java" />
+            <include name="src/frontend/org/voltdb/task/Scheduler.java" />
+            <include name="src/frontend/org/voltdb/task/Action.java" />
+            <include name="src/frontend/org/voltdb/task/ActionResult.java" />
+            <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
         </fileset>
     </javadoc>
 
@@ -619,6 +616,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="LICENSE.voltdbclient"/>
             <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
@@ -1164,8 +1162,7 @@ JAR BUILDING
     </ant>
 </target>
 
-<target name="voltdbthin.jar" depends="compile"
-    description="used by testability-explorer">
+<target name="voltdbthin.jar" depends="compile" description="used by testability-explorer">
     <jar destfile="${build.prod.dir}/voltdbthin.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
@@ -2281,7 +2278,6 @@ TEST CASES
       <fileset dir="${lib.dir}" includes ="*.jar" />
       <fileset dir='${vendor.lib.dir}'>
           <include name='*.jar' />
-          <exclude name='classes-java1.6.jar' />
       </fileset>
       <pathelement location="${build.test.dir}" />
       <fileset refid="voltpro.classpath"/>

@@ -23,7 +23,10 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -51,6 +54,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
 
     private static SocketExportTestServer m_serverSocket;
     private static LocalCluster config;
+    private static List<String> exStream = new ArrayList<>(Arrays.asList("ex"));
 
     @Override
     public void setUp() throws Exception
@@ -83,7 +87,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         Client client = getClient();
         Client adminClient = getAdminClient();
 
-        client.callProcedure("@AdHoc", "create stream ex export to target default (i bigint not null)");
+        client.callProcedure("@AdHoc", "create stream ex export to target socketconn (i bigint not null)");
         //We need a non export table
         client.callProcedure("@AdHoc", "create table ex2 (i bigint not null)");
         StringBuilder insertSql;
@@ -93,7 +97,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(1000);
         client.close();
         config.overrideStartCommandVerb("recover");
@@ -112,7 +116,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(2000);
     }
 
@@ -135,7 +139,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-        project.addExport(true, ServerExportEnum.CUSTOM, props, "default");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "socketconn");
         /*
          * compile the catalog all tests start with
          */

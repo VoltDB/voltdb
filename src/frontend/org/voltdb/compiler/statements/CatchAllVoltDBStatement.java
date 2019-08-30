@@ -90,11 +90,16 @@ public class CatchAllVoltDBStatement extends StatementProcessor {
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 
-        if (SCHEDULE.equals(m_firstProcessor.getCommandPrefix())) {
+        if (TASK.equals(m_firstProcessor.getCommandPrefix())) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid CREATE SCHEDULE statement: \"%s\", "
-                            + "expected syntax: \"CREATE SCHEDULE <name> [ON (SYSTEM | HOSTS | PARTITIONS)] "
-                            + "USING <scheduler class> [AS USER <user>] [DISABLED] [WITH arg1, ...]\"",
+                    "Invalid CREATE TASK statement: \"%s\", expected syntax: \n\""
+                            + "CREATE TASK <name> "
+                            + "ON SCHEDULE (CRON <exp> | DELAY <interval> <unit> | EVERY <interval> <unit>) "
+                            + "PROCEDURE <procedure> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]"
+                            + "\"\nor\n\""
+                            + "CREATE TASK <name> FROM CLASS <class> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]\"",
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 

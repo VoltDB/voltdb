@@ -24,7 +24,7 @@ import java.io.OutputStreamWriter;
 import java.util.Queue;
 import java.util.zip.GZIPOutputStream;
 
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.voltcore.logging.VoltLogger;
 
 

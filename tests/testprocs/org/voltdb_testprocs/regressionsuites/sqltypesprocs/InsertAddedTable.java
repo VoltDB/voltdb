@@ -37,9 +37,6 @@ public class InsertAddedTable extends VoltProcedure {
     public final SQLStmt i_addedtable = new SQLStmt
     ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public final SQLStmt i_addedtable_grp = new SQLStmt
-    ("INSERT INTO ADDED_TABLE_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
     public VoltTable[] run(
             String tablename,
             int pkey,
@@ -73,12 +70,6 @@ public class InsertAddedTable extends VoltProcedure {
 
         if (tablename.equals("ADDED_TABLE")) {
             voltQueueSQL(i_addedtable, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("ADDED_TABLE_GRP")) {
-            voltQueueSQL(i_addedtable_grp, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
                          a_geography_point, a_geography);

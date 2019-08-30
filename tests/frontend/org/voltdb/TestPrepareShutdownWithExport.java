@@ -70,7 +70,8 @@ public class TestPrepareShutdownWithExport extends TestExportBase
 
         final Client client2 = this.getClient();
         //add tuples for export
-        client2.callProcedure("@AdHoc", "create stream ex (i bigint not null)");
+        client2.callProcedure("@AdHoc", "create stream ex export to target ex (i bigint not null)");
+        m_streamNames.add("ex");
         for (int i= 0;i < 10000; i++) {
             client2.callProcedure("@AdHoc", "insert into ex values(" + i + ");");
         }
@@ -80,7 +81,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
 
         //push out export buffer and verify if there are any export queue.
-        waitForExportAllocatedMemoryZero(client2);
+        waitForExportAllRowsDelivered(client2, m_streamNames);
         m_serverSocket.verifyExportedTuples(10000);
 
         long sum = Long.MAX_VALUE;
@@ -127,7 +128,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-        project.addExport(true, ServerExportEnum.CUSTOM, props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "ex");
 
         LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
