@@ -17,9 +17,9 @@
 
 package org.voltdb.importer;
 
-import org.voltdb.client.ProcedureCallback;
+import java.util.function.Predicate;
 
-import java.util.function.Function;
+import org.voltdb.client.ProcedureCallback;
 
 
 /**
@@ -47,7 +47,8 @@ public interface ImporterServerAdapter {
      * @param fieldList the parameters to be passed in to the procedure
      * @return returns true if the procedure execution was queued successfully; false otherwise.
      */
-    public boolean callProcedure(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback callback, String proc, Object... fieldList);
+    public boolean callProcedure(AbstractImporter importer, Predicate<Integer> backPressurePredicate,
+            ProcedureCallback callback, String proc, Object... fieldList);
 
     /**
      * This should be used by importers to report failure while trying to execute a procedure.

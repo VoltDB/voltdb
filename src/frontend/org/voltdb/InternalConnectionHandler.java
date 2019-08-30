@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -98,7 +99,7 @@ public class InternalConnectionHandler {
             int timeout,
             ProcedureCallback cb,
             boolean ntPriority,
-            Function<Integer, Boolean> backPressurePredicate,
+            Predicate<Integer> backPressurePredicate,
             String procName,
             Object...args)
     {
@@ -112,7 +113,7 @@ public class InternalConnectionHandler {
             int timeout,
             ProcedureCallback cb,
             boolean ntPriority,
-            Function<Integer, Boolean> backPressurePredicate,
+            Predicate<Integer> backPressurePredicate,
             String procName,
             Object...args)
     {
@@ -171,7 +172,7 @@ public class InternalConnectionHandler {
 
     // Use null backPressurePredicate for no back pressure
     public boolean callProcedure(InternalConnectionContext caller,
-                                 Function<Integer, Boolean> backPressurePredicate,
+                                 Predicate<Integer> backPressurePredicate,
                                  InternalConnectionStatsCollector statsCollector,
                                  ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());

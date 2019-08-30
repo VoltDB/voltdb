@@ -30,7 +30,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.Level;
@@ -175,7 +175,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final AuthSystem.AuthUser user,
             final int[] partitions,
             final boolean ntPriority,
-            final Function<Integer, Boolean> backPressurePredicate) {
+            final Predicate<Integer> backPressurePredicate) {
 
         int primaryPartition = ((partitions == null) || (partitions.length > 1)) ? MpInitiator.MP_INIT_PID : partitions[0];
 
@@ -189,7 +189,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     if (m_permits.tryAcquire(BACK_PRESSURE_WAIT_TIME, MILLISECONDS)) {
                         break;
                     }
-                } while (backPressurePredicate.apply(primaryPartition));
+                } while (backPressurePredicate.test(primaryPartition));
             } catch (InterruptedException e) {}
         }
 
