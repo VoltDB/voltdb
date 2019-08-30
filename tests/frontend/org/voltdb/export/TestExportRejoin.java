@@ -87,6 +87,9 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
             client.callProcedure("ExportInsertNoNulls", params);
         }
         client.drain();
+        // We need to make sure that the buffer has drained on 2 of the three hosts. Otherwise,
+        // the buffer could be dropped by both hosts that are being killed.
+        client.callProcedure("@Quiesce");
 
         ((LocalCluster) m_config).recoverOne(1, null, "");
         Thread.sleep(500);
