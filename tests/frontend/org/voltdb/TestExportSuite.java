@@ -301,6 +301,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             SnapshotVerifier.main(args);
             ps.flush();
             final String reportString = baos.toString("UTF-8");
+            System.out.println(reportString);
             assertTrue(reportString.startsWith("Snapshot valid\n"));
         } catch (final UnsupportedEncodingException e) {}
         finally {
