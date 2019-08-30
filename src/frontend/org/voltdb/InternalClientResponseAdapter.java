@@ -130,7 +130,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 // just restarting the transaction here? Why? Safe?
                 createTransaction(
                         m_kattrs,
-                        m_task.getProcName(),
                         m_proc, m_cb,
                         m_statsCollector,
                         m_task,
@@ -167,7 +166,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     public boolean createTransaction(final InternalAdapterTaskAttributes kattrs,
-            final String procName,
             final Procedure catProc,
             final ProcedureCallback proccb,
             final InternalConnectionStatsCollector statsCollector,
@@ -209,7 +207,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
-                            kattrs, catProc, task, procName, partitions, proccb, statsCollector, user, handle);
+                            kattrs, catProc, task, catProc.getTypeName(), partitions, proccb, statsCollector, user,
+                            handle);
 
                     m_callbacks.put(handle, cb);
 
