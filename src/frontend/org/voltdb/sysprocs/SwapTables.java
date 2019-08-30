@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.hsqldb_voltpatches.lib.StringUtil;
@@ -29,7 +28,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -66,6 +64,9 @@ public class SwapTables extends AdHocNTBase {
         if (ttlTable != null && !StringUtil.isEmpty(ttlTable.getMigrationtarget())) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     String.format("Table %s cannot be swapped since it uses TTL.",theTable));
+        } else if (CatalogUtil.hasShadowStream(theTable) || CatalogUtil.hasShadowStream(otherTable)) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    String.format("Table %s cannot be swapped since it is used for exporting.",theTable));
         } else {
             return runNonDDLAdHoc(context, sqlStatements, true, null, ExplainMode.NONE,
                     false, true, userParams);
