@@ -681,7 +681,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                       m_siteId,
                                       m_indexStats);
             m_memStats = memStats;
-            m_tickProducer = new TickProducer(scheduler);
+            m_tickProducer = new TickProducer(pendingSiteTasks, siteId);
         } else {
             // MPI doesn't need to track these stats
             m_tableStats = null;

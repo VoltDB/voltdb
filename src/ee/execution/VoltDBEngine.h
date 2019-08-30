@@ -142,11 +142,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t sitesPerHost,
                         int32_t hostId,
-                        std::string hostname,
+                        std::string const& hostname,
                         int32_t drClusterId,
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
-                        bool createDrReplicatedStream,
+                        bool isLowestSiteId,
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
