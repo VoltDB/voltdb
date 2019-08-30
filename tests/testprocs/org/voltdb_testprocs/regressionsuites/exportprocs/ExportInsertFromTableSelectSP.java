@@ -21,38 +21,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
-import java.math.BigDecimal;
-
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.types.TimestampType;
+import org.voltdb.VoltTable;
 
-/**
- * Update for the EL tests, which error updates to append-only
- * tables.
- */
+public class ExportInsertFromTableSelectSP extends VoltProcedure {
 
-public class Update_Export extends VoltProcedure {
+    private final SQLStmt i_insert_select_repl = new SQLStmt
+    ("INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS;");
 
-    public long run(
-            String tablename,
-            int pkey,
-            long a_tinyint,
-            long a_smallint,
-            long a_integer,
-            long a_bigint,
-            double a_float,
-            TimestampType a_timestamp,
-            String a_inline_s1,
-            String a_inline_s2,
-            String a_pool_s,
-            String a_pool_max_s,
-            byte[] b_inline,
-            byte[] b_pool,
-            BigDecimal a_decimal
+    private final SQLStmt i_insert_select_part = new SQLStmt
+    ("INSERT INTO S_ALLOW_NULLS SELECT * FROM NO_NULLS;");
+
+    public VoltTable[] run(
+            String targetStream,
+            int pkey
             )
     {
-        return 0;
+        if (targetStream.equals("S_ALLOW_NULLS_REPL")) {
+            voltQueueSQL(i_insert_select_repl);
+        }
+        else if (targetStream.equals("S_ALLOW_NULLS")) {
+            voltQueueSQL(i_insert_select_part);
+        }
+        else {
+            throw new RuntimeException("Don't call this.");
+        }
+        return voltExecuteSQL();
     }
 }

@@ -23,22 +23,25 @@
 
 package org.voltdb.export;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.utils.MiscUtils;
 
-public class TestExportV2SuitePro extends TestExportBaseSocketExport {
+/**
+ * End to end Export tests using the injected custom export.
+ *
+ *  Note, this test reuses the TestSQLTypesSuite schema and procedures.
+ *  Each table in that schema, to the extent the DDL is supported by the
+ *  DB, really needs an Export round trip test.
+ */
+
+public class TestExportSnapshot extends TestExportBaseSocketExport {
     private static final int k_factor = 1;
 
     @Override
@@ -51,7 +54,6 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        m_streamNames.add("S_ALLOW_NULLS");
     }
 
     @Override
@@ -61,60 +63,78 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         closeSocketExporterClientAndServer();
     }
 
-    // Test Export of an ADDED stream.
-    //
-    public void testExportAndAddedTable() throws Exception {
-        System.out.println("testExportAndAddedTable");
-        final Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
-
-        // add a new table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                                                                             new File(deploymentURL));
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        m_streamNames.add("S_ADDED_STREAM");
-
-        // verify that it exports
-        for (int i=0; i < 10; i++) {
+    public void testExportSnapshotResetsSequenceNumber() throws Exception {
+        System.out.println("testExportSnapshotResetsSequenceNumber");
+        String targetStream = "S_NO_NULLS";
+        m_streamNames.add(targetStream);
+        Client client = getClient();
+        for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "S_ADDED_STREAM", i, convertValsToRow(i, 'I', rowdata));
-            // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            final Object[]  params = convertValsToParams("S_ADDED_STREAM", i, rowdata);
-            client.callProcedure("InsertAddedStream", params);
+            final Object[] params = convertValsToParams(targetStream, i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
         }
+        waitForExportAllRowsDelivered(client, m_streamNames);
+        quiesce(client);
 
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
+
+        m_config.shutDown();
+        ExportManager.setInstanceForTest(null);
+
+        m_config.startUp(false);
+
+        System.out.println("Restart is done...........");
+        client = getClient();
+
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
+        System.out.println("Snapshot Restore is done...........");
+
+        for (int i = 10; i < 20; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client, targetStream, i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams(targetStream, i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
+        }
+        System.out.println("Insert Data is done...........");
+
+        // must still be able to verify the export data.
+        // ENG-570
+        client.drain();
+        waitForExportAllRowsDelivered(client, m_streamNames);
+        // Ignore first 10 rows received before restart, make sure the sequence number of
+        // remaining rows start from beginning.
+        for (int i = 0; i < 10; i++) {
+            m_verifier.ignoreRow(targetStream, i);
+        }
+        m_verifier.verifyRows();
+        System.out.println("Passed!");
     }
 
-    public TestExportV2SuitePro(final String name) {
+    public TestExportSnapshot(final String name) {
         super(name);
     }
 
     static public junit.framework.Test suite() throws Exception
     {
-        LocalCluster config;
-
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-        Map<String, String> additionalEnv = new HashMap<>();
+        String dexportClientClassName = System.getProperty("exportclass", "");
+        System.out.println("Test System override export class is: " + dexportClientClassName);
+        LocalCluster  config;
+        Map<String, String> additionalEnv = new HashMap<String, String>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
 
         final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestExportV2SuitePro.class);
+            new MultiConfigSuiteBuilder(TestExportSnapshot.class);
 
         project = new VoltProjectBuilder();
         project.setSecurityEnabled(true, true);
         project.addRoles(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("S_ALLOW_NULLS");
-        project.addProcedures(ALLOWNULLS_PROCEDURES);
+        wireupExportTableToSocketExport("S_NO_NULLS");
 
+        project.addProcedures(NONULLS_PROCEDURES);
 
         // JNI, single server
         // Use the cluster only config. Multiple topologies with the extra catalog for the
@@ -131,35 +151,13 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        //TODO: Update after fixing Snapshot on same server
+        config.setNewCli(false);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
-
-        /*
-         * compile a catalog with an added table for add tests
-         */
-        config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true,additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        project = new VoltProjectBuilder();
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
-        project.addSchema(TestExportBase.class.getResource("export-addedstream-ddl-with-target.sql"));
-
-        wireupExportTableToSocketExport("S_ALLOW_NULLS");
-        wireupExportTableToSocketExport("S_ADDED_STREAM");
-
-        project.addProcedures(ALLOWNULLS_PROCEDURES);
-        project.addProcedures(ADDSTREAM_PROCEDURES);
-        compile = config.compile(project);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml"));
-        assertTrue(compile);
-
+        builder.addServerConfig(config);
 
         return builder;
     }

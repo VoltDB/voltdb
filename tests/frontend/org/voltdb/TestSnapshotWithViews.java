@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -85,12 +86,13 @@ public class TestSnapshotWithViews extends TestExportBase {
         for (String ddl : ddls) {
             client.callProcedure("@AdHoc", ddl);
         }
+        m_streamNames.add("EX");
         int numValues=5000;
         for (int i=0;i<numValues;i++) {
             client.callProcedure("@AdHoc", "insert into ex values(" + i + ");");
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, m_streamNames);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), numValues);
 
@@ -123,6 +125,7 @@ public class TestSnapshotWithViews extends TestExportBase {
         for (String ddl : ddls) {
             client.callProcedure("@AdHoc", ddl);
         }
+        m_streamNames.add("EX");
         StringBuilder insertSql;
         for (int i=0;i<5000;i++) {
             insertSql = new StringBuilder();
@@ -130,7 +133,7 @@ public class TestSnapshotWithViews extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, m_streamNames);
         client.callProcedure("@AdHoc", "delete from v_ex where i = 0");
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), 4999);
@@ -164,9 +167,10 @@ public class TestSnapshotWithViews extends TestExportBase {
         for (String ddl : ddls) {
             client.callProcedure("@AdHoc", ddl);
         }
+        m_streamNames.add("EX");
         client.callProcedure("@AdHoc", "insert into ex values(0)");
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, m_streamNames);
         client.callProcedure("@AdHoc", "update v_ex set counti = 10");
         ClientResponse response = client.callProcedure("@AdHoc", "select counti from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), 10);
@@ -274,7 +278,6 @@ public class TestSnapshotWithViews extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
         response = client.callProcedure("@AdHoc", "select count(*) from v_ex_np");

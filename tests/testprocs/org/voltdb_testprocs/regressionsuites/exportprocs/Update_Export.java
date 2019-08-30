@@ -21,36 +21,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
-import org.voltdb.SQLStmt;
+import java.math.BigDecimal;
+
 import org.voltdb.VoltProcedure;
-import static org.voltdb.VoltProcedure.EXPECT_SCALAR_MATCH;
-import static org.voltdb.VoltProcedure.EXPECT_ZERO_OR_ONE_ROW;
-import org.voltdb.VoltTable;
+import org.voltdb.types.TimestampType;
 
-//1 - paused
-//0 - resumed
-public class PauseResumeExport extends VoltProcedure {
+/**
+ * Update for the EL tests, which error updates to append-only
+ * tables.
+ */
 
-    public static final SQLStmt checkStateStmt = new SQLStmt(
-            "SELECT status FROM PAUSE_RESUME WHERE STATUS_ID = ?;");
-    public static final SQLStmt insertStmt = new SQLStmt(
-            "INSERT INTO PAUSE_RESUME (status, status_id) VALUES (?, ?);");
-    public static final SQLStmt updateStmt = new SQLStmt(
-            "UPDATE PAUSE_RESUME set status=? where status_id=1;");
+public class Update_Export extends VoltProcedure {
 
-    public long run(long flag) {
-        voltQueueSQL(checkStateStmt, EXPECT_ZERO_OR_ONE_ROW, 1);
-        VoltTable validation[] = voltExecuteSQL();
-
-        if (validation[0].getRowCount() == 0) {
-            voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), flag, 1);
-            voltExecuteSQL();
-        } else {
-            voltQueueSQL(updateStmt, EXPECT_SCALAR_MATCH(1), flag);
-            voltExecuteSQL();
-        }
-        return flag;
+    public long run(
+            String tablename,
+            int pkey,
+            long a_tinyint,
+            long a_smallint,
+            long a_integer,
+            long a_bigint,
+            double a_float,
+            TimestampType a_timestamp,
+            String a_inline_s1,
+            String a_inline_s2,
+            String a_pool_s,
+            String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
+            BigDecimal a_decimal
+            )
+    {
+        return 0;
     }
 }

@@ -21,24 +21,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
+package org.voltdb_testprocs.regressionsuites.exportprocs;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-public class InsertBase extends VoltProcedure {
+public class ExportInsertFromTableSelectMP extends VoltProcedure {
 
-    protected final SQLStmt i_no_nulls = new SQLStmt
-    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    // This statement currently fails to compile. So it is commented out for now. See ENG-16980
+    //private final SQLStmt i_insert_select_repl = new SQLStmt
+    //("INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS_REPL;");
 
-    protected final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    private final SQLStmt i_insert_select_part = new SQLStmt
+    ("INSERT INTO S_ALLOW_NULLS SELECT * FROM NO_NULLS_REPL;");
 
-    public final SQLStmt i_with_defaults = new SQLStmt
-    ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
-
-    public long run() {
-        throw new RuntimeException("Don't call this.");
+    public VoltTable[] run(
+            String targetStream,
+            int pkey
+            )
+    {
+        if (targetStream.equals("S_ALLOW_NULLS_REPL")) {
+            //voltQueueSQL(i_insert_select_repl);
+        }
+        else if (targetStream.equals("S_ALLOW_NULLS")) {
+            voltQueueSQL(i_insert_select_part);
+        }
+        else {
+            throw new RuntimeException("Don't call this.");
+        }
+        return voltExecuteSQL();
     }
-
 }
