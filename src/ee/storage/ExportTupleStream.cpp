@@ -57,7 +57,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
 }
 
 void ExportTupleStream::setGeneration(int64_t generation) {
-    assert(generation > m_generation);
+    assert(generation >= m_generation);
     m_generation = generation;
 }
 

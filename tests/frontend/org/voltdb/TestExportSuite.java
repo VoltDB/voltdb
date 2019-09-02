@@ -79,7 +79,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         closeClientAndServer();
     }
 
-
     // Test Export of an ADDED table.
     //
     public void testExportAndAddedTable() throws Exception {
@@ -301,7 +300,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             SnapshotVerifier.main(args);
             ps.flush();
             final String reportString = baos.toString("UTF-8");
-            System.out.println(reportString);
+            System.out.println("reportString=" + reportString);
             assertTrue(reportString.startsWith("Snapshot valid\n"));
         } catch (final UnsupportedEncodingException e) {}
         finally {

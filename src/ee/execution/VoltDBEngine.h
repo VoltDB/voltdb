@@ -593,6 +593,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void loadBuiltInJavaFunctions();
 
+        void attachTupleStream(StreamedTable* streamedTable,
+                               const std::string& streamName,
+                               std::map<std::string, ExportTupleStream*> & purgedStreams,
+                               int64_t timestamp);
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
