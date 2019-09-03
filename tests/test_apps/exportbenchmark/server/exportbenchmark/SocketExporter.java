@@ -116,7 +116,6 @@ public class SocketExporter extends ExportClientBase {
             } catch (JSONException e) {
                 m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
             }
-<<<<<<< HEAD
 
             String messageString = message.toString();
             buffer.clear();
@@ -124,15 +123,6 @@ public class SocketExporter extends ExportClientBase {
             buffer.put(messageString.getBytes());
             buffer.flip();
 
-=======
-
-            String messageString = message.toString();
-            buffer.clear();
-            buffer.put((byte)messageString.length());
-            buffer.put(messageString.getBytes());
-            buffer.flip();
-
->>>>>>> master
             // Send message over socket
             try {
                 int sent = channel.send(buffer, address);
