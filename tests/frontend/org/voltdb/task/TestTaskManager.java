@@ -29,7 +29,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -115,9 +114,9 @@ public class TestTaskManager {
         m_internalConnectionHandler = mock(InternalConnectionHandler.class);
 
         m_response = when(mock(ClientResponse.class).getStatus()).thenReturn(ClientResponse.SUCCESS).getMock();
-        when(m_internalConnectionHandler.callProcedure(any(), eq(false), anyInt(), any(), eq(PROCEDURE_NAME), any()))
-                .then(m -> {
-                    ((ProcedureCallback) m.getArgument(3)).clientCallback(m_response);
+        when(m_internalConnectionHandler.callProcedure(any(), any(), eq(false), any(), eq(m_procedure), any(),
+                eq(false), any())).then(m -> {
+                    ((ProcedureCallback) m.getArgument(5)).clientCallback(m_response);
                     return true;
                 });
 
@@ -188,16 +187,11 @@ public class TestTaskManager {
      */
     @Test
     public void partitionScheduleCreateDrop() throws Exception {
-        TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
-
         Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
-        m_procedure.setPartitionparameter(0);
-        Column column = new Column();
-        column.setType(VoltType.INTEGER.getValue());
-        m_procedure.setPartitioncolumn(column);
+        m_procedure.setPartitionparameter(-1);
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -570,10 +564,10 @@ public class TestTaskManager {
 
         int procedureCalls = previousCount/2;
 
-        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
 
         verify(m_clientInterface, atLeast(procedureCalls)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(procedureCalls + 1)).getProcedureFromName(eq(PROCEDURE_NAME));
@@ -600,10 +594,10 @@ public class TestTaskManager {
         assertEquals(startCount, s_firstActionSchedulerCallCount.get());
         assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
 
-        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), any(), eq(false),
+                any(), eq(m_procedure), any(), eq(false), any());
 
         if (procedureValidated) {
             previousCount += startCount;

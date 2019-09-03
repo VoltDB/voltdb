@@ -179,9 +179,8 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
 
         String procName = getMethodName() + "_prune";
         client.callProcedure("@AdHoc",
-                "CREATE PROCEDURE " + procName + " PARTITION ON TABLE " + tableName
-                        + " COLUMN key PARAMETER 0 AS DELETE FROM " + tableName
-                        + " WHERE CAST(? AS INTEGER) IS NOT NULL ORDER BY key OFFSET 10");
+                "CREATE PROCEDURE " + procName + " PARTITIONED AS DELETE FROM " + tableName
+                        + " ORDER BY key OFFSET 10");
 
         AtomicReference<Exception> error = new AtomicReference<>();
         Thread producer = new Thread() {
@@ -237,7 +236,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
                 client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + tableName).getResults()[0].asScalarLong());
 
         // Test that partition schedules fail over
-        getCluster(0).killSingleHost(m_random.nextInt(3));
+        getCluster(0).killSingleHost(1);
 
         table = getScheduleStats(client);
         assertEquals(4, table.getRowCount());
