@@ -53,21 +53,15 @@ import org.voltdb.ClientInterface;
 import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsAgent;
-import org.voltdb.TheHashinator;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
-import org.voltdb.client.BatchTimeoutOverrideType;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.iv2.MpInitiator;
@@ -833,9 +827,10 @@ public final class TaskManager {
                 return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
-            if (procedure.getPartitionparameter() != 0) {
+            if (procedure.getPartitionparameter() != -1) {
                 return String.format(
-                        "Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
+                        "Procedure %s must be a work procedure which is not partitioned on a table. "
+                                + "Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
@@ -1297,10 +1292,11 @@ public final class TaskManager {
                 return;
             }
 
-            Object[] procedureParameters = getProcedureParameters(procedure);
-            if (procedureParameters == null) {
-                return;
-            }
+            StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+            invocation.setProcName(m_scheduledAction.getProcedure());
+            invocation.setParams(m_scheduledAction.getRawProcedureParameters());
+
+            modifyInvocation(procedure, invocation);
 
             String userName = m_handler.getUser();
             AuthUser user = getUser(userName);
@@ -1311,13 +1307,12 @@ public final class TaskManager {
 
             if (log.isTraceEnabled()) {
                 log.trace(generateLogMessage("Executing procedure " + m_scheduledAction.getProcedure() + ' '
-                        + Arrays.toString(procedureParameters)));
+                        + invocation.getParams()));
             }
 
             m_scheduledAction.setStarted();
-            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(user, false,
-                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_scheduledAction.getProcedure(),
-                    procedureParameters)) {
+            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(null, user, false, invocation,
+                    procedure, this::handleResponse, false, null)) {
                 errorOccurred("Could not call procedure %s", m_scheduledAction.getProcedure());
             }
         }
@@ -1402,15 +1397,12 @@ public final class TaskManager {
         }
 
         /**
-         * Generate the parameters to pass to the procedure during execution
+         * Method which can be overridden to modify the {@code invocation} prior to the transacation being created
          *
-         * @param procedure being executed
-         * @return Parameters to use with the procedure to execute or {@code null} if there was an error generating the
-         *         parameters
+         * @param procedure  {@link Procedure} which is to be invoked
+         * @param invocation {@link StoredProcedureInvocation} describing how to invoke the procedure
          */
-        Object[] getProcedureParameters(Procedure procedure) {
-            return m_scheduledAction.getRawProcedureParameters();
-        }
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {}
 
         /**
          * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if
@@ -1586,51 +1578,11 @@ public final class TaskManager {
             m_partition = partition;
         }
 
-        /**
-         * Behaves like run {@link Client#callAllPartitionProcedure(String, Object...)} where the first argument to the
-         * procedure is just there to route the procedure call to the desired partition.
-         */
         @Override
-        Object[] getProcedureParameters(Procedure procedure) {
-            if (!procedure.getSinglepartition()) {
-                return super.getProcedureParameters(procedure);
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {
+            if (procedure.getSinglepartition() && procedure.getPartitionparameter() == -1) {
+                invocation.setPartitionDestination(m_partition);
             }
-
-            Object[] baseParams = super.getProcedureParameters(procedure);
-            CatalogMap<ProcParameter> procParams = procedure.getParameters();
-            if (procParams == null
-                    || !(procParams.size() == baseParams.length + 1 && procedure.getPartitionparameter() == 0)) {
-                return baseParams;
-            }
-
-            Object[] partitionedParams = new Object[baseParams.length + 1];
-
-            VoltType keyType = VoltType.get((byte) procedure.getPartitioncolumn().getType());
-            // BIGINT isn't supported so just use the INTEGER keys since they are compatible
-            VoltTable keys = TheHashinator.getPartitionKeys(keyType == VoltType.BIGINT ? VoltType.INTEGER : keyType);
-            if (keys == null) {
-                errorOccurred("Unsupported partition key type %s for procedure %s", keyType, procedure.getTypeName());
-                return null;
-            }
-
-            VoltTable copy = PrivateVoltTableFactory.createVoltTableFromBuffer(keys.getBuffer(), true);
-
-            // Find the key for partition destination
-            copy.resetRowPosition();
-            while (copy.advanceRow()) {
-                if (m_partition == copy.getLong(0)) {
-                    partitionedParams[0] = copy.get(1, keyType);
-                    break;
-                }
-            }
-
-            if (partitionedParams[0] == null) {
-                errorOccurred("Unable to find a key for partition %d", m_partition);
-                return null;
-            }
-
-            System.arraycopy(baseParams, 0, partitionedParams, 1, baseParams.length);
-            return partitionedParams;
         }
 
         @Override
