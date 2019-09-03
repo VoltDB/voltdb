@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,8 +35,8 @@ import genqa.VerifierUtils.Config;
 
 public class JDBCGetData {
     static Connection conn;
-    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
-    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
+    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE_JDBC\" where \"ROWID\" = ?;";
+    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE_JDBC\" where \"ROWID\" = ?;";
     static PreparedStatement selectStmt = null;
     private static Config config;
     /**
