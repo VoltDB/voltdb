@@ -33,6 +33,9 @@
        <fileset dir="/home/opt/rabbitmq">
            <include name="*.jar"/>
        </fileset>
+       <fileset dir="/home/opt/kafka/libs">
+           <include name="*.jar"/>
+       </fileset>
     </path>
 
     <target name="client-compile">
