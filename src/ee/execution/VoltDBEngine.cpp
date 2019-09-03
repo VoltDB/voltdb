@@ -931,7 +931,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
     s_exportFlushTimeout = catalogCluster->exportFlushInterval();
-    assert(s_exportFlushTimeout > 0);
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
