@@ -569,7 +569,7 @@ public class SQLCommand {
 
     private static void executeListTasks() throws Exception {
         VoltTable schedules = m_client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
-        System.out.println("--- Schedules ------------------------------------------------");
+        System.out.println("--- Tasks ----------------------------------------------------");
         while (schedules.advanceRow()) {
             System.out.println(schedules.getString(0));
         }

@@ -216,14 +216,14 @@ public final class TaskManager {
      * Asynchronously start the scheduler manager and any configured schedules which are eligible to be run on this
      * host.
      *
-     * @param configuration      Global configuration for all tasks
-     * @param procedureSchedules {@link Collection} of configured {@link Task}
-     * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured classes
+     * @param configuration Global configuration for all tasks
+     * @param tasks         {@link Collection} of configured {@link Task}s
+     * @param authSystem    Current {@link AuthSystem} for the system
+     * @param classLoader   {@link ClassLoader} to use to load configured classes
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> procedureSchedules, AuthSystem authSystem,
+    ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
             ClassLoader classLoader) {
         return execute(() -> {
             m_started = true;
@@ -231,7 +231,7 @@ public final class TaskManager {
             // Create a dummy stats source so something is always reported
             TaskStatsSource.createDummy().register(m_statsAgent);
 
-            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
+            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -249,18 +249,18 @@ public final class TaskManager {
     /**
      * Asynchronously promote this host to be the global leader
      *
-     * @param configuration      Global configuration for all tasks
-     * @param procedureSchedules {@link Collection} of configured {@link Task}
-     * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured classes
+     * @param configuration Global configuration for all tasks
+     * @param tasks         {@link Collection} of configured {@link Task}s
+     * @param authSystem    Current {@link AuthSystem} for the system
+     * @param classLoader   {@link ClassLoader} to use to load configured classes
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader) {
+    ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+            ClassLoader classLoader) {
         log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
             m_leader = true;
-            processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, false);
+            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -279,17 +279,17 @@ public final class TaskManager {
     /**
      * Asynchronously process an update to the scheduler configuration
      *
-     * @param configuration      Global configuration for all tasks
-     * @param procedureSchedules {@link Collection} of configured {@link Task}
-     * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load configured classes
-     * @param classesUpdated     If {@code true} handle classes being updated in the system jar
+     * @param configuration  Global configuration for all tasks
+     * @param tasks          {@link Collection} of configured {@link Task}s
+     * @param authSystem     Current {@link AuthSystem} for the system
+     * @param classLoader    {@link ClassLoader} to use to load configured classes
+     * @param classesUpdated If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> processUpdate(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
+    ListenableFuture<?> processUpdate(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+            ClassLoader classLoader, boolean classesUpdated) {
         return execute(
-                () -> processCatalogInline(configuration, procedureSchedules, authSystem, classLoader, classesUpdated));
+                () -> processCatalogInline(configuration, tasks, authSystem, classLoader, classesUpdated));
     }
 
     /**
@@ -594,13 +594,13 @@ public final class TaskManager {
      * Process any potential scheduler changes. Any modified schedules will be stopped and restarted with their new
      * configuration. If a schedule was not modified it will be left running.
      *
-     * @param configuration      Global configuration for all tasks
-     * @param procedureSchedules {@link Collection} of configured {@link Task}
-     * @param authSystem         Current {@link AuthSystem} for the system
-     * @param classLoader        {@link ClassLoader} to use to load classes
+     * @param configuration Global configuration for all tasks
+     * @param tasks         {@link Collection} of configured {@link Task}s
+     * @param authSystem    Current {@link AuthSystem} for the system
+     * @param classLoader   {@link ClassLoader} to use to load classes
      */
-    private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> procedureSchedules,
-            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
+    private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+            ClassLoader classLoader, boolean classesUpdated) {
         if (!m_started) {
             return;
         }
@@ -634,7 +634,7 @@ public final class TaskManager {
         boolean hasNonPartitionedSchedule = false;
         boolean hasPartitionedSchedule = false;
 
-        for (Task procedureSchedule : procedureSchedules) {
+        for (Task procedureSchedule : tasks) {
             if (log.isDebugEnabled()) {
                 ToStringHelper toString = MoreObjects.toStringHelper(procedureSchedule);
                 for (String field : procedureSchedule.getFields()) {
