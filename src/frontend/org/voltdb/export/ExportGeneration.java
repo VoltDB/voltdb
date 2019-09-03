@@ -1040,6 +1040,7 @@ public class ExportGeneration implements Generation {
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        targets.addAll(exportTargets);
         synchronized (m_dataSourcesByPartition) {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
                 Integer partition = partitionDataSourceMap.getKey();
