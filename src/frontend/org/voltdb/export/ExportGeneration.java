@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -950,6 +951,8 @@ public class ExportGeneration {
     public void processStreamControl(String exportSource, List<String> exportTargets,
             OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
+        TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        targets.addAll(exportTargets);
         synchronized (m_dataSourcesByPartition) {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap :
                 m_dataSourcesByPartition.entrySet()) {
@@ -959,8 +962,8 @@ public class ExportGeneration {
                         continue;
                     }
 
-                    // no target match
-                    if (!exportTargets.contains(source.getTarget())) {
+                    // no target match (case insensitive)
+                    if (!targets.contains(source.getTarget())) {
                         continue;
                     }
 
