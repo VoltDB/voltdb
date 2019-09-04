@@ -256,7 +256,7 @@ public class ClientCnxn {
 
         Record response;
 
-        boolean finished;
+        volatile boolean finished;
 
         AsyncCallback cb;
 
