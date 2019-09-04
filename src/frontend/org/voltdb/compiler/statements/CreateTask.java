@@ -95,7 +95,6 @@ public class CreateTask extends StatementProcessor {
                     task.setScheduleclass(CronSchedule.class.getName());
                     addParameter(scheduleParams, 0, matcher.group("cron"));
                 } else {
-
                     String intervalSchedule = matcher.group("intervalSchedule");
                     if ("delay".equalsIgnoreCase(intervalSchedule)) {
                         task.setScheduleclass(DelaySchedule.class.getName());
@@ -105,7 +104,7 @@ public class CreateTask extends StatementProcessor {
                         throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
                     }
                     addParameter(scheduleParams, 0, matcher.group("interval"));
-                    addParameter(scheduleParams, 1, matcher.group("timeUnit"));
+                    addParameter(scheduleParams, 1, matcher.group("timeUnit").toUpperCase());
                 }
             } else {
                 task.setScheduleclass(scheduleClass);

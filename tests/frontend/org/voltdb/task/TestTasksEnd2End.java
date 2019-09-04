@@ -105,9 +105,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
                 + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
                 + getTableName(0, TableType.REPLICATED) + ";') ON ERROR IGNORE;";
 
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY 50 MILLISECONDS", 1));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "delay 50 MILLISECONDS", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 MILLISECONDS", 3));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 milliseconds", 3));
 
         // Give everything some time to run
         Thread.sleep(1000);
