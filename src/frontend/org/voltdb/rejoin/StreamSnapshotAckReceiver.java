@@ -45,6 +45,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
     private final AtomicInteger m_expectedEOFs;
 
     volatile Exception m_lastException = null;
+    private volatile boolean m_stop;
 
     public StreamSnapshotAckReceiver(Mailbox mb)
     {
@@ -57,6 +58,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_msgFactory = msgFactory;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
+        m_stop = false;
     }
 
     public void setCallback(long targetId, AckCallback callback, int expectedAcksForEOF) {
@@ -64,17 +66,27 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_callbacks.put(targetId, callback);
     }
 
+    public void forceStop() {
+        m_stop = true;
+    }
+
     @Override
     public void run() {
-        rejoinLog.trace("Starting ack receiver thread");
+        if (rejoinLog.isTraceEnabled()) {
+            rejoinLog.trace("Starting ack receiver thread");
+        }
 
         try {
-            while (true) {
-                rejoinLog.trace("Blocking on receiving mailbox");
+            while (!m_stop) {
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Blocking on receiving mailbox");
+                }
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
                 if (msg == null) {
-                    rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
-                                   " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
+                    if (!m_stop) {
+                        rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
+                                       " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
+                    }
                     continue;
                 }
 
@@ -94,6 +106,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
                 if (ackCallback == null) {
                     rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
                                     " in stream snapshot ack message");
+                    continue;
                 } else if (m_msgFactory.getAckBlockIndex(msg) != -1) {
                     ackCallback.receiveAck(m_msgFactory.getAckBlockIndex(msg));
                 }
@@ -112,7 +125,9 @@ public class StreamSnapshotAckReceiver implements Runnable {
             m_lastException = e;
             rejoinLog.error("Error reading a message from a recovery stream", e);
         } finally {
-            rejoinLog.trace("Ack receiver thread exiting");
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Ack receiver thread exiting");
+            }
         }
     }
 }

@@ -71,6 +71,7 @@ public abstract class StreamSnapshotBase {
         {
             return null;
         }
+
     }
 
 }

@@ -124,9 +124,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_ackReceiver = ackReceiver;
         m_ackReceiver.setCallback(m_targetId, this, m_replicatedTableTarget ? allDestHostHSIds.size() : 1);
 
-        rejoinLog.debug(String.format("Initializing snapshot stream processor " +
-                "for source site id: %s, and with processorid: %d%s" ,
-                CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite?" [Lowest Site]":"")));
+        if (rejoinLog.isDebugEnabled()) {
+            rejoinLog.debug(String.format("Initializing snapshot stream processor " +
+                    "for source site id: %s, and with processorid: %d%s" ,
+                    CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite?" [Lowest Site]":"")));
+        }
 
         // start a periodic task to look for timed out connections
         VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
@@ -370,7 +372,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             return;
         }
 
-        rejoinLog.trace("Clearing outstanding work.");
+        if (rejoinLog.isTraceEnabled()) {
+            rejoinLog.trace("Clearing outstanding work.");
+        }
 
         for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
             e.getValue().discard();
@@ -419,6 +423,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         final Map<Long, AtomicLong> m_bytesSent;
         final Map<Long, AtomicLong> m_worksSent;
         volatile Exception m_lastException = null;
+        volatile boolean m_stop;
 
         public SnapshotSender(Mailbox mb)
         {
@@ -434,6 +439,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
             m_worksSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+            m_stop = false;
         }
 
         public void registerDataTarget(long targetId)
@@ -448,19 +454,29 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_workQueue.offer(work);
         }
 
+        public void forceStop() {
+            m_stop = true;
+        }
+
         @Override
         public void run() {
-            rejoinLog.trace("Starting stream sender thread");
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Starting stream sender thread");
+            }
 
-            while (true) {
+            while (!m_stop) {
                 SendWork work;
 
                 try {
-                    rejoinLog.trace("Blocking on sending work queue");
+                    if (rejoinLog.isTraceEnabled()) {
+                        rejoinLog.trace("Blocking on sending work queue");
+                    }
                     work = m_workQueue.poll(10, TimeUnit.MINUTES);
 
                     if (work == null) {
-                        rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
+                        if (!m_stop) {
+                            rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
+                        }
                         break;
                     } else if (work.m_isEmpty) {
                         // Empty work indicates the end of the queue.
@@ -483,7 +499,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 }
             }
             CompressionService.releaseThreadLocal();
-            rejoinLog.trace("Stream sender thread exiting");
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Stream sender thread exiting");
+            }
         }
     }
 
@@ -495,7 +513,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     @Override
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId) {
         synchronized(this) {
-            rejoinLog.trace("Starting write");
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Starting write");
+            }
             try {
                 BBContainer chunkC;
                 ByteBuffer chunk;
@@ -525,7 +545,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 // but here, throw an exception because this isn't supposed to happen
                 if (m_closed.get()) {
                     chunkC.discard();
-
                     IOException e = new IOException("Trying to write snapshot data " +
                             "after the stream is closed");
                     m_writeFailed.set(e);
@@ -538,9 +557,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     // remove the schema once sent
                     byte[] schema = tableInfo.getSecond();
                     m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
-                    rejoinLog.debug("Sending schema for table " + tableId);
-
-                    rejoinLog.trace("Writing schema as part of this write");
+                    if (rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("Sending schema for table " + tableId);
+                    }
+                    if (rejoinLog.isTraceEnabled()) {
+                        rejoinLog.trace("Writing schema as part of this write");
+                    }
                     send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
                 }
 
@@ -551,7 +573,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 chunk.position(0);
                 return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.getFirst());
             } finally {
-                rejoinLog.trace("Finished call to write");
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Finished call to write");
+                }
             }
         }
     }
@@ -611,7 +635,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * target
          */
         if (!m_closed.get()) {
-            rejoinLog.trace("Closing stream snapshot target " + m_targetId);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Closing stream snapshot target " + m_targetId);
+            }
 
             // block until all acks have arrived
             waitForOutstandingWork();
@@ -630,7 +656,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 assert(m_outstandingWork.size() == 0);
             }
 
-            rejoinLog.trace("Closed stream snapshot target " + m_targetId);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Closed stream snapshot target " + m_targetId);
+            }
         }
 
         Runnable closeHandle = m_onCloseHandler.get();
