@@ -63,7 +63,7 @@ static inline std::string const enrich(std::string const& a) noexcept {
 static inline std::string enrich(std::string src) {
     return src.append("\nSTACK TRACE:")
         .append(voltdb::StackTrace::stringStackTrace("\t"))
-        .substr(0, 4096);
+        .substr(0, 2048);
 }
 #endif
 
