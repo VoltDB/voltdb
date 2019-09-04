@@ -686,19 +686,27 @@ public class SnapshotSiteProcessor {
                                     t.close();
                                 } catch (IOException e) {
                                     snapshotSucceeded = false;
-                                    throw new RuntimeException(e);
+                                    // Don't throw timeout exception, the warning has been logged
+                                    // in another place.
+                                    if (e instanceof StreamSnapshotTimeoutException) {
+                                        continue;
+                                    } else {
+                                        throw new RuntimeException(e);
+                                    }
                                 } catch (InterruptedException e) {
                                     snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 }
                             }
 
-                            Runnable r = null;
-                            while ((r = m_tasksOnSnapshotCompletion.poll()) != null) {
-                                try {
-                                    r.run();
-                                } catch (Exception e) {
-                                    SNAP_LOG.error("Error running snapshot completion task", e);
+                            if (snapshotSucceeded) {
+                                Runnable r = null;
+                                while ((r = m_tasksOnSnapshotCompletion.poll()) != null) {
+                                    try {
+                                        r.run();
+                                    } catch (Exception e) {
+                                        SNAP_LOG.error("Error running snapshot completion task", e);
+                                    }
                                 }
                             }
                         } finally {

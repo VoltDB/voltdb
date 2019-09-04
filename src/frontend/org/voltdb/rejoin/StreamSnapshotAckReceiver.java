@@ -64,13 +64,21 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_callbacks.put(targetId, callback);
     }
 
+    public void sendPoisonPill(long targetId) {
+        m_mb.deliver(new RejoinDataAckMessage(true, targetId, -1));
+    }
+
     @Override
     public void run() {
-        rejoinLog.trace("Starting ack receiver thread");
+        if (rejoinLog.isTraceEnabled()) {
+            rejoinLog.trace("Starting ack receiver thread");
+        }
 
         try {
             while (true) {
-                rejoinLog.trace("Blocking on receiving mailbox");
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Blocking on receiving mailbox");
+                }
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
                 if (msg == null) {
                     rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
@@ -112,7 +120,9 @@ public class StreamSnapshotAckReceiver implements Runnable {
             m_lastException = e;
             rejoinLog.error("Error reading a message from a recovery stream", e);
         } finally {
-            rejoinLog.trace("Ack receiver thread exiting");
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Ack receiver thread exiting");
+            }
         }
     }
 }
