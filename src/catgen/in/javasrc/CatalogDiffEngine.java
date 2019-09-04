@@ -505,7 +505,7 @@ public class CatalogDiffEngine {
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
             suspect instanceof Constraint ||
-            suspect instanceof ProcedureSchedule)
+            suspect instanceof Task)
         {
             return null;
         }
@@ -1048,7 +1048,7 @@ public class CatalogDiffEngine {
             }
         }
 
-        if (suspect instanceof ProcedureSchedule && (field.equals("enabled") || field.equals("onError"))) {
+        if (suspect instanceof Task && (field.equals("enabled") || field.equals("onError"))) {
             return null;
         }
 

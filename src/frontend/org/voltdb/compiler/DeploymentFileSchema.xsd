@@ -51,8 +51,8 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
-      <xs:element name="scheduler" minOccurs="0" type="schedulerType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
+      <xs:element name="tasks" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
     </xs:all>
   </xs:complexType>
 
@@ -511,7 +511,7 @@
   </xs:complexType>
 
   <!-- SchedulerManager -->
-  <xs:complexType name="schedulerType">
+  <xs:complexType name="taskSettingsType">
     <xs:attribute name="min-delay-ms" type="xs:int" default="0"/>
     <xs:attribute name="max-run-frequency" type="xs:double" default="0"/>
     <xs:attribute name="host-thread-count" default="0">

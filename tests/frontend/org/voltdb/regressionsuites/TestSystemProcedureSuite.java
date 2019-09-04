@@ -1007,6 +1007,16 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+    public void testSwapTablesWithExport() throws Exception {
+        Client client = getClient();
+        try {
+            client.callProcedure("@SwapTables", "MIGRATE1", "MIGRATE2");
+            fail("Swap should not be allowed between migrate tables.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("exporting"));
+        }
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -1044,7 +1054,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "CREATE TABLE PAUSE_TEST_TBL (\n" +
                 "  TEST_ID SMALLINT DEFAULT 0 NOT NULL\n" +
                 ");\n" +
-                "";
+                "CREATE table MIGRATE1 MIGRATE to TARGET FOO (" +
+                        "PKEY          INTEGER          NOT NULL);\n" +
+                "CREATE table MIGRATE2 MIGRATE to TARGET FOO (" +
+                        "PKEY          INTEGER          NOT NULL);\n";
         project.addLiteralSchema(literalSchema);
 
         // testSwapTables needs lots of variations on the same table,

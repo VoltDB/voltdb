@@ -3314,6 +3314,14 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    public static boolean hasShadowStream(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return TableType.needsShadowStream(table.getTabletype());
+        }
+        return false;
+    }
+
     /**
      * Utility method for converting a {@link Column} to a {@link VoltTable.ColumnInfo}
      *

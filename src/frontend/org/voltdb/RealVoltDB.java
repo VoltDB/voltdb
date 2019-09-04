@@ -177,7 +177,6 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
-import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
 import org.voltdb.settings.DbSettings;
@@ -193,6 +192,7 @@ import org.voltdb.sysprocs.VerifyCatalogAndWriteJar;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
@@ -352,7 +352,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ElasticService m_elasticService = null;
 
     // Scheduler manager
-    private SchedulerManager m_schedulerManager = null;
+    private TaskManager m_taskManager = null;
 
     // Snapshot IO agent
     private SnapshotIOAgent m_snapshotIOAgent = null;
@@ -1519,8 +1519,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            m_schedulerManager = new SchedulerManager(m_clientInterface, getStatsAgent(), m_myHostId);
-            m_globalServiceElector.registerService(() -> m_schedulerManager.promoteToLeader(m_catalogContext));
+            m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId);
+            m_globalServiceElector.registerService(() -> m_taskManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
             if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
@@ -1714,7 +1714,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // TODO determine if this is actually a good place for this
-            m_schedulerManager.start(m_catalogContext);
+            m_taskManager.start(m_catalogContext);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -3661,7 +3661,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } catch (Throwable t) { }
 
-                m_schedulerManager.shutdown();
+                m_taskManager.shutdown();
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
@@ -4047,7 +4047,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
 
                 // 4.6 Update scheduler (asynchronously)
-                m_schedulerManager.processUpdate(m_catalogContext, !hasSchemaChange);
+                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
@@ -5243,8 +5243,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public SchedulerManager getSchedulerManager() {
-        return m_schedulerManager;
+    public TaskManager getTaskManager() {
+        return m_taskManager;
     }
 }
 

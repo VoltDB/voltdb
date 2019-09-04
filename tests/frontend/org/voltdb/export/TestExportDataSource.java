@@ -397,7 +397,7 @@ public class TestExportDataSource extends TestCase {
             // Do a reentrant poll - the returned fut should have the expected exception
             ListenableFuture<AckingContainer> fut2 = s.poll();
             try {
-                AckingContainer c = fut2.get();
+                fut2.get();
                 fail("Did not get expected exception");
             }
             catch (Exception e) {
