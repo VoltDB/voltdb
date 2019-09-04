@@ -532,9 +532,14 @@ public final class InvocationDispatcher {
     }
 
     public final static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
-        Procedure catProc = catalogContext.procedures.get(procName);
+        return getProcedureFromName(procName, catalogContext.procedures, catalogContext.m_defaultProcs);
+    }
+
+    public final static Procedure getProcedureFromName(String procName, CatalogMap<Procedure> procedures,
+            DefaultProcedureManager defaultProcs) {
+        Procedure catProc = procedures.get(procName);
         if (catProc == null) {
-            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procName);
+            catProc = defaultProcs.checkForDefaultProcedure(procName);
         }
 
         if (catProc == null) {

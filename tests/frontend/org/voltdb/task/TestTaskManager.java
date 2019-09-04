@@ -78,6 +78,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
+import org.voltdb.task.TaskManager.TaskValidationResult;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -256,14 +257,14 @@ public class TestTaskManager {
     public void schedulerWithBadParameters() throws Exception {
         Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
 
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.getSchedulerparameters().get("0").setParameter("NAN");
         task.getSchedulerparameters().get("2").setParameter("7894");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionScheduler.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
     }
 
     /*
@@ -513,17 +514,17 @@ public class TestTaskManager {
     public void testValidateParameters() throws Exception {
         Task task = createSchedulerTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
 
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertTrue(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionSchedulerValidateParamsWithHelper.class.getName());
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertTrue(validateTask(task).isValid());
 
         // Parameter fails validation
         task.getSchedulerparameters().get("0").setParameter("FAIL");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionSchedulerValidateParams.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
     }
 
     /*
@@ -721,6 +722,10 @@ public class TestTaskManager {
         assertTrue(totalActionSchedulerInvocations >= totalProcedureInvocations);
         assertTrue(totalActionSchedulerInvocations <= s_firstActionSchedulerCallCount.get()
                 + s_postRunActionSchedulerCallCount.get());
+    }
+
+    private TaskValidationResult validateTask(Task task) {
+        return TaskManager.validateTask(task, null, getClass().getClassLoader());
     }
 
     public static class TestActionScheduler implements ActionScheduler {

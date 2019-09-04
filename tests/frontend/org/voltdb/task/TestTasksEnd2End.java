@@ -252,6 +252,14 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
         }
+
+        try {
+            client.callProcedure("@AdHoc", "DROP PROCEDURE " + procName);
+            fail("Should not have been able to drop: " + procName);
+        } catch (ProcCallException e) {
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Procedure does not exist: " + procName));
+        }
     }
 
     @Test
