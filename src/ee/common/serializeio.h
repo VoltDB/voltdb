@@ -517,9 +517,9 @@ public:
 protected:
     /** Reference output can't resize the buffer: Frowny-Face. */
     virtual void expand(size_t minimum_desired) {
-        throw SQLException(SQLException::volt_output_buffer_overflow,
-            "Output from SQL stmt overflowed output/network buffer of 10mb. "
-            "Try a \"limit\" clause or a stronger predicate.");
+        throwSQLException(SQLException::volt_output_buffer_overflow,
+            "Output from SQL stmt overflowed output/network buffer of 10mb (%lu bytes). "
+            "Try a \"limit\" clause or a stronger predicate.", minimum_desired);
     }
 };
 
