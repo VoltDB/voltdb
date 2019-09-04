@@ -693,7 +693,13 @@ public class SnapshotSiteProcessor {
                                     t.close();
                                 } catch (IOException e) {
                                     snapshotSucceeded = false;
-                                    throw new RuntimeException(e);
+                                    // Don't throw timeout exception, the warning has been logged
+                                    // in another place.
+                                    if (e instanceof StreamSnapshotTimeoutException) {
+                                        continue;
+                                    } else {
+                                        throw new RuntimeException(e);
+                                    }
                                 } catch (InterruptedException e) {
                                     snapshotSucceeded = false;
                                     throw new RuntimeException(e);
