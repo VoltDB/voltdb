@@ -153,7 +153,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                         Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
         }
 
-        List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas);
+        List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas, context.getSiteId());
 
         // If there's no work to do on this host, just claim success, return an empty plan,
         // and things will sort themselves out properly
@@ -188,7 +188,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    Map<Integer, Set<Long>> destsByHostId,
                                                    HashinatorSnapshotData hashinatorData,
-                                                   Map<Integer, Pair<Boolean, byte[]>> schemas)
+                                                   Map<Integer, Pair<Boolean, byte[]>> schemas,
+                                                   long siteId)
     {
         byte[] hashinatorConfig = null;
         if (hashinatorData != null) {
@@ -204,15 +205,17 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
-            new Thread(sender, "Stream Snapshot Sender").start();
-            new Thread(ackReceiver, "Stream Snapshot Ack Receiver").start();
+            new Thread(sender, "Stream Snapshot Sender - " + CoreUtils.hsIdToString(siteId)).start();
+            new Thread(ackReceiver, "Stream Snapshot Ack Receiver - " + CoreUtils.hsIdToString(siteId)).start();
             // The mailbox will be removed after all snapshot data targets are finished
-            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(createCompletionTask(mb));
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(createCompletionTask(mb, sender, ackReceiver));
 
             // Create data target for each source HSID in each stream
             for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
-                SNAP_LOG.debug("Sites to stream from: " +
-                               CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Sites to stream from: " +
+                                   CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+                }
                 for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
                     long srcHSId = entry.getKey();
                     long destHSId = entry.getValue();
@@ -241,11 +244,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     /**
      * Remove the mailbox from the host messenger after all data targets are done.
      */
-    private Runnable createCompletionTask(final Mailbox mb)
+    private Runnable createCompletionTask(final Mailbox mb, StreamSnapshotDataTarget.SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver)
     {
         return new Runnable() {
             @Override
             public void run() {
+                sender.forceStop();
+                ackReceiver.forceStop();
                 VoltDB.instance().getHostMessenger().removeMailbox(mb.getHSId());
             }
         };
