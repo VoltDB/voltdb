@@ -112,9 +112,13 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         String schedule2 = getMethodName() + "_2";
         String schedule3 = getMethodName() + "_3";
 
-        String summaryFormat = "CREATE TASK %s ON SCHEDULE %s PROCEDURE @AdHoc WITH ('INSERT INTO " + summaryTable
-                + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
-                + getTableName(0, TableType.REPLICATED) + ";') ON ERROR IGNORE;";
+        client.callProcedure("@AdHoc",
+                "CREATE PROCEDURE " + getMethodName() + " AS INSERT INTO " + summaryTable
+                        + " SELECT NOW, CAST(? AS INT), COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
+                        + getTableName(0, TableType.REPLICATED) + ';');
+
+        String summaryFormat = "CREATE TASK %s ON SCHEDULE %s PROCEDURE " + getMethodName()
+                + " WITH (%d) ON ERROR IGNORE;";
 
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "delay 50 MILLISECONDS", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
