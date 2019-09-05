@@ -116,7 +116,6 @@ public class LocalCluster extends VoltServerConfig {
     int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<>();
     int perLocalClusterExtProcessIndex = 0;
-    VoltProjectBuilder m_builder;
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
