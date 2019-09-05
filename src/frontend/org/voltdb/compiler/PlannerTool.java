@@ -17,6 +17,9 @@
 
 package org.voltdb.compiler;
 
+import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
+
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
@@ -26,6 +29,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.tools.RelConversionException;
@@ -57,10 +62,6 @@ import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-
-
-import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
-import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
@@ -226,6 +227,10 @@ public class PlannerTool {
         RelNode rel = planner.convert(validatedNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
 
+        JoinCounter scanCounter = new JoinCounter();
+        rel.accept(scanCounter);
+        boolean canCommuteJoins = scanCounter.canCommuteJoins();
+
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
 
@@ -261,6 +266,9 @@ public class PlannerTool {
             throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
+        // Transform RIGHT Outer joins to LEFT ones
+        transformed = VoltPlanner.transformHep(Phase.OUTER_JOIN, transformed);
+
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
         // See RelDistributions.RelDistributionImpl.satisfies()
@@ -269,7 +277,9 @@ public class PlannerTool {
                 .replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
-        transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(), requiredPhysicalOutputTraits, transformed);
+        Phase physicalPhase = (canCommuteJoins) ?
+                Phase.PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE : Phase.PHYSICAL_CONVERSION;
+        transformed = planner.transform(physicalPhase.ordinal(), requiredPhysicalOutputTraits, transformed);
 
         // apply inlining rules.
         transformed = VoltPlanner.transformHep(Phase.INLINE, HepMatchOrder.ARBITRARY, transformed, true);
@@ -397,4 +407,24 @@ public class PlannerTool {
             }
         }
     }
+
+    // RelShuttle to count number of joins in the RelNode to decide
+    // whether to apply join commute rules or not
+    public static class JoinCounter extends RelShuttleImpl {
+        private final static int DEFAULT_MAX_JOIN_TABLES = 6;
+
+        private int joinCount = 0;
+
+        public boolean canCommuteJoins() {
+            return joinCount < DEFAULT_MAX_JOIN_TABLES;
+        }
+
+         @Override
+        public RelNode visit(LogicalJoin join) {
+            ++joinCount;
+            return super.visit(join);
+        }
+
+    }
+
 }

@@ -36,11 +36,13 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
+import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
+import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -83,6 +85,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         RelRoot m_root;
         RelNode m_transformedNode;
         int m_ruleSetIndex = -1;
+        boolean m_canCommuteJoins = false;
 
         void reset() {
             m_sap = null;
@@ -202,6 +205,10 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 throw new AssertionError("Need to specify a planner phase.");
             }
 
+            JoinCounter scanCounter = new JoinCounter();
+            m_root.rel.accept(scanCounter);
+            m_canCommuteJoins = scanCounter.canCommuteJoins();
+
             m_transformedNode = m_planner.transform(PlannerRules.Phase.LOGICAL.ordinal(),
                     getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION), m_root.rel);
             if (m_ruleSetIndex == PlannerRules.Phase.LOGICAL.ordinal() && m_expectedTransform != null) {
@@ -245,15 +252,32 @@ public class Plannerv2TestCase extends PlannerTestCase {
         }
     }
 
-    public class PhysicalConversionRulesTester extends MPFallbackTester {
+    public class OuterJoinRulesTester extends MPFallbackTester {
+        @Override public void pass() throws AssertionError {
+            super.pass();
+            if (m_ruleSetIndex < 0) {
+                throw new AssertionError("Need to specify a planner phase.");
+            }
+
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.OUTER_JOIN, m_transformedNode);
+            if (m_ruleSetIndex == PlannerRules.Phase.OUTER_JOIN.ordinal() && m_expectedTransform != null) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                assertEquals(m_expectedTransform, actualTransform);
+            }
+        }
+    }
+
+    public class PhysicalConversionRulesTester extends OuterJoinRulesTester {
         @Override public void pass() throws AssertionError {
             super.pass();
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
             RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
                     replace(RelDistributions.ANY);
-            m_transformedNode = m_planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
+            Phase physicalPhase = (m_canCommuteJoins) ?
+                    Phase.PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE : Phase.PHYSICAL_CONVERSION;
+            m_transformedNode = m_planner.transform(physicalPhase.ordinal(),
                     physicalTraits, m_transformedNode);
-            if (m_ruleSetIndex == PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {
+            if (m_ruleSetIndex == Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
                 assertEquals(m_expectedTransform, actualTransform);
             }

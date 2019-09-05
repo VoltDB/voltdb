@@ -17,15 +17,64 @@
 
 package org.voltdb.plannerv2.rules;
 
-import com.google.common.collect.ImmutableList;
-import org.apache.calcite.rel.rules.*;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
+
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.rel.rules.CalcMergeRule;
+import org.apache.calcite.rel.rules.FilterCalcMergeRule;
+import org.apache.calcite.rel.rules.FilterJoinRule;
+import org.apache.calcite.rel.rules.FilterMergeRule;
+import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
+import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
+import org.apache.calcite.rel.rules.FilterToCalcRule;
+import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
+import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
+import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rel.rules.ReduceExpressionsRule;
+import org.apache.calcite.rel.rules.UnionMergeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.inlining.*;
-import org.voltdb.plannerv2.rules.logical.*;
-import org.voltdb.plannerv2.rules.physical.*;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalAggregateScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcAggregateMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitJoinMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
+import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
+import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPNestLoopIndexToMergeJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPNestLoopToIndexJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortIndexScanRemoveRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortScanToIndexRule;
+import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -50,9 +99,21 @@ public class PlannerRules {
                 return PlannerRules.MP_FALLBACK;
             }
         },
+        OUTER_JOIN {
+            @Override public RuleSet getRules() {
+                return PlannerRules.HEP_OUTER_JOIN;
+            }
+        },
         PHYSICAL_CONVERSION {
             @Override public RuleSet getRules() {
                 return PlannerRules.PHYSICAL_CONVERSION;
+            }
+        },
+        PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE {
+            @Override public RuleSet getRules() {
+                return PlannerRules.getProgram(
+                        PlannerRules.PHYSICAL_CONVERSION,
+                        PlannerRules.PHYSICAL_JOIN_COMMUTE);
             }
         },
         INLINE {
@@ -106,14 +167,12 @@ public class PlannerRules {
             VoltLAggregateRule.INSTANCE,
             // Joins
             VoltLJoinRule.INSTANCE,
-            FilterJoinRule.FILTER_ON_JOIN,
-            FilterJoinRule.JOIN,
 
             // Setops
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,
-            VoltLValuesRule.INSTANCE,
+            VoltLValuesRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -137,9 +196,9 @@ public class PlannerRules {
 //            AggregateExpandDistinctAggregatesRule.INSTANCE,
 //            // See comments inside for examples.
 //            AggregateReduceFunctionsRule.INSTANCE,
-              JoinCommuteRule.INSTANCE
+//            JoinCommuteRule.INSTANCE
 //            JoinPushThroughJoinRule.LEFT,
-//            JoinPushThroughJoinRule.RIGHT,
+//            JoinPushThroughJoinRule.RIGHT
 //            SortProjectTransposeRule.INSTANCE,
     );
 
@@ -149,7 +208,15 @@ public class PlannerRules {
             MPSetOpsQueryFallBackRule.INSTANCE
     );
 
+    private static final RuleSet HEP_OUTER_JOIN = RuleSets.ofList(
+            CalcMergeRule.INSTANCE,
+            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT
+    );
+
+
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
+            CalcMergeRule.INSTANCE,
+
             VoltPCalcRule.INSTANCE,
             VoltPSeqScanRule.INSTANCE,
             VoltPSortConvertRule.INSTANCE_VOLTDB,
@@ -157,7 +224,6 @@ public class PlannerRules {
             VoltPAggregateRule.INSTANCE,
             // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
-            JoinCommuteRule.INSTANCE,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
@@ -181,6 +247,20 @@ public class PlannerRules {
             VoltPValuesRule.INSTANCE
     );
 
+    // Join Permutation rules are part of the PHYSICAL phase on a condition
+    // that the total number of scans in a query is less than a predefined
+    // threshold
+    private static final RuleSet PHYSICAL_JOIN_COMMUTE = RuleSets.ofList(
+            VoltPJoinCommuteRule.INSTANCE_OUTER_CALC_SSCAN,
+            VoltPJoinCommuteRule.INSTANCE_OUTER_SSCAN,
+            VoltPJoinPushThroughJoinRule.LEFT_JOIN_JOIN,
+            VoltPJoinPushThroughJoinRule.RIGHT_JOIN_JOIN
+    );
+
+    // Combined physical conversion and join commute rule set
+    private static final RuleSet PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE =
+            PlannerRules.getProgram(PHYSICAL_CONVERSION, PHYSICAL_JOIN_COMMUTE);
+
     private static final RuleSet INLINE = RuleSets.ofList(
             VoltPhysicalCalcAggregateMergeRule.INSTANCE,
             VoltPhysicalCalcScanMergeRule.INSTANCE,
@@ -196,10 +276,27 @@ public class PlannerRules {
             Programs.listOf(
                     LOGICAL,
                     MP_FALLBACK,
+                    HEP_OUTER_JOIN,
                     PHYSICAL_CONVERSION,
+                    PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
                     INLINE
             )
     );
+
+    /**
+     * Build a Program containing rules from specified rule sets
+     * @param ruleSets list of rule sets to combine
+     * @return Program
+     */
+    private static RuleSet getProgram(RuleSet...ruleSets) {
+         List<RelOptRule> rules = IntStream.range(0, ruleSets.length)
+                .mapToObj(ruleSetIdx ->
+                        StreamSupport.stream(
+                                ruleSets[ruleSetIdx].spliterator(), false))
+                .flatMap(stream -> stream)
+                .collect(Collectors.toList());
+        return RuleSets.ofList(rules);
+    }
 
     public static ImmutableList<Program> getPrograms() {
         return PROGRAMS;
