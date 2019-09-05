@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
@@ -28,34 +27,26 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin;
  * Volt extension of the JoinPushThroughJoinRule
  * {@link org.apache.calcite.rel.rules.JoinPushThroughJoinRule}
  * that operates on VoltPhysicalNestLoopJoin relation
- *
  */
 public class VoltPJoinPushThroughJoinRule extends JoinPushThroughJoinRule {
 
     /** Instance of the rule that works on physical NJ joins only, and pushes to the
      * right. */
-    public static final VoltPJoinPushThroughJoinRule RIGHT_JOIN_JOIN =
-            new VoltPJoinPushThroughJoinRule(
-                    operand(VoltPhysicalNestLoopJoin.class,
-                            operand(VoltPhysicalNestLoopJoin.class, any()),
-                            operand(RelNode.class, any())),
-                    "VoltPJoinPushThroughJoinRule:right_join_join", true);
+    public static final VoltPJoinPushThroughJoinRule RIGHT_JOIN_JOIN = new VoltPJoinPushThroughJoinRule(
+            operand(VoltPhysicalNestLoopJoin.class,
+                    operand(VoltPhysicalNestLoopJoin.class, any()),
+                    operand(RelNode.class, any())),
+            "VoltPJoinPushThroughJoinRule:right_join_join", true);
 
     /** Instance of the rule that works on physical NJ joins only, and pushes to the
      * left. */
-    public static final VoltPJoinPushThroughJoinRule LEFT_JOIN_JOIN =
-        new VoltPJoinPushThroughJoinRule(
-                operand(VoltPhysicalNestLoopJoin.class,
-                        operand(VoltPhysicalNestLoopJoin.class, any()),
-                        operand(RelNode.class, any())),
-                "VoltPJoinPushThroughJoinRule:left", false);
+    public static final VoltPJoinPushThroughJoinRule LEFT_JOIN_JOIN = new VoltPJoinPushThroughJoinRule(
+            operand(VoltPhysicalNestLoopJoin.class,
+                    operand(VoltPhysicalNestLoopJoin.class, any()),
+                    operand(RelNode.class, any())),
+            "VoltPJoinPushThroughJoinRule:left", false);
 
-    protected VoltPJoinPushThroughJoinRule(RelOptRuleOperand operand, String description, boolean right) {
+    private VoltPJoinPushThroughJoinRule(RelOptRuleOperand operand, String description, boolean right) {
         super(description, right, VoltPhysicalNestLoopJoin.class, VoltPRelBuilder.PHYSICAL_BUILDER);
     }
-
-    @Override public void onMatch(RelOptRuleCall call) {
-        super.onMatch(call);
-      }
-
 }

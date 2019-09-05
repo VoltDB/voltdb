@@ -64,30 +64,7 @@ import com.google_voltpatches.common.base.Preconditions;
  * Contains implementation for creating various VoltPhysical nodes.
  *
  */
-public class VoltPRelFactories {
-
-    public static ProjectFactory VOLT_PHYSICAL_PROJECT_FACTORY =
-        new VoltPProjectFactoryImpl();
-
-    public static FilterFactory VOLT_PHYSICAL_FILTER_FACTORY =
-            new VoltPFilterFactoryImpl();
-
-    public static final JoinFactory VOLT_PHYSICAL_JOIN_FACTORY =
-            new VoltPJoinFactoryImpl();
-
-    public static final SortFactory VOLT_PHYSICAL_SORT_FACTORY =
-            new VoltPSortFactoryImpl();
-
-    public static final AggregateFactory VOLT_PHYSICAL_AGGREGATE_FACTORY =
-            new VoltPAggregateFactoryImpl();
-
-    public static final SetOpFactory VOLT_PHYSICAL_SET_OP_FACTORY =
-            new VoltPSetOpFactoryImpl();
-
-    public static final ValuesFactory VOLT_PHYSICAL_VALUES_FACTORY =
-            new VoltPValuesFactoryImpl();
-
-    // @TODO Scan Factory
+class VoltPRelFactories {
 
     /**
      * Implementation of ProjectFactory
@@ -95,129 +72,89 @@ public class VoltPRelFactories {
      * that returns a VoltPhysicalCalc
      * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc}.
      */
-    private static class VoltPProjectFactoryImpl implements ProjectFactory {
-
-        public RelNode createProject(RelNode input,
-                List<? extends RexNode> childExprs, List<String> fieldNames) {
-
-            final RelDataType outputRowType =
-                    RexUtil.createStructType(input.getCluster().getTypeFactory(), childExprs,
-                        fieldNames, SqlValidatorUtil.F_SUGGESTER);
-
-            final RexProgram program =
-                    RexProgram.create(
-                            input.getRowType(),
-                            childExprs,
-                            null,
-                            outputRowType,
-                            input.getCluster().getRexBuilder());
-
-            return new VoltPhysicalCalc(input.getCluster(),
-                    input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                    input,
-                    program,
-                    1);
-        }
-    }
+    static ProjectFactory VOLT_PHYSICAL_PROJECT_FACTORY =
+            (RelNode input, List<? extends RexNode> childExprs, List<String> fieldNames) -> {
+                final RelDataType outputRowType =
+                        RexUtil.createStructType(input.getCluster().getTypeFactory(), childExprs,
+                                fieldNames, SqlValidatorUtil.F_SUGGESTER);
+                final RexProgram program =
+                        RexProgram.create(input.getRowType(), childExprs, null,
+                                outputRowType, input.getCluster().getRexBuilder());
+                return new VoltPhysicalCalc(input.getCluster(),
+                        input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+                        input, program, 1);
+            };
 
     /**
      * Implementation of {@link RelFactories.FilterFactory} that
      * that returns a VoltPhysicalCalc
      * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc}.
      */
-    private static class VoltPFilterFactoryImpl implements FilterFactory {
-        public RelNode createFilter(RelNode input, RexNode condition) {
-            // Create a program containing a filter.
-            final RexBuilder rexBuilder = input.getCluster().getRexBuilder();
-            final RelDataType inputRowType = input.getRowType();
-            final RexProgramBuilder programBuilder =
+    static FilterFactory VOLT_PHYSICAL_FILTER_FACTORY = (RelNode input, RexNode condition) -> {
+        // Create a program containing a filter.
+        final RexBuilder rexBuilder = input.getCluster().getRexBuilder();
+        final RelDataType inputRowType = input.getRowType();
+        final RexProgramBuilder programBuilder =
                 new RexProgramBuilder(inputRowType, rexBuilder);
-            programBuilder.addIdentity();
-            programBuilder.addCondition(condition);
-            final RexProgram program = programBuilder.getProgram();
-            return new VoltPhysicalCalc(input.getCluster(),
-                    input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                    input,
-                    program,
-                    1);
-        }
-    }
+        programBuilder.addIdentity();
+        programBuilder.addCondition(condition);
+        final RexProgram program = programBuilder.getProgram();
+        return new VoltPhysicalCalc(input.getCluster(),
+                input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+                input, program, 1);
+    };
 
     /**
      * Implementation of {@link JoinFactory} that returns a VoltPhysicalNestLoopJoin
      * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin}.
      */
-    private static class VoltPJoinFactoryImpl implements JoinFactory {
-      public RelNode createJoin(RelNode left, RelNode right,
-          RexNode condition, Set<CorrelationId> variablesSet,
-          JoinRelType joinType, boolean semiJoinDone) {
-          return new VoltPhysicalNestLoopJoin(
-                  left.getCluster(),
-                  left.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                  left,
-                  right,
-                  condition,
-                  variablesSet,
-                  joinType,
-                  semiJoinDone,
-                  ImmutableList.of()
-                  );
-      }
-
-      public RelNode createJoin(RelNode left, RelNode right, RexNode condition,
-          JoinRelType joinType, Set<String> variablesStopped,
-          boolean semiJoinDone) {
-        return createJoin(left, right, condition,
-            CorrelationId.setOf(variablesStopped), joinType, semiJoinDone);
-      }
-    }
+    static final JoinFactory VOLT_PHYSICAL_JOIN_FACTORY = new JoinFactory() {
+        @Override
+        public RelNode createJoin(RelNode left, RelNode right, RexNode condition, Set<CorrelationId> variablesSet,
+                                  JoinRelType joinType, boolean semiJoinDone) {
+            return new VoltPhysicalNestLoopJoin(left.getCluster(),
+                    left.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+                    left, right, condition, variablesSet,
+                    joinType, semiJoinDone, ImmutableList.of());
+        }
+        @Override @Deprecated
+        public RelNode createJoin(RelNode left, RelNode right, RexNode condition,
+                                  JoinRelType joinType, Set<String> variablesStopped, boolean semiJoinDone) {
+            return createJoin(left, right, condition, CorrelationId.setOf(variablesStopped), joinType, semiJoinDone);
+        }
+    };
 
     /**
      * Implementation of {@link RelFactories.SortFactory} that
      * returns a vanilla {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalSort}.
      */
-    private static class VoltPSortFactoryImpl implements SortFactory {
-        public RelNode createSort(RelNode input, RelCollation collation,
-                RexNode offset, RexNode fetch) {
-            return new VoltPhysicalSort(
-                    input.getCluster(),
+    static final SortFactory VOLT_PHYSICAL_SORT_FACTORY = new SortFactory() {
+        @Override
+        public RelNode createSort(RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
+            return new VoltPhysicalSort(input.getCluster(),
                     input.getTraitSet().plus(collation).replace(VoltPhysicalRel.CONVENTION),
-                    input,
-                    collation,
-                    1);
+                    input, collation, 1);
         }
-
-        @Deprecated // to be removed before 2.0
-        public RelNode createSort(RelTraitSet traits, RelNode input,
-                RelCollation collation, RexNode offset, RexNode fetch) {
+        @Override @Deprecated // to be removed before 2.0
+        public RelNode createSort(
+                RelTraitSet traits, RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
             return createSort(input, collation, offset, fetch);
         }
-    }
+    };
 
     /**
      * Implementation of {@link RelFactories.AggregateFactory}
      * that returns a VoltPhysicalHashAggregate
      * {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalHashAggregate}.
      */
-    private static class VoltPAggregateFactoryImpl implements AggregateFactory {
-        @SuppressWarnings("deprecation")
-        public RelNode createAggregate(RelNode input, boolean indicator,
-                ImmutableBitSet groupSet, ImmutableList<ImmutableBitSet> groupSets,
-                List<AggregateCall> aggCalls) {
-            return new VoltPhysicalHashAggregate(
-                    input.getCluster(),
-                    // Hash destroys ORDERING
-                    input.getTraitSet().replace(RelCollations.EMPTY).replace(VoltPhysicalRel.CONVENTION),
-                    input,
-                    indicator,
-                    groupSet,
-                    groupSets,
-                    aggCalls,
-                    null,
-                    1,
-                    false);
-        }
-    }
+    static final AggregateFactory VOLT_PHYSICAL_AGGREGATE_FACTORY =
+            (RelNode input, boolean indicator, ImmutableBitSet groupSet, ImmutableList<ImmutableBitSet> groupSets,
+             List<AggregateCall> aggCalls) -> new VoltPhysicalHashAggregate(
+                            input.getCluster(),
+                            // Hash destroys ORDERING
+                            input.getTraitSet().replace(RelCollations.EMPTY).replace(VoltPhysicalRel.CONVENTION),
+                            input, indicator, groupSet, groupSets, aggCalls,
+                    null, 1, false);
 
     /**
      * Implementation of {@link RelFactories.SetOpFactory} that
@@ -226,60 +163,36 @@ public class VoltPRelFactories {
      * or a {@link org.voltdb.plannerv2.rel.physical.VoltPhysicalIntersect}
      * for the particular kind of set operation (UNION, EXCEPT, INTERSECT).
      */
-    private static class VoltPSetOpFactoryImpl implements SetOpFactory {
-        public RelNode createSetOp(SqlKind kind, List<RelNode> inputs,
-                boolean all) {
-            Preconditions.checkArgument(!inputs.isEmpty());
-            RelNode firstChild = inputs.get(0);
-            RelTraitSet traits = firstChild.getTraitSet()
-                    .replace(RelCollations.EMPTY)
-                    .replace(VoltPhysicalRel.CONVENTION);
-            switch (kind) {
+    static final SetOpFactory VOLT_PHYSICAL_SET_OP_FACTORY = (SqlKind kind, List<RelNode> inputs, boolean all) -> {
+        Preconditions.checkArgument(!inputs.isEmpty());
+        final RelNode firstChild = inputs.get(0);
+        final RelTraitSet traits = firstChild.getTraitSet()
+                .replace(RelCollations.EMPTY)
+                .replace(VoltPhysicalRel.CONVENTION);
+        switch (kind) {
             case UNION:
-                return new VoltPhysicalUnion(
-                        firstChild.getCluster(),
-                        traits,
-                        inputs,
-                        all,
-                        1);
+                return new VoltPhysicalUnion(firstChild.getCluster(), traits, inputs, all, 1);
             case EXCEPT:
-                return new VoltPhysicalMinus(
-                        firstChild.getCluster(),
-                        traits,
-                        inputs,
-                        all,
-                        1);
+                return new VoltPhysicalMinus(firstChild.getCluster(), traits, inputs, all, 1);
             case INTERSECT:
-                return new VoltPhysicalIntersect(
-                        firstChild.getCluster(),
-                        traits,
-                        inputs,
-                        all,
-                        1);
+                return new VoltPhysicalIntersect(firstChild.getCluster(), traits, inputs, all, 1);
             default:
                 throw new AssertionError("not a set op: " + kind);
-            }
         }
-    }
+    };
 
     /**
      * Implementation of {@link ValuesFactory} that returns a
      * {@link VoltPhysicalValues}.
      */
-    private static class VoltPValuesFactoryImpl implements ValuesFactory {
-        public RelNode createValues(RelOptCluster cluster, RelDataType rowType,
-                List<ImmutableList<RexLiteral>> tuples) {
-            RelTraitSet traitSet = cluster.traitSet()
-                    .plus(VoltPhysicalRel.CONVENTION)
-                    .plus(RelCollations.EMPTY)
-                    .plus(RelDistributions.ANY);
-            return new VoltPhysicalValues(
-                    cluster,
-                    traitSet,
-                    rowType,
-                    ImmutableList.copyOf(tuples),
-                    1);
-        }
-    }
+    static final ValuesFactory VOLT_PHYSICAL_VALUES_FACTORY =
+            (RelOptCluster cluster, RelDataType rowType, List<ImmutableList<RexLiteral>> tuples) ->
+                    new VoltPhysicalValues(cluster,
+                            cluster.traitSet()
+                                    .plus(VoltPhysicalRel.CONVENTION)
+                                    .plus(RelCollations.EMPTY)
+                                    .plus(RelDistributions.ANY),
+                            rowType, ImmutableList.copyOf(tuples), 1);
 
+    // @TODO Scan Factory
 }

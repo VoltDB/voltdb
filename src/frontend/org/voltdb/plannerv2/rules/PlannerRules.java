@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rules;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -273,14 +274,12 @@ public class PlannerRules {
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
-            Programs.listOf(
-                    LOGICAL,
+            Programs.listOf(LOGICAL,
                     MP_FALLBACK,
                     HEP_OUTER_JOIN,
                     PHYSICAL_CONVERSION,
                     PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
-                    INLINE
-            )
+                    INLINE)
     );
 
     /**
@@ -289,10 +288,8 @@ public class PlannerRules {
      * @return Program
      */
     private static RuleSet getProgram(RuleSet...ruleSets) {
-         List<RelOptRule> rules = IntStream.range(0, ruleSets.length)
-                .mapToObj(ruleSetIdx ->
-                        StreamSupport.stream(
-                                ruleSets[ruleSetIdx].spliterator(), false))
+         List<RelOptRule> rules = Arrays.stream(ruleSets).map(ruleSet -> StreamSupport.stream(
+                 ruleSet.spliterator(), false))
                 .flatMap(stream -> stream)
                 .collect(Collectors.toList());
         return RuleSets.ofList(rules);

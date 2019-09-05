@@ -23,6 +23,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Index;
+import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.VoltPRelBuilder;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin;
@@ -31,49 +32,37 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 import com.google.common.base.Preconditions;
 
 /**
- * Volt extension of the VoltPJoinCommuteRule
- * {@link org.apache.calcite.rel.rules.VoltPJoinCommuteRule}
+ * Volt extension of the JoinCommuteRule {@link org.apache.calcite.rel.rules.JoinCommuteRule}
  * that operates on VoltPhysicalNestLoopJoin relation
- *
  */
 public class VoltPJoinCommuteRule extends JoinCommuteRule {
 
     /** Instance of the rule that only swaps inner NL joins that have
      * Sequential scan on the left. This join has a potential to be converted to a NLIJ
      */
-    public static final VoltPJoinCommuteRule INSTANCE_OUTER_CALC_SSCAN =
-            new VoltPJoinCommuteRule(
-                    operand(
-                            VoltPhysicalCalc.class, operand(VoltPhysicalTableSequentialScan.class, none())
-                            ),
-                    operand(RelNode.class, any()),
-                    "VoltPJoinCommuteRule:cacl_sscan"
-                    );
+    public static final VoltPJoinCommuteRule INSTANCE_OUTER_CALC_SSCAN = new VoltPJoinCommuteRule(
+            operand(VoltPhysicalCalc.class, operand(VoltPhysicalTableSequentialScan.class, none())),
+            operand(RelNode.class, any()),
+            "VoltPJoinCommuteRule:cacl_sscan");
 
-    public static final VoltPJoinCommuteRule INSTANCE_OUTER_SSCAN =
-            new VoltPJoinCommuteRule(
-                    operand(VoltPhysicalTableSequentialScan.class, none()),
-                    operand(RelNode.class, any()),
-                    "VoltPJoinCommuteRule:sscan"
-                    );
+    public static final VoltPJoinCommuteRule INSTANCE_OUTER_SSCAN = new VoltPJoinCommuteRule(
+            operand(VoltPhysicalTableSequentialScan.class, none()),
+            operand(RelNode.class, any()),
+            "VoltPJoinCommuteRule:sscan");
 
     private VoltPJoinCommuteRule(RelOptRuleOperand outerChild, RelOptRuleOperand innerChild, String desc) {
         super(VoltPhysicalNestLoopJoin.class,
-                outerChild,
-                innerChild,
-                VoltPRelBuilder.PHYSICAL_BUILDER,
-                false,
-                desc);
+                outerChild, innerChild, VoltPRelBuilder.PHYSICAL_BUILDER, false, desc);
     }
 
     @Override
     public boolean matches(final RelOptRuleCall call) {
         // Matches only if an outer scan has an index. There is a possibility of NLIJ then
         Preconditions.checkArgument(call.rels.length > 2);
-        VoltPhysicalTableSequentialScan scan = call.rel(call.rels.length - 2);
+        final AbstractVoltTableScan scan = call.rel(call.rels.length - 2);
         Preconditions.checkArgument(scan.getVoltTable() != null &&
                 scan.getVoltTable().getCatalogTable() != null);
-        CatalogMap<Index> indexMap = scan.getVoltTable().getCatalogTable().getIndexes();
+        final CatalogMap<Index> indexMap = scan.getVoltTable().getCatalogTable().getIndexes();
         return indexMap != null && !indexMap.isEmpty();
     }
 }

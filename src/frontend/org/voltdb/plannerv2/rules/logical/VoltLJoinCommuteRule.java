@@ -19,7 +19,6 @@ package org.voltdb.plannerv2.rules.logical;
 
 import java.util.function.Predicate;
 
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
@@ -27,8 +26,7 @@ import org.voltdb.plannerv2.rel.VoltLRelBuilder;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 
 /**
- * Volt extension of the VoltLJoinCommuteRule
- * {@link org.apache.calcite.rel.rules.VoltLJoinCommuteRule}
+ * Volt extension of the JoinCommuteRule {@link org.apache.calcite.rel.rules.JoinCommuteRule}
  * that operates on VoltLogicallJoin relation
  *
  */
@@ -37,24 +35,14 @@ public class VoltLJoinCommuteRule extends JoinCommuteRule {
     /**
      * Predicate to match RIGHT joins
     */
-    private static Predicate<Join> RIGHT_JOIN_PREDICATE = join -> join.getJoinType() == JoinRelType.RIGHT;
+    private static final Predicate<Join> RIGHT_JOIN_PREDICATE = join -> join.getJoinType() == JoinRelType.RIGHT;
 
     /** Instance of the rule that only swaps RIGHT NL joins to become LEFT joins
      */
-    public static final VoltLJoinCommuteRule INSTANCE_RIGHT_TO_LEFT =
-            new VoltLJoinCommuteRule();
+    public static final VoltLJoinCommuteRule INSTANCE_RIGHT_TO_LEFT = new VoltLJoinCommuteRule();
 
     private VoltLJoinCommuteRule() {
-        super(VoltLogicalJoin.class,
-                RIGHT_JOIN_PREDICATE,
-                VoltLRelBuilder.LOGICAL_BUILDER,
-                true,
-                "VoltLJoinCommuteRule:right_to_left");
+        super(VoltLogicalJoin.class, RIGHT_JOIN_PREDICATE,
+                VoltLRelBuilder.LOGICAL_BUILDER, true, "VoltLJoinCommuteRule:right_to_left");
     }
-    @Override
-    public void onMatch(RelOptRuleCall call) {
-        int a = 0;
-        super.onMatch(call);
-    }
-
 }
