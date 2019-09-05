@@ -162,11 +162,10 @@ public class DropTableUtils {
                                 .filter(tbl -> tbl.getTypeName().equals(tableName)).findAny();
         CalciteUtils.exceptWhen(!ignoreNotFound && !table.isPresent(),
                 String.format("Table %s not found", tableName));
-        if (table.isPresent()) {     // found table: check dependencies
-            return execDropTable(db, sql, tableName, table.get(), cascaded, schema, compiler);
-        } else {        // Exec "DROP TABLE t IF EXISTS;" and t does not exist
-            return "";
-        }
+        // found table: check dependencies
+        // Exec "DROP TABLE t IF EXISTS;" and t does not exist
+        return table.map(value -> execDropTable(db, sql, tableName, value, cascaded, schema, compiler))
+                .orElse("");
     }
 
     private static String execDropTable(
