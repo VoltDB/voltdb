@@ -24,6 +24,7 @@
 package org.voltdb.task;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -41,6 +42,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.tasktest.CustomTestActionGenerator;
+import org.voltdb.tasktest.CustomTestActionScheduler;
+import org.voltdb.utils.MiscUtils;
 
 public class TestTasksEnd2End extends LocalClustersTestBase {
     private static final String s_userName = "TestUser";
@@ -276,6 +280,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
     }
 
+    /*
+     * Test that a custom scheduler can be provided in the DDL
+     */
     @Test
     public void customScheduler() throws Exception {
         Client client = getClient(0);
@@ -339,6 +346,53 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
             getCluster(0).updateCatalog(m_builder);
             fail("Should have failed to update the catalog since the user is in use");
         } catch (ProcCallException e) {}
+    }
+
+    /*
+     * Test that limitations are enforced in community and not in pro
+     */
+    @Test
+    public void communityLimitations() throws Exception {
+        Client client = getClient(0);
+
+        // Test ability to use system procedures
+        try {
+            client.callProcedure("@AdHoc",
+                    "CREATE TASK " + getMethodName()
+                            + " ON SCHEDULE DELAY 5 SECONDS PROCEDURE @AdHoc WITH ('SELECT * FROM "
+                            + getTableName(0, TableType.REPLICATED) + ";');");
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("System procedures are not allowed in tasks"));
+        }
+
+        // Test ability to use custom action generator
+        try {
+            client.callProcedure("@AdHoc", "CREATE TASK " + getMethodName()
+                    + " ON SCHEDULE DELAY 5 SECONDS PROCEDURE FROM CLASS " + CustomTestActionGenerator.class.getName()
+                    + ';');
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Custom action generator class not allowed in tasks"));
+        }
+
+        // Test ability to use custom action scheduler
+        try {
+            client.callProcedure("@AdHoc", "CREATE TASK " + getMethodName()
+                    + " FROM CLASS " + CustomTestActionScheduler.class.getName() + ';');
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Custom action scheduler class not allowed in tasks"));
+        }
     }
 
     private static VoltTable getTaskStats(Client client)
