@@ -41,6 +41,7 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -54,6 +55,8 @@ import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.FlushIntervalType;
+import org.voltdb.compiler.deploymentfile.FeatureType;
+import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -79,6 +82,8 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -330,6 +335,7 @@ public class VoltProjectBuilder {
     private String m_drConsumerSslPropertyFile = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
+    private FeaturesType m_featureOptions;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -374,6 +380,31 @@ public class VoltProjectBuilder {
     public VoltProjectBuilder setElasticDuration(int target) {
         m_elasticDuration = target;
         return this;
+    }
+
+    public void setExportMode(ExportMode mode) {
+        if (mode == ExportMode.ADVANCED && !VoltDB.instance().getConfig().m_isEnterprise) {
+            throw new IllegalArgumentException("Attempt to set export mode to ADVANCED in community build");
+        }
+
+        if (m_featureOptions == null) {
+            m_featureOptions = new FeaturesType();
+        } else {
+            FeatureType exportFeature = null;
+            for (FeatureType feature : m_featureOptions.getFeature()) {
+                if (feature.getName().equals(ExportManagerInterface.EXPORT_FEATURE)) {
+                    exportFeature = feature;
+                    break;
+                }
+            }
+            if (exportFeature != null) {
+                m_featureOptions.getFeature().remove(exportFeature);
+            }
+        }
+        FeatureType exportFeature = new FeatureType();
+        exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
+        exportFeature.setOption(mode.name());
+        m_featureOptions.getFeature().add(exportFeature);
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -1334,6 +1365,8 @@ public class VoltProjectBuilder {
             conn.setSsl(m_drConsumerSslPropertyFile);
         }
 
+        setFeatureOptions(deployment);
+
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
         JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
@@ -1343,6 +1376,23 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
+    }
+
+    private void setFeatureOptions(DeploymentType deployment) {
+        // set export mode to ADVANCED in pro builds, unless it is already explicitly set.
+        // This is so that we can run E3 export in pro junits by default.
+           if (m_featureOptions == null &&
+               VoltDB.instance().getConfig() != null && VoltDB.instance().getConfig().m_isEnterprise) {
+            m_featureOptions = new FeaturesType();
+            FeatureType exportFeature = new FeatureType();
+            exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
+            exportFeature.setOption(ExportMode.ADVANCED.name());
+            m_featureOptions.getFeature().add(exportFeature);
+        }
+
+        if (m_featureOptions != null) {
+            deployment.setFeatures(m_featureOptions);
+        }
     }
 
 
