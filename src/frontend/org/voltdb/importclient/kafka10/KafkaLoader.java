@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@ package org.voltdb.importclient.kafka10;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.RowWithMetaData;
 
 /**
@@ -222,6 +224,14 @@ public class KafkaLoader implements ImporterLifecycle {
     }
 
     private void processKafkaMessages() throws Exception {
+        FileReader fr = null;
+
+        // read username and password from txt file
+        if (m_cliOptions.credentials != null && !m_cliOptions.credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(m_cliOptions.credentials);
+            m_cliOptions.user = props.getProperty("username");
+            m_cliOptions.password = props.getProperty("password");
+        }
 
         // If we need to prompt the user for a VoltDB password, do so.
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
@@ -273,7 +283,12 @@ public class KafkaLoader implements ImporterLifecycle {
         config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String host : hosts) {
-            client.createConnection(host);
+            try {
+                client.createConnection(host);
+            }catch (IOException e) {
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
+            }
         }
         if (client.getConnectedHostList().isEmpty()) {
             try {

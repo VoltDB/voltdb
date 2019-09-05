@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,11 +25,9 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 
-import org.voltcore.agreement.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -41,13 +39,7 @@ import org.voltdb.VoltTable;
  *specified in SystemProcedureCatalog will be blocked.
  *
  */
-@ProcInfo(singlePartition = false)
 public class PrepareShutdown extends Pause {
-
-    private final static int DEP_prepareShutdown = (int)
-            PF_prepareShutdown | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private final static int DEP_prepareShutdonwAggregate = (int)
-            PF_prepareShutdownAggregate;
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
@@ -73,12 +65,12 @@ public class PrepareShutdown extends Pause {
                     LOG.debug("@PrepareShutdown returning sigil " + ll(m_stat.getMzxid()));
                 }
             }
-            return new DependencyPair.TableDependencyPair(DEP_prepareShutdown, t);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_prepareShutdown, t);
 
         } else if (fragmentId == PF_prepareShutdownAggregate) {
 
             NavigableSet<Long> uniqueTxnIds = new TreeSet<>();
-            for (VoltTable t: dependencies.get(DEP_prepareShutdown)) {
+            for (VoltTable t: dependencies.get(SysProcFragmentId.PF_prepareShutdown)) {
                 while (t.advanceRow()) {
                     uniqueTxnIds.add(t.getLong(0));
                 }
@@ -89,7 +81,7 @@ public class PrepareShutdown extends Pause {
                 t.addRow(zktxnid);
             }
 
-            return new DependencyPair.TableDependencyPair(DEP_prepareShutdonwAggregate, t);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_prepareShutdownAggregate, t);
 
         } else {
 
@@ -101,29 +93,8 @@ public class PrepareShutdown extends Pause {
         throw new RuntimeException("Should not reach this code");
     }
 
-    private SynthesizedPlanFragment[] createPrepareFragments() {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = PF_prepareShutdown;
-        pfs[0].outputDepId = DEP_prepareShutdown;
-        pfs[0].inputDepIds = new int[]{};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = PF_prepareShutdownAggregate;
-        pfs[1].outputDepId = DEP_prepareShutdonwAggregate;
-        pfs[1].inputDepIds = new int[] {DEP_prepareShutdown};
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return pfs;
-
-    }
-
     @Override
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        return executeSysProcPlanFragments(createPrepareFragments(), DEP_prepareShutdonwAggregate);
+        return createAndExecuteSysProcPlan(PF_prepareShutdown, PF_prepareShutdownAggregate);
     }
 }

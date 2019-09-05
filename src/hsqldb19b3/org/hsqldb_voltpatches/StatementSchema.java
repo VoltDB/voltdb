@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -110,6 +112,8 @@ public class StatementSchema extends Statement {
             case StatementTypes.ALTER_TYPE :
             case StatementTypes.ALTER_TABLE :
             case StatementTypes.ALTER_TRANSFORM :
+            case StatementTypes.ALTER_TTL :
+            case StatementTypes.ALTER_EXPORT :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -133,6 +137,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.DROP_INDEX :
             case StatementTypes.DROP_CONSTRAINT :
             case StatementTypes.DROP_COLUMN :
+            case StatementTypes.DROP_TTL:
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -415,6 +420,50 @@ public class StatementSchema extends Statement {
 
                     tableWorks.dropColumn(colindex, cascade);
 
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.DROP_TTL : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    table.dropTTL();
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.ALTER_EXPORT : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    String target = (String)arguments[1];
+                    @SuppressWarnings("unchecked")
+                    List<String> triggers = (List<String>)arguments[2];
+                    table.addPersistentExport(target, triggers);
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.ALTER_TTL : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    int ttlValue = (Integer) arguments[1];
+                    String ttlUnit = (String)arguments[2];
+                    String ttlColumn = (String)arguments[3];
+                    int batchSize = (Integer) arguments[4];
+                    int maxFrequency = (Integer) arguments[5];
+                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);
@@ -943,12 +992,13 @@ public class StatementSchema extends Statement {
                 Table    table;
                 HsqlName name;
                 int[]    indexColumns;
-                boolean  unique;
+                boolean  unique, migrating;
 
                 table        = (Table) arguments[0];
                 indexColumns = (int[]) arguments[1];
                 name         = (HsqlName) arguments[2];
                 unique       = ((Boolean) arguments[3]).booleanValue();
+                migrating    = ((Boolean) arguments[4]).booleanValue();
 
                 try {
                     /*
@@ -967,16 +1017,19 @@ public class StatementSchema extends Statement {
                     TableWorks tableWorks = new TableWorks(session, table);
 
                     // A VoltDB extension to support indexed expressions and partial indexes
-                    Expression predicate = (Expression) arguments[6];
+                    Expression predicate = (Expression) arguments[7];
                     @SuppressWarnings("unchecked")
-                    java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[4];
-                    boolean assumeUnique = ((Boolean) arguments[5]).booleanValue();
+                    java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[5];
+                    boolean assumeUnique = ((Boolean) arguments[6]).booleanValue();
                     if (indexExprs != null) {
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
+                        tableWorks.addExprIndex(
+                                indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]),
+                                name, unique, migrating, predicate)
+                                .setAssumeUnique(assumeUnique);
                         break;
                     }
-                    org.hsqldb_voltpatches.index.Index addedIndex = 
-                    tableWorks.addIndex(indexColumns, name, unique, predicate);
+                    org.hsqldb_voltpatches.index.Index addedIndex =
+                    tableWorks.addIndex(indexColumns, name, unique, migrating, predicate);
                     // End of VoltDB extension
                     // tableWorks.addIndex(indexColumns, name, unique);
                     // A VoltDB extension to support assume unique attribute

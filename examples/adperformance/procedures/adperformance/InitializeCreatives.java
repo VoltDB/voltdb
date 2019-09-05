@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,19 +27,17 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class InitializeCreatives extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt(
-        "INSERT INTO creatives VALUES (?,?,?);"
+    public final SQLStmt upsert = new SQLStmt(
+        "UPSERT INTO creatives VALUES (?,?,?,?,?,?);"
         );
 
-    public long run(int advertisers, int campaigns, int creatives)
+    public long run(long id, int advertiser, int campaigns, int creatives)
         throws VoltAbortException {
-        long creativeMaxID = 0;
-        for (int advertiser=1; advertiser<=advertisers; advertiser++) {
-            for (int campaign=1; campaign<=campaigns; campaign++) {
-                for (int i=1; i<=creatives; i++) {
-                    creativeMaxID++;
-                    voltQueueSQL(insert, creativeMaxID, campaign, advertiser);
-                }
+        for (int campaign=1; campaign<=campaigns; campaign++) {
+            for (int i=1; i<=creatives; i++) {
+                id++;
+                voltQueueSQL(upsert, id, campaign, advertiser, "https://example.com",
+                             "ExampleName", "ExampleDescription");
             }
         }
 

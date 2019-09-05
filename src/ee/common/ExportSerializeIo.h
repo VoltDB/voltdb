@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,7 +46,7 @@
 #ifndef NATIVEEXPORTSERIALIZEIO_H
 #define NATIVEEXPORTSERIALIZEIO_H
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <limits>
 #include <stdint.h>
@@ -123,14 +123,14 @@ class ExportSerializeInput {
     const void* getRawPointer(size_t length) {
         const void* result = current_;
         current_ += length;
-        assert(current_ <= end_);
+        vassert(current_ <= end_);
         return result;
     }
 
     /** Copy a string from the buffer. */
     inline std::string readTextString() {
         int32_t stringLength = readInt();
-        assert(stringLength >= 0);
+        vassert(stringLength >= 0);
         return std::string(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
     };
@@ -174,7 +174,7 @@ class ExportSerializeOutput {
         buffer_(NULL), position_(0), capacity_(0)
     {
         buffer_ = reinterpret_cast<char*>(buffer);
-        assert(position_ <= capacity);
+        vassert(position_ <= capacity);
         capacity_ = capacity;
     }
 
@@ -189,51 +189,51 @@ class ExportSerializeOutput {
     size_t size() const { return position_; }
 
     // functions for serialization
-    inline void writeChar(char value) {
-        writePrimitive(value);
+    inline size_t writeChar(char value) {
+        return writePrimitive(value);
     }
 
-    inline void writeByte(int8_t value) {
-        writePrimitive(value);
+    inline size_t writeByte(int8_t value) {
+        return writePrimitive(value);
     }
 
-    inline void writeShort(int16_t value) {
-        writePrimitive(static_cast<uint16_t>(value));
+    inline size_t writeShort(int16_t value) {
+        return writePrimitive(static_cast<uint16_t>(value));
     }
 
-    inline void writeInt(int32_t value) {
-        writePrimitive(value);
+    inline size_t writeInt(int32_t value) {
+        return writePrimitive(value);
     }
 
-    inline void writeBool(bool value) {
-        writeByte(value ? int8_t(1) : int8_t(0));
+    inline size_t writeBool(bool value) {
+        return writeByte(value ? int8_t(1) : int8_t(0));
     };
 
-    inline void writeLong(int64_t value) {
-        writePrimitive(value);
+    inline size_t writeLong(int64_t value) {
+        return writePrimitive(value);
     }
 
-    inline void writeFloat(float value) {
+    inline size_t writeFloat(float value) {
         int32_t data;
         memcpy(&data, &value, sizeof(data));
-        writePrimitive(data);
+        return writePrimitive(data);
     }
 
-    inline void writeDouble(double value) {
+    inline size_t writeDouble(double value) {
         int64_t data;
         memcpy(&data, &value, sizeof(data));
-        writePrimitive(data);
+        return writePrimitive(data);
     }
 
-    inline void writeEnumInSingleByte(int value) {
-        assert(std::numeric_limits<int8_t>::min() <= value &&
+    inline size_t writeEnumInSingleByte(int value) {
+        vassert(std::numeric_limits<int8_t>::min() <= value &&
                 value <= std::numeric_limits<int8_t>::max());
-        writeByte(static_cast<int8_t>(value));
+        return writeByte(static_cast<int8_t>(value));
     }
 
     // this explicitly accepts char* and length (or ByteArray)
     // as std::string's implicit construction is unsafe!
-    inline void writeBinaryString(const void* value, size_t length) {
+    inline size_t writeBinaryString(const void* value, size_t length) {
         int32_t stringLength = static_cast<int32_t>(length);
         assureExpand(length + sizeof(stringLength));
 
@@ -242,22 +242,25 @@ class ExportSerializeOutput {
         current += sizeof(stringLength);
         memcpy(current, value, length);
         position_ += sizeof(stringLength) + length;
+        return sizeof(stringLength) + length;
     }
 
-    inline void writeTextString(const std::string &value) {
-        writeBinaryString(value.data(), value.size());
+    inline size_t writeTextString(const std::string &value) {
+        return writeBinaryString(value.data(), value.size());
     }
 
-    inline void writeBytes(const void *value, size_t length) {
+    inline size_t writeBytes(const void *value, size_t length) {
         assureExpand(length);
         memcpy(buffer_ + position_, value, length);
         position_ += length;
+        return length;
     }
 
-    inline void writeZeros(size_t length) {
+    inline size_t writeZeros(size_t length) {
         assureExpand(length);
         memset(buffer_ + position_, 0, length);
         position_ += length;
+        return length;
     }
 
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
@@ -278,10 +281,11 @@ class ExportSerializeOutput {
 
 private:
     template <typename T>
-    void writePrimitive(T value) {
+    size_t writePrimitive(T value) {
         assureExpand(sizeof(value));
         memcpy(buffer_ + position_, &value, sizeof(value));
         position_ += sizeof(value);
+        return sizeof(value);
     }
 
     template <typename T>
@@ -294,7 +298,7 @@ private:
         if (minimum_desired > capacity_) {
             // TODO: die
         }
-        assert(capacity_ >= minimum_desired);
+        vassert(capacity_ >= minimum_desired);
     }
 
     // Beginning of the buffer.

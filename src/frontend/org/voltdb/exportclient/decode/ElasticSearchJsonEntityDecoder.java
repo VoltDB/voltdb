@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.AbstractHttpEntity;
@@ -29,6 +30,7 @@ import org.apache.http.entity.ContentType;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONWriter;
 import org.voltcore.utils.ByteBufferOutputStream;
+import org.voltdb.VoltType;
 
 public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
 {
@@ -57,31 +59,32 @@ public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
     }
 
     @Override
-    public void add(Object[] fields) throws BulkException{
-        try
-        {
+    public void add(long generation, String tableName, List<VoltType> types, List<String> names, Object[] fields) throws BulkException{
+        try {
             addActionMetaData();
             m_writer.append("\n");
-            m_jsonDecoder.decode(new JSONWriter(m_writer), fields);
+            m_jsonDecoder.decode(generation, tableName, types, names, new JSONWriter(m_writer), fields);
             m_writer.append("\n");
-        } catch (JSONException | IOException e)
-        {
+        }
+        catch (JSONException | IOException e) {
             throw new BulkException("unable to convert a row into Json string", e);
         }
     }
 
     @Override
-    public AbstractHttpEntity harvest() {
-        ByteBufferEntity enty ;
+    public AbstractHttpEntity harvest(long generation) {
+        ByteBufferEntity entity ;
         try {
             m_writer.flush();
-            enty = new ByteBufferEntity(m_bbos.toByteBuffer(), JsonContentType);
-        } catch (IOException e) {
+            entity = new ByteBufferEntity(m_bbos.toByteBuffer(), JsonContentType);
+        }
+        catch (IOException e) {
             throw new BulkException("unable to flush JSON ", e);
-        } finally {
+        }
+        finally {
             m_bbos.reset();
         }
-        return enty;
+        return entity;
     }
     private void addActionMetaData() throws JSONException, IOException {
         // write out the action-meta-data line
@@ -103,20 +106,19 @@ public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
         }
 
         // TODO
-        // suppor other acceptable bulk parameters
+        // support other acceptable bulk parameters
         // i.e.  TIMESTAMP, TTL, RETRY_ON_CONFLICT, VERSION etc.
         jsonWriter.endObject();
         jsonWriter.endObject();
     }
 
     @Override
-    public void discard() {
+    public void discard(long generation) {
         try { m_bbos.close(); } catch (Exception ignoreIt) {}
     }
 
     @Override
-    public AbstractHttpEntity getHeaderEntity() {
-        //return m_header;
+    public AbstractHttpEntity getHeaderEntity(long generation, String tableName, List<VoltType> types, List<String> names) {
         return null;
     }
 

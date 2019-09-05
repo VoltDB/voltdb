@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,10 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -37,12 +41,11 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.TestCase;
-
-public class TestSSL extends TestCase {
+public class TestSSL extends JUnit4LocalClusterTest {
 
     private LocalCluster m_cluster;
     private ServerThread m_server;
@@ -63,7 +66,8 @@ public class TestSSL extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);",
+                new ProcedurePartitionData("T", "A1"));
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         builder.setSslEnabled(true);
@@ -71,7 +75,6 @@ public class TestSSL extends TestCase {
         return builder;
     }
 
-    @Override
     @After
     public void tearDown() throws Exception {
         if (m_admin != null) {
@@ -106,7 +109,7 @@ public class TestSSL extends TestCase {
         Map<String,String> env = new TreeMap<>();
         env.put("io.netty.leakDetection.level","PARANOID");
         m_cluster = new LocalCluster("ssl.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, false, true, env);
+                LocalCluster.FailureState.ALL_RUNNING, false, env);
         boolean success = m_cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("ssl.xml"));
@@ -215,7 +218,7 @@ public class TestSSL extends TestCase {
         int sitesPerHost = 2;
         int hostCount = 3;
         int kFactor = 2;
-        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI, false);
+        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setMaxHeap(1400);
         m_cluster.overrideAnyRequestForValgrind();
         m_cluster.setHasLocalServer(false);
@@ -256,7 +259,7 @@ public class TestSSL extends TestCase {
         m_cluster.killSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration(m_cluster.portGenerator);
+        VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
         config.m_startAction = m_cluster.isNewCli() ? StartAction.PROBE : StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("sslRejoin.jar");
         if (m_cluster.isNewCli()) {

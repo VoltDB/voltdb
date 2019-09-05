@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,28 +42,11 @@ import com.google_voltpatches.common.collect.MapMaker;
  */
 public abstract class TheHashinator {
 
-    public static enum HashinatorType {
-        LEGACY(0, LegacyHashinator.class)
-        , ELASTIC(1, ElasticHashinator.class);
-
-        public final int typeId;
-        public final Class<? extends TheHashinator> hashinatorClass;
-        private HashinatorType(int typeId, Class<? extends TheHashinator> hashinatorClass) {
-            this.typeId = typeId;
-            this.hashinatorClass = hashinatorClass;
-        }
-        public int typeId() {
-            return typeId;
-        }
-    };
-
     public static class HashinatorConfig {
-        public final HashinatorType type;
         public final byte configBytes[];
         public final long configPtr;
         public final int numTokens;
-        public HashinatorConfig(HashinatorType type, byte configBytes[], long configPtr, int numTokens) {
-            this.type = type;
+        public HashinatorConfig(byte configBytes[], long configPtr, int numTokens) {
             this.configBytes = configBytes;
             this.configPtr = configPtr;
             this.numTokens = numTokens;
@@ -136,7 +119,7 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Get TheHashinator instanced based on knwon implementation and configuration.
+     * Get TheHashinator instanced based on known implementation and configuration.
      * Used by client after asking server what it is running.
      *
      * @param hashinatorImplementation
@@ -185,7 +168,6 @@ public abstract class TheHashinator {
     abstract public Map<Integer, Integer> pPredecessors(int partition);
     abstract public Pair<Integer, Integer> pPredecessor(int partition, int token);
     abstract public Map<Integer, Integer> pGetRanges(int partition);
-    public abstract HashinatorType getConfigurationType();
     // This method is only called within this class,
     // {@see getHashedPartitionForParameter}
     // but it must be declared protected to allow the required overriding.
@@ -193,6 +175,13 @@ public abstract class TheHashinator {
     abstract protected Set<Integer> pGetPartitions();
     abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
+
+    /**
+     * @return {@link Set} of partitions which are in this hashinator
+     */
+    public Set<Integer> getPartitions() {
+        return pGetPartitions();
+    }
 
     static public void resetElasticallyModifiedForTest() {
         m_elasticallyModified = false;
@@ -343,7 +332,9 @@ public abstract class TheHashinator {
         if (existingHashinator == null) {
             existingHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
             TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, existingHashinator);
-            if (tempVal != null) existingHashinator = tempVal;
+            if (tempVal != null) {
+                existingHashinator = tempVal;
+            }
         }
 
         //Do a CAS loop to maintain a global instance
@@ -390,69 +381,15 @@ public abstract class TheHashinator {
         }
     }
 
-    /**
-     * By default returns LegacyHashinator.class, but for development another hashinator
-     * can be specified using the environment variable HASHINATOR
-     */
     public static Class<? extends TheHashinator> getConfiguredHashinatorClass() {
-        HashinatorType type = getConfiguredHashinatorType();
-        switch (type) {
-        case LEGACY:
-            return LegacyHashinator.class;
-        case ELASTIC:
-            return ElasticHashinator.class;
-        }
-        throw new RuntimeException("Should not reach here");
-    }
-
-    private static volatile HashinatorType configuredHashinatorType = null;
-
-    /**
-     * By default returns HashinatorType.LEGACY, but for development another hashinator
-     * can be specified using the environment variable or the Java property HASHINATOR
-     */
-    public static HashinatorType getConfiguredHashinatorType() {
-        if (configuredHashinatorType != null) {
-            return configuredHashinatorType;
-        }
-        String hashinatorType = System.getenv("HASHINATOR");
-        if (hashinatorType == null) {
-            hashinatorType = System.getProperty("HASHINATOR", HashinatorType.ELASTIC.name());
-        }
-        if (hostLogger.isDebugEnabled()) {
-            hostLogger.debug("Overriding hashinator to use " + hashinatorType);
-        }
-        configuredHashinatorType = HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
-        return configuredHashinatorType;
+        return ElasticHashinator.class;
     }
 
     /**
-     * This is only called by server client should never call this.
-     *
-     * @param type
-     */
-    public static void setConfiguredHashinatorType(HashinatorType type) {
-        if (System.getenv("HASHINATOR") == null && System.getProperty("HASHINATOR") == null) {
-            configuredHashinatorType = type;
-        } else {
-            hostLogger.info("Ignoring manually specified hashinator type " + type +
-                            " in favor of environment/property type " + getConfiguredHashinatorType());
-        }
-    }
-
-    /**
-     * Get a basic configuration for the currently selected hashinator type based
-     * on the current partition count. If Elastic is in play
+     * Get a basic configuration for the current hashinator
      */
     public static byte[] getConfigureBytes(int partitionCount) {
-        HashinatorType type = getConfiguredHashinatorType();
-        switch (type) {
-        case LEGACY:
-            return LegacyHashinator.getConfigureBytes(partitionCount);
-        case ELASTIC:
-            return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-        }
-        throw new RuntimeException("Should not reach here");
+        return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
     }
 
     public static HashinatorConfig getCurrentConfig() {
@@ -490,18 +427,9 @@ public abstract class TheHashinator {
     public static HashinatorSnapshotData serializeConfiguredHashinator()
             throws IOException
     {
-        HashinatorSnapshotData hashData = null;
         Pair<Long, ? extends TheHashinator> currentInstance = instance.get();
-        switch (getConfiguredHashinatorType()) {
-          case LEGACY:
-            break;
-          case ELASTIC: {
-            byte[] cookedData = currentInstance.getSecond().getCookedBytes();
-            hashData = new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
-            break;
-          }
-        }
-        return hashData;
+        byte[] cookedData = currentInstance.getSecond().getCookedBytes();
+        return new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
     }
 
     /**
@@ -547,10 +475,16 @@ public abstract class TheHashinator {
                 Set<Integer> partitions = TheHashinator.this.pGetPartitions();
 
                 for (int ii = 0; ii < 500000; ii++) {
-                    if (partitions.isEmpty()) break;
+                    if (partitions.isEmpty()) {
+                        break;
+                    }
                     Object value = null;
-                    if (type == VoltType.INTEGER) value = ii;
-                    if (type == VoltType.STRING) value = String.valueOf(ii);
+                    if (type == VoltType.INTEGER) {
+                        value = ii;
+                    }
+                    if (type == VoltType.STRING) {
+                        value = String.valueOf(ii);
+                    }
                     if (type == VoltType.VARBINARY) {
                         ByteBuffer buf = ByteBuffer.allocate(4);
                         buf.putInt(ii);
@@ -593,15 +527,26 @@ public abstract class TheHashinator {
      * @return a VoltTable containing the partition keys
      */
     public static VoltTable getPartitionKeys(TheHashinator hashinator, VoltType type) {
+        // get partitionKeys response table so we can copy it
+        final VoltTable partitionKeys;
+
         switch (type) {
             case INTEGER:
-                return hashinator.m_integerPartitionKeys.get();
+                partitionKeys = hashinator.m_integerPartitionKeys.get();
+                break;
             case STRING:
-                return hashinator.m_stringPartitionKeys.get();
+                partitionKeys = hashinator.m_stringPartitionKeys.get();
+                break;
             case VARBINARY:
-                return hashinator.m_varbinaryPartitionKeys.get();
+                partitionKeys = hashinator.m_varbinaryPartitionKeys.get();
+                break;
             default:
                 return null;
         }
+
+        // return a clone because if the table is used at all in the voltdb process,
+        // (like by an NT procedure),
+        // you can corrupt the various offsets and positions in the underlying buffer
+        return partitionKeys.semiDeepCopy();
     }
 }

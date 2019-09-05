@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -105,6 +105,13 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_offset = offset;
     }
 
+    public boolean hasOffset() {
+        if (m_offsetParameterId == -1 && m_offset == 0) {
+            return false;
+        }
+        return true;
+    }
+
     public AbstractExpression getLimitExpression() {
         return m_limitExpression;
     }
@@ -127,8 +134,16 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_limitParameterId = limitParameterId;
     }
 
+    public long getLimitParameterIndex() {
+        return m_limitParameterId;
+    }
+
     public void setOffsetParameterIndex(long offsetParameterId) {
         m_offsetParameterId = offsetParameterId;
+    }
+
+    public long getOffsetParameterIndex() {
+        return m_offsetParameterId;
     }
 
     @Override
@@ -138,7 +153,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         AbstractPlanNode childNode = m_children.get(0);
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);

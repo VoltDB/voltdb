@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
+import java.rmi.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,15 +40,11 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
@@ -60,17 +57,17 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SerializationHelper;
+import org.voltdb.utils.*;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 import junit.framework.TestCase;
 
 /**
@@ -83,18 +80,26 @@ import junit.framework.TestCase;
  *
  */
 public class RegressionSuite extends TestCase {
-    protected final static double GEOGRAPHY_EPSILON = 1.0e-13;
+    final static double GEOGRAPHY_EPSILON = 1.0e-13;
 
-    protected static int m_verboseDiagnosticRowCap = 40;
+    static int m_verboseDiagnosticRowCap = 40;
     protected VoltServerConfig m_config;
     protected String m_username = "default";
     protected String m_password = "password";
     private final ArrayList<Client> m_clients = new ArrayList<>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
-    protected final String m_methodName;
+    final String m_methodName;
     // If the current RegressionSuite instance is the last one in the current VoltServerConfig,
     // shutdown the cluster completely after finishing the test.
-    protected boolean m_completeShutdown;
+    boolean m_completeShutdown;
+    boolean m_fatalFailure;
+    /**
+     * We sometimes need to take different actions, i.e. skip a test, change error message, etc. depending on
+     * the actual parser/planner being in use. Eventually when we fully integrate with Calcite and replace our
+     * legacy planner, we don't need to take branches on those test logic.
+     */
+    final static boolean USING_CALCITE =
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false"));
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -106,6 +111,7 @@ public class RegressionSuite extends TestCase {
 
         VoltServerConfig.setInstanceSet(new HashSet<>());
         m_completeShutdown = false;
+        m_fatalFailure = false;
     }
 
     /**
@@ -114,7 +120,6 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void setUp() throws Exception {
-
         //New tests means a new server thread that hasn't done a restore
         m_config.setCallingMethodName(m_methodName);
         m_config.startUp(true);
@@ -139,10 +144,11 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-        if (m_completeShutdown) {
+        if (m_fatalFailure) {
+            System.exit(0);
+        } else if (m_completeShutdown) {
             m_config.shutDown();
-        }
-        else {
+        } else {
             Catalog currentCataog = getCurrentCatalog();
             if (currentCataog != null) {
                 CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), currentCataog);
@@ -152,7 +158,7 @@ public class RegressionSuite extends TestCase {
                 if (diff.commands().split("\n").length > 1) {
                     fail("Catalog changed in test " + getName() +
                             " while the regression suite optimization is on: \n" +
-                            diff.getDescriptionOfChanges(false));
+                            diff.getDescriptionOfChanges(false) + "\n<" + diff.commands() + ">");
                 }
             }
 
@@ -170,8 +176,7 @@ public class RegressionSuite extends TestCase {
             for (String tableName : tableNames) {
                 try {
                     client.callProcedure("@AdHoc", "DELETE FROM " + tableName);
-                }
-                catch (ProcCallException pce) {
+                } catch (ProcCallException pce) {
                     if (! pce.getMessage().contains("Illegal to modify a materialized view.")) {
                         fail("Hit an exception when cleaning up tables between tests: " + pce.getMessage());
                     }
@@ -186,8 +191,7 @@ public class RegressionSuite extends TestCase {
             for (final SocketChannel sc : m_clientChannels) {
                 try {
                     ConnectionUtil.closeConnection(sc);
-                }
-                catch (final IOException e) {
+                } catch (final IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -206,7 +210,7 @@ public class RegressionSuite extends TestCase {
     /**
      * @return The number of logical partitions in this configuration
      */
-    public int getLogicalPartitionCount() {
+    int getLogicalPartitionCount() {
         return m_config.getLogicalPartitionCount();
     }
 
@@ -217,7 +221,7 @@ public class RegressionSuite extends TestCase {
         return m_config.isValgrind();
     }
 
-    public boolean isLocalCluster() {
+    boolean isLocalCluster() {
         return m_config instanceof LocalCluster;
     }
 
@@ -228,7 +232,7 @@ public class RegressionSuite extends TestCase {
     /**
      * @return a reference to the associated VoltServerConfig
      */
-    public final VoltServerConfig getServerConfig() {
+    public VoltServerConfig getServerConfig() {
         return m_config;
     }
 
@@ -286,11 +290,10 @@ public class RegressionSuite extends TestCase {
 
     public Client getClient(long timeout, ClientAuthScheme scheme, boolean useAdmin) throws IOException {
         final Random r = new Random();
-        String listener = null;
+        String listener;
         if (useAdmin) {
             listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-        }
-        else {
+        } else {
             listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
         }
         ClientConfig config = new ClientConfigForTest(m_username, m_password, scheme);
@@ -300,13 +303,10 @@ public class RegressionSuite extends TestCase {
         // Use the port generated by LocalCluster if applicable
         try {
             client.createConnection(listener);
-        }
-        // retry once
-        catch (ConnectException e) {
+        } catch (ConnectException e) { // retry once
             if (useAdmin) {
                 listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-            }
-            else {
+            } else {
                 listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
             }
             client.createConnection(listener);
@@ -336,9 +336,7 @@ public class RegressionSuite extends TestCase {
         // Use the port generated by LocalCluster if applicable
         try {
             client.createConnection(listener);
-        }
-        // retry once
-        catch (ConnectException e) {
+        } catch (ConnectException e) { // retry once
             listener = listeners.get(r.nextInt(listeners.size()));
             client.createConnection(listener);
         }
@@ -353,7 +351,7 @@ public class RegressionSuite extends TestCase {
      * @return A VoltClient instance connected to the server driven by the
      * VoltServerConfig instance.
      */
-    public Client getClientToHostId(int hostId, long timeout) throws IOException {
+    Client getClientToHostId(int hostId, long timeout) throws IOException {
         final String listener = m_config.getListenerAddress(hostId);
         ClientConfig config = new ClientConfigForTest(m_username, m_password);
         config.setConnectionResponseTimeout(timeout);
@@ -361,16 +359,14 @@ public class RegressionSuite extends TestCase {
         final Client client = ClientFactory.createClient(config);
         try {
             client.createConnection(listener);
-        }
-        // retry once
-        catch (ConnectException e) {
+        } catch (ConnectException e) { // retry once
             client.createConnection(listener);
         }
         m_clients.add(client);
         return client;
     }
 
-    public Client getClientToSubsetHosts(int[] hostIds, long timeout) throws IOException {
+    Client getClientToSubsetHosts(int[] hostIds, long timeout) throws IOException {
         List<String> listeners = new ArrayList<>();
         for (int hostId : hostIds) {
             listeners.add(m_config.getListenerAddress(hostId));
@@ -382,9 +378,7 @@ public class RegressionSuite extends TestCase {
         for (String listener : listeners) {
             try {
                 client.createConnection(listener);
-            }
-            // retry once
-            catch (ConnectException e) {
+            } catch (ConnectException e) { // retry once
                 client.createConnection(listener);
             }
         }
@@ -403,9 +397,7 @@ public class RegressionSuite extends TestCase {
             // Use the port generated by LocalCluster if applicable
             try {
                 client.createConnection(listener);
-            }
-            // retry once
-            catch (ConnectException e) {
+            } catch (ConnectException e) { // retry once
                 listener = listeners.get(r.nextInt(listeners.size()));
                 client.createConnection(listener);
             }
@@ -417,7 +409,7 @@ public class RegressionSuite extends TestCase {
     /**
      * Release a client instance and any resources associated with it
      */
-    public void releaseClient(Client c) throws IOException, InterruptedException {
+    public void releaseClient(Client c) throws InterruptedException {
         boolean removed = m_clients.remove(c);
         assert(removed);
         c.close();
@@ -431,11 +423,11 @@ public class RegressionSuite extends TestCase {
      * @return A SocketChannel that is already authenticated with the server
      */
 
-    public SocketChannel getClientChannel() throws IOException {
+    SocketChannel getClientChannel() throws IOException {
         return getClientChannel(false);
     }
 
-    public SocketChannel getClientChannel(final boolean noTearDown) throws IOException {
+    SocketChannel getClientChannel(final boolean noTearDown) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
@@ -448,16 +440,15 @@ public class RegressionSuite extends TestCase {
 
         SSLEngine sslEngine = null;
         boolean sslEnabled = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
-         if (sslEnabled) {
-             SSLContext sslContext = SSLConfiguration.createSslContext(new SSLConfiguration.SslConfig());
-             sslEngine = sslContext.createSSLEngine("client", port);
-             sslEngine.setUseClientMode(true);
-         }
+        if (sslEnabled) {
+            SslContext sslContext = SSLConfiguration.createClientSslContext(new SSLConfiguration.SslConfig());
+            sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT, hNp.getHost(), port);
+            sslEngine.setUseClientMode(true);
+        }
 
         final SocketChannel channel = (SocketChannel)
-            ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
+        ConnectionUtil.getAuthenticatedConnection(hNp.getHost(), m_username, hashedPassword, port, null,
+                ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -511,13 +502,13 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, new long[][] {{modifiedTupleCount}});
     }
 
     static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
@@ -532,14 +523,14 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateTableOfScalarLongs(Client client, String sql, long[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
     }
 
     static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
@@ -571,16 +562,12 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    private static void validateTableOfLongs(String messagePrefix,
-            VoltTable vt, long[][] expected) {
+    private static void validateTableOfLongs(String messagePrefix, VoltTable vt, long[][] expected) {
         assertNotNull(expected);
-        if (expected.length != vt.getRowCount()) {
-            if (vt.getRowCount() < m_verboseDiagnosticRowCap) {
-                System.out.println("Diagnostic dump of unexpected result for " + messagePrefix + " : " + vt);
-                System.out.println("VS. expected : ");
-                dumpExpectedLongs(expected);
-            }
-            //* enable and set breakpoint to debug multiple row count mismatches and continue */ return;
+        if (expected.length != vt.getRowCount() && vt.getRowCount() < m_verboseDiagnosticRowCap) {
+            System.out.println("Diagnostic dump of unexpected result for " + messagePrefix + " : " + vt);
+            System.out.println("VS. expected : ");
+            dumpExpectedLongs(expected);
         }
         assertEquals(messagePrefix + " returned wrong number of rows.  ",
                         expected.length, vt.getRowCount());
@@ -591,11 +578,10 @@ public class RegressionSuite extends TestCase {
     }
 
     protected void validateRowCount(Client client, String query, int expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
         int actual = result.getRowCount();
-        assertEquals("Wrong row count from query '" + query + "'",
-                expected, actual);
+        assertEquals("Wrong row count from query '" + query + "'", expected, actual);
     }
 
     public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
@@ -612,25 +598,20 @@ public class RegressionSuite extends TestCase {
             // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
             try {
                 actual = vt.getLong(i);
-            }
-            catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException ex) {
                 try {
                     actual = (long) vt.getDouble(i);
-                }
-                catch (IllegalArgumentException newEx) {
+                } catch (IllegalArgumentException newEx) {
                     try {
                         actual = vt.getTimestampAsLong(i);
-                    }
-                    catch (IllegalArgumentException exTm) {
+                    } catch (IllegalArgumentException exTm) {
                         try {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
-                        }
-                        catch (IllegalArgumentException newerEx) {
+                        } catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
                             fail(message);
                         }
-                    }
-                    catch (ArithmeticException newestEx) {
+                    } catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
                         fail(message);
                     }
@@ -659,7 +640,7 @@ public class RegressionSuite extends TestCase {
      *
      * @param input
      */
-    static protected <T> T[][] shuffleArray(T [][] input) {
+    static<T> T[][] shuffleArray(T [][] input) {
         T[][] output = input.clone();
         Integer [] indices = new Integer[input.length];
         for (int idx = 0; idx < indices.length; idx += 1) {
@@ -673,7 +654,7 @@ public class RegressionSuite extends TestCase {
         return output;
     }
 
-    static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
+    static void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -684,15 +665,14 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == Long.MIN_VALUE) {
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            }
-            else {
+            } else {
                 assertEquals(expected[i], actual);
             }
         }
     }
 
     static protected void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
@@ -710,9 +690,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == null) {
                 String actual = vt.getString(col);
                 assertTrue(vt.wasNull());
-                assertEquals(null, actual);
-            }
-            else {
+                assertNull(actual);
+            } else {
                 assertEquals(expected[i], vt.getString(col));
             }
         }
@@ -720,7 +699,7 @@ public class RegressionSuite extends TestCase {
 
 
     static protected void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarbinary(vt, 0, expected);
     }
@@ -735,21 +714,20 @@ public class RegressionSuite extends TestCase {
 
               if (expected[i] == null) {
                   assertTrue(vt.wasNull());
-                  assertEquals(null, actual);
-              }
-              else {
+                  assertNull(actual);
+              } else {
                   assertEquals(expected[i], Encoder.hexEncode(actual));
               }
           }
     }
 
     static protected void validateTableColumnOfScalarFloat(Client client, String sql, double[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarFloat(vt, 0, expected);
     }
 
-    static protected void validateTableColumnOfScalarFloat(VoltTable vt, int col, double[] expected) {
+    static void validateTableColumnOfScalarFloat(VoltTable vt, int col, double[] expected) {
           assertNotNull(expected);
           assertEquals(expected.length, vt.getRowCount());
           int len = expected.length;
@@ -759,8 +737,7 @@ public class RegressionSuite extends TestCase {
 
               if (expected[i] <= VoltType.NULL_FLOAT) {
                   assertTrue(vt.wasNull());
-              }
-              else {
+              } else {
                   assertEquals(expected[i], actual, 0.00001);
               }
           }
@@ -773,29 +750,24 @@ public class RegressionSuite extends TestCase {
             BigDecimal actual = null;
             try {
                 actual = vt.getDecimalAsBigDecimal(i);
-            }
-            catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException ex) {
                 ex.printStackTrace();
                 fail();
             }
             if (expected[i] != null) {
                 assertNotSame(null, actual);
                 assertEquals(expected[i], actual);
-            }
-            else {
-                if (isHSQL()) {
-                    // We don't actually use this with
-                    // HSQL.  So, just assert failure here.
-                    fail("HSQL is not used to test the Volt DECIMAL type.");
-                }
-                else {
-                    assertTrue(vt.wasNull());
-                }
+            } else if (isHSQL()) {
+                // We don't actually use this with
+                // HSQL.  So, just assert failure here.
+                fail("HSQL is not used to test the Volt DECIMAL type.");
+            } else {
+                assertTrue(vt.wasNull());
             }
         }
     }
 
-    protected void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
+    private void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -804,17 +776,17 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    protected static int m_defaultScale = 12;
-    protected static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
-    protected static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
-    protected static String m_defaultRoundingEnablement = "true";
-    protected static String m_defaultRoundingMode = "HALF_UP";
+    static int m_defaultScale = 12;
+    static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
+    static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
+    static String m_defaultRoundingEnablement = "true";
+    static String m_defaultRoundingMode = "HALF_UP";
 
-    protected static String getRoundingString(String label) {
+    static String getRoundingString(String label) {
         return String.format("%sRounding %senabled, mode is %s",
-                             label == null ? (label + ": ") : "",
-                             VoltDecimalHelper.isRoundingEnabled() ? "is " : "is *NOT* ",
-                             VoltDecimalHelper.getRoundingMode().toString());
+                label == null ? (label + ": ") : "",
+                VoltDecimalHelper.isRoundingEnabled() ? "is " : "is *NOT* ",
+                VoltDecimalHelper.getRoundingMode().toString());
     }
 
     /*
@@ -823,9 +795,8 @@ public class RegressionSuite extends TestCase {
      * using the given mode.  If roundingEnabled is false, no
      * rounding is done.
      */
-    protected static final BigDecimal roundDecimalValue(String decimalValueString,
-                                                      boolean roundingEnabled,
-                                                      RoundingMode mode) {
+    static BigDecimal roundDecimalValue(
+            String decimalValueString, boolean roundingEnabled, RoundingMode mode) {
         BigDecimal bd = new BigDecimal(decimalValueString);
         if (!roundingEnabled) {
             return bd;
@@ -847,20 +818,19 @@ public class RegressionSuite extends TestCase {
         return nbd;
     }
 
-    protected void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
-            throws Exception, IOException, ProcCallException {
+    void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected) throws Exception {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfDecimal(vt, expected);
     }
 
-    static protected void validateTableColumnOfScalarDecimal(Client client, String sql, BigDecimal[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+    static void validateTableColumnOfScalarDecimal(Client client, String sql, BigDecimal[] expected)
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarDecimal(vt, 0, expected);
     }
 
-    static protected void validateTableColumnOfScalarDecimal(VoltTable vt, int col, BigDecimal[] expected) {
+    static void validateTableColumnOfScalarDecimal(VoltTable vt, int col, BigDecimal[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -870,21 +840,20 @@ public class RegressionSuite extends TestCase {
 
             if (expected[i] == null) {
                 assertTrue(vt.wasNull());
-                assertEquals(null, actual);
-            }
-            else {
+                assertNull(actual);
+            } else {
                 BigDecimal rounded = expected[i].setScale(m_defaultScale, RoundingMode.valueOf(m_defaultRoundingMode));
                 assertEquals(rounded, actual);
             }
         }
   }
 
-    protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
+    void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
         assertTablesAreEqual(prefix, expectedRows, actualRows, null);
     }
 
     private static final long TOO_MUCH_INFO = 100;
-    protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows, Double epsilon) {
+    void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows, Double epsilon) {
         assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
                 expectedRows.getColumnCount(), actualRows.getColumnCount());
         if (expectedRows.getRowCount() != actualRows.getRowCount()) {
@@ -893,8 +862,7 @@ public class RegressionSuite extends TestCase {
             if (expRowCount + actRowCount < TOO_MUCH_INFO) {
                 System.out.println("Expected: " + expectedRows);
                 System.out.println("Actual:   " + actualRows);
-            }
-            else {
+            } else {
                 System.out.println("Expected: " + expRowCount + " rows");
                 System.out.println("Actual:   " + actRowCount + " rows");
             }
@@ -919,8 +887,7 @@ public class RegressionSuite extends TestCase {
                         continue;
                     }
                     fail(colPrefix + "expected null, got non null value: " + actualObj);
-                }
-                else {
+                } else {
                     assertFalse(colPrefix + "expected the value " + expectedObj +
                             ", got a null value.",
                             actualRows.wasNull());
@@ -948,8 +915,9 @@ public class RegressionSuite extends TestCase {
     }
 
     public static void assertEquals(String msg, GeographyPointValue expected, GeographyPointValue actual) {
-            assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
+        assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
     }
+
     /**
      * Assert that two points are approximately equal.  By this we mean the latitude and
      * longitude differ by at most epsilon.  If epsilon is zero or negative this means
@@ -963,8 +931,7 @@ public class RegressionSuite extends TestCase {
         if (epsilon > 0) {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
-        }
-        else {
+        } else {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude());
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude());
         }
@@ -997,7 +964,7 @@ public class RegressionSuite extends TestCase {
      * @param actual
      * @param epsilon
      */
-    public static void assertApproximatelyEquals(String msg, GeographyValue expected, GeographyValue actual, double epsilon) {
+    static void assertApproximatelyEquals(String msg, GeographyValue expected, GeographyValue actual, double epsilon) {
         if (expected == actual) {
             return;
         }
@@ -1041,10 +1008,7 @@ public class RegressionSuite extends TestCase {
         assertEquals("Geographies not equal: ", expected, actual);
     }
 
-    private static void assertApproximateContentOfRow(int row,
-                                                      Object[] expectedRow,
-                                                      VoltTable actualRow,
-                                                      double epsilon) {
+    private static void assertApproximateContentOfRow(int row, Object[] expectedRow, VoltTable actualRow, double epsilon) {
         assertEquals("Actual row has wrong number of columns",
                 expectedRow.length, actualRow.getColumnCount());
         for (int i = 0; i < expectedRow.length; ++i) {
@@ -1062,30 +1026,23 @@ public class RegressionSuite extends TestCase {
                             + Arrays.toString((Byte[])actualValue);
                 }
                 assertTrue(fullMsg, actualRow.wasNull());
-            }
-            else if (expectedObj instanceof GeographyPointValue) {
+            } else if (expectedObj instanceof GeographyPointValue) {
                 assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
-            }
-            else if (expectedObj instanceof GeographyValue) {
+            } else if (expectedObj instanceof GeographyValue) {
                 assertApproximatelyEquals(msg, (GeographyValue) expectedObj, actualRow.getGeographyValue(i), epsilon);
-            }
-            else if (expectedObj instanceof Long) {
-                long val = ((Long)expectedObj).longValue();
+            } else if (expectedObj instanceof Long) {
+                long val = (Long)expectedObj;
                 assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Integer) {
+            } else if (expectedObj instanceof Integer) {
                 long val = ((Integer)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Short) {
+            } else if (expectedObj instanceof Short) {
                 long val = ((Short)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Byte) {
+            } else if (expectedObj instanceof Byte) {
                 long val = ((Byte)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Double) {
+            } else if (expectedObj instanceof Double) {
                 Double expectedValue = (Double)expectedObj;
                 double actualValue = actualRow.getDouble(i);
                 // Either both are null or neither is null
@@ -1096,44 +1053,38 @@ public class RegressionSuite extends TestCase {
                     assertEquals(fullMsg, expectedValue, actualValue);
                 }
                 else {
-                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
-                                                         Math.abs(expectedValue - actualValue), epsilon);
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e: expected %f, got %f",
+                            Math.abs(expectedValue - actualValue), epsilon, expectedValue, actualValue);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
-            }
-            else if (expectedObj instanceof BigDecimal) {
+            } else if (expectedObj instanceof BigDecimal) {
                 BigDecimal exp = (BigDecimal)expectedObj;
                 BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
                 // Either both are null or neither is null
                 assertEquals(msg+"expected "+exp+" but got "+got+": checking for null DECIMAL: ",
                         exp == null, got == null);
                 assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
-            }
-            else if (expectedObj instanceof byte[]) {
+            } else if (expectedObj instanceof byte[]) {
                 byte[] expectedVarbinary = (byte[]) expectedObj;
                 byte[] actualVarbinary = actualRow.getVarbinary(i);
                 assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
                 for (int k = 0; k < expectedVarbinary.length; k++) {
                     assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
                 }
-            }
-            else if (expectedObj instanceof Byte[]) {
+            } else if (expectedObj instanceof Byte[]) {
                 Byte[] expectedVarbinary = (Byte[]) expectedObj;
                 Byte[] actualVarbinary = SerializationHelper.boxUpByteArray(actualRow.getVarbinary(i));
                 assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
                 for (int k = 0; k < expectedVarbinary.length; k++) {
                     assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
                 }
-            }
-            else if (expectedObj instanceof String) {
+            } else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
                 assertEquals(msg, val, actualRow.getString(i));
-            }
-            else if (expectedObj instanceof TimestampType) {
+            } else if (expectedObj instanceof TimestampType) {
                 TimestampType val = (TimestampType)expectedObj;
                 assertEquals(msg, val, actualRow.getTimestampAsTimestamp(i));
-            }
-            else {
+            } else {
                 fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());
             }
         }
@@ -1157,9 +1108,7 @@ public class RegressionSuite extends TestCase {
      * @param actualTable
      * @param epsilon
      */
-    public static void assertApproximateContentOfTable(Object[][] expectedTable,
-                                                       VoltTable actualTable,
-                                                       double epsilon) {
+    static void assertApproximateContentOfTable(Object[][] expectedTable, VoltTable actualTable, double epsilon) {
         for (int i = 0; i < expectedTable.length; ++i) {
             assertTrue("Fewer rows than expected: "
                     + "expected: " + expectedTable.length + ", "
@@ -1188,24 +1137,22 @@ public class RegressionSuite extends TestCase {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
     }
 
-    static protected void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
+    static void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
-    static protected void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {
             what = "the statement \"" + args[0] + "\"";
-        }
-        else {
+        } else {
             what = "the stored procedure \"" + storedProc + "\"";
         }
 
         try {
             client.callProcedure(storedProc, args);
-        }
-        catch (ProcCallException pce) {
+        } catch (ProcCallException pce) {
             String msg = pce.getMessage();
             String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
                     expectedPattern + "\", but instead it threw an exception containing \"" + msg + "\".";
@@ -1224,8 +1171,7 @@ public class RegressionSuite extends TestCase {
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
     // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
     // SAME METADATA.
-    static protected void validateSchema(VoltTable result, VoltTable expected)
-    {
+    static protected void validateSchema(VoltTable result, VoltTable expected) {
         assertEquals(expected.getColumnCount(), result.getColumnCount());
         for (int i = 0; i < result.getColumnCount(); i++) {
             assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
@@ -1237,7 +1183,8 @@ public class RegressionSuite extends TestCase {
         validStatisticsForTableLimitAndPercentage(client, tableName, limit, -1);
     }
 
-    static protected void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage) throws Exception {
+    static void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage)
+            throws Exception {
         long start = System.currentTimeMillis();
         while (true) {
             long lastLimit =-1, lastPercentage = -1;
@@ -1252,7 +1199,9 @@ public class RegressionSuite extends TestCase {
 
             VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
             for (VoltTable t: results) { System.out.println(t.toString()); }
-            if (results[0].getRowCount() == 0) continue;
+            if (results[0].getRowCount() == 0) {
+                continue;
+            }
 
             boolean foundTargetTuple = false;
             boolean limitExpected = false;
@@ -1271,11 +1220,15 @@ public class RegressionSuite extends TestCase {
                             percentageExpected = true;
                         }
 
-                        if (limitExpected && percentageExpected) return;
+                        if (limitExpected && percentageExpected) {
+                            return;
+                        }
                         break;
                     }
                 }
-                if (foundTargetTuple) break;
+                if (foundTargetTuple) {
+                    break;
+                }
             }
         }
     }
@@ -1323,7 +1276,7 @@ public class RegressionSuite extends TestCase {
         VoltTable vts[] = client.callProcedure("@AdHoc", StringUtils.join(queries, '\n')).getResults();
         int ii = 0;
         for (VoltTable vtn : vts) {
-            System.out.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
+            System.err.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
             ++ii;
         }
     }
@@ -1338,12 +1291,17 @@ public class RegressionSuite extends TestCase {
      */
     protected static void dumpQueryPlans(Client client, String... queries)
             throws IOException, NoConnectionsException, ProcCallException {
-        VoltTable vts[] = client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults();
-        int ii = 0;
-        for (VoltTable vtn : vts) {
-            System.out.println("DEBUG: plan for " + queries[ii] + "\n" + vtn + "\n");
-            ++ii;
+        for (String query : Arrays.asList(queries)) {
+            System.out.println("DEBUG: plan for " + query + "\n" + getQueryPlan('\n', client, query));
         }
+    }
+
+    protected static String getQueryPlan(char splitter, Client client, String... queries) throws IOException, ProcCallException{
+        StringBuilder sb = new StringBuilder();
+        for (VoltTable vtb : Arrays.asList(client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults())) {
+            sb.append(vtb.toString()).append(splitter);
+        }
+        return sb.toString();
     }
 
     protected static void truncateTables(Client client, String... tables)
@@ -1406,7 +1364,7 @@ public class RegressionSuite extends TestCase {
      * @param client
      * @throws Exception
      */
-    public void dropAllFunctions(Client client) throws Exception {
+    private void dropAllFunctions(Client client) throws Exception {
         dropAllTheThings(client, "function");
     }
 
@@ -1416,7 +1374,7 @@ public class RegressionSuite extends TestCase {
      * @param client
      * @throws Exception
      */
-    public void dropAllViews(Client client) throws Exception {
+    private void dropAllViews(Client client) throws Exception {
         dropAllTheThings(client, "view");
     }
 
@@ -1427,7 +1385,7 @@ public class RegressionSuite extends TestCase {
      * @param client
      * @throws Exception
      */
-    public void dropAllTables(Client client) throws Exception {
+    private void dropAllTables(Client client) throws Exception {
         dropAllTheThings(client, "table");
     }
 
@@ -1438,7 +1396,7 @@ public class RegressionSuite extends TestCase {
      * @param client
      * @throws Exception
      */
-    public void dropAllProcedures(Client client) throws Exception {
+    private void dropAllProcedures(Client client) throws Exception {
         dropAllTheThings(client, "procedure");
     }
 
@@ -1450,7 +1408,7 @@ public class RegressionSuite extends TestCase {
      * @param client
      * @throws Exception
      */
-    public void dropEverything(Client client) throws Exception {
+    void dropEverything(Client client) throws Exception {
         dropAllProcedures(client);
         dropAllViews(client);
         dropAllTables(client);
@@ -1468,7 +1426,7 @@ public class RegressionSuite extends TestCase {
      *        property-name-2, string-value-2, ...
      * @return the new Properties object
      **/
-    public static Properties buildProperties(String... alternatingKeysAndValues) {
+    protected static Properties buildProperties(String... alternatingKeysAndValues) {
         Properties properties = new Properties();
         int nStrings = alternatingKeysAndValues.length;
         // Each key should have a value, so the length should be even.
@@ -1480,5 +1438,93 @@ public class RegressionSuite extends TestCase {
                     alternatingKeysAndValues[ii+1]);
         }
         return properties;
+    }
+
+    /**
+     * Test environment with configured schema and server.
+     */
+    public static class RegresssionEnv {
+        final VoltProjectBuilder m_builder;
+        LocalCluster m_cluster;
+        public Client m_client = null;
+
+        public RegresssionEnv(String ddlText, String pathToCatalog, String pathToDeployment,
+                int siteCount, int hostCount, int kFactor, boolean debug) {
+
+            m_builder = new VoltProjectBuilder();
+            //Increase query timeout as long literal queries taking long time.
+            m_builder.setQueryTimeout(60000);
+            try {
+                m_builder.addLiteralSchema(ddlText);
+
+                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
+                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
+            } catch (Exception e) {
+                e.printStackTrace();
+                fail("Failed to set up schema");
+            }
+
+            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
+                    BackendTarget.NATIVE_EE_JNI,
+                    LocalCluster.FailureState.ALL_RUNNING,
+                    debug);
+            m_cluster.setHasLocalServer(true);
+            boolean success = m_cluster.compile(m_builder);
+            assert(success);
+
+            try {
+                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
+            } catch (Exception e) {
+                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
+            }
+        }
+
+        public void setUp() {
+            m_cluster.startUp();
+
+            try {
+                // do the test
+                m_client = ClientFactory.createClient();
+                m_client.createConnection("localhost", m_cluster.port(0));
+            } catch (IOException e) {
+                e.printStackTrace();
+                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
+            }
+        }
+
+        public void tearDown() {
+            if (m_client != null) {
+                try {
+                    m_client.close();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to close client");
+                }
+            }
+            m_client = null;
+
+            if (m_cluster != null) {
+                try {
+                    m_cluster.shutDown();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to shut down cluster");
+                }
+            }
+            m_cluster = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+
+        public boolean isValgrind() {
+            if (m_cluster != null)
+                return m_cluster.isValgrind();
+            return true;
+        }
+
+        public boolean isMemcheckDefined() {
+            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
+        }
     }
 }

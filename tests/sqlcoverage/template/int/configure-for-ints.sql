@@ -17,6 +17,7 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 {@insertcols = "ID, TINY, SMALL, BIG"}
+{@insertselectcols = "ID+8, TINY, SMALL, BIG"}
 -- scaling down the random values until overflow detection works in VoltDB AND HSQL
 --{@insertvals = "_id, _value[byte], _value[int16], _value[int64]"}
 {@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[byte]"}
@@ -24,9 +25,11 @@
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@plus10 = " + 10"}
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[byte]"}
+{@updatecolumn2 = "SMALL"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "6"} -- maximum depth, in Recursive CTE tests

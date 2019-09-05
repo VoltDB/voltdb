@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
@@ -25,20 +26,30 @@ public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
     private boolean m_distinct = false;
+    protected final int m_userAggregateId;
+    protected final String m_name;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
+        m_userAggregateId = -1;
+        m_name = "";
     }
 
-    public AggregateExpression() {
-        //
-        // This is needed for serialization
-        //
-        super();
+    public AggregateExpression(ExpressionType type, int id, String n) {
+        super(type);
+        m_userAggregateId = id;
+        m_name = n;
     }
 
     public void setDistinct() { m_distinct = true; }
     public boolean isDistinct() { return m_distinct;  }
+
+    /**
+     * @return user aggregate id
+     */
+    public int getUserAggregateId() {
+        return m_userAggregateId;
+    }
 
     @Override
     public boolean equals(Object obj) {
@@ -75,6 +86,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_COUNT:
         case AGGREGATE_WINDOWED_RANK:
         case AGGREGATE_WINDOWED_DENSE_RANK:
+        case AGGREGATE_WINDOWED_ROW_NUMBER:
         case AGGREGATE_WINDOWED_COUNT:
         case AGGREGATE_COUNT_STAR:
         case AGGREGATE_APPROX_COUNT_DISTINCT:
@@ -94,6 +106,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_MIN:
         case AGGREGATE_WINDOWED_MIN:
         case AGGREGATE_WINDOWED_MAX:
+        case USER_DEFINED_AGGREGATE:
             //
             // It's always whatever the base type is
             //
@@ -101,6 +114,7 @@ public class AggregateExpression extends AbstractExpression {
             assert(aggArg != null);
             expr.m_valueType = aggArg.getValueType();
             expr.m_valueSize = aggArg.getValueSize();
+            expr.m_inBytes = aggArg.getInBytes();
             // Of these aggregate functions, only AVG is
             // non-deterministic on floating point types.
             if (expr.m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
@@ -139,4 +153,11 @@ public class AggregateExpression extends AbstractExpression {
             m_left.explain(impliedTableName) + ")";
     }
 
+    public boolean isUserDefined() {
+        return FunctionForVoltDB.isUserDefinedFunctionId(m_userAggregateId);
+    }
+
+    public String getFunctionName() {
+        return m_name;
+    }
 }

@@ -1239,6 +1239,7 @@ a.icon-document:hover {
     color: #76bd1d;
 }
 #schema,
+#exporter,
 #sqlQuery,
 #admin,
 #dr {
@@ -1980,6 +1981,15 @@ ul.drHeadList li.drArrow {
     z-index: 999;
     top: 10.5%;
 }
+#exporterOverlay {
+    position: fixed;
+    height: 100%;
+    width: 100%;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    top: 10.5%;
+}
 #sqlQueryOverlay {
     position: absolute;
     height: 100%;
@@ -2036,6 +2046,9 @@ ul.drHeadList li.drArrow {
     padding: 4px 4px 4px 4px !important;
 }
 #schema table.tablesorter th {
+    padding-right: 10px !important;
+}
+#exporter table.tablesorter th {
     padding-right: 10px !important;
 }
 .dataBlockContent.systemOver table td:nth-child(1) {
@@ -3832,7 +3845,7 @@ generateProcedureDate { float:right;padding-right: 85px;}
     padding: 2px;
     resize: vertical;
     outline: none;
-    white-space: pre-line;
+    white-space: pre;
     font-size: 18px;
     font-family: Arial, Helvetica, sans-serif;
 }
@@ -4777,4 +4790,11 @@ table.dataTable {top:0;}
     .split.split-horizontal {
         height: 99% !important;
     }
+}
+
+#exportTableScrollBar {
+  display:block;
+  position:relative;
+  overflow: auto;
+  height: 250px;
 }

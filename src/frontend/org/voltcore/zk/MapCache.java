@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -256,7 +256,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         HashMap<String, JSONObject> cache = new HashMap<String, JSONObject>();
         for (ByteArrayCallback callback : callbacks) {
             try {
-                byte payload[] = callback.getData();
+                byte payload[] = callback.get();
                 JSONObject jsObj = new JSONObject(new String(payload, "UTF-8"));
                 cache.put(callback.getPath(), jsObj);
             } catch (KeeperException.NoNodeException e) {
@@ -279,7 +279,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
-            byte payload[] = cb.getData();
+            byte payload[] = cb.get();
             JSONObject jsObj = new JSONObject(new String(payload, "UTF-8"));
             cacheCopy.put(cb.getPath(), jsObj);
         } catch (KeeperException.NoNodeException e) {

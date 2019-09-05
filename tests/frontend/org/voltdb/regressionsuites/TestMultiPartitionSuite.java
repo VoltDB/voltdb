@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,11 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
@@ -42,6 +38,8 @@ import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteIndexS
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelectDuped;
 
+import junit.framework.Test;
+
 /**
  * Tests a mix of multi-partition and single partition procedures on a
  * mix of replicated and partititioned tables on a mix of single-site and
@@ -51,13 +49,12 @@ import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect
 public class TestMultiPartitionSuite extends RegressionSuite {
 
     // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         MultiSiteSelect.class,
         MultiSiteSelectDuped.class,
         MultiSiteIndexSelect.class,
-        MultiSiteDelete.class, UpdateNewOrder.class,
-        MispartitionedInsert.class,
-        MispartitionedUpdate.class
+        MultiSiteDelete.class,
+        UpdateNewOrder.class
     };
 
     /**
@@ -282,7 +279,10 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(MispartitionedInsert.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(MispartitionedUpdate.class, "NEW_ORDER.NO_W_ID: 0");
+
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
         // build the jarfile
         boolean success = config.compile(project);

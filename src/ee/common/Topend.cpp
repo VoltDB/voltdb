@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,13 +21,10 @@
 #include "storage/tablefactory.h"
 
 namespace voltdb {
-    static Table* copyTable(const std::string &name, Table* template_table, char *signature)
-    {
-        Table* t = TableFactory::getPersistentTable(0,
-                                                    name,
-                                                    TupleSchema::createTupleSchema(template_table->schema()),
-                                                    template_table->getColumnNames(),
-                                                    signature);
+    static Table* copyTable(const std::string &name, Table* template_table, char *signature) {
+        Table* t = TableFactory::getPersistentTable(0, name.c_str(),
+                TupleSchema::createTupleSchema(template_table->schema()),
+                template_table->getColumnNames(), signature);
         TableTuple tuple(template_table->schema());
         TableIterator iterator = template_table->iterator();
         while (iterator.next(tuple)) {
@@ -61,42 +58,50 @@ namespace voltdb {
     void DummyTopend::crashVoltDB(voltdb::FatalException e) {
     }
 
-    int64_t DummyTopend::getQueuedExportBytes(int32_t partitionId, std::string signature) {
+    int64_t DummyTopend::getFlushedExportBytes(int32_t partitionId) {
         int64_t bytes = 0;
-        for (int ii = 0; ii < blocks.size(); ii++) {
-            bytes += blocks[ii]->rawLength();
+        for (int ii = 0; ii < exportBlocks.size(); ii++) {
+            bytes += exportBlocks[ii]->rawLength();
         }
         return bytes;
     }
 
-    void DummyTopend::pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream) {
-        if (sync) {
+    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature,
+            ExportStreamBlock *block) {
+        if (!block) {
             return;
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
-    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+    void DummyTopend::pushEndOfStream(int32_t partitionId, std::string signature) {
+        partitionIds.push(partitionId);
+        signatures.push(signature);
+        receivedExportBuffer = true;
+    }
+
+    // only used for EE Test, ignore the committedSpHandle for now
+    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         return pushDRBufferRetval;
     }
 
-
-    void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) {
+    void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {
         partitionIds.push(partitionId);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
     }
 
 
-    int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+    int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId,
+            int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
@@ -161,12 +166,32 @@ namespace voltdb {
         return false;
     }
 
-    bool DummyTopend::releaseLargeTempTableBlock(int64_t blockId) {
+    bool DummyTopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
         return false;
     }
 
     int32_t DummyTopend::callJavaUserDefinedFunction() {
         // We do not call any UDF here, directly return zero which means success.
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateStart(int functionId) {
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateAssemble() {
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateCombine() {
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateWorkerEnd() {
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateCoordinatorEnd() {
         return 0;
     }
 

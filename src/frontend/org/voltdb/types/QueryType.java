@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,7 +33,8 @@ public enum QueryType {
     INSERT      (3),
     UPDATE      (4),
     DELETE      (5),
-    UPSERT      (6);
+    UPSERT      (6),
+    MIGRATE     (7);    // MIGRATE FROM tbl WHERE ...
 
     QueryType(int val) {
         assert (this.ordinal() == val) :
@@ -46,8 +47,8 @@ public enum QueryType {
         return this.ordinal();
     }
 
-    protected static final Map<Integer, QueryType> idx_lookup = new HashMap<Integer, QueryType>();
-    protected static final Map<String, QueryType> name_lookup = new HashMap<String, QueryType>();
+    protected static final Map<Integer, QueryType> idx_lookup = new HashMap<>();
+    protected static final Map<String, QueryType> name_lookup = new HashMap<>();
     static {
         for (QueryType vt : EnumSet.allOf(QueryType.class)) {
             QueryType.idx_lookup.put(vt.ordinal(), vt);
@@ -94,10 +95,11 @@ public enum QueryType {
         else if (stmt.startsWith("delete") || stmt.startsWith("trunca")) {
             return QueryType.DELETE;
         }
-        else if (stmt.startsWith("select")) {
+        else if (stmt.startsWith("select") || stmt.startsWith("with")) {
             // This covers simple select statements as well as UNIONs and other set operations that are being used with default precedence
             // as in "select ... from ... UNION select ... from ...;"
             // Even if set operations are not currently supported, let them pass as "select" statements to let the parser sort them out.
+            // We also cover "with" statments.
             return QueryType.SELECT;
         }
         else if (stmt.startsWith("upsert")) {
@@ -116,6 +118,9 @@ public enum QueryType {
             // motivating diving right in to the full parser/planner without this pre-check.
             // We don't want to be re-implementing the parser here -- this has already gone far enough.
             return QueryType.SELECT;
+        } else if (stmt.startsWith("migrat")) {
+            // Note that we are only comparing the first 6 characters as a hack.
+            return QueryType.MIGRATE;
         }
         // else:
         // All the known statements are handled above, so default to cataloging an invalid read-only statement

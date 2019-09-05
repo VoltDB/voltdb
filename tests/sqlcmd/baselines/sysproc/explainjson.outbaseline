@@ -6,11 +6,15 @@ CREATE TABLE EMPLOYEES (
 );
 Command succeeded.
 
+PARTITION TABLE EMPLOYEES ON COLUMN EMP_ID;
+Command succeeded.
+
 explainjson SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID IS NULL;
 JSON_PLAN                      
 -------------------------------
 {
     "EXECUTE_LIST": [
+        3,
         2,
         1
     ],
@@ -22,9 +26,103 @@ JSON_PLAN
             "PLAN_NODE_TYPE": "SEND"
         },
         {
+            "CHILDREN_IDS": [3],
             "ID": 2,
+            "OUTPUT_SCHEMA": [
+                {
+                    "COLUMN_NAME": "LAST_NAME",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 0,
+                        "TYPE": 32,
+                        "VALUE_SIZE": 20,
+                        "VALUE_TYPE": 9
+                    }
+                },
+                {
+                    "COLUMN_NAME": "EMP_ID",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 1,
+                        "TYPE": 32,
+                        "VALUE_TYPE": 5
+                    }
+                },
+                {
+                    "COLUMN_NAME": "MANAGER_ID",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 2,
+                        "TYPE": 32,
+                        "VALUE_TYPE": 5
+                    }
+                },
+                {
+                    "COLUMN_NAME": "C4",
+                    "EXPRESSION": {
+                        "PARAM_IDX": 0,
+                        "TYPE": 31,
+                        "VALUE_TYPE": 5
+                    }
+                },
+                {
+                    "COLUMN_NAME": "LAST_NAME",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 0,
+                        "TYPE": 32,
+                        "VALUE_SIZE": 20,
+                        "VALUE_TYPE": 9
+                    }
+                }
+            ],
+            "PLAN_NODE_TYPE": "PROJECTION"
+        },
+        {
+            "ID": 3,
+            "OUTPUT_SCHEMA": [
+                {
+                    "COLUMN_NAME": "LAST_NAME",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 0,
+                        "TYPE": 32,
+                        "VALUE_SIZE": 20,
+                        "VALUE_TYPE": 9
+                    }
+                },
+                {
+                    "COLUMN_NAME": "EMP_ID",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 1,
+                        "TYPE": 32,
+                        "VALUE_TYPE": 5
+                    }
+                },
+                {
+                    "COLUMN_NAME": "MANAGER_ID",
+                    "EXPRESSION": {
+                        "COLUMN_IDX": 2,
+                        "TYPE": 32,
+                        "VALUE_TYPE": 5
+                    }
+                }
+            ],
+            "PLAN_NODE_TYPE": "RECEIVE"
+        }
+    ]
+}
+{
+    "EXECUTE_LIST": [
+        5,
+        4
+    ],
+    "IS_LARGE_QUERY": false,
+    "PLAN_NODES": [
+        {
+            "CHILDREN_IDS": [5],
+            "ID": 4,
+            "PLAN_NODE_TYPE": "SEND"
+        },
+        {
+            "ID": 5,
             "INLINE_NODES": [{
-                "ID": 3,
+                "ID": 6,
                 "OUTPUT_SCHEMA": [
                     {
                         "COLUMN_NAME": "LAST_NAME",
@@ -49,23 +147,6 @@ JSON_PLAN
                             "COLUMN_IDX": 2,
                             "TYPE": 32,
                             "VALUE_TYPE": 5
-                        }
-                    },
-                    {
-                        "COLUMN_NAME": "C4",
-                        "EXPRESSION": {
-                            "PARAM_IDX": 0,
-                            "TYPE": 31,
-                            "VALUE_TYPE": 5
-                        }
-                    },
-                    {
-                        "COLUMN_NAME": "LAST_NAME",
-                        "EXPRESSION": {
-                            "COLUMN_IDX": 0,
-                            "TYPE": 32,
-                            "VALUE_SIZE": 20,
-                            "VALUE_TYPE": 9
                         }
                     }
                 ],

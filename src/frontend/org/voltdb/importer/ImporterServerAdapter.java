@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,4 +68,11 @@ public interface ImporterServerAdapter {
      * @param procName the name of the procedure that the importer was trying to execute
      */
     public void reportQueued(String importerName, String procName);
+
+    /** This should be used by importer to report that the importer was successfully initialized.
+     *
+     * @param importerName the name of the importer
+     * @param procName the name of the procedure that the importer was trying to execute
+     */
+    public void reportInitialized(String importerName, String procName);
 }

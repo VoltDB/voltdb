@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,9 +34,6 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBatch;
 
 
 public class TestGiantDeleteSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { InsertBatch.class };
 
     public void testGiantDelete() throws IOException, ProcCallException
     {
@@ -85,7 +82,7 @@ public class TestGiantDeleteSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(InsertBatch.class, "ASSET.OBJECT_DETAIL_ID: 1");
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
         config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);

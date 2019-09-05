@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,9 +42,9 @@ public class TestLoadingSuite extends RegressionSuite {
     static byte upsertMode = (byte) 0;
 
     static VoltTable m_template = new VoltTable(new ColumnInfo[] {
-            new ColumnInfo("col1", VoltType.BIGINT),
-            new ColumnInfo("col2", VoltType.BIGINT),
-            new ColumnInfo("col3", VoltType.BIGINT),
+            new ColumnInfo("col1", VoltType.INTEGER),
+            new ColumnInfo("col2", VoltType.INTEGER),
+            new ColumnInfo("col3", VoltType.TINYINT),
             new ColumnInfo("col4", VoltType.STRING),
             new ColumnInfo("col5", VoltType.FLOAT)
     });
@@ -81,12 +81,12 @@ public class TestLoadingSuite extends RegressionSuite {
 
         // test failure to load replicated table from SP proc
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
+            client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
                     "REPLICATED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
-            e.printStackTrace();
         }
+
         assertEquals(0, countReplicatedRows(client));
 
         // test rollback for constraint
@@ -94,20 +94,28 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(3, 2, 3, "3", 3.0);
         table.addRow(3, 2, 3, "3", 3.0);
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(2),
+            client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(2),
                     "PARTITIONED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
             e.printStackTrace();
         }
+
         // 2 rows in the db from the previous test (3 for hsql)
-        if (isHSQL()) // sadly, hsql is not super transactional as a backend
+        if (isHSQL()) { // sadly, hsql is not super transactional as a backend
             assertEquals(3, countPartitionedRows(client));
-        else
+        }
+        else {
             assertEquals(2, countPartitionedRows(client));
+        }
     }
 
     public void testMultiPartitionLoad() throws Exception {
+        // MockExecutionEngine does not implement loadTable
+        if (isHSQL()) {
+            System.out.println("Skip testMultiPartitionLoad for HSQL");
+            return;
+        }
 
         Client client = getClient();
         VoltTable table; ClientResponse r;
@@ -124,29 +132,54 @@ public class TestLoadingSuite extends RegressionSuite {
         assertEquals(4, r.getResults()[0].asScalarLong());
         assertEquals(4, countReplicatedRows(client));
 
-        if (!isHSQL()) {
-            // test successful load to partitioned table from MP txn
-            table = m_template.clone(100);
-            table.addRow(1, 1, 1, "1", 1.0);
-            table.addRow(2, 1, 2, "2", 2.0);
-            table.addRow(3, 2, 3, "3", 3.0);
-            table.addRow(4, 2, 4, "4", 4.0);
-            try {
-                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", upsertMode, table);
-                fail();
-            } catch (ProcCallException e) {}
-
-            // test rollback to a replicated table (constraint)
-            table = m_template.clone(100);
-            table.addRow(5, 1, 5, "5", 5.0);
-            table.addRow(5, 1, 5, "5", 5.0);
-            try {
-                r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
-                fail(); // prev stmt should throw exception
-            } catch (ProcCallException e) {}
-            // 4 rows in the db from the previous test
-            assertEquals(4, countReplicatedRows(client));
+        // test failure to load partitioned table from MP txn
+        table = m_template.clone(100);
+        table.addRow(1, 1, 1, "1", 1.0);
+        table.addRow(2, 1, 2, "2", 2.0);
+        table.addRow(3, 2, 3, "3", 3.0);
+        table.addRow(4, 2, 4, "4", 4.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", upsertMode, table);
+            fail();
         }
+        catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("no longer supports loading partitioned tables"));
+        }
+
+        // test rollback to a replicated table (constraint)
+        table = m_template.clone(100);
+        table.addRow(5, 1, 5, "5", 5.0);
+        table.addRow(5, 1, 5, "5", 5.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
+            fail(); // prev stmt should throw exception
+        }
+        catch (ProcCallException e) {
+            // Unfortunately the IPC path for loadTable will always throw EEException
+            // if the return error_code is not success.
+            // It didn't deserilize from exception buffer like JNI path,
+            // so the error type and message was not preserved.
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            }
+        }
+
+        // test rollback to a replicated table (sql exception)
+        table = m_template.clone(100);
+        table.addRow(6, 1, 5, "6", 5.0);
+        table.addRow(7, 1, 5, "777", 5.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
+            fail(); // prev stmt should throw exception
+        }
+        catch (ProcCallException e) {
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+            }
+        }
+
+        // 4 rows in the db from the previous test
+        assertEquals(4, countReplicatedRows(client));
     }
 
     public TestLoadingSuite(String name) {
@@ -170,7 +203,7 @@ public class TestLoadingSuite extends RegressionSuite {
                         "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
                         "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
                         "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
-                        "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
+                        "  sval VARCHAR(2) DEFAULT '0' NOT NULL,\n" +
                         "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
                         "  PRIMARY KEY (ival)\n" +
                         ");\n" +

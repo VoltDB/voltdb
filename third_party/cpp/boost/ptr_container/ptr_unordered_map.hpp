@@ -18,6 +18,12 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/ptr_container/ptr_map_adapter.hpp>
+#include <boost/ptr_container/detail/ptr_container_disable_deprecated.hpp>
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 namespace boost
 {
@@ -29,13 +35,16 @@ namespace boost
         class Hash           = boost::hash<Key>,
         class Pred           = std::equal_to<Key>,
         class CloneAllocator = heap_clone_allocator,
-        class Allocator      = std::allocator< std::pair<const Key,void*> >
+        class Allocator      = std::allocator< std::pair<const Key,
+                           typename ptr_container_detail::void_ptr<T>::type> >
     >
     class ptr_unordered_map : 
-        public ptr_map_adapter<T,boost::unordered_map<Key,void*,Hash,Pred,Allocator>,
+        public ptr_map_adapter<T,boost::unordered_map<Key,
+            typename ptr_container_detail::void_ptr<T>::type,Hash,Pred,Allocator>,
                                CloneAllocator,false>
     {
-        typedef ptr_map_adapter<T,boost::unordered_map<Key,void*,Hash,Pred,Allocator>,
+        typedef ptr_map_adapter<T,boost::unordered_map<Key,
+            typename ptr_container_detail::void_ptr<T>::type,Hash,Pred,Allocator>,
                                CloneAllocator,false>
             base_type;
 
@@ -244,5 +253,9 @@ namespace boost
 
 
 }
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic pop
+#endif
 
 #endif

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -56,13 +57,13 @@ public class DuplicateCounter
     boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
-    final VoltMessage m_openMessage;
+    final TransactionInfoBaseMessage m_openMessage;
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            VoltMessage openMessage)
+            TransactionInfoBaseMessage openMessage)
     {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
@@ -85,7 +86,22 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage) {
+    void addReplicas(long[] newReplicas) {
+        for (long replica : newReplicas) {
+            m_expectedHSIds.add(replica);
+        }
+    }
+
+    public void updateReplica (Long previousMaster, Long newMaster){
+        m_expectedHSIds.remove(previousMaster);
+        m_expectedHSIds.add(newMaster);
+    }
+
+    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
+        if (misMatchPos >= 0) {
+            ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
+            ((InitiateResponseMessage) m_lastResponse).setMismatchPos(misMatchPos);
+        }
         String msg = String.format(reason + " COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
@@ -121,6 +137,10 @@ public class DuplicateCounter
         return null;
     }
 
+    public TransactionInfoBaseMessage getOpenMessage() {
+        return m_openMessage;
+    }
+
     String getStoredProcedureName() {
         StoredProcedureInvocation invocation = getInvocation();
         if (invocation != null) {
@@ -138,23 +158,24 @@ public class DuplicateCounter
     protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
+            int pos = -1;
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
                 m_txnSucceed = txnSucceed;
             }
-            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
+            else if (m_txnSucceed != txnSucceed) {
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                + " succeeded on one partition but failed on another partition."
+                + " Shutting down to preserve data integrity.");
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
+                return ABORT;
+            }
+            else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("HASH MISMATCH", hashes, message);
+                logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                 return MISMATCH;
-            }
-            else if (m_txnSucceed != txnSucceed) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
-                        + " succeeded on one partition but failed on another partition."
-                        + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message);
-                return ABORT;
             }
             m_lastResponse = message;
             m_lastResultTables = resultTables;
@@ -213,6 +234,14 @@ public class DuplicateCounter
     VoltMessage getLastResponse()
     {
         return m_lastResponse;
+    }
+
+    public void dumpCounter(StringBuilder sb) {
+        sb.append("DuplicateCounter: [");
+        m_openMessage.toDuplicateCounterString(sb);
+        sb.append(" outstanding HSIds: ");
+        sb.append(CoreUtils.hsIdCollectionToString(m_expectedHSIds));
+        sb.append("]\n");
     }
 
     @Override

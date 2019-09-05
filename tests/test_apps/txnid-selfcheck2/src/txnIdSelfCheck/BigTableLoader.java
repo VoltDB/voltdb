@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,21 +23,17 @@
 
 package txnIdSelfCheck;
 
-import java.io.IOException;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+
 import java.io.InterruptedIOException;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 
 public class BigTableLoader extends BenchmarkThread {
 
@@ -125,7 +121,8 @@ public class BigTableLoader extends BenchmarkThread {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
-                        long p = Math.abs((long)(r.nextGaussian() * this.partitionCount));
+                        // introduce skew in the partition data (also need an empty partition
+                        long p = Math.abs((long)(r.nextGaussian() * this.partitionCount-1));
                         try {
                             m_permits.acquire();
                         } catch (InterruptedException e) {

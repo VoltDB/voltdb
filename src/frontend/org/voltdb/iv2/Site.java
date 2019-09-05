@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,6 +56,7 @@ import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
@@ -73,10 +73,12 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogSerializer;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
 import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
@@ -86,9 +88,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
+import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -100,13 +106,15 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Lists;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
@@ -145,7 +153,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final int m_siteIndex = siteIndexCounter.getAndIncrement();
 
     // Manages pending tasks.
-    final SiteTaskerQueue m_scheduler;
+    final SiteTaskerQueue m_pendingSiteTasks;
 
     /*
      * There is really no legitimate reason to touch the initiator mailbox from the site,
@@ -177,7 +185,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private PartitionDRGateway m_drGateway;
     private PartitionDRGateway m_mpDrGateway;
-    private final boolean m_hasMPDRGateway; // true if this site has the MP gateway
+    private final boolean m_isLowestSiteId; // true if this site has the MP gateway
 
     /*
      * Track the last producer-cluster unique IDs and drIds associated with an
@@ -349,6 +357,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public long getGenerationId() {
+            return m_context.m_genId;
+        }
+
+        @Override
         public byte[] getCatalogHash() {
             return m_context.getCatalogHash();
         }
@@ -422,9 +435,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(final int tableId, TableStreamType type,
+                HiddenColumnFilter hiddenColumnFilter, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
+            return m_ee.activateTableStream(tableId, type, hiddenColumnFilter,
+                    undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -475,11 +490,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                     if (lastReceivedLogId >= logId) {
                         // This is a duplicate
+                        if (drLog.isDebugEnabled()) {
+                            drLog.debug(String.format("P%d binary log site idempotency check returning DUP. " +
+                                    "Site's tracker lastReceivedLogId is %d while the logId is %d",
+                                    producerPartitionId, lastReceivedLogId, logId));
+                        }
                         return DRIdempotencyResult.DUPLICATE;
                     }
 
-                    if (drLog.isTraceEnabled()) {
-                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                    if (drLog.isDebugEnabled()) {
+                        drLog.debug(String.format("P%d binary log site idempotency check failed. " +
                                                   "Site's tracker lastReceivedLogId %d while the logId %d",
                                                   producerPartitionId, lastReceivedLogId, logId));
                     }
@@ -550,32 +570,40 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                if (hasReplicatedStream && !clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                    clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
-                }
-                int oldProducerPartitionCount = clusterSources.size() - (clusterSources.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0);
-                int newProducerPartitionCount = entry.getValue();
-                assert(oldProducerPartitionCount >= 0);
-                assert(newProducerPartitionCount != -1);
-
-                for (int i = oldProducerPartitionCount; i < newProducerPartitionCount; i++) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, i);
-                    clusterSources.put(i, tracker);
-                }
+                addRemoveTrackers(producerClusterId, entry.getValue(), clusterSources);
 
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
+        }
+
+        private void addRemoveTrackers(int clusterId, int newCount, Map<Integer, DRSiteDrIdTracker> currMap) {
+            if (!currMap.containsKey(MpInitiator.MP_INIT_PID)) {
+                DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                                                DRLogSegmentId.makeEmptyDRId(clusterId),
+                                                Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                currMap.put(MpInitiator.MP_INIT_PID, tracker);
+            }
+
+            int oldCount = currMap.size() - 1;
+            assert(oldCount >= 0);
+            assert(newCount > 0);
+
+            if (newCount > oldCount) { // elastic add. Initialize trackers for new partitions
+                for (int i = oldCount; i < newCount; i++) {
+                    DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                            DRLogSegmentId.makeEmptyDRId(clusterId),
+                            Long.MIN_VALUE, Long.MIN_VALUE, i);
+                    currMap.put(i, tracker);
+                }
+            } else { // elastic remove. Remove trackers for removed partitions
+                for (int i=newCount; i< oldCount; i++) {
+                    currMap.remove(i);
+                }
             }
         }
 
@@ -606,7 +634,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /** Create a new execution site and the corresponding EE */
     public Site(
-            SiteTaskerQueue scheduler,
+            SiteTaskerQueue pendingSiteTasks,
             long siteId,
             BackendTarget backend,
             CatalogContext context,
@@ -620,13 +648,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             MemoryStats memStats,
             String coreBindIds,
             TaskLog rejoinTaskLog,
-            boolean hasMPDRGateway)
+            boolean isLowestSiteId)
     {
         m_siteId = siteId;
         m_context = context;
         m_partitionId = partitionId;
         m_numberOfPartitions = numPartitions;
-        m_scheduler = scheduler;
+        m_pendingSiteTasks = pendingSiteTasks;
         m_backend = backend;
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
@@ -638,7 +666,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
-        m_hasMPDRGateway = hasMPDRGateway;
+        m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
@@ -664,9 +692,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         m_drGateway = drGateway;
         m_mpDrGateway = mpDrGateway;
-        if (m_hasMPDRGateway && m_mpDrGateway == null) {
+        if (m_isLowestSiteId && m_mpDrGateway == null) {
             throw new IllegalArgumentException("This site should contain the MP DR gateway but was not given");
-        } else if (!m_hasMPDRGateway && m_mpDrGateway != null) {
+        } else if (!m_isLowestSiteId && m_mpDrGateway != null) {
             throw new IllegalArgumentException("This site should not contain the MP DR gateway but was given");
         }
     }
@@ -702,7 +730,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         m_ee.loadFunctions(m_context);
 
-        m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
+        m_snapshotter = new SnapshotSiteProcessor(m_pendingSiteTasks,
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override
@@ -720,6 +748,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
+        int configuredTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
+        final int exportFlushTimeout = configuredTimeout > 0 ? configuredTimeout : 4*1000;
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting
@@ -728,19 +758,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         try {
-            if (m_backend == BackendTarget.NATIVE_EE_JNI) {
+            // NATIVE_EE_JNI and NATIVE_EE_LARGE_JNI
+            if (m_backend.isDefaultJNITarget) {
                 eeTemp =
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
+                        m_context.getNodeSettings().getLocalSitesCount(),
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_hasMPDRGateway);
+                        m_isLowestSiteId,
+                        exportFlushTimeout);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -749,22 +782,25 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
+                        m_context.getNodeSettings().getLocalSitesCount(),
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_hasMPDRGateway);
+                        m_isLowestSiteId,
+                        exportFlushTimeout);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
-            else {
+            else if (m_backend.isIPC) {
                 // set up the EE over IPC
                 eeTemp =
                     new ExecutionEngineIPC(
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
                             m_partitionId,
+                            m_context.getNodeSettings().getLocalSitesCount(),
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDrclusterid(),
@@ -773,7 +809,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
-                            m_hasMPDRGateway);
+                            m_isLowestSiteId,
+                            exportFlushTimeout);
+            }
+            else {
+                /* This seems very bad. */
+                throw new VoltAbortException(
+                        String.format("Unexpected BackendTarget value %s", m_backend)
+                );
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
             eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -809,7 +852,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             while (m_shouldContinue) {
                 if (m_rejoinState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
-                    SiteTasker task = m_scheduler.take();
+                    SiteTasker task = m_pendingSiteTasks.take();
                     if (task instanceof TransactionTask) {
                         m_currentTxnId = ((TransactionTask)task).getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
@@ -818,7 +861,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_scheduler.peek();
+                    SiteTasker task = m_pendingSiteTasks.peek();
                     boolean didWork = false;
                     if (task != null) {
                         didWork = true;
@@ -834,16 +877,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // remove the task from the scheduler and give it to task log.
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
                         if (m_rejoinState != kStateRunning) {
-                            m_scheduler.poll();
+                            m_pendingSiteTasks.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
                     } else {
                         //If there are no tasks, do task log work
-                        didWork |= replayFromTaskLog(mrm);
+                        didWork = replayFromTaskLog(mrm);
                     }
-                    if (!didWork) Thread.yield();
+                    if (!didWork) {
+                        Thread.yield();
+                    }
                 } else {
-                    SiteTasker task = m_scheduler.take();
+                    SiteTasker task = m_pendingSiteTasks.take();
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 }
             }
@@ -896,7 +941,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m);
-                if (!filter(tibm)) {
+                if(allowInitiateTask(m)) {
                     m_currentTxnId = t.getTxnId();
                     m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
@@ -919,7 +964,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
                 }
 
-                if (!filter(tibm)) {
+                if (allowFragmentTask(m)) {
                     m_currentTxnId = t.getTxnId();
                     m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
@@ -935,9 +980,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
-                    if (!filter(tibm)) {
-                        t.runFromTaskLog(this);
-                    }
+                    t.runFromTaskLog(this);
                 }
             }
             else {
@@ -957,26 +1000,26 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return tibm != null;
     }
 
-    static boolean filter(TransactionInfoBaseMessage tibm)
-    {
+    public static boolean allowFragmentTask(FragmentTaskMessage msg) {
         // don't log sysproc fragments or iv2 initiate task messages.
         // this is all jealously; should be refactored to ask tibm
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
-        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
-        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
-                return true;
-            }
+        // Multi part AdHoc Does not need to be checked because its an alias and runs procedure as planned.
+        if (!msg.isSysProcTask()) {
+            return true;
         }
-        else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
-            // All durable sysprocs and non-sysprocs should not get filtered.
-            return sysproc != null && !sysproc.isDurable();
-        }
-        return false;
+
+        // fragId is not always available before FragmentTask is executed. In this case, check sysproc name.
+        long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
+        return (SystemProcedureCatalog.isAllowableInTaskLog(fragId, msg));
+    }
+
+    public static boolean allowInitiateTask(Iv2InitiateTaskMessage msg){
+        final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(msg.getStoredProcedureName());
+        // All durable sysprocs and non-sysprocs should not get filtered.
+        return(sysproc == null || sysproc.isDurable());
     }
 
     public void startShutdown()
@@ -1018,11 +1061,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, isTruncation, extraSnapshotData);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, hiddenColumnFilter, tasks, txnId, isTruncation,
+                extraSnapshotData);
     }
 
     /*
@@ -1068,45 +1113,39 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, String clusterName, String databaseName,
-            String tableName, VoltTable data,
-            boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName,
+            VoltTable data, LoadTableCaller caller) throws VoltAbortException
     {
-        Cluster cluster = m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
-        }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
-        }
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = m_context.database.getTables().getIgnoreCase(tableName);
         if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database");
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, table.getRelativeIndex(), data, caller);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
-            VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                returnUniqueViolations,
-                shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
+                caller.createUndoToken() ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                caller);
     }
 
     @Override
     public void updateBackendLogLevels()
     {
         m_ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        m_ee.setViewsEnabled(viewNames, enabled);
     }
 
     @Override
@@ -1131,17 +1170,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * @param undo
      */
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
-        if (undoLog == null) return;
-
-        for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
-            final UndoAction action = iterator.previous();
-            if (undo)
-                action.undo();
-            else
-                action.release();
+        if (undoLog == null) {
+            return;
         }
-        if (undo)
+
+        if (undo) {
+            undoLog = Lists.reverse(undoLog);
+        }
+        for (UndoAction action : undoLog) {
+            if (undo) {
+                action.undo();
+            } else {
+                action.release();
+            }
+        }
+        if (undo) {
             undoLog.clear();
+        }
     }
 
     private void setLastCommittedSpHandle(long spHandle)
@@ -1156,8 +1201,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, List<UndoAction> undoLog)
-    {
+    public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long beginUndoToken,
+            long spHandle, List<UndoAction> undoLog) {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
             setLastCommittedSpHandle(spHandle);
@@ -1166,18 +1211,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Any new txnid will create a new undo quantum, including the same txnid again
         m_latestUndoTxnId = Long.MIN_VALUE;
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
-        if (beginUndoToken == Site.kInvalidUndoToken) return;
-        if (rollback) {
+        if (beginUndoToken == Site.kInvalidUndoToken) {
+            return;
+        } else if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
-        }
-        else {
+        } else {
             assert(m_latestUndoToken != Site.kInvalidUndoToken);
             assert(m_latestUndoToken >= beginUndoToken);
             if (m_latestUndoToken > beginUndoToken) {
-                m_ee.releaseUndoToken(m_latestUndoToken);
+                m_ee.releaseUndoToken(m_latestUndoToken, isEmptyDRTxn);
             }
         }
-
         // java level roll back
         handleUndoLog(undoLog, rollback);
     }
@@ -1205,14 +1249,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
-        return m_ee.getUSOForExportTable(signature);
+        return m_ee.getUSOForExportTable(streamName);
     }
 
     @Override
     public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
+        if (m_drGateway == null || !m_drGateway.isActive()) {
+            return null;
+        }
         // Set the psetBuffer buffer capacity and clear the buffer
         m_ee.getParamBufferForExecuteTask(0);
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
@@ -1222,7 +1269,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
-        TupleStreamStateInfo info = null;
+        TupleStreamStateInfo info;
         if (hasReplicatedStateInfo != 0) {
             long replicatedSequenceNumber = resultBuffer.getLong();
             long replicatedSpUniqueId = resultBuffer.getLong();
@@ -1237,7 +1284,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber) {
-        if (partitionSequenceNumber == null && mpSequenceNumber == null) return;
+        if (partitionSequenceNumber == null && mpSequenceNumber == null) {
+            return;
+        }
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(16);
         paramBuffer.putLong(partitionSequenceNumber != null ? partitionSequenceNumber : Long.MIN_VALUE);
         paramBuffer.putLong(mpSequenceNumber != null ? mpSequenceNumber : Long.MIN_VALUE);
@@ -1297,15 +1346,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     //Assert column index matches name for ENG-4092
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     assert(stats.getColumnName(6).equals("TABLE_TYPE"));
-                    if ("PersistentTable".equals(stats.getString(6))){
+                    assert(stats.getColumnName(5).equals("TABLE_NAME"));
+                    boolean isReplicated = tables.getIgnoreCase(stats.getString(5)).getIsreplicated();
+                    boolean trackMemory = (!isReplicated) || m_isLowestSiteId;
+                    if ("PersistentTable".equals(stats.getString(6)) && trackMemory){
                         tupleCount += stats.getLong(7);
                     }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
-                    tupleAllocatedMem += stats.getLong(8);
+                    if (trackMemory) {
+                        tupleAllocatedMem += stats.getLong(8);
+                    }
                     assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
-                    tupleDataMem += stats.getLong(9);
+                    if (trackMemory) {
+                        tupleDataMem += stats.getLong(9);
+                    }
                     assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
-                    stringMem += stats.getLong(10);
+                    if (trackMemory) {
+                        stringMem += stats.getLong(10);
+                    }
                 }
                 stats.resetRowPosition();
 
@@ -1327,8 +1385,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
                     //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(6).equals("TABLE_NAME"));
+                    boolean isReplicated = tables.getIgnoreCase(stats.getString(6)).getIsreplicated();
+                    boolean trackMemory = (!isReplicated) || m_isLowestSiteId;
                     assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
-                    indexMem += stats.getLong(11);
+                    if (trackMemory) {
+                        indexMem += stats.getLong(11);
+                    }
                 }
                 stats.resetRowPosition();
 
@@ -1361,12 +1424,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
-                             Long sequenceNumber,
-                             Integer partitionId, String tableSignature)
+                             ExportSnapshotTuple sequences,
+                             Integer partitionId, String streamName)
     {
-        m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
-                          partitionId, tableSignature);
+        m_ee.exportAction(syncAction, sequences, partitionId, streamName);
+    }
+
+    @Override
+    public boolean deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId)
+    {
+        return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
+                tableName, deletableTxnId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1391,7 +1463,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -1410,7 +1482,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.instance().setClusterCreateTime(clusterCreateTime);
         }
 
-        for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+        for (Map.Entry<String, Map<Integer, ExportSnapshotTuple>> tableEntry : exportSequenceNumbers.entrySet()) {
             final Table catalogTable = m_context.tables.get(tableEntry.getKey());
             if (catalogTable == null) {
                 VoltDB.crashLocalVoltDB(
@@ -1418,7 +1490,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         true,
                         null);
             }
-            Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            ExportSnapshotTuple sequenceNumbers = tableEntry.getValue().get(m_partitionId);
 
             if (sequenceNumbers == null) {
                 if (requireExistingSequenceNumbers) {
@@ -1427,16 +1499,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                     m_partitionId + " table " +
                                     tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
                 } else {
-                    sequenceNumbers = Pair.of(0L,0L);
+                    sequenceNumbers = new ExportSnapshotTuple();
                 }
             }
 
             exportAction(
                     true,
-                    sequenceNumbers.getFirst().longValue(),
-                    sequenceNumbers.getSecond(),
+                    sequenceNumbers,
                     m_partitionId,
-                    catalogTable.getSignature());
+                    catalogTable.getTypeName());
+            // assign the stats to the other partition's value
+            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
+                    StreamStartAction.REJOIN, tableEntry.getValue());
+        }
+        if (m_sysprocContext.isLowestSiteId()) {
+            ExportManager.instance().updateDanglingExportStates(StreamStartAction.REJOIN, exportSequenceNumbers);
         }
 
         if (drSequenceNumbers != null) {
@@ -1460,6 +1537,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Rejoin Complete. State:" + m_rejoinState + " PartitionId:" +m_partitionId + " Site:" +
+                 CoreUtils.hsIdToString(m_siteId));
+        }
     }
 
     private void setReplayRejoinComplete() {
@@ -1467,6 +1548,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         assert(m_rejoinState == kStateReplayingRejoin);
         m_replayCompletionAction.run();
         m_rejoinState = kStateRunning;
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Replay Rejoin Complete. State:" + m_rejoinState +  " PartitionId:" +m_partitionId + " Site:" +
+                    CoreUtils.hsIdToString(m_siteId));
+        }
     }
 
     @Override
@@ -1513,14 +1598,29 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long txnId, long uniqueId, long spHandle,
-            boolean isReplay,
-            boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration)
+    public boolean updateCatalog(String diffCmds,
+                                 CatalogContext context,
+                                 boolean requiresSnapshotIsolationboolean,
+                                 boolean isMPI,
+                                 long txnId,
+                                 long uniqueId,
+                                 long spHandle,
+                                 boolean isReplay,
+                                 boolean requireCatalogDiffCmdsApplyToEE,
+                                 boolean requiresNewExportGeneration)
     {
         CatalogContext oldContext = m_context;
         m_context = context;
@@ -1556,7 +1656,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
             for (Table t : oldTables) {
                 if (t.getIsdred()) {
-                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    DRCatalogChange |= diffCmds.contains(CatalogSerializer.getDeleteDiffStatement(t, "tables"));
                     if (DRCatalogChange) {
                         break;
                     }
@@ -1582,7 +1682,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedSpHandle);
+        //No need to quiesce as there is no rolling of generation OLD datasources will be polled and pushed until there is no more data.
+        //m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
@@ -1608,28 +1709,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart) {
-        boolean foundMultipartTxnId = skipMultiPart;
-        boolean foundSinglepartTxnId = false;
+        long foundMultipartTxnId = -1;
+        long foundSinglepartTxnId = -1;
         for (long txnId : perPartitionTxnIds) {
             if (TxnEgo.getPartitionId(txnId) == m_partitionId) {
-                if (foundSinglepartTxnId) {
+                if (foundSinglepartTxnId != -1) {
                     VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a partition", false, null);
+                            "Found multiple transactions ids (" + TxnEgo.txnIdToString(txnId) + " and " +
+                            TxnEgo.txnIdToString(foundSinglepartTxnId) + ")during restore for a partition",
+                            false, null);
                 }
-                foundSinglepartTxnId = true;
+                foundSinglepartTxnId = txnId;
                 m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
                 setSpHandleForSnapshotDigest(txnId);
             }
             if (!skipMultiPart && TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
-                if (foundMultipartTxnId) {
+                if (foundMultipartTxnId != -1) {
                     VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a multipart txnid", false, null);
+                            "Found multiple transactions ids (" + TxnEgo.txnIdToString(txnId) + " and " +
+                            TxnEgo.txnIdToString(foundMultipartTxnId) + ") during restore for a multipart txnid",
+                            false, null);
                 }
-                foundMultipartTxnId = true;
+                foundMultipartTxnId = txnId;
                 m_initiatorMailbox.setMaxLastSeenMultipartTxnId(txnId);
             }
         }
-        if (!foundMultipartTxnId) {
+        if (!skipMultiPart && foundMultipartTxnId == -1) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
     }
@@ -1654,16 +1759,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + hashinatorConfig.length);
         paramBuffer.putInt(tableIds.length);
         for (long tableId : tableIds) {
             paramBuffer.putLong(tableId);
         }
-        paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer));
@@ -1680,8 +1784,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setProcedureName(String procedureName) {
-        m_ee.setProcedureName(procedureName);
+    public void setupProcedure(String procedureName) {
+        m_ee.setupProcedure(procedureName);
+    }
+
+    @Override
+    public void completeProcedure() {
+        m_ee.completeProcedure();
     }
 
     @Override
@@ -1690,14 +1799,33 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, int remoteClusterId,
-                               byte log[]) throws EEException {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[])
+            throws EEException {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(Integer.BYTES * 2 + log.length);
+        paramBuffer.putInt(1);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
-        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, getNextUndoToken(m_currentTxnId));
+        return callApplyBinaryLogEE(paramBuffer, txnId, spHandle, uniqueId, remoteClusterId, -1);
+    }
+
+    @Override
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logs[])
+            throws EEException {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
+        paramBuffer.put(logs);
+        return callApplyBinaryLogEE(paramBuffer, txnId, spHandle, uniqueId, remoteClusterId, remoteTxnUniqueId);
+    }
+
+    private long callApplyBinaryLogEE(ByteBuffer paramBuffer, long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteUniqueId)
+            throws EEException {
+        try {
+            return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
+                    remoteClusterId, getNextUndoToken(m_currentTxnId));
+        } catch(DRTableNotFoundException e) {
+            e.setRemoteTxnUniqueId(remoteUniqueId);
+            e.setCatalogVersion(getSystemProcedureExecutionContext().getCatalogVersion());
+            throw e;
+        }
     }
 
     @Override
@@ -1726,19 +1854,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
-//        Enable this code and fix up generateDREvent in DRTuplestream once the DR ReplicatedTable Stream has been removed
-//        if (m_partitionId >= oldPartitionCnt) {
-//            generateDREvent(
-//                    EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
-//        }
-//        else {
-            ByteBuffer paramBuffer = ByteBuffer.allocate(8);
-            paramBuffer.putInt(oldPartitionCnt);
-            paramBuffer.putInt(newPartitionCnt);
-            generateDREvent(
-                    EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
-//        }
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle,
+            long uniqueId) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+        paramBuffer.putInt(oldPartitionCnt);
+        paramBuffer.putInt(newPartitionCnt);
+        generateDREvent(EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle,
+                paramBuffer.array());
     }
 
     @Override
@@ -1751,6 +1873,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_ELASTIC_REBALANCE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
     }
 
+    @Override
     public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
@@ -1776,11 +1899,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void disableExternalStreams() {
+        m_ee.disableExternalStreams();
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return m_ee.externalStreamsEnabled();
+    }
+
+    @Override
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
     }
 
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return m_loadedProcedures.getMigrateProcRunner(procName, catTable, column, op);
+    }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
     }
 }

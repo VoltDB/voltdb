@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ VoltDB catalog code generator.
 from catalog_utils import *
 from string import Template
 from subprocess import Popen
+import shutil
 
 #
 # Code generation (shared).
@@ -63,18 +64,11 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     # SETUP
     ##########
     pkgdir = package.replace('.', '/')
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
-    os.system( interp( "mkdir -p $postpath/", locals() ) )
-    os.system( interp( "cp $prepath/Catalog.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogType.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogMap.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogException.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogChangeGroup.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DRCatalogCommands.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DatabaseConfiguration.java $postpath", locals() ) )
+    shutil.rmtree(postpath, ignore_errors=True)
+    os.makedirs(postpath)
+    javasrcs = os.listdir(prepath)
+    for javasrc in javasrcs:
+        shutil.copy(os.path.join(prepath, javasrc), postpath)
 
     ##########
     # WRITE THE SOURCE FILES
@@ -232,7 +226,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
 
         # copyFields
         write(                     '    @Override' )
-        write(                     '    void copyFields(CatalogType obj) {' )
+        write(                     '    public void copyFields(CatalogType obj) {' )
         if len(cls.fields) > 0:
             write(                 '        // this is safe from the caller' )
             write( interp(         '        $clsname other = ($clsname) obj;\n', locals() ) )
@@ -295,13 +289,11 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     # SETUP
     ##########
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
-    os.system( interp( "mkdir -p $postpath/", locals() ) )
-    os.system( interp( "cp $prepath/catalog.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogtype.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogmap.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalog.cpp $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogtype.cpp $postpath", locals() ) )
+    shutil.rmtree(postpath, ignore_errors=True)
+    os.makedirs(postpath)
+    cppsrcs = os.listdir(prepath)
+    for cppsrc in cppsrcs:
+        shutil.copy(os.path.join(prepath, cppsrc), postpath)
 
     ##########
     # WRITE THE SOURCE FILES

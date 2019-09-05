@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -44,7 +44,6 @@
  */
 
 #include <sstream>
-#include <cassert>
 #include <cstdio>
 #include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
@@ -65,40 +64,22 @@ using std::string;
 namespace voltdb {
 
 Table::Table(int tableAllocationTargetSize) :
-    m_tempTuple(),
-    m_schema(NULL),
-    m_columnNames(),
-    m_columnHeaderData(NULL),
-    m_columnHeaderSize(-1),
-    m_tupleCount(0),
-    m_tuplesPinnedByUndo(0),
-    m_columnCount(0),
-    m_tuplesPerBlock(0),
-    m_nonInlinedMemorySize(0),
-    m_databaseId(-1),
-    m_name(""),
-    m_ownsTupleSchema(true),
-    m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_refcount(0),
-    m_compactionThreshold(95)
+    m_tableAllocationTargetSize(tableAllocationTargetSize)
 {
 }
 
 Table::~Table() {
     // not all tables are reference counted but this should be invariant
-    assert(m_refcount == 0);
+    vassert(m_refcount == 0);
 
     // clear the schema
     if (m_ownsTupleSchema) {
         TupleSchema::freeTupleSchema(m_schema);
     }
 
-    m_schema = NULL;
-
     // clear any cached column serializations
     if (m_columnHeaderData)
         delete[] m_columnHeaderData;
-    m_columnHeaderData = NULL;
 }
 
 void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
@@ -151,7 +132,9 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
     // default value of hidden dr timestamp is null
     if (m_schema->hiddenColumnCount() > 0) {
-        m_tempTuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        for (int i = 0; i < m_schema->hiddenColumnCount(); i++) {
+           m_tempTuple.setHiddenNValue(i, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        }
     }
     m_tempTuple.setActiveTrue();
 
@@ -175,7 +158,7 @@ int Table::columnIndex(const std::string &name) const {
 }
 
 bool Table::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.columnCount());
+    vassert(m_columnCount == tuple.columnCount());
     for (int i = m_columnCount - 1; i >= 0; --i) {
         if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
             VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
@@ -206,10 +189,12 @@ std::string Table::debug(const std::string &spacer) const {
     buffer << infoSpacer << m_schema->debug();
     //buffer << infoSpacer << " - TupleSchema needs a \"debug\" method. Add one for output here.\n";
 
+#ifdef VOLT_TRACE_ENABLED
     //
     // Tuples
     //
-    if (tableType().compare("LargeTempTable") != 0) {
+    if (tableType().compare("LargeTempTable") != 0
+        && tableType().compare("StreamedTable") != 0) {
         buffer << infoSpacer << "===========================================================\n";
         buffer << infoSpacer << "\tDATA\n";
 
@@ -227,6 +212,7 @@ std::string Table::debug(const std::string &spacer) const {
         }
         buffer << infoSpacer << "===========================================================\n";
     }
+#endif
     std::string ret(buffer.str());
     VOLT_DEBUG("tabledebug end");
 
@@ -254,15 +240,15 @@ size_t Table::getAccurateSizeToSerialize() {
         bytes += tuple.serializationSize();  // tuple size
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 
     return bytes;
 }
 
-size_t Table::getColumnHeaderSizeToSerialize() const {
+size_t Table::getColumnHeaderSizeToSerialize() {
     // use a cache if possible
     if (m_columnHeaderData) {
-        assert(m_columnHeaderSize != -1);
+        vassert(m_columnHeaderSize != -1);
         return m_columnHeaderSize;
     }
 
@@ -278,7 +264,7 @@ size_t Table::getColumnHeaderSizeToSerialize() const {
         bytes += columnName(i).size();
     }
 
-    return bytes;
+    return m_columnHeaderSize = bytes;
 }
 
 
@@ -289,18 +275,15 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
        bug in tables of single integers, make sure that's correct.
     */
 
-    // skip header position
-    std::size_t start;
-
     // use a cache
     if (m_columnHeaderData) {
-        assert(m_columnHeaderSize != -1);
+        vassert(m_columnHeaderSize != -1);
         serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
         return;
     }
-    assert(m_columnHeaderSize == -1);
 
-    start = serialOutput.position();
+    // skip header position
+    std::size_t const start = serialOutput.position();
 
     // skip header position
     serialOutput.writeInt(-1);
@@ -324,7 +307,7 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
         const string& name = columnName(i);
         // column names can't be null, so length must be >= 0
         int32_t length = static_cast<int32_t>(name.size());
-        assert(length >= 0);
+        vassert(length >= 0);
 
         // this is standard string serialization for voltdb
         serialOutput.writeInt(length);
@@ -333,8 +316,8 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
 
 
     // write the header size which is a non-inclusive int
-    size_t position = serialOutput.position();
-    m_columnHeaderSize = static_cast<int32_t>(position - start);
+    getColumnHeaderSizeToSerialize();
+    vassert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
     serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
 
@@ -370,11 +353,11 @@ void Table::serializeTo(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
-    assert(sz > 0);
+    vassert(sz > 0);
     serialOutput.writeIntAt(pos, sz);
 }
 
@@ -390,7 +373,7 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 }
 
 /**
@@ -398,12 +381,12 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
  * Used by the exception stuff Ariel put in.
  */
 void Table::serializeTupleTo(SerializeOutput &serialOutput, voltdb::TableTuple *tuples, int numTuples) {
-    //assert(m_schema->equals(tuples[0].getSchema()));
+    //vassert(m_schema->equals(tuples[0].getSchema()));
 
     std::size_t pos = serialOutput.position();
     serialOutput.writeInt(-1);
 
-    assert(!tuples[0].isNullTuple());
+    vassert(!tuples[0].isNullTuple());
 
     serializeColumnHeaderTo(serialOutput);
 
@@ -458,23 +441,13 @@ bool Table::equals(voltdb::Table *other) {
 }
 
 void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
-                                   Pool *stringPool,
-                                   ReferenceSerializeOutput *uniqueViolationOutput,
-                                   bool shouldDRStreamRow) {
+                                   Pool *stringPool) {
     int tupleCount = serialInput.readInt();
-    assert(tupleCount >= 0);
+    vassert(tupleCount >= 0);
 
-    TableTuple target(m_schema);
-
-    //Reserve space for a length prefix for rows that violate unique constraints
-    //If there is no output supplied it will just throw
-    size_t lengthPosition = 0;
     int32_t serializedTupleCount = 0;
     size_t tupleCountPosition = 0;
-    if (uniqueViolationOutput != NULL) {
-        lengthPosition = uniqueViolationOutput->reserveBytes(4);
-    }
-
+    TableTuple target(m_schema);
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
         target.setActiveTrue();
@@ -482,28 +455,14 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 
-        target.deserializeFrom(serialInput, stringPool);
+        target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
 
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
-    }
-
-    //If unique constraints are being handled, write the length/size of constraints that occured
-    if (uniqueViolationOutput != NULL) {
-        if (serializedTupleCount == 0) {
-            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
-        } else {
-            uniqueViolationOutput->writeIntAt(lengthPosition,
-                                              static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
-            uniqueViolationOutput->writeIntAt(tupleCountPosition,
-                                              serializedTupleCount);
-        }
+        processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
     }
 }
 
 void Table::loadTuplesFrom(SerializeInputBE &serialInput,
-                           Pool *stringPool,
-                           ReferenceSerializeOutput *uniqueViolationOutput,
-                           bool shouldDRStreamRow) {
+                           Pool *stringPool) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -525,7 +484,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
     serialInput.readByte();
 
     int16_t colcount = serialInput.readShort();
-    assert(colcount >= 0);
+    vassert(colcount >= 0);
 
     // Store the following information so that we can provide them to the user
     // on failure
@@ -557,11 +516,10 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
             message << "column " << i << ": " << names[i]
                     << ", type = " << getTypeName(types[i]) << std::endl;
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message.str().c_str());
+        throw SerializableEEException(message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialInput, stringPool, uniqueViolationOutput, shouldDRStreamRow);
+    loadTuplesFromNoHeader(serialInput, stringPool);
 }
 
 }

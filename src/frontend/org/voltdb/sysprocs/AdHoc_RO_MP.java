@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
 
@@ -27,9 +26,7 @@ import org.voltdb.VoltTable;
  * embedded planner process.
  *
  * AdHocBase implements the core logic.
- * This subclass is needed for @ProcInfo.
  */
-@ProcInfo(singlePartition = false)
 public class AdHoc_RO_MP extends AdHocBase {
 
     /**

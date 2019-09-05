@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -88,10 +88,10 @@ def test_os_release(output):
         supported = False
         if distInfo[0] in ("centos", "redhat", "rhel"):
             releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
-            if releaseNum >= "6.6":
+            if releaseNum >= "7.0":
                 supported = True
         elif "ubuntu" in distInfo[0].lower():
-            if distInfo[1] in ("14.04", "16.04"):
+            if distInfo[1] in ("14.04", "16.04", "18.04"):
                 supported = True
     elif platform.system() == "Darwin":
         output["OS"] = ["PASS", "MacOS X"]
@@ -149,7 +149,7 @@ def test_java_version(output):
     if not java:
         utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
     javaVersion = utility.get_java_version(javaHome=java, verbose=True)
-    if '1.8.' in javaVersion:
+    if '1.8.' in javaVersion or '11.' in javaVersion:
         output['Java'] = ["PASS", javaVersion.strip()]
     elif len(javaVersion) > 0:
         output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly and JAVA_HOME has been setup correctly."]
@@ -238,6 +238,10 @@ def test_full_config(output):
         test_swap(output)
         test_segmentation_offload(output)
         test_tcp_retries2(output)
+        # Compare Swapoff and Swappiness (Swappiness wins)
+        if output["Swapoff"][0] == "WARN" and output["Swappiness"][0] == "PASS":
+           output["Swapoff"][0] = "PASS"
+           output["Swapoff"][1] = output["Swapoff"][1]  + ", however swappiness supercedes it"
 
 def test_hard_requirements():
     """ Returns any errors resulting from hard config requirement violations

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -47,9 +47,10 @@ class PersistentTableMemStatsTest : public Test {
 public:
     PersistentTableMemStatsTest() {
         m_engine = new VoltDBEngine();
-        int partitionCount = htonl(1);
-        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        int partitionCount = 1;
+        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
+        m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("0");
         m_columnNames.push_back("1");
@@ -77,6 +78,7 @@ public:
     ~PersistentTableMemStatsTest() {
         delete m_engine;
         delete m_table;
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable() {
@@ -88,7 +90,7 @@ public:
                                      BALANCED_TREE_INDEX,
                                      m_primaryKeyIndexColumns,
                                      TableIndex::simplyIndexColumns(),
-                                     true, true, m_tableSchema);
+                                     true, true, false, m_tableSchema);
 
         vector<TableIndexScheme> indexes;
 
@@ -142,7 +144,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
 
     m_table->insertTuple(tuple);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     ASSERT_EQ(orig_size + added_bytes, m_table->nonInlinedMemorySize());
 
@@ -221,7 +223,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
 
     m_table->updateTuple(tuple, tempTuple);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     ASSERT_EQ(orig_size + added_bytes - removed_bytes, m_table->nonInlinedMemorySize());
 
@@ -305,7 +307,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
 
     m_table->deleteTuple(tuple, true);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     //cout << "Final non-inline size: " << m_table->nonInlinedMemorySize() << endl;
     ASSERT_EQ(orig_size - removed_bytes, m_table->nonInlinedMemorySize());

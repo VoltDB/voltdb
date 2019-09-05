@@ -115,7 +115,12 @@ public interface OpTypes {
         , WINDOWED_SUM          = 104
         , WINDOWED_PERCENT_RANK = 102 // reserved but not used
         , WINDOWED_CUME_DIST    = 103 // reserved but not used
-        // End VoltDB extension
+        , WINDOWED_ROW_NUMBER   = 105
+        , USER_DEFINED_AGGREGATE  = 106
+
+        // A VoltDB extension of STARTS WITH
+        , STARTS_WITH = 150
+        // End of VoltDB extension
     ;
 
     /**
@@ -132,6 +137,8 @@ public interface OpTypes {
             return "RANK";
         case WINDOWED_DENSE_RANK:
             return "DENSE_RANK";
+        case WINDOWED_ROW_NUMBER:
+            return "ROW_NUMBER";
         case WINDOWED_COUNT:
         case COUNT:
             return "COUNT";

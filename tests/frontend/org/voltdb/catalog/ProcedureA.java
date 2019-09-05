@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb.catalog;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -31,10 +30,6 @@ import org.voltdb.VoltProcedure;
  * A meaningless procedure that reads table 'A' for testing catalog
  * table add/drop.
  */
-@ProcInfo (
-   partitionInfo = "A.C1: 0",
-   singlePartition = true
-)
 public class ProcedureA extends VoltProcedure {
 
    public final SQLStmt select = new SQLStmt("Select C1 from A where C1 = ?");

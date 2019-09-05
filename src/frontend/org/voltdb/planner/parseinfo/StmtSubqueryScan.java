@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,11 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -33,32 +32,34 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
  */
-public class StmtSubqueryScan extends StmtTableScan {
+public class StmtSubqueryScan extends StmtEphemeralTableScan {
     // Sub-Query
+    /**
+     * This is the parsed statement defining this subquery.
+     */
     private final AbstractParsedStmt m_subqueryStmt;
-    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
-
-    private CompiledPlan m_bestCostPlan = null;
-
-    private StatementPartitioning m_subqueriesPartitioning = null;
 
     private boolean m_failedSingleFragmentTest = false;
 
     private boolean m_tableAggregateSubquery = false;
 
+    /**
+     * When this scan is planned, this is where the best plan will be cached.
+     */
+    private CompiledPlan m_bestCostPlan = null;
+
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
     public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias, int stmtId) {
-        super(tableAlias, stmtId);
+        super(tableAlias, tableAlias, stmtId);
         m_subqueryStmt = subqueryStmt;
 
         // A union or other set operator uses the output columns of its left-most leaf child statement.
@@ -68,13 +69,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
         assert (subqueryStmt instanceof ParsedSelectStmt);
 
-        int i = 0;
         for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
-            String colAlias = col.alias == null? col.columnName : col.alias;
             SchemaColumn scol = col.asSchemaColumn();
-            m_outputColumnList.add(scol);
-            m_outputColumnIndexMap.put(Pair.of(colAlias, col.differentiator), i);
-            i++;
+            addOutputColumn(scol);
         }
     }
 
@@ -82,9 +79,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         this(subqueryStmt, tableAlias, 0);
     }
 
-    public void setSubqueriesPartitioning(StatementPartitioning subqueriesPartitioning) {
-        assert(subqueriesPartitioning != null);
-        m_subqueriesPartitioning = subqueriesPartitioning;
+    @Override
+    public void setScanPartitioning(StatementPartitioning currentPartitioning) {
+        assert(currentPartitioning != null);
+        super.setScanPartitioning(currentPartitioning);
         findPartitioningColumns();
     }
 
@@ -97,15 +95,18 @@ public class StmtSubqueryScan extends StmtTableScan {
     public void promoteSinglePartitionInfo(
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets) {
-        assert(m_subqueriesPartitioning != null);
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0 ||
-                m_subqueriesPartitioning.requiresTwoFragments()) {
+        if (getScanPartitioning() == null) {
+            throw new PlanningErrorException("Unsupported statement, subquery expressions are only supported for " +
+                    "single partition procedures and AdHoc replicated tables.");
+        }
+        if (getScanPartitioning().getCountOfPartitionedTables() == 0 ||
+                getScanPartitioning().requiresTwoFragments()) {
             return;
         }
 
         // This subquery is a single partitioned query on partitioned tables
         // promoting the single partition expression up to its parent level.
-        AbstractExpression spExpr = m_subqueriesPartitioning.singlePartitioningExpression();
+        AbstractExpression spExpr = getScanPartitioning().singlePartitioningExpression();
 
         for (SchemaColumn col: m_partitioningColumns) {
             AbstractExpression tveKey = col.getExpression();
@@ -161,9 +162,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         m_partitioningColumns = new ArrayList<>();
-        assert(m_subqueriesPartitioning != null);
+        assert(getScanPartitioning() != null);
 
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
+        if (getScanPartitioning().getCountOfPartitionedTables() > 0) {
             for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
                 List<SchemaColumn> scols = tableScan.getPartitioningColumns();
                 if (scols != null) {
@@ -180,7 +181,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         for (SchemaColumn partitionCol: scols) {
             SchemaColumn matchedCol = null;
             // Find whether the partition column is in output column list
-            for (SchemaColumn outputCol: m_outputColumnList) {
+            for (SchemaColumn outputCol: getOutputSchema()) {
                 AbstractExpression outputExpr = outputCol.getExpression();
                 if ( ! (outputExpr instanceof TupleValueExpression)) {
                     continue;
@@ -200,7 +201,7 @@ public class StmtSubqueryScan extends StmtTableScan {
             }
             // single partition sub-query case can be single partition without
             // including partition column in its display column list
-            else if ( ! m_subqueriesPartitioning.requiresTwoFragments()) {
+            else if ( ! getScanPartitioning().requiresTwoFragments()) {
                 colNameForParentQuery = partitionCol.getColumnName();
             }
             else {
@@ -210,12 +211,6 @@ public class StmtSubqueryScan extends StmtTableScan {
                     colNameForParentQuery, colNameForParentQuery);
             m_partitioningColumns.add(partitionCol);
         }
-    }
-
-    @Override
-    public String getTableName() {
-        // Because a derived table must have an alias, use its alias instead.
-        return m_tableAlias;
     }
 
     /**
@@ -249,48 +244,18 @@ public class StmtSubqueryScan extends StmtTableScan {
         return stmtTables;
     }
 
-    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<>();
     @Override
     public List<Index> getIndexes() {
-        return noIndexesSupportedOnSubqueryScans;
+        return noIndexesSupportedOnSubqueryScansOrCommonTables;
     }
 
     public AbstractParsedStmt getSubqueryStmt() {
         return m_subqueryStmt;
     }
 
-    public CompiledPlan getBestCostPlan() {
-        return m_bestCostPlan;
-    }
-
-    public void setBestCostPlan(CompiledPlan costPlan) {
-        m_bestCostPlan = costPlan;
-    }
-
     @Override
     public String getColumnName(int columnIndex) {
         return getSchemaColumn(columnIndex).getColumnName();
-    }
-
-    public SchemaColumn getSchemaColumn(int columnIndex) {
-        return m_outputColumnList.get(columnIndex);
-    }
-
-    public Integer getColumnIndex(String columnAlias, int differentiator) {
-        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
-    }
-
-    @Override
-    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
-        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
-        if (idx == null) {
-            throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
-        }
-        SchemaColumn schemaCol = m_outputColumnList.get(idx.intValue());
-
-        expr.setColumnIndex(idx.intValue());
-        expr.setTypeSizeAndInBytes(schemaCol);
-        return expr;
     }
 
     /**
@@ -304,11 +269,12 @@ public class StmtSubqueryScan extends StmtTableScan {
      * @param root
      * @return true if there is no aspect to the plan that requires execution on the coordinator.
      */
+    @Override
     public boolean canRunInOneFragment() {
-        assert(m_subqueriesPartitioning != null);
+        assert(getScanPartitioning() != null);
         assert(m_subqueryStmt != null);
 
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0) {
+        if (getScanPartitioning().getCountOfPartitionedTables() == 0) {
             return true;
         }
 
@@ -398,18 +364,68 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     /** Produce a tuple value expression for a column produced by this subquery */
     public TupleValueExpression getOutputExpression(int index) {
-        SchemaColumn schemaCol = m_outputColumnList.get(index);
+        SchemaColumn schemaCol = getSchemaColumn(index);
         TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
                 schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
         return tve;
-    }
-
-    public List<SchemaColumn> getOutputSchema() {
-        return m_outputColumnList;
     }
 
     public String calculateContentDeterminismMessage() {
         return m_subqueryStmt.calculateContentDeterminismMessage();
     }
 
+    @Override
+    public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
+        SubqueryLeafNode leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, this);
+        leafNode.updateContentDeterminismMessage(calculateContentDeterminismMessage());
+        return leafNode;
+    }
+
+    @Override
+    public boolean isOrderDeterministic(boolean orderIsDeterministic) {
+        CompiledPlan plan = getBestCostPlan();
+        // If the plan is null, there is an error in the query,
+        // so we can return anything.
+        if (plan != null) {
+            return orderIsDeterministic && plan.isOrderDeterministic();
+        }
+        return orderIsDeterministic;
+    }
+
+    @Override
+    public String contentNonDeterminismMessage(String isContentDeterministic) {
+        /*
+         * If it's already known to be content deterministic, and
+         * we have an error message, then use that.
+         */
+        if (isContentDeterministic != null) {
+            return isContentDeterministic;
+        }
+        CompiledPlan plan = getBestCostPlan();
+        // If the plan is null we don't care, since there is
+        // an error in the query.
+        if (plan != null && !plan.isContentDeterministic()) {
+            isContentDeterministic = plan.nondeterminismDetail();
+        }
+        return isContentDeterministic;
+    }
+
+    @Override
+    public boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit) {
+        // Offsets or limits in subqueries are only significant (only effect content determinism)
+        // when they apply to un-ordered subquery contents.  If the plan is
+        // null there is some error, so this computation is irrelevant.
+        CompiledPlan scanBestPlan = getBestCostPlan();
+        if (scanBestPlan != null) {
+            return hasSignificantOffsetOrLimit || ( ! scanBestPlan.isOrderDeterministic() && scanBestPlan.hasLimitOrOffset());
+        }
+        return hasSignificantOffsetOrLimit;
+    }
+    public final CompiledPlan getBestCostPlan() {
+        return m_bestCostPlan;
+    }
+
+    public final void setBestCostPlan(CompiledPlan costPlan) {
+        m_bestCostPlan = costPlan;
+    }
 }

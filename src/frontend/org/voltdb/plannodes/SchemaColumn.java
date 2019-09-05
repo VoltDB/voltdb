@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -240,9 +240,17 @@ public class SchemaColumn {
 
     public AbstractExpression getExpression() { return m_expression; }
 
-    public VoltType getType() { return m_expression.getValueType(); }
+    public VoltType getValueType() { return m_expression.getValueType(); }
 
-    public int getSize() { return m_expression.getValueSize(); }
+    public void setValueType(VoltType type) { m_expression.setValueType(type); }
+
+    public int getValueSize() { return m_expression.getValueSize(); }
+
+    public void setValueSize(int size) { m_expression.setValueSize(size); }
+
+    public boolean getInBytes() { return m_expression.getInBytes(); }
+
+    public void setInBytes(boolean inBytes) { m_expression.setInBytes(inBytes); }
 
     /**
      * Return the differentiator that can distinguish columns with the same name.
@@ -333,7 +341,14 @@ public class SchemaColumn {
         if (m_expression != null) {
             str += " expr: (";
             if (m_expression.getValueType() != null) {
-                str += "[" + m_expression.getValueType().toSQLString() + "] ";
+                VoltType vt = m_expression.getValueType();
+                String typeStr = vt.toSQLString();
+                if (vt.isVariableLength()) {
+                    boolean inBytes = m_expression.getInBytes();
+                    typeStr += "(" + m_expression.getValueSize()
+                    + (inBytes ? " bytes" : " chars") + ")";
+                }
+                str += "[" + typeStr + "] ";
             }
             else {
                 str += "[!!! value type:NULL !!!] ";

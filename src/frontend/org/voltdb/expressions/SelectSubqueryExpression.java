@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,7 +48,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     private StmtSubqueryScan m_subquery;
     // List of all correlated parameter indexes this subquery and its descendants depend on
     // They may originate at different levels in the subquery hierarchy.
-    private List<Integer> m_allParameterIdxList = new ArrayList<Integer>();
+    private List<Integer> m_allParameterIdxList = new ArrayList<>();
 
     // SelectSubqueryExpression can be changed to a ScalarSubqueryExpression in certain contexts
     // By default, AbstractSubqueryExpression use the BigInt as the return type because of possible
@@ -70,18 +70,18 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         assert(subquery != null);
         m_subquery = subquery;
         assert(m_subquery.getSubqueryStmt() != null);
-        m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
+        m_subqueryId = m_subquery.getSubqueryStmt().getStmtId();
         if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
             m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
-        m_args = new ArrayList<AbstractExpression>();
+        m_args = new ArrayList<>();
         resolveCorrelations();
 
         m_scalarExprType = m_valueType;
         if (m_subquery.getOutputSchema().size() == 1) {
             // potential scalar sub-query
-            m_scalarExprType = m_subquery.getOutputSchema().get(0).getType();
+            m_scalarExprType = m_subquery.getOutputSchema().getColumn(0).getValueType();
         }
     }
 
@@ -151,7 +151,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     public SelectSubqueryExpression clone() {
         SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {
-            clone.m_allParameterIdxList = new ArrayList<Integer>();
+            clone.m_allParameterIdxList = new ArrayList<>();
             for (Integer paramIdx : m_allParameterIdxList) {
                 clone.m_allParameterIdxList.add(new Integer(paramIdx.intValue()));
             }
@@ -176,7 +176,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         // by this subquery
         if (!m_allParameterIdxList.isEmpty()) {
             // Calculate the difference between two sets of parameters
-            Set<Integer> allParams = new HashSet<Integer>();
+            Set<Integer> allParams = new HashSet<>();
             allParams.addAll(m_allParameterIdxList);
             allParams.removeAll(getParameterIdxList());
             if (!allParams.isEmpty()) {
@@ -250,7 +250,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             AbstractExpression expr = entry.getValue();
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
-                if (tve.getOrigStmtId() == parentStmt.m_stmtId) {
+                if (tve.getOrigStmtId() == parentStmt.getStmtId()) {
                     // TVE originates from the statement that this SubqueryExpression belongs to
                     addArgumentParameter(paramIdx, expr);
                 }

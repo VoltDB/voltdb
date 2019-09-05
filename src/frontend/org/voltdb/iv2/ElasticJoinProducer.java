@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,8 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
@@ -39,7 +41,7 @@ import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
-    private static final VoltLogger JOINLOG = new VoltLogger("JOIN");
+    private static final VoltLogger ELASTICLOG = new VoltLogger("ELASTIC");
 
     // true if the site has received the first fragment task message
     private boolean m_receivedFirstFragment = false;
@@ -48,7 +50,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private boolean m_firstFragResponseSent = false;
 
     // a snapshot sink used to stream table data from multiple sources
-    private final StreamSnapshotSink m_dataSink;
+    private StreamSnapshotSink m_dataSink = null;
     private Mailbox m_streamSnapshotMb;
 
     private class CompletionAction extends JoinCompletionAction {
@@ -65,8 +67,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         super(partitionId, "Elastic join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
-        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
+        if (ELASTICLOG.isDebugEnabled()) {
+            ELASTICLOG.debug(m_whoami + "created");
+        }
     }
 
     /*
@@ -108,23 +111,38 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void applyPerPartitionTxnId(SiteProcedureConnection connection) {
         //If there was no ID nothing to do
         long partitionTxnIds[] = fetchPerPartitionTxnId();
-        if (partitionTxnIds == null) return;
+        if (partitionTxnIds == null) {
+            return;
+        }
         connection.setPerPartitionTxnIds(partitionTxnIds, true);
+    }
+
+    private void initMailBox() {
+        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
     }
 
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
+        initMailBox();
+
         registerSnapshotMonitor(message.getSnapshotNonce());
 
-        long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
-                                              message.getSnapshotBufferPool());
+        // The lowest partition has a single source for all messages whereas all other partitions have a real
+        // data source and a dummy data source for replicated tables that are used to sync up replicated table changes.
+        boolean haveTwoSources = VoltDB.instance().getLowestPartitionId() != m_partitionId;
+
+        long sinkHSId = m_dataSink.initialize(haveTwoSources?2:1,
+                                              message.getSnapshotDataBufferPool(),
+                                              message.getSnapshotCompressedDataBufferPool());
 
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
         m_taskQueue.offer(this);
-        JOINLOG.info("P" + m_partitionId + " received initiation");
+        ELASTICLOG.info("P" + m_partitionId + " received initiation" +
+                " sinkHSID:" + sinkHSId + " haveTwoSources:" + haveTwoSources);
     }
 
     /**
@@ -132,8 +150,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void sendFirstFragResponse()
     {
-        if (JOINLOG.isDebugEnabled()) {
-            JOINLOG.debug("P" + m_partitionId + " sending first fragment response to coordinator " +
+        if (ELASTICLOG.isDebugEnabled()) {
+            ELASTICLOG.debug("P" + m_partitionId + " sending first fragment response to coordinator " +
                     CoreUtils.hsIdToString(m_coordinatorHsId));
         }
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(),
@@ -151,6 +169,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         boolean sourcesReady = false;
         RestoreWork restoreWork = m_dataSink.poll(m_snapshotBufferAllocator);
         if (restoreWork != null) {
+            if (m_commaSeparatedNameOfViewsToPause == null) {
+                // Disable views prior to the first restore work being processed
+                initListOfViewsToPause();
+                siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
+            }
             restoreBlock(restoreWork, siteConnection);
             sourcesReady = true;
         }
@@ -164,7 +187,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             if (m_streamSnapshotMb != null) {
                 VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
                 m_streamSnapshotMb = null;
-                JOINLOG.debug(m_whoami + " data transfer is finished");
+                ELASTICLOG.debug(m_whoami + " data transfer is finished");
             }
 
             if (m_snapshotCompletionMonitor.isDone()) {
@@ -172,7 +195,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     SnapshotCompletionEvent event = m_snapshotCompletionMonitor.get();
                     siteConnection.setDRProtocolVersion(event.drVersion);
                     assert(event != null);
-                    JOINLOG.debug("P" + m_partitionId + " noticed data transfer completion");
+                    ELASTICLOG.debug("P" + m_partitionId + " noticed data transfer completion");
                     m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
                     setJoinComplete(siteConnection,
@@ -181,6 +204,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                                     event.drMixedClusterSizeConsumerState,
                                     false /* requireExistingSequenceNumbers */,
                                     event.clusterCreateTime);
+                    if (m_commaSeparatedNameOfViewsToPause != null) {
+                        // Resume the views if they were paused
+                        siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, true);
+                    }
                 } catch (InterruptedException e) {
                     // isDone() already returned true, this shouldn't happen
                     VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
@@ -226,13 +253,18 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
     @Override
     protected VoltLogger getLogger() {
-        return JOINLOG;
+        return ELASTICLOG;
     }
 
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
         throw new RuntimeException("Unexpected execution of run method in rejoin producer");
+    }
+
+    @Override
+    protected boolean shouldAddToViewsToPause(Database db, Table table) {
+        return table.getIsreplicated() && super.shouldAddToViewsToPause(db, table);
     }
 
     @Override
@@ -258,8 +290,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         assert(!(message instanceof Iv2InitiateTaskMessage));
         if (message instanceof FragmentTaskMessage) {
-            if (JOINLOG.isTraceEnabled()) {
-                JOINLOG.trace("P" + m_partitionId + " received first fragment");
+            if (ELASTICLOG.isTraceEnabled()) {
+                ELASTICLOG.trace("P" + m_partitionId + " received first fragment");
             }
             m_receivedFirstFragment = true;
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,7 @@ std::string TableCountPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
-    assert(m_predicate == NULL);
+    vassert(m_predicate == NULL);
     std::string tmpString = isSubqueryScan() ? "TEMPORARY " : "";
     buffer << spacer << tmpString << "TABLE COUNT Expression: <NULL>";
     return buffer.str();

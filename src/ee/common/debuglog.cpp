@@ -1,5 +1,9 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB Inc. are licensed under the following
+ * terms and conditions:
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,76 +18,34 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+/* Copyright (C) 2008 by H-Store Project
+ * Brown University
+ * Massachusetts Institute of Technology
+ * Yale University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #include "debuglog.h"
-#include <execinfo.h>
-#include <cstring>
-#include <cxxabi.h>   // for abi
-#include <cstdlib> // for malloc/free
-#include <sstream> // for std::ostringstream
-
-namespace voltdb {
-StackTrace::StackTrace() {
-    /**
-     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-     */
-    void *traces[128];
-    char mangledName[256];
-    for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
-    const int numTraces = backtrace( traces, 128);
-    m_traceSymbols = backtrace_symbols( traces, numTraces);
-
-    for (int ii = 0; ii < numTraces; ii++) {
-        std::size_t sz = 200;
-        // Note: must use malloc vs. new so __cxa_demangle can use realloc.
-        char *function = static_cast<char*>(::malloc(sz));
-        char *begin = NULL, *end = NULL;
-
-        //Find parens surrounding mangled name
-        for (char *j = m_traceSymbols[ii]; *j; ++j) {
-            if (*j == '(') {
-                begin = j;
-            }
-            else if (*j == '+') {
-                end = j;
-            }
-        }
-
-        if (begin && end) {
-            begin++;
-            ::memcpy(mangledName, begin, end-begin);
-            mangledName[end-begin] = '\0';
-            int status;
-            char *ret = abi::__cxa_demangle(mangledName, function, &sz, &status);
-            if (ret) {
-                //return value may be a realloc of input
-                function = ret;
-            } else {
-                // demangle failed, treat it like a C function with no args
-                strncpy(function, mangledName, sz);
-                strncat(function, "()", sz);
-                function[sz-1] = '\0';
-            }
-            m_traces.push_back(std::string(function));
-        } else {
-            //didn't find the mangled name in the trace
-            m_traces.push_back(std::string(m_traceSymbols[ii]));
-        }
-        ::free(function);
-    }
-}
-
-StackTrace::~StackTrace() {
-    ::free(m_traceSymbols);
-}
-
-std::string StackTrace::stringStackTrace()
-{
-    StackTrace st;
-    std::ostringstream stacked;
-    for (int ii=2; ii < st.m_traces.size(); ii++) {
-        stacked << st.m_traces[ii] << "\n";
-    }
-    return stacked.str();
-}
-
-} // namespace voltdb
+#ifndef NDEBUG
+#ifndef MACOSX
+char __assert_failure_msg__[4096];
+#endif
+#endif

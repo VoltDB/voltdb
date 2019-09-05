@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,7 +34,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -43,10 +47,6 @@ import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class TestJDBCAutoReconnectOnLoss {
 
@@ -73,10 +73,11 @@ public class TestJDBCAutoReconnectOnLoss {
         m_builder = new VoltProjectBuilder();
         m_builder.addLiteralSchema(ddl);
         m_builder.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        m_builder.addProcedures(ArbitraryDurationProc.class);
+        m_builder.addProcedure(ArbitraryDurationProc.class);
         m_builder.addPartitionInfo("TT", "A1");
         m_builder.addPartitionInfo("ORDERS", "A1");
-        m_builder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        m_builder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);",
+                new ProcedurePartitionData("TT", "A1"));
         m_builder.addStmtProcedure("SelectB", "SELECT * FROM TT;");
 
         assertTrue("failed to compile catalog", m_builder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0));

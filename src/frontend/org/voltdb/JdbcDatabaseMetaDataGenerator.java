@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,9 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
@@ -36,6 +36,8 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Task;
+import org.voltdb.catalog.TaskParameter;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -205,6 +207,20 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("CONFIG_DESCRIPTION", VoltType.STRING)
         };
 
+    static public final ColumnInfo[] TASKS_SCHEMA = new ColumnInfo[] {
+            new ColumnInfo("TASK_NAME", VoltType.STRING),
+            new ColumnInfo("SCHEDULER_CLASS", VoltType.STRING),
+            new ColumnInfo("SCHEDULER_PARAMETERS", VoltType.STRING),
+            new ColumnInfo("ACTIONS_CLASS", VoltType.STRING),
+            new ColumnInfo("ACTIONS_PARAMETERS", VoltType.STRING),
+            new ColumnInfo("SCHEDULE_CLASS", VoltType.STRING),
+            new ColumnInfo("SCHEDULE_PARAMETERS", VoltType.STRING),
+            new ColumnInfo("ON_ERROR", VoltType.STRING),
+            new ColumnInfo("RUN_LOCATION", VoltType.STRING),
+            new ColumnInfo("USER", VoltType.STRING),
+            new ColumnInfo("ENABLED", VoltType.STRING)
+    };
+
     JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
@@ -253,6 +269,8 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("CLASSES"))
         {
             result = getClasses();
+        } else if (selector.equalsIgnoreCase("TASKS")) {
+            result = getTasks();
         }
         return result;
     }
@@ -264,15 +282,9 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null)
+        else if (TableType.isStream(table.getTabletype()))
         {
-            for (Connector conn : m_database.getConnectors()) {
-                 if (conn.getTableinfo() != null &&
-                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
-                     type = "EXPORT";
-                     break;
-                 }
-            }
+            type = "EXPORT";
         }
         return type;
     }
@@ -598,8 +610,9 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(FUNCTIONS_SCHEMA);
 
         for (Function func : m_database.getFunctions()) {
+            String functionType = func.getMethodname() == null ? "aggregate" : "scalar";
             results.addRow(
-                           "scalar",                // Function Type
+                           functionType,           // Function Type
                            func.getFunctionname(),  // Function Name
                            func.getClassname(),     // Class Name
                            func.getMethodname());   // Method Name
@@ -826,6 +839,32 @@ public class JdbcDatabaseMetaDataGenerator
             }
         }
         return results;
+    }
+
+    VoltTable getTasks() {
+        VoltTable results = new VoltTable(TASKS_SCHEMA);
+        for (Task task : m_database.getTasks()) {
+            results.addRow(task.getName(), task.getSchedulerclass(), getParamsString(task.getSchedulerparameters()),
+                    task.getActiongeneratorclass(), getParamsString(task.getActiongeneratorparameters()),
+                    task.getScheduleclass(), getParamsString(task.getScheduleparameters()), task.getOnerror(),
+                    task.getScope(), task.getUser(), Boolean.toString(task.getEnabled()));
+
+        }
+        return results;
+    }
+
+    private String getParamsString(CatalogMap<TaskParameter> params) {
+        String paramsArray[] = new String[params.size()];
+        for (TaskParameter param : params) {
+            paramsArray[param.getIndex()] = param.getParameter();
+        }
+        StringBuilder sb = new StringBuilder("[");
+        String prefix = "'";
+        for (String param : paramsArray) {
+            sb.append(prefix).append(param).append('\'');
+            prefix = ", '";
+        }
+        return sb.append(']').toString();
     }
 
     private final Catalog m_catalog;

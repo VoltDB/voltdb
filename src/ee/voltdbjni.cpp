@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -67,6 +67,7 @@
 #define  __USE_GNU
 #endif // __USE_GNU
 #include <sched.h>
+#include <cerrno>
 #endif // LINUX
 #ifdef MACOSX
 #include <mach/task.h>
@@ -107,9 +108,8 @@
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
 #include "common/SegvException.hpp"
-#include "common/RecoveryProtoMessage.h"
-#include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
@@ -139,15 +139,16 @@ using namespace voltdb;
  */
 static VoltDBEngine *currentEngine = NULL;
 static JavaVM *currentVM = NULL;
+static jfieldID field_fd;
 
 void signalHandler(int signum, siginfo_t *info, void *context) {
     if (currentVM == NULL || currentEngine == NULL)
         return;
 
     char err_msg[128];
-    snprintf(err_msg, 128, "SIGSEGV caught: signal number %d, error value %d,"
-             " signal code %d\n\n", info->si_signo, info->si_errno,
-             info->si_code);
+    snprintf(err_msg, sizeof err_msg, "SIGSEGV caught: signal number %d, error value %d,"
+            " signal code %d\n\n", info->si_signo, info->si_errno, info->si_code);
+    err_msg[sizeof err_msg - 1] = '\0';
     std::string message = err_msg;
     message.append(currentEngine->debug());
 
@@ -185,7 +186,7 @@ void setupSigHandler(void) {
 // Create / Destroy
 ////////////////////////////////////////////////////////////////////////////
 /**
- * Just creates a new VoltDBEngine object and retunrs it to Java.
+ * Just creates a new VoltDBEngine object and returns it to Java.
  * Never fail to destroy() for the VoltDBEngine* once you call this method
  * NOTE: Call initialize() separately for initialization.
  * This does strictly nothing so that this method never throws an exception.
@@ -205,7 +206,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
 
     jobject java_ee = env->NewGlobalRef(obj);
     if (java_ee == NULL) {
-        assert(!"Failed to allocate global reference to java EE.");
+        vassert(!"Failed to allocate global reference to java EE.");
         throw std::exception();
         return 0;
     }
@@ -214,6 +215,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     currentVM = vm;
     if (isSunJVM == JNI_TRUE)
         setupSigHandler();
+    // retrieving the fieldId fd of FileDescriptor for later use
+    jclass class_fdesc = env->FindClass("java/io/FileDescriptor");
+    if (class_fdesc == NULL) {
+        vassert(!"Failed to find filed if of FileDescriptor.");
+        throw std::exception();
+        return 0;
+    }
+    // poke the "fd" field with the file descriptor
+    field_fd = env->GetFieldID(class_fdesc, "fd", "I");
+
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
@@ -262,13 +273,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint clusterIndex,
     jlong siteId,
     jint partitionId,
+    jint sitesPerHost,
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jint compactionThreshold)
+    jint compactionThreshold,
+    jint exportFlushTimeout)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -289,13 +302,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         engine->initialize(clusterIndex,
                            siteId,
                            partitionId,
+                           sitesPerHost,
                            hostId,
                            hostString,
                            drClusterId,
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold));
+                           static_cast<int32_t>(compactionThreshold),
+                           exportFlushTimeout);
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }
@@ -409,7 +424,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
-    jlong uniqueId, jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken)
+    jlong uniqueId, jlong undoToken, jbyte callerId)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -418,22 +433,21 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     }
 
     engine->resetReusedResultOutputBuffer();
-    engine->setUndoToken(undoToken);
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    VOLT_DEBUG("loading table %d in C++...", table_id);
+    VOLT_DEBUG("loading table %d in C++ on thread %d", table_id, ThreadLocalPool::getThreadPartitionId());
 
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
-    VOLT_DEBUG("deserializing %d bytes ...", (int) length);
+    VOLT_DEBUG("deserializing %d bytes on thread %d", (int) length, ThreadLocalPool::getThreadPartitionId());
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
     ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
-                                             spHandle, lastCommittedSpHandle, uniqueId,
-                                             returnUniqueViolations, shouldDRStream);
+                                             spHandle, lastCommittedSpHandle, uniqueId, undoToken,
+                                             LoadTableCaller::get(static_cast<LoadTableCaller::Id>(callerId)));
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 
@@ -480,7 +494,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
     }
-    assert (cnt < MAX_PARAM_COUNT);
+    vassert(cnt <= MAX_PARAM_COUNT);
     deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
     return cnt;
 }
@@ -583,7 +597,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
     // setup
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
+    vassert(engine);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
@@ -592,7 +606,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info
-        assert (num_fragments <= MAX_BATCH_COUNT);
+        vassert(num_fragments <= MAX_BATCH_COUNT);
         jlong* fragmentIdsBuffer = engine->getBatchFragmentIdsContainer();
         env->GetLongArrayRegion(plan_fragment_ids, 0, num_fragments, fragmentIdsBuffer);
 
@@ -606,25 +620,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         // all fragments' parameters are in this buffer
         ReferenceSerializeInputBE serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
 
-        int failures = engine->executePlanFragments(num_fragments,
-                                                    fragmentIdsBuffer,
-                                                    input_dep_ids ? depIdsBuffer : NULL,
-                                                    serialize_in,
-                                                    txnId,
-                                                    spHandle,
-                                                    lastCommittedSpHandle,
-                                                    uniqueId,
-                                                    undoToken,
-                                                    traceOn == JNI_TRUE);
-
+        int failures = engine->executePlanFragments(num_fragments, fragmentIdsBuffer, input_dep_ids ? depIdsBuffer : NULL,
+              serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken, traceOn == JNI_TRUE);
         if (failures > 0) {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
-        else {
+        } else {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
         }
-    }
-    catch (const FatalException &e) {
+    } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -674,7 +677,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
         env->ExceptionDescribe();
         return -1;
     }
-    assert(address);
+    vassert(address);
     boost::crc_32_type crc;
     crc.process_bytes(address + offset, length);
     return static_cast<jint>(crc.checksum());
@@ -688,7 +691,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(ptr);
-    assert(address);
+    vassert(address);
     boost::crc_32_type crc;
     crc.process_bytes(address + offset, length);
     return static_cast<jint>(crc.checksum());
@@ -706,7 +709,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32C
         env->ExceptionDescribe();
         return -1;
     }
-    assert(address);
+    vassert(address);
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, address + offset, length);
     return static_cast<jint>(vdbcrc::crc32cFinish(crc));
@@ -720,7 +723,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32C
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(ptr);
-    assert(address);
+    vassert(address);
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, address + offset, length);
     return static_cast<jint>(vdbcrc::crc32cFinish(crc));
@@ -888,15 +891,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
-{
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken, jboolean isEmptyDRTxn) {
     VOLT_DEBUG("nativeReleaseUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         if (engine) {
-            engine->releaseUndoToken(undoToken);
+            engine->releaseUndoToken(undoToken, isEmptyDRTxn);
             return JNI_TRUE;
         }
     } catch (const FatalException &e) {
@@ -910,15 +912,14 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeR
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUndoUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
-{
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken) {
     VOLT_DEBUG("nativeUndoUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         if (engine) {
-            engine->undoUndoToken(undoToken);
+              engine->undoUndoToken(undoToken);
             return JNI_TRUE;
         }
         return JNI_FALSE;
@@ -956,7 +957,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
  * Signature: (JIIIJ[B)Z
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
-        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jlong undoToken,
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jbyte schemaFilterType, jlong undoToken,
         jbyteArray serialized_predicates)
 {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
@@ -971,7 +972,8 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
+            voltdb::HiddenColumnFilter::Type hiddenColumnFilter = static_cast<voltdb::HiddenColumnFilter::Type>(schemaFilterType);
+            bool success = engine->activateTableStream(tableId, tableStreamType, hiddenColumnFilter, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;
@@ -1096,7 +1098,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * @param pollAction true if this call requests a poll
  * @param syncAction true if the stream offset being set for a table
  * @param ackOffset  if acking, the universal stream offset being acked/released
- * @param tableSignature    Signature of the table to which the Export action applies
+ * @param streamName    Name of the stream to which the Export action applies
  *
  * @return the universal stream offset for the last octet in any
  * returned poll results (returned via the query results buffer).  On
@@ -1110,20 +1112,22 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
-   jbyteArray tableSignature) {
+   jlong genId,
+   jbyteArray streamName) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
+    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
+    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
             return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
-                                        signature);
+                                        static_cast<int64_t>(genId),
+                                        streamNameStr);
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
@@ -1133,60 +1137,80 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     return 0;
 }
 
+/**
+ * Complete the deletion of the Migrated Table rows.
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeDeleteMigratedRows
+ *
+ * @param txnId The transactionId of the currently executing stored procedure
+ * @param spHandle The spHandle of the currently executing stored procedure
+ * @param uniqueId The uniqueId of the currently executing stored procedure
+ * @param mTableName The name of the table that the deletes should be applied to.
+ * @param deletableTxnId The transactionId of the last row that can be deleted
+ * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+ * @param undoToken The token marking the rollback point for this transaction
+ * @return true if more rows to be deleted
+ */
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
+        JNIEnv *env, jobject obj, jlong engine_ptr,
+        jlong txnId, jlong spHandle, jlong uniqueId,
+        jbyteArray tableName, jlong deletableTxnId, jlong undoToken)
+{
+    VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte *tableNameChars = env->GetByteArrayElements(tableName, NULL);
+    std::string tableNameStr(reinterpret_cast<char *>(tableNameChars), env->GetArrayLength(tableName));
+    env->ReleaseByteArrayElements(tableName, tableNameChars, JNI_ABORT);
+    try {
+        try {
+            engine->resetReusedResultOutputBuffer();
+            return engine->deleteMigratedRows(static_cast<int64_t>(txnId),
+                                              static_cast<int64_t>(spHandle),
+                                              static_cast<int64_t>(uniqueId),
+                                              tableNameStr,
+                                              static_cast<int64_t>(deletableTxnId),
+                                              static_cast<int64_t>(undoToken));
+        } catch (const SQLException &e) {
+            throwFatalException("%s", e.message().c_str());
+        }
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return false;
+}
+
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetUSOForExportTable
  * Signature: (JLjava/lang/String;)[J
  */
 SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray tableSignature) {
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray streamName) {
 
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
+    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
+    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
     try {
-        jlong data[2];
+        jlong data[3];
         size_t ackOffset;
         int64_t seqNo;
-        engine->getUSOForExportTable(ackOffset, seqNo, signature);
+        int64_t generationId;
+        engine->getUSOForExportTable(ackOffset, seqNo, generationId, streamNameStr);
         data[0] = ackOffset;
         data[1] = seqNo;
-        jlongArray retval = env->NewLongArray(2);
-        env->SetLongArrayRegion(retval, 0, 2, data);
+        data[2] = generationId;
+        jlongArray retval = env->NewLongArray(3);
+        env->SetLongArrayRegion(retval, 0, 3, data);
         return retval;
     }
     catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return NULL;
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeProcessRecoveryMessage
- * Signature: (JJII)V
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint offset, jint remaining) {
-    //ProfilerEnable();
-    VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    char *data = reinterpret_cast<char*>(buffer_ptr) + offset;
-    try {
-        if (data == NULL) {
-            throwFatalException("Failed to get byte array elements of recovery message");
-        }
-        ReferenceSerializeInputBE input(data, remaining);
-        RecoveryProtoMsg message(&input);
-        return engine->processRecoveryMessage(&message);
-    } catch (const FatalException &e) {
-        topend->crashVoltDB(e);
-    }
-    //ProfilerDisable();
 }
 
 /*
@@ -1198,25 +1222,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
 {
     VOLT_DEBUG("nativeHashinate in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
+    vassert(engine);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         NValueArray& params = engine->getExecutorContext()->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[2]);
-        switch (hashinatorType) {
-        case HASHINATOR_LEGACY:
-            hashinator.reset(LegacyHashinator::newInstance(configValue));
-            break;
-        case HASHINATOR_ELASTIC:
-            hashinator.reset(ElasticHashinator::newInstance(configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount)));
-            break;
-        default:
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[1]);
+        hashinator.reset(ElasticHashinator::newInstance(configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount)));
         int retval =
             hashinator->hashinate(params[0]);
         stringPool->purge();
@@ -1233,17 +1247,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
  * Method:    nativeUpdateHashinator
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateHashinator(JNIEnv *env, jobject obj, jlong engine_ptr, jint type, jlong configPtr, jint tokenCount)
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateHashinator(JNIEnv *env, jobject obj, jlong engine_ptr, jlong configPtr, jint tokenCount)
 {
     VOLT_DEBUG("nativeUpdateHashinator in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
+    vassert(engine);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        HashinatorType hashinatorType = static_cast<HashinatorType>(type);
         //Fast path processing, just use the config given by pointer
         if (configPtr != 0) {
-            engine->updateHashinator(hashinatorType, NULL, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
+            engine->updateHashinator(NULL, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
             return;
         }
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
@@ -1251,7 +1264,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[0]);
-        engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
+        engine->updateHashinator(configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
@@ -1336,15 +1349,22 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
 #endif
 }
 
+/**
+ * Utility used for access file descriptor number from JAVA FileDescriptor class
+ */
+jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject) {
+    return env-> GetIntField(fdObject, field_fd);
+}
+
 /*
  * Class:     org_voltdb_utils_PosixAdvise
- * Method:    fadvise
- * Signature: (JJJI)J
+ * Method:    nativeFadvise
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_nativeFadvise
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
-    return posix_fadvise(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+    return posix_fadvise(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
 #else
     return 0;
 #endif
@@ -1353,20 +1373,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    sync_file_range
- * Signature: (JJJI)J
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
 #error VoltDB server requires that your kernel headers define __NR_sync_file_range.
 #endif
-    return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
+    return syscall(__NR_sync_file_range, getFdFromFileDescriptor(env,fdObject), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
 #elif MACOSX
     return -1;
 #else
-    return fdatasync(static_cast<int>(fd));
+    return fdatasync(getFdFromFileDescriptor(env,fdObject));
 #endif
 }
 
@@ -1374,14 +1394,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    fallocate
- * Signature: (JJJ)J
+ * Signature: (Ljava/io/FileDescriptor;JJ)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length) {
 #ifdef MACOSX
     return -1;
 #else
-    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+    return posix_fallocate(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length));
 #endif
 }
 
@@ -1400,11 +1420,11 @@ Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    VOLT_DEBUG("applying binary log in C++...");
+    VOLT_DEBUG("applying MP binary log in C++...");
 
     try {
         return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken,
-                               engine->getParameterBuffer() + sizeof(int64_t));
+                engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
         e.serialize(engine->getExceptionOutputSerializer());
@@ -1419,7 +1439,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
   (JNIEnv *env, jobject obj, jlong engine_ptr) {
     VOLT_DEBUG("nativeExecuteTask in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
+    vassert(engine);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
@@ -1459,7 +1479,7 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         std::vector<int32_t> flagList(flagsPtr, flagsPtr + env->GetArrayLength(flags));
         env->ReleaseIntArrayElements(flags, flagsJPtr, JNI_ABORT);
 
-        assert(partitionKeyValueList.size() == flagList.size());
+        vassert(partitionKeyValueList.size() == flagList.size());
 
         char *output = new char[1024 * 256];
         int32_t length = DRTupleStream::getTestDRBuffer(static_cast<uint8_t>(drProtocolVersion), partitionId,
@@ -1480,4 +1500,40 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         exit(-1);
     }
 }
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeSetViewsEnabled
+ * Signature: (J[BZ)V
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetViewsEnabled
+  (JNIEnv *env, jobject object, jlong engine_ptr, jbyteArray viewNamesAsBytes, jboolean enabled) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    vassert(engine);
+    jbyte *viewNamesChars = env->GetByteArrayElements(viewNamesAsBytes, NULL);
+    std::string viewNames(reinterpret_cast<char *>(viewNamesChars), env->GetArrayLength(viewNamesAsBytes));
+    env->ReleaseByteArrayElements(viewNamesAsBytes, viewNamesChars, JNI_ABORT);
+    engine->setViewsEnabled(viewNames, enabled);
+}
+
+/*
+ * Implemention of ExecutionEngineJNI.nativeDisableExternalStreams
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDisableExternalStreams
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    vassert(engine);
+    engine->disableExternalStreams();
+}
+
+/*
+ * Implemention of ExecutionEngineJNI.nativeExternalStreamsEnabled
+ */
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExternalStreamsEnabled
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    vassert(engine);
+    return engine->externalStreamsEnabled();
+}
+
 /** @} */ // end of JNI doxygen group

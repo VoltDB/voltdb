@@ -131,6 +131,15 @@ public class Error {
     }
 
     /**
+     * Just throw an error with a message.
+     *
+     * @see HsqlException#HsqlException(String, String, int)
+     * @return an <code>HsqlException</code>
+     */
+    public static HsqlException error(String message) {
+        return new HsqlException(message, "", 0);
+    }
+    /**
      * Compose error message by inserting the strings in the add variables
      * in placeholders within the error message. The message string contains
      * $$ markers for each context variable. Context variables are supplied in

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,5 +20,8 @@ package org.voltcore.messaging;
 import java.util.Set;
 
 public interface DisconnectFailedHostsCallback {
+    // Disconnect host before mesh determination is made. Used in rejoining scenario: a rejoining host
+    // can be shutdown before mesh arbitration is completed.
+    public void disconnectWithoutMeshDetermination();
     public void disconnect(Set<Integer> failedHostIds);
 }

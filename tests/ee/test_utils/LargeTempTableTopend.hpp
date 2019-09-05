@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,14 +21,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef LARGE_TEMP_TABLE_TOPEND_HPP
-#define LARGE_TEMP_TABLE_TOPEND_HPP
+#pragma once
 
 #include <cstring>
 #include <map>
 
 #include "harness.h"
 
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/tabletuple.h"
 #include "common/Topend.h"
 
@@ -46,23 +46,20 @@ class TupleSchema;
  */
 class LargeTempTableTopend : public voltdb::DummyTopend {
 private:
-
     class Block {
     public:
-        Block(char* data, int64_t activeTupleCount, const voltdb::TupleSchema *schema)
-            : m_origAddress(data)
-            , m_data(new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES])
-            , m_activeTupleCount(activeTupleCount)
+        Block(char* data, const voltdb::TupleSchema *schema)
+            : m_data(new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES])
             , m_schema(schema)
+            , m_origAddress(data)
         {
             ::memcpy(m_data.get(), data, voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
         }
 
         Block()
-            : m_origAddress(NULL)
-            , m_data()
-            , m_activeTupleCount(0)
+            : m_data()
             , m_schema(NULL)
+            , m_origAddress(NULL)
         {
         }
 
@@ -70,12 +67,9 @@ private:
             return m_data.get();
         }
 
-        char* origAddress() {
-            return m_origAddress;
-        }
-
         int64_t activeTupleCount() {
-            return m_activeTupleCount;
+            int32_t* countPtr = reinterpret_cast<int32_t*>(&(m_data[sizeof(char*)]));
+            return int64_t(*countPtr);
         }
 
         std::string debug() const {
@@ -85,20 +79,23 @@ private:
             return oss.str();
         }
 
-    private:
-        char* m_origAddress;
-        std::unique_ptr<char[]> m_data;
-        int64_t m_activeTupleCount;
-        const voltdb::TupleSchema* m_schema;
-    };
+        char* origAddress() const {
+            return m_origAddress;
+        }
 
+    private:
+        std::unique_ptr<char[]> m_data;
+        const voltdb::TupleSchema* m_schema;
+        char* m_origAddress;
+    };
+    std::map<voltdb::LargeTempTableBlockId, Block*> m_map;
 public:
 
     bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
         assert (m_map.count(block->id()) == 0);
 
         std::unique_ptr<char[]> storage = block->releaseData();
-        Block *newBlock = new Block{storage.get(), block->activeTupleCount(), block->schema()};
+        Block *newBlock = new Block{storage.get(), block->schema()};
         m_map[block->id()] = newBlock;
 
         return true;
@@ -109,15 +106,16 @@ public:
         assert (it != m_map.end());
         Block *storedBlock = it->second;
 
+        assert (*(reinterpret_cast<char**>(storedBlock->data())) == storedBlock->origAddress());
         std::unique_ptr<char[]> storage{new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES]};
         ::memcpy(storage.get(), storedBlock->data(), voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
-        block->setData(storedBlock->origAddress(), std::move(storage));
+        block->setData(std::move(storage));
         assert(block->activeTupleCount() == storedBlock->activeTupleCount());
 
         return true;
     }
 
-    bool releaseLargeTempTableBlock(int64_t blockId) {
+    bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId) {
         auto it = m_map.find(blockId);
         if (it == m_map.end()) {
             assert(false);
@@ -142,16 +140,12 @@ public:
     std::string debug() const {
         std::ostringstream oss;
         oss << "LTTTopend: (" << m_map.size() << " blocks)\n";
-        BOOST_FOREACH(auto &entry, m_map) {
+        for(auto &entry : m_map) {
             oss << "  Block " << entry.first << ": " << entry.second->debug() << "\n";
         }
 
         return oss.str();
     }
 
-private:
-
-    std::map<int64_t, Block*> m_map;
 };
 
-#endif // LARGE_TEMP_TABLE_TOPEND_HPP

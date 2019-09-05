@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,13 @@
 
 package org.voltdb.exportclient.decode;
 
+import static org.voltdb.exportclient.decode.RowDecoder.Builder.camelCaseNameLowerFirst;
+
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TimeZone;
 
@@ -39,42 +43,52 @@ public class JsonStringDecoder extends RowDecoder<String, JSONException> {
 
     final protected SimpleDateFormat m_dateFormatter =
             new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
-    protected final String [] m_columnNames;
-    protected final JsonFieldDecoder [] m_fieldDecoders;
     protected final StringWriter m_writer;
+    protected final boolean m_camelCaseFieldNames;
+    protected final Map<Long, JsonFieldDecoder []> m_fieldDecoders = new HashMap<>();
 
-    protected JsonStringDecoder(List<VoltType> columnTypes,
-            List<String> columnNames, int firstFieldOffset,
-            TimeZone timeZone) {
-        super(columnTypes, columnNames, firstFieldOffset);
-
+    protected JsonStringDecoder(int firstFieldOffset,
+            TimeZone timeZone, boolean camelCaseFieldNames) {
+        super(firstFieldOffset);
+        m_camelCaseFieldNames = camelCaseFieldNames;
         m_dateFormatter.setTimeZone(timeZone);
-        m_columnNames = new String[m_typeMap.size()];
-        m_fieldDecoders = new JsonFieldDecoder[m_typeMap.size()];
 
         m_writer = new StringWriter(4096);
 
-        int i = 0;
-        for (Entry<String, DecodeType> e: m_typeMap.entrySet()) {
-            final String columnName = e.getKey().intern();
-            m_columnNames[i] = columnName;
-            m_fieldDecoders[i++] = e.getValue()
-                    .accept(decodingVisitor, columnName, null)
-                    ;
-        }
     }
 
     @Override
-    public String decode(String ignored, Object[] fields) throws JSONException {
+    public String decode(long generation, String tableName, List<VoltType> types, List<String> names, String ignored, Object[] fields) throws JSONException {
         final JSONWriter jsonWriter = new JSONWriter(m_writer);
+
+        JsonFieldDecoder [] fieldDecoders;
+        if ((fieldDecoders = m_fieldDecoders.get(generation)) == null) {
+            List<String> columnNames = names;
+            if (m_camelCaseFieldNames) {
+                columnNames = FluentIterable.from(columnNames)
+                      .transform(camelCaseNameLowerFirst)
+                      .toList();
+            }
+
+            int k = 0;
+            Map<String, DecodeType> typeMap = getTypeMap(generation, types, columnNames);
+            fieldDecoders = new JsonFieldDecoder[typeMap.size()];
+            for (Entry<String, DecodeType> e: typeMap.entrySet()) {
+                final String columnName = e.getKey().intern();
+                fieldDecoders[k++] = e.getValue()
+                        .accept(decodingVisitor, columnName, null)
+                        ;
+            }
+            m_fieldDecoders.put(generation, fieldDecoders);
+        }
 
         jsonWriter.object();
         for (
                 int i = m_firstFieldOffset, j = 0;
-                i < fields.length && j < m_fieldDecoders.length;
+                i < fields.length && j < fieldDecoders.length;
                 ++i, ++j
         ) {
-            m_fieldDecoders[j].decode(jsonWriter, fields[i]);
+            fieldDecoders[j].decode(jsonWriter, fields[i]);
         }
         jsonWriter.endObject();
 
@@ -225,15 +239,8 @@ public class JsonStringDecoder extends RowDecoder<String, JSONException> {
         }
 
         public JsonStringDecoder build() {
-            List<String> columnNames = m_columnNames;
-            if (m_camelCaseFieldNames) {
-                columnNames = FluentIterable.from(columnNames)
-                      .transform(camelCaseNameLowerFirst)
-                      .toList();
-            }
             return new JsonStringDecoder(
-                    m_columnTypes, columnNames,
-                    m_firstFieldOffset, m_timeZone
+                    m_firstFieldOffset, m_timeZone, m_camelCaseFieldNames
                     );
         }
     }

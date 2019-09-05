@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,16 +25,11 @@ package org.voltdb.compiler.procedures;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    partitionInfo = "blah.ival: 0",
-    singlePartition = true
-)
 public class CrazyBlahProc extends VoltProcedure {
 
     public VoltTable[] run(long ival, short ival2, double[] dvals, VoltTable tval, BigDecimal bd, BigDecimal[] decvals, TimestampType timeval) {

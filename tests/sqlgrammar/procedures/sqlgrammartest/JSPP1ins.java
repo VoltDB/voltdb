@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,7 @@ import org.voltdb.*;
  */
 public class JSPP1ins extends GetOrInsertBase {
 
-    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO P1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO P1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     /**
      * Inserts a new row into the P1 table, using the specified ID,

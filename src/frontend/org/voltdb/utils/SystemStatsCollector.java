@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -478,7 +478,8 @@ public class SystemStatsCollector {
         String pidString = processName.substring(0, processName.indexOf('@'));
         pid = Integer.valueOf(pidString);
 
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(false);
+        // ETHAN (11/7/2018): If loading the native library does not have to succeed, why load?
+        // org.voltdb.NativeLibraryLoader.loadVoltDB(false);
 
         // test the default fallback performance
         start = System.currentTimeMillis();

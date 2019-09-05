@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,44 +17,42 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/constraintutil.h"
 #include "storage/table.h"
-#include <cassert>
+#include <common/debuglog.h>
 
 using namespace voltdb;
 using std::string;
 
 ConstraintFailureException::ConstraintFailureException(
-        Table *table,
-        TableTuple tuple,
-        TableTuple otherTuple,
-        ConstraintType type) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
+        Table *table, TableTuple tuple, TableTuple otherTuple,
+        ConstraintType type, PersistentTableSurgeon *surgeon) :
+    SQLException(SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
-            VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+            VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
-    m_type(type)
-{
-    assert(table);
-    assert(!tuple.isNullTuple());
+    m_type(type),
+    m_surgeon(surgeon) {
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
-        string message) :
+        string const& message,
+        PersistentTableSurgeon *surgeon) :
         SQLException(
                 SQLException::integrity_constraint_violation,
                 message,
-                VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+                VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
-    m_type(CONSTRAINT_TYPE_PARTITIONING)
-{
-    assert(table);
-    assert(!tuple.isNullTuple());
+    m_type(CONSTRAINT_TYPE_PARTITIONING),
+    m_surgeon(surgeon) {
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
@@ -71,13 +69,16 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
     output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
 }
 
-ConstraintFailureException::~ConstraintFailureException() {
-    // TODO Auto-generated destructor stub
+ConstraintFailureException::~ConstraintFailureException() throw () {
+    // if delayed tuple deallocation for serialization (by passing in tableSurgeon),
+    // do cleanup here
+    VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));
+    if (m_surgeon && !m_tuple.isNullTuple()) {
+        m_surgeon->deleteTupleStorage(m_tuple);
+    }
 }
 
-const string
-ConstraintFailureException::message() const
-{
+string ConstraintFailureException::message() const {
     // This should probably be an override of the << operator and then used here, but meh
     string msg = SQLException::message();
     msg.append("\nConstraint violation type: ");

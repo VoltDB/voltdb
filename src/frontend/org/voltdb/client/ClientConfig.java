@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,6 +33,7 @@ import javax.security.auth.login.LoginException;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
+import org.voltdb.common.Constants;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
@@ -505,5 +506,12 @@ public class ClientConfig {
         if (m_sslConfig == null) {
             m_sslConfig = new SSLConfiguration.SslConfig();
         }
+    }
+
+    public void setTrustStoreConfigFromDefault() {
+        String trustStore = Constants.DEFAULT_TRUSTSTORE_RESOURCE;
+        String trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
+
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
     }
 }

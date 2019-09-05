@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
 class DRTupleStream;
+class VoltDBEngine;
 
 // There might be a better place for this, but current callers happen to have this header in common.
 template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
@@ -62,9 +63,10 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::unordered_
 
 class TableCatalogDelegate {
   public:
-    TableCatalogDelegate(const std::string& signature, int32_t compactionThreshold)
+    TableCatalogDelegate(const std::string& signature, int32_t compactionThreshold, VoltDBEngine* engine)
         : m_table(NULL)
-        , m_exportEnabled(false)
+        , m_tableType(PERSISTENT)
+        , m_materialized(false)
         , m_signature(signature)
         , m_compactionThreshold(compactionThreshold)
     {}
@@ -77,8 +79,6 @@ class TableCatalogDelegate {
               catalog::Table const &catalogTable,
               bool isXDCR);
     PersistentTable *createDeltaTable(catalog::Database const &catalogDatabase,
-            catalog::Table const &catalogTable);
-    void evaluateExport(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
@@ -118,6 +118,10 @@ class TableCatalogDelegate {
 
     Table *getTable() const;
 
+    TableType getTableType() const {
+        return m_tableType;
+    }
+
     PersistentTable *getPersistentTable() {
         return dynamic_cast<PersistentTable*>(m_table);
     }
@@ -129,8 +133,6 @@ class TableCatalogDelegate {
     void setTable(Table * tb) {
         m_table = tb;
     }
-
-    bool exportEnabled() { return m_exportEnabled; }
 
     const std::string& signature() { return m_signature; }
 
@@ -151,7 +153,7 @@ class TableCatalogDelegate {
                                      bool forceNoDR = false);
 
     voltdb::Table *m_table;
-    bool m_exportEnabled;
+    TableType m_tableType;
     bool m_materialized;
     const std::string m_signature;
     const int32_t m_compactionThreshold;

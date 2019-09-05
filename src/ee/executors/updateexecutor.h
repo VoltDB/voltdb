@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -66,32 +66,25 @@ class UpdateExecutor : public AbstractExecutor
 {
 public:
     UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTargetMapSize = -1;
-        m_inputTable = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-    }
+        : AbstractExecutor(engine, abstract_node) { }
 
 protected:
     bool p_init(AbstractPlanNode*,
                 const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-    UpdatePlanNode* m_node;
+    UpdatePlanNode* m_node = nullptr;
 
-    std::vector<std::pair<int, int> > m_inputTargetMap;
-    int m_inputTargetMapSize;
+    std::vector<std::pair<int, int>> m_inputTargetMap{};
+    int m_inputTargetMapSize = -1;
 
-    AbstractTempTable* m_inputTable;
+    AbstractTempTable* m_inputTable = nullptr;
 
-    TableTuple m_inputTuple;
-    int m_partitionColumn;
-    bool m_partitionColumnIsString;
+    TableTuple m_inputTuple{};
+    int m_partitionColumn = -1;
+    bool m_partitionColumnIsString = false;
 
-    /** reference to the engine/context to store the number of modified tuples */
-    VoltDBEngine* m_engine;
+    static int64_t s_modifiedTuples;
 };
 
 }

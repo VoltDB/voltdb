@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,16 +30,12 @@
 
 package org.voltdb_testprocs.adhoc;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PARTED1.PARTVAL:0",
-    singlePartition = true
-)
+
 public class executeSQLSP extends VoltProcedure {
     public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1 order by partval");
 

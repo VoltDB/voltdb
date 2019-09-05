@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 
 public interface InputHandler
 {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,20 +18,31 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
+import java.io.ObjectOutput;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectInput;
+import java.lang.reflect.Array;
 
-import org.voltcore.logging.VoltLogger;
+
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
+import org.voltdb.UserDefinedScalarFunctionRunner;
+import org.voltdb.UserDefinedAggregateFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -39,13 +50,15 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.largequery.LargeBlockManager;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
+import org.voltdb.largequery.BlockId;
+import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -69,9 +82,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * if it is even 1% empty.
      */
     public static final int EE_COMPACTION_THRESHOLD;
-
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private static final boolean HOST_TRACE_ENABLED;
 
@@ -146,13 +156,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean isLowestSiteId,
+            final int exportFlushTimeout)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -167,6 +179,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
          */
         pointer = nativeCreate(System.getProperty("java.vm.vendor")
                                .toLowerCase().contains("sun microsystems"));
+
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
         int errorCode =
             nativeInitialize(
@@ -174,13 +187,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     clusterIndex,
                     siteId,
                     partitionId,
+                    sitesPerHost,
                     hostId,
                     getStringBytes(hostname),
                     drClusterId,
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
-                    createDrReplicatedStream,
-                    EE_COMPACTION_THRESHOLD);
+                    isLowestSiteId,
+                    EE_COMPACTION_THRESHOLD,
+                    exportFlushTimeout);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);
@@ -280,15 +295,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
+        throw getExceptionFromError(errorCode);
+    }
+
+    private SerializableException getExceptionFromError(final int errorCode) {
         m_exceptionBuffer.clear();
         final int exceptionLength = m_exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
-            throw new EEException(errorCode);
+            return new EEException(errorCode);
         } else {
             m_exceptionBuffer.position(0);
             m_exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(m_exceptionBuffer);
+            return SerializableException.deserializeFromBuffer(m_exceptionBuffer);
         }
     }
 
@@ -382,25 +401,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public FastDeserializer coreExecutePlanFragments(
-            final int batchIndex,
-            final int numFragmentIds,
-            final long[] planFragmentIds,
-            final long[] inputDepIds,
-            final Object[] parameterSets,
-            DeterminismHash determinismHash,
-            boolean[] isWriteFrags,
-            int[] sqlCRCs,
-            final long txnId,
-            final long spHandle,
-            final long lastCommittedSpHandle,
-            long uniqueId,
-            final long undoToken,
-            final boolean traceOn) throws EEException
-    {
+            final int batchIndex, final int numFragmentIds, final long[] planFragmentIds, final long[] inputDepIds,
+            final Object[] parameterSets, DeterminismHash determinismHash, boolean[] isWriteFrags, int[] sqlCRCs,
+            final long txnId, final long spHandle, final long lastCommittedSpHandle, long uniqueId,
+            final long undoToken, final boolean traceOn) throws EEException {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
-        if (numFragmentIds == 0) return m_emptyDeserializer;
+        if (numFragmentIds == 0) {
+            return m_emptyDeserializer;
+        }
         final int batchSize = numFragmentIds;
         if (HOST_TRACE_ENABLED) {
             for (int i = 0; i < batchSize; ++i) {
@@ -426,13 +436,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             if (param instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) param;
                 m_psetBuffer.put(buf);
-            }
-            else {
+            } else {
                 ParameterSet pset = (ParameterSet) param;
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
-                }
-                catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
+                } catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +
@@ -452,20 +460,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         FastDeserializer targetDeserializer = (batchIndex == 0) ? m_firstDeserializer : m_nextDeserializer;
         targetDeserializer.clear();
 
-        final int errorCode =
-            nativeExecutePlanFragments(
-                    pointer,
-                    batchIndex,
-                    numFragmentIds,
-                    planFragmentIds,
-                    inputDepIds,
-                    txnId,
-                    spHandle,
-                    lastCommittedSpHandle,
-                    uniqueId,
-                    undoToken,
-                    traceOn);
-
+        final int errorCode = nativeExecutePlanFragments(
+                pointer, batchIndex, numFragmentIds, planFragmentIds, inputDepIds, txnId, spHandle,
+                lastCommittedSpHandle, uniqueId, undoToken, traceOn);
         try {
             checkErrorCode(errorCode);
             m_usingFallbackBuffer = m_fallbackBuffer != null;
@@ -504,9 +501,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long spHandle,
         final long lastCommittedSpHandle,
         final long uniqueId,
-        boolean returnUniqueViolations,
-        boolean shouldDRStream,
-        long undoToken) throws EEException
+        long undoToken,
+        LoadTableCaller caller) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -520,13 +516,17 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken);
+                                              undoToken, caller.getId());
         checkErrorCode(errorCode);
 
         try {
             int length = m_nextDeserializer.readInt();
-            if (length == 0) return null;
-            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+            if (length == 0) {
+                return null;
+            }
+            if (length < 0) {
+                VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+            }
 
             byte uniqueViolations[] = new byte[length];
             m_nextDeserializer.readFully(uniqueViolations);
@@ -583,7 +583,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 int len = m_nextDeserializer.readInt();
                 byte[] bufCopy = new byte[len];
                 m_nextDeserializer.readFully(bufCopy, 0, len);
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
+                // This Table should be readonly (true), but table stats need to be updated
+                // Stream stats until Stream stats are deprecated from Table stats
+                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), false);
             }
             return results;
         } catch (final IOException ex) {
@@ -598,8 +600,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
+        return nativeReleaseUndoToken(pointer, undoToken, isEmptyDRTxn);
     }
 
     @Override
@@ -620,9 +622,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
+                                       HiddenColumnFilter hiddenColumnFilter,
                                        long undoQuantumToken,
                                        byte[] predicates) {
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), hiddenColumnFilter.getId(),
                                          undoQuantumToken, predicates);
     }
 
@@ -664,28 +667,42 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
-            long ackTxnId, long seqNo, int partitionId, String tableSignature)
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String streamName)
     {
+        if (EXPORT_LOG.isDebugEnabled()) {
+            EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", streamName: " + streamName);
+        }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
+                                         syncAction,
+                                         sequences.getAckOffset(),
+                                         sequences.getSequenceNumber(),
+                                         sequences.getGenerationId(),
+                                         getStringBytes(streamName));
         if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
-                    ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
-                    ", tableSignature: " + tableSignature);
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", partitionId: " + partitionId +
+                    ", streamName: " + streamName);
         }
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
+        m_nextDeserializer.clear();
+        boolean txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+                getStringBytes(tableName), deletableTxnId, undoToken);
+        return txnFullyDeleted;
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
+    public long[] getUSOForExportTable(String streamName) {
+        return nativeGetUSOForExportTable(pointer, getStringBytes(streamName));
     }
 
     @Override
@@ -698,7 +715,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Object value,
             HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.configBytes);
 
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
@@ -726,16 +743,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
 
-        nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+        nativeUpdateHashinator(pointer, config.configPtr, config.numTokens);
     }
 
     @Override
-    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken) throws EEException
-    {
-        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
+    public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
+                undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int)rowCount);
+            throw getExceptionFromError((int) rowCount);
         }
         return rowCount;
     }
@@ -765,11 +782,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_udfBuffer.clear();
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
         int functionId = m_udfBuffer.getInt();
-        UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
-        assert(udfRunner != null);
-        Throwable throwable = null;
+        UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         Object returnValue = null;
+        Throwable throwable = null;
         try {
+            assert(udfRunner != null);
             // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);
 
@@ -806,7 +823,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            UserDefinedScalarFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
         }
@@ -836,71 +853,249 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return -1;
     }
 
+    private UserDefinedAggregateFunctionRunner getUdafRunner() {
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
+        return m_functionManager.getAggregateFunctionRunnerById(functionId);
+    }
+
+    private void handleUDAFError(Throwable throwable) {
+        // Getting here means the execution was not successful.
+        try {
+            assert(throwable != null);
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+            // But you never know.
+            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(errorMsg.length + 4);
+            }
+            m_udfBuffer.clear();
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void resizeUDAFBuffer(Object returnValue, VoltType returnType) {
+        // If the function we are running returns variable-length return value,
+        // it may be possible that the buffer is not large enough to hold it.
+        // Check the required buffer size and enlarge the existing buffer when necessary.
+        // The default buffer size is 256K, which is more than enough for any
+        // fixed-length data and NULL variable-length data (the buffer size will not go less than 256K).
+        if (returnType.isVariableLength() && ! VoltType.isVoltNullValue(returnValue)) {
+            // The minimum required size is 5 bytes:
+            // 1 byte for the type indicator, 4 bytes for the prefixed length.
+            int sizeRequired = 1 + 4;
+            if (returnValue instanceof byte[] || returnValue instanceof Byte[]) {
+                sizeRequired += Array.getLength(returnValue);
+            }
+            if (sizeRequired > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(sizeRequired);
+            }
+        }
+    }
+
+    class UDAFObjectInputStream extends ObjectInputStream {
+
+        public UDAFObjectInputStream(InputStream in) throws IOException {
+            super(in);
+        }
+
+        @Override
+        protected Class<?> resolveClass(ObjectStreamClass desc)
+            throws IOException, ClassNotFoundException
+            {
+                String name = desc.getName();
+                try {
+                    return Class.forName(name, true, VoltDB.instance().getCatalogContext().m_catalogInfo.m_jarfile.getLoader());
+                } catch (ClassNotFoundException ex) {
+                    throw ex;
+                }
+            }
+    }
+
+    public int callJavaUserDefinedAggregateStart(int functionId) {
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        try {
+            assert(udafRunner != null);
+            // Call the user-defined function start method
+            udafRunner.start();
+            m_udfBuffer.clear();
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateAssemble() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        try {
+            assert(udafRunner != null);
+            // Call the user-defined function assemble method.
+            // For vectorization, pass an array of arguments of same type, stored in m_udfBuffer
+            udafRunner.assemble(m_udfBuffer, udafIndex);
+            m_udfBuffer.clear();
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateCombine() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        Object workerObject = null;
+        try {
+            assert(udafRunner != null);
+            // get the worker's byte array from the buffer
+            byte[] workerByteArray = UserDefinedAggregateFunctionRunner.readVarbinary(m_udfBuffer);
+            // convert worker's byte array to the object
+            ByteArrayInputStream bis = new ByteArrayInputStream(workerByteArray);
+            ObjectInput in = new UDAFObjectInputStream(bis);
+            try {
+                workerObject = in.readObject();
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException exIgnored) {}
+            }
+            // call the combine method with the deserialized worker object
+            udafRunner.combine(workerObject, udafIndex);
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateWorkerEnd() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
+        Object returnValue = null;
+        VoltType returnType = null;
+        try {
+            assert(udafRunner != null);
+            // we serialized the object to a byte array
+            // and the return type for a worker is a varbinary
+            Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutput out = null;
+            try {
+                out = new ObjectOutputStream(bos);
+                out.writeObject(workerInstance);
+                out.flush();
+                returnValue = bos.toByteArray();
+            } finally {
+                try {
+                    bos.close();
+                } catch (IOException ex) {
+                // ignore close exception
+                }
+            }
+            returnType = VoltType.VARBINARY;
+            udafRunner.clearFunctionInstance(udafIndex);
+            resizeUDAFBuffer(returnValue, returnType);
+            m_udfBuffer.clear();
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
+    public int callJavaUserDefinedAggregateCoordinatorEnd() {
+        UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
+        int udafIndex = m_udfBuffer.getInt();
+        Object returnValue = null;
+        try {
+            assert(udafRunner != null);
+            // call the end method to terminate the entire aggregate function process
+            returnValue = udafRunner.end(udafIndex);
+            VoltType returnType = udafRunner.getReturnType();
+            resizeUDAFBuffer(returnValue, returnType);
+            m_udfBuffer.clear();
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
+        }
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
+        return -1;
+    }
+
     /**
      * Store a large temp table block to disk.
      *
-     * @param id           The id of the block to store to disk
-     * @param origAddress  The original address of the block
+     * @param siteId       The site id of the block to store to disk
+     * @param blockCounter The serial number of the block to store to disk
      * @param block        A directly-allocated ByteBuffer of the block
      * @return true if operation succeeded, false otherwise
      */
-    public boolean storeLargeTempTableBlock(long id, long origAddress, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-
-        try {
-            lbm.storeBlock(id, origAddress, block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-            return false;
-        }
-
-        return true;
+    public boolean storeLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
+        LargeBlockTask task = LargeBlockTask.getStoreTask(new BlockId(siteId, blockCounter), block);
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     /**
      * Read a large table block from disk and write it to a ByteBuffer.
      * Block will still be stored on disk when this operation completes.
      *
-     * @param id     The id of the block to load
-     * @param block  The buffer to write the block to
+     * @param siteId         The originating site id of the block to load
+     * @param blockCounter   The id of the block to load
+     * @param block          The buffer to write the block to
      * @return The original address of the block (so that its internal pointers may get updated)
      */
-    public long loadLargeTempTableBlock(long id, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-        long origAddress = 0;
-
-        try {
-            origAddress = lbm.loadBlock(id, block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-        }
-
-        return origAddress;
+    public boolean loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
+        LargeBlockTask task = LargeBlockTask.getLoadTask(new BlockId(siteId, blockCounter), block);
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     /**
      * Delete the block with the given id from disk.
      *
-     * @param blockId   The id of the block to release
+     * @param siteId        The originating site id of the block to release
+     * @param blockCounter  The serial number of the block to release
      * @return True if the operation succeeded, and false otherwise
      */
-    public boolean releaseLargeTempTableBlock(long blockId) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-
-        try {
-            lbm.releaseBlock(blockId);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());
-            return false;
-        }
-
-        return true;
+    public boolean releaseLargeTempTableBlock(long siteId, long blockCounter) {
+        LargeBlockTask task = LargeBlockTask.getReleaseTask(new BlockId(siteId, blockCounter));
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     @Override
@@ -915,9 +1110,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             checkErrorCode(errorCode);
             return (byte[])m_nextDeserializer.readArray(byte.class);
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     @Override
@@ -925,5 +1119,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
         m_psetBuffer.position(8);
         return m_psetBuffer;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        if (viewNames.equals("")) {
+            return;
+        }
+        if (enabled) {
+            LOG.info("The maintenance of the following views is restarting: " + viewNames);
+        }
+        else {
+            LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
+        }
+        nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        nativeDisableExternalStreams(pointer);
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return nativeExternalStreamsEnabled(pointer);
     }
 }

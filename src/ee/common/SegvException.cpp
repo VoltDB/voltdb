@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,9 @@
 
 #include "SegvException.hpp"
 
-#include <cstdlib>
 #include <cstring> // for strcmp
 #include <cxxabi.h>
 #include <dlfcn.h>
-#include <string>
-
 
 using namespace std;
 using namespace voltdb;
@@ -98,12 +95,11 @@ SegvException::SegvException(
             symname = tmp;
 #endif
 
-        snprintf(trace, 1024, "% 2d: %p <%s+%lu> (%s)\n",
-                ++f,
-                ip,
-                symname,
+        snprintf(trace, sizeof trace, "% 2d: %p <%s+%lu> (%s)\n",
+                ++f, ip, symname,
                 (unsigned long)ip - (unsigned long)dlinfo.dli_saddr,
                 dlinfo.dli_fname);
+        trace[sizeof trace - 1] = '\0';
         traces.push_back(std::string(trace));
 
 #ifndef NO_CPP_DEMANGLE

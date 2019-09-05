@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,7 +25,7 @@
 from subprocess import Popen, PIPE
 import os
 import sys
-
+import argparse
 print sys.path[0]
 
 script = """
@@ -66,8 +66,15 @@ exec
 done
 """
 
-p = Popen(os.path.join(sys.path[0], "index_scripted_test"),
-          shell=False, stdin=PIPE, close_fds=True)
+if len(sys.argv) > 1:
+    cmd = sys.argv[1:]
+else:
+    cmd = os.path.join(sys.path[0], 'index_scripted_test')
+
+print(cmd)
+
+p = Popen(cmd, shell=False, stdin=PIPE, close_fds=True)
+
 def write(x):
     p.stdin.write(x)
 write(script)

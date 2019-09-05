@@ -1,0 +1,132 @@
+============================================================
+Initializing
+
+drop table ENG13524_cte_data if exists;
+Command succeeded.
+
+drop table ENG13524_one_row if exists;
+Command succeeded.
+
+create table ENG13524_one_row ( id bigint );
+Command succeeded.
+
+create table ENG13524_cte_data (
+  id           bigint,
+  name         varchar,
+  left_rent    bigint,
+  right_rent   bigint
+);
+Command succeeded.
+
+insert into ENG13524_one_row values ( null );
+(Returned 1 rows in #.##s)
+============================================================
+Wrong number of input columns - too many or too few.
+------------------------------------------------------------
+
+with cte(id, name, left_rent, right_rent) as (
+  select * from ENG13524_one_row
+) select * from cte;
+------------------------------------------------------------
+
+with recursive cte(id, name, left_rent, right_rent, bumble) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+------------------------------------------------------------
+
+with cte(id, name, left_rent) as (
+  select * from ENG13524_cte_data
+) select * from cte;
+------------------------------------------------------------
+
+with recursive cte(id, name, left_rent) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+============================================================
+Check for name leaks out of CTE queries.
+
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+ID   
+-----
+ NULL
+
+(Returned 1 rows in #.##s)
+------------------------------------------------------------
+
+select * from cte;
+
+drop table cte if exists;
+Command succeeded.
+
+with recursive cte(id, name, left_rent, right_rent) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+ID  NAME  LEFT_RENT  RIGHT_RENT 
+--- ----- ---------- -----------
+  0 NULL          -1          -1
+
+(Returned 1 rows in #.##s)
+------------------------------------------------------------
+
+select * from cte;
+
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+ID   
+-----
+ NULL
+
+(Returned 1 rows in #.##s)
+------------------------------------------------------------
+
+create table cte ( id bigint );
+Command succeeded.
+
+drop table cte if exists;
+Command succeeded.
+
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+ID   
+-----
+ NULL
+
+(Returned 1 rows in #.##s)
+------------------------------------------------------------
+
+drop table cte;
+============================================================
+Cleaning up.
+
+drop table ENG13524_cte_data if exists;
+Command succeeded.
+
+drop table ENG13524_one_row if exists;
+Command succeeded.
+
+drop table cte if exists;
+Command succeeded.
+Done.
+============================================================

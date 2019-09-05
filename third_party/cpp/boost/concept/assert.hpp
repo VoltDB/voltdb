@@ -5,7 +5,7 @@
 # define BOOST_CONCEPT_ASSERT_DWA2006430_HPP
 
 # include <boost/config.hpp>
-# include <boost/detail/workaround.hpp>
+# include <boost/config/workaround.hpp>
 
 // The old protocol used a constraints() member function in concept
 // checking classes.  If the compiler supports SFINAE, we can detect
@@ -18,8 +18,7 @@
 # if !defined(BOOST_NO_OLD_CONCEPT_SUPPORT)                                         \
     && !defined(BOOST_NO_SFINAE)                                                    \
                                                                                     \
-    && !(BOOST_WORKAROUND(__GNUC__, == 3) && BOOST_WORKAROUND(__GNUC_MINOR__, < 4)) \
-    && !(BOOST_WORKAROUND(__GNUC__, == 2))
+    && !(BOOST_WORKAROUND(__GNUC__, == 3) && BOOST_WORKAROUND(__GNUC_MINOR__, < 4))
 
 // Note: gcc-2.96 through 3.3.x have some SFINAE, but no ability to
 // check for the presence of particularmember functions.

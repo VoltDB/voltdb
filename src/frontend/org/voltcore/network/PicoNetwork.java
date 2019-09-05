@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -95,19 +95,19 @@ import org.voltcore.utils.Pair;
 public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 {
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private final Selector m_selector;
-    private final NetworkDBBPool m_pool = new NetworkDBBPool(64);
-    private final NIOReadStream m_readStream = new NIOReadStream();
-    private final PicoNIOWriteStream m_writeStream = new PicoNIOWriteStream();
-    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
-    private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
-    private long m_messagesRead;
-    private int m_interestOps = 0;
-    private final SocketChannel m_sc;
-    private final SelectionKey m_key;
-    private InputHandler m_ih;
+    protected final Selector m_selector;
+    protected final NetworkDBBPool m_pool = new NetworkDBBPool(64);
+    protected final NIOReadStream m_readStream = new NIOReadStream();
+    protected PicoNIOWriteStream m_writeStream;
+    protected final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
+    protected volatile boolean m_shouldStop = false;//volatile boolean is sufficient
+    protected long m_messagesRead;
+    protected int m_interestOps = 0;
+    protected final SocketChannel m_sc;
+    protected final SelectionKey m_key;
+    protected InputHandler m_ih;
 
     private final Thread m_thread;
     volatile String m_remoteHostname = null;
@@ -124,15 +124,19 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     public void start(InputHandler ih, Set<Long> verbotenThreads) {
         m_ih = ih;
         m_verbotenThreads = verbotenThreads;
+        startSetup();
         m_thread.start();
+    }
+
+    protected void startSetup() {
+        m_writeStream = new PicoNIOWriteStream();
     }
 
     /**
      * Create a pico network thread
      * @param sc  SocketChannel
-     * @param isSecondary  Is this a secondary thread?
      */
-    public PicoNetwork(SocketChannel sc, boolean isSecondary) {
+    public PicoNetwork(SocketChannel sc) {
         m_sc = sc;
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
         m_remoteSocketAddress = remoteAddress;
@@ -143,11 +147,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_remoteHostname = remoteHost;
             m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
         }
-        if (isSecondary) {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
-        } else {
-            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort;
-        }
+        m_threadName = remoteHost;
 
         m_thread = new Thread(this, "Pico Network - " + m_threadName);
         m_thread.setDaemon(true);
@@ -176,7 +176,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     //Track how busy the thread is and spin once
     //if there is always work
-    private boolean m_hadWork = false;
+    protected boolean m_hadWork = false;
 
     @Override
     public void run() {
@@ -233,7 +233,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         }
     }
 
-    private void dispatchReadStream() throws IOException {
+    protected void dispatchReadStream() throws IOException {
         if (readyForRead()) {
             if (fillReadStream() > 0) m_hadWork = true;
             ByteBuffer message;
@@ -284,7 +284,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         return read;
     }
 
-    private void drainWriteStream() throws IOException {
+    protected void drainWriteStream() throws IOException {
         /*
          * Drain the write stream
          */
@@ -311,7 +311,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     }
 
     private boolean m_alreadyStopping = false;
-    private void safeStopping() {
+    protected void safeStopping() {
         if (!m_alreadyStopping) {
             m_alreadyStopping = true;
             m_ih.stopping(this);
@@ -431,7 +431,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     @Override
     public NIOReadStream readStream() {
-        throw new UnsupportedOperationException();
+        return m_readStream;
     }
 
     @Override

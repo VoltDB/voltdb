@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,9 +19,11 @@ package org.voltdb.exportclient.decode;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.file.CodecFactory;
@@ -33,6 +35,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.voltcore.utils.ByteBufferOutputStream;
+import org.voltdb.VoltType;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -48,29 +51,50 @@ public class AvroEntityDecoder extends EntityDecoder {
     public static final ContentType AvroSchemaContentType = ContentType.create("application/json", Charsets.UTF_8);
 
     protected final AvroDecoder m_avroDecoder;
-    protected final ByteBufferOutputStream m_bbos = new ByteBufferOutputStream();
-    protected final GenericDatumWriter<GenericRecord> m_writer;
-    protected final DataFileWriter<GenericRecord> m_fileWriter;
 
-    protected final AbstractHttpEntity m_header;
     protected final List<GenericRecord> m_records = new LinkedList<>();
+    protected final Map <Long, DecoderHelper> m_decoders = new HashMap<>();
 
+    protected final boolean m_compress;
     protected AvroEntityDecoder(AvroDecoder avroDecoder, boolean compress) {
+        m_compress = compress;
         m_avroDecoder = avroDecoder;
-        m_writer = new GenericDatumWriter<>(getSchema());
-        m_fileWriter = new DataFileWriter<GenericRecord>(m_writer);
-        if (compress) {
-            m_fileWriter.setCodec(CodecFactory.snappyCodec());
+    }
+
+    class DecoderHelper {
+        final ByteBufferOutputStream m_bbos = new ByteBufferOutputStream();
+        final GenericDatumWriter<GenericRecord> m_writer;
+        final DataFileWriter<GenericRecord> m_fileWriter;
+        final AbstractHttpEntity m_headerEntity;
+
+        public DecoderHelper(final Schema schema) throws IOException {
+            assert(schema != null);
+            m_writer = new GenericDatumWriter<>(schema);
+            m_fileWriter = new DataFileWriter<GenericRecord>(m_writer);
+            if (m_compress) {
+                m_fileWriter.setCodec(CodecFactory.snappyCodec());
+            }
+            try {
+                m_fileWriter.create(schema, m_bbos);
+                m_fileWriter.flush();
+                m_headerEntity = new ByteArrayEntity(m_bbos.toByteArray(), AvroContentType);
+            } catch (IOException e) {
+                throw new BulkException("failed to initialize avro data container header", e);
+            } finally {
+                m_bbos.reset();
+            }
         }
-        try {
-            m_fileWriter.create(getSchema(), m_bbos);
-            m_fileWriter.flush();
-            m_header = new ByteArrayEntity(m_bbos.toByteArray(), AvroContentType);
-        } catch (IOException e) {
-            throw new BulkException("failed to initialize avro data container header", e);
-        } finally {
-            m_bbos.reset();
+
+    }
+
+    private DecoderHelper decoder(long generation, Schema schema) throws IOException {
+        DecoderHelper decoder = m_decoders.get(generation);
+        if (decoder != null) {
+            return decoder;
         }
+        decoder = new DecoderHelper(schema);
+        m_decoders.put(generation, decoder);
+        return decoder;
     }
 
     /**
@@ -79,52 +103,81 @@ public class AvroEntityDecoder extends EntityDecoder {
      * decoder (i.e. with synchronous requests)
      */
     @Override
-    public AbstractHttpEntity harvest() {
-        ByteBufferEntity enty = null;
+    public AbstractHttpEntity harvest(long generation) {
+        DecoderHelper decoder = null;
+        DataFileWriter<GenericRecord> fileWriter = null;
+        ByteBufferEntity entity = null;
+        //Now iterate over records and write
+        Iterator<GenericRecord> itr = m_records.iterator();
         try {
-            Iterator<GenericRecord> itr = m_records.iterator();
             while (itr.hasNext()) {
-                m_fileWriter.append(itr.next());
+                GenericRecord record = itr.next();
+                if (decoder == null) {
+                    decoder = decoder(generation, record.getSchema());
+                }
+                fileWriter = decoder.m_fileWriter;
+                fileWriter.append(record);
                 itr.remove();
             }
 
-            m_fileWriter.flush();
-            enty = new ByteBufferEntity(m_bbos.toByteBuffer(), AvroContentType);
-        } catch (IOException e) {
+            if (fileWriter != null) {
+                fileWriter.flush();
+            }
+            if (decoder != null) {
+                entity = new ByteBufferEntity(decoder.m_bbos.toByteBuffer(), AvroContentType);
+            }
+        }
+        catch (IOException e) {
             throw new BulkException("failed to append to the avro data container", e);
-        } finally {
-            reset();
+        }
+        finally {
+            if (decoder != null) {
+                decoder.m_bbos.reset();
+            }
+            m_records.clear();
         }
 
-        return enty;
+        return entity;
     }
 
     @Override
-    public void add(Object[] fields) throws RuntimeException {
-        m_records.add(m_avroDecoder.decode(null, fields));
+    public void add(long generation, String tableName, List<VoltType> types, List<String> names, Object[] fields) throws RuntimeException {
+        GenericRecord record = m_avroDecoder.decode(generation, tableName, types, names, null, fields);
+        m_records.add(record);
     }
 
     @Override
-    public void discard() {
-        try { m_bbos.close(); } catch (Exception ignoreIt) {}
+    public void discard(long generation) {
+        DecoderHelper decoder = m_decoders.get(generation);
+        if (decoder != null) {
+            try {
+                decoder.m_bbos.close();
+            }
+            catch (Exception ignore) {}
+        }
     }
 
     @Override
-    public AbstractHttpEntity getHeaderEntity() {
-        return m_header;
+    public AbstractHttpEntity getHeaderEntity(long generation, String tableName, List<VoltType> columnTypes, List<String> columnNames) {
+        DecoderHelper decoder = m_decoders.get(generation);
+        if (decoder != null) {
+            return decoder.m_headerEntity;
+        }
+        try {
+            decoder = new DecoderHelper(getSchema(generation, tableName, columnTypes, columnNames));
+            m_decoders.put(generation, decoder);
+        } catch (IOException e) {
+            throw new BulkException("failed to append to the avro data container", e);
+        }
+        return decoder.m_headerEntity;
     }
 
-    protected void reset() {
-        m_bbos.reset();
-        m_records.clear();
+    public Schema getSchema(long generation, String tableName, List<VoltType> types, List<String> names) {
+        return m_avroDecoder.getSchema(generation, tableName, types, names);
     }
 
-    public Schema getSchema() {
-        return m_avroDecoder.getSchema();
-    }
-
-    public StringEntity getSchemaAsEntity() {
-        return new StringEntity(m_avroDecoder.getSchema().toString(true), AvroSchemaContentType);
+    public StringEntity getSchemaAsEntity(long generation, String tableName, List<VoltType> types, List<String> names) {
+        return new StringEntity(m_avroDecoder.getSchema(generation, tableName, types, names).toString(true), AvroSchemaContentType);
     }
 
     public static Builder builder() {

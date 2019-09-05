@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="3pty_jars">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../../third_party/java/jars" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../../third_party/java/jars" />
+    </SOURCES>
+    <jarDirectory url="file://$PROJECT_DIR$/../../third_party/java/jars" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/../../third_party/java/jars" recursive="false" type="SOURCES" />
+  </library>
+</component>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,37 +25,12 @@ import com.google_voltpatches.common.base.Supplier;
 /**
  * Class that aides in the tracking of a VoltDB node state.
  */
-public class NodeStateTracker {
-
-    private final AtomicReference<NodeState> nodeState = new AtomicReference<>(NodeState.INITIALIZING);
-
+public class NodeStateTracker extends AtomicReference<NodeState> {
     public NodeStateTracker() {
+        super(NodeState.INITIALIZING);
     }
 
-    static class NodeStateSupplier implements Supplier<NodeState> {
-        private final AtomicReference<NodeState> ref;
-        private NodeStateSupplier(AtomicReference<NodeState> ref) {
-            this.ref = ref;
-        }
-        @Override
-        public NodeState get() {
-            return ref.get();
-        }
-    }
-
-    public Supplier<NodeState> getNodeStateSupplier() {
-        return new NodeStateSupplier(nodeState);
-    }
-
-    public boolean setNodeState(NodeState update) {
-        return compareAndSetNodeState(nodeState.get(), update);
-    }
-
-    public boolean compareAndSetNodeState(NodeState expect, NodeState update) {
-        return nodeState.compareAndSet(expect, update);
-    }
-
-    public NodeState getNodeState() {
-        return nodeState.get();
+    public Supplier<NodeState> getSupplier() {
+        return this::get;
     }
 }

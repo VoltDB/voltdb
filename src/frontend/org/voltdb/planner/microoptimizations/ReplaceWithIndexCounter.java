@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -113,8 +113,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
 
-        // Guard against (possible future?) cases of indexable subquery.
-        if (((IndexScanPlanNode)child).isSubQuery()) {
+        // Guard against (possible future?) cases of indexable subquery or common table.
+        if (! ((IndexScanPlanNode)child).isPersistentTableScan()) {
             return plan;
         }
 

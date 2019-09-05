@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,9 +27,11 @@
 #include "catalog/materializedviewinfo.h"
 
 #include "common/CatalogUtil.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
+#include "common/StackTrace.h"
 
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
@@ -43,7 +45,7 @@
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-
+#include "execution/VoltDBEngine.h"
 #include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
@@ -79,10 +81,34 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // sort it by Column index to preserve column order.
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
-    TupleSchemaBuilder schemaBuilder(numColumns,
-                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
-
+    bool needsHiddenCountForView = false;
+    bool needsHiddenCloumnTableWithMigrate = isTableWithMigrate(static_cast<TableType>(catalogTable.tableType()));
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
+
+    // only looking for potential existing table count(*) when this is a Materialized view table
+    if (isTableMaterialized(catalogTable)) {
+      for (colIterator = catalogTable.columns().begin();
+           colIterator != catalogTable.columns().end(); colIterator++) {
+          auto catalogColumn = colIterator->second;
+          if (catalogColumn->aggregatetype() == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+            // there exists count(*), directly quit
+            break;
+          }
+      }
+      if (colIterator == catalogTable.columns().end()) {
+        // iterator meets the end, meaning no count(*) column
+        needsHiddenCountForView = true;
+      }
+    }
+
+    // DR timestamp and hidden COUNT(*) should not appear at the same time
+    vassert(!(needsDRTimestamp && needsHiddenCountForView));
+    int numHiddenColumns = (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0;
+    if (needsHiddenCloumnTableWithMigrate) {
+         numHiddenColumns++;
+    }
+    TupleSchemaBuilder schemaBuilder(numColumns, numHiddenColumns);
+
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
 
@@ -93,7 +119,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                        catalogColumn->nullable(),
                                        catalogColumn->inbytes());
     }
-
+    int hiddenIndex = 0;
     if (needsDRTimestamp) {
         // Create a hidden timestamp column for a DRed table in an
         // active-active context.
@@ -101,12 +127,22 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         // Column will be marked as not nullable in TupleSchema,
         // because we never expect a null value here, but this is not
         // actually enforced at runtime.
-        schemaBuilder.setHiddenColumnAtIndex(0,
-                                             VALUE_TYPE_BIGINT,
-                                             8,      // field size in bytes
-                                             false); // nulls not allowed
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::XDCR_TIMESTAMP);
+        VOLT_DEBUG("Adding hidden column for dr table %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
+    if (needsHiddenCountForView) {
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::VIEW_COUNT);
+        VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
+    }
+
+    // Always create the hidden column for migrate last so the hidden columns can be handled correctly on java side
+    // for snapshot write plans.
+    if (needsHiddenCloumnTableWithMigrate) {
+        VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::MIGRATE_TXN);
+    }
+    vassert(numHiddenColumns == hiddenIndex);
     return schemaBuilder.build();
 }
 
@@ -119,12 +155,10 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
 
     // The catalog::Index object now has a list of columns that are to be
     // used
-    if (catalogIndex.columns().size() == (size_t) 0) {
-        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
-                   " to use",
-                   catalogIndex.name().c_str(),
-                   catalogTable.name().c_str());
-        return false;
+    if (catalogIndex.columns().size() == 0) {
+       VOLT_ERROR("Index '%s' in table '%s' does not declare any columns to use",
+             catalogIndex.name().c_str(), catalogTable.name().c_str());
+       return false;
     }
 
     auto indexedExpressions = TableIndex::simplyIndexColumns();
@@ -137,12 +171,9 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
     // the catalogs, we'll use the index attribute to make sure we put them
     // in the right order
     index_columns.resize(catalogIndex.columns().size());
-    std::map<std::string, catalog::ColumnRef*>::const_iterator colrefIterator;
-    for (colrefIterator = catalogIndex.columns().begin();
-         colrefIterator != catalogIndex.columns().end();
-         colrefIterator++) {
-        auto catalogColref = colrefIterator->second;
-        assert(catalogColref->index() >= 0);
+    for (auto const& col : catalogIndex.columns()) {
+        auto const* catalogColref = col.second;
+        vassert(catalogColref->index() >= 0);
         index_columns[catalogColref->index()] = catalogColref->column()->index();
     }
     // partial index predicate
@@ -158,6 +189,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
                                predicate,
                                catalogIndex.unique(),
                                catalogIndex.countable(),
+                               catalogIndex.migrating(),
                                expressionsAsText,
                                predicateAsText,
                                schema);
@@ -187,7 +219,7 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
         break;
     default:
         // this would need to change if we added index types
-        assert(false);
+        vassert(false);
         break;
     }
 
@@ -199,6 +231,7 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
     for (size_t i = 0; i < columnIndexes.size(); i++) {
         char buf[128];
         snprintf(buf, 128, "-%d", columnIndexes[i]);
+        buf[sizeof buf - 1] = '\0';
         retval += buf;
     }
 
@@ -265,9 +298,6 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                        bool isXDCR,
                                                        int tableAllocationTargetSize,
                                                        bool forceNoDR) {
-    // Create a persistent table for this table in our catalog
-    int32_t tableId = catalogTable.relativeIndex();
-
     // get an array of table column names
     const int numColumns = static_cast<int>(catalogTable.columns().size());
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
@@ -308,9 +338,9 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         switch (type) {
         case CONSTRAINT_TYPE_PRIMARY_KEY:
             // Make sure we have an index to use
-            assert(catalogConstraint->index());
+            vassert(catalogConstraint->index());
             // Make sure they didn't declare more than one primary key index
-            assert(pkeyIndexId.empty());
+            vassert(pkeyIndexId.empty());
             pkeyIndexId = catalogConstraint->index()->name();
             break;
         case CONSTRAINT_TYPE_UNIQUE:
@@ -318,7 +348,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
             // TODO: In the future I would like bring back my Constraint
             //       object so that we can keep track of everything that a
             //       table has...
-            assert(catalogConstraint->index());
+            vassert(catalogConstraint->index());
             break;
         // Unsupported
         case CONSTRAINT_TYPE_CHECK:
@@ -333,7 +363,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
             VOLT_ERROR("Invalid constraint type '%s' for '%s'",
                        constraintutil::getTypeName(type).c_str(),
                        catalogConstraint->name().c_str());
-            assert(false);
+            vassert(false);
             return NULL;
         }
     }
@@ -343,22 +373,16 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     // all unique indices afterwards, and all the non-unique indices at the end.
     std::deque<TableIndexScheme> indexes;
     TableIndexScheme pkeyIndex_scheme;
-    std::map<std::string, TableIndexScheme>::const_iterator indexIterator;
-    for (indexIterator = index_map.begin(); indexIterator != index_map.end();
-         indexIterator++) {
-        // Exclude the primary key
-        if (indexIterator->second.name.compare(pkeyIndexId) == 0) {
-            pkeyIndex_scheme = indexIterator->second;
-        // Just add it to the list
-        }
-        else {
-            if (indexIterator->second.unique) {
-                indexes.push_front(indexIterator->second);
-            }
-            else {
-                indexes.push_back(indexIterator->second);
-            }
-        }
+    for (auto const& indexIterator : index_map) {
+       auto const& indexScheme = indexIterator.second;
+       // Exclude the primary key
+       if (indexScheme.name.compare(pkeyIndexId) == 0) {
+          pkeyIndex_scheme = indexScheme;
+       } else if (indexScheme.unique) {
+          indexes.push_front(indexScheme);
+       } else {
+          indexes.push_back(indexScheme);
+       }
     }
 
     // partition column:
@@ -368,9 +392,9 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
+    m_tableType = static_cast<TableType>(catalogTable.tableType());
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
+    bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
     std::string const& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -388,26 +412,23 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
-    Table* table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, m_signatureHash,
-                                                    m_materialized,
-                                                    partitionColumnIndex, exportEnabled,
-                                                    tableIsExportOnly,
-                                                    tableAllocationTargetSize,
-                                                    catalogTable.tuplelimit(),
-                                                    m_compactionThreshold,
-                                                    drEnabled);
+    VOLT_DEBUG("Creating %s %s as %s, type: %d", m_materialized?"VIEW":"TABLE",
+               tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType());
+    Table* table = TableFactory::getPersistentTable(
+            databaseId, tableName.c_str(), schema, columnNames, m_signatureHash,
+            m_materialized, partitionColumnIndex, m_tableType, tableAllocationTargetSize,
+            catalogTable.tuplelimit(), m_compactionThreshold, drEnabled, isReplicated);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
-        assert(pkeyIndexId.empty());
-        assert(indexes.empty());
+        vassert(pkeyIndexId.empty());
+        vassert(indexes.empty());
         return table;
     }
 
     // add a pkey index if one exists
     if ( ! pkeyIndexId.empty()) {
         TableIndex* pkeyIndex = TableIndexFactory::getInstance(pkeyIndex_scheme);
-        assert(pkeyIndex);
+        vassert(pkeyIndex);
         persistentTable->addIndex(pkeyIndex);
         persistentTable->setPrimaryKeyIndex(pkeyIndex);
     }
@@ -415,7 +436,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     // add other indexes
     BOOST_FOREACH(TableIndexScheme& scheme, indexes) {
         TableIndex* index = TableIndexFactory::getInstance(scheme);
-        assert(index);
+        vassert(index);
         persistentTable->addIndex(index);
     }
 
@@ -432,8 +453,6 @@ void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
         return;
     }
 
-    evaluateExport(catalogDatabase, catalogTable);
-
     // configure for stats tables
     PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
     if (persistenttable) {
@@ -444,23 +463,18 @@ void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
 
 PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const& catalogDatabase,
         catalog::Table const& catalogTable) {
+    bool isXDCR = ExecutorContext::getEngine()->getIsActiveActiveDREnabled();
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
     // Delta table must be forced to have DR disabled even if the source table is DRed,
     // therefore true is passed in for the forceNoDR parameter
-    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, 1024 * 64, true);
+    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, isXDCR, 1024 * 64, true);
     deltaTable->incrementRefcount();
     // We have the restriction that view on joined table cannot have non-persistent table source.
     // So here we could use static_cast. But if we in the future want to lift this limitation,
     // we will have to put more thoughts on this.
     return static_cast<PersistentTable*>(deltaTable);
-}
-
-//After catalog is updated call this to ensure your export tables are connected correctly.
-void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
-        catalog::Table const& catalogTable) {
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
 }
 
 static void migrateChangedTuples(catalog::Table const& catalogTable,
@@ -541,7 +555,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator iterator = existingTable->iterator();
+        TableIterator iterator(existingTable->iterator());
         TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {
@@ -589,10 +603,10 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     }
 
     // check tuple counts are sane
-    assert(newTable->activeTupleCount() == existingTupleCount);
+    vassert(newTable->activeTupleCount() == existingTupleCount);
     // dumb way to structure an assert avoids unused variable warning (lame)
     if (tuplesMigrated != existingTupleCount) {
-        assert(tuplesMigrated == existingTupleCount);
+        vassert(tuplesMigrated == existingTupleCount);
     }
 }
 
@@ -652,7 +666,7 @@ static void migrateExportViews(catalog::CatalogMap<catalog::MaterializedViewInfo
     MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
-    assert(obsoleteViews.size() == 0);
+    vassert(obsoleteViews.size() == 0);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
@@ -701,10 +715,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
 
     Table* existingTable = m_table;
     m_table = constructTableFromCatalog(catalogDatabase, catalogTable, isXDCR);
-    assert(m_table);
+    vassert(m_table);
     m_table->incrementRefcount();
     PersistentTable* newPersistentTable = dynamic_cast<PersistentTable*>(m_table);
     PersistentTable* existingPersistentTable = dynamic_cast<PersistentTable*>(existingTable);
+    StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
+    StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
 
     ///////////////////////////////////////////////
     // Move tuples from one table to the other
@@ -712,19 +728,34 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     if (existingPersistentTable && newPersistentTable) {
         migrateChangedTuples(catalogTable, existingPersistentTable, newPersistentTable);
         migrateViews(catalogTable.views(), existingPersistentTable, newPersistentTable, delegatesByName);
+        existingStreamedTable = existingPersistentTable->getStreamedTable();
+        newStreamedTable = newPersistentTable->getStreamedTable();
     }
-    else {
-        StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
-        StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
-        if (existingStreamedTable && newStreamedTable) {
-            migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
-        }
+    if (existingStreamedTable && newStreamedTable) {
+        ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
+        // There should be no pending buffer at the time of UAC
+        vassert(wrapper != NULL &&
+                (wrapper->getCurrBlock() == NULL ||
+                 wrapper->getCurrBlock()->getRowCount() == 0));
+        existingStreamedTable->setWrapper(NULL);
+        newStreamedTable->setWrapper(wrapper);
+        migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
     }
 
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
-    existingTable->decrementRefcount();
+    if (existingPersistentTable && newPersistentTable &&
+            newPersistentTable->isReplicatedTable() != existingPersistentTable->isReplicatedTable()) {
+        // A table can only be modified from replicated to partitioned
+        vassert(newPersistentTable->isReplicatedTable());
+        // Assume the MP memory context before starting the deallocate
+        ExecuteWithMpMemory useMpMemory;
+        existingTable->decrementRefcount();
+    }
+    else {
+        existingTable->decrementRefcount();
+    }
 
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement
@@ -787,6 +818,7 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
                 nowFields.push_back(col->index());
                 break;
             }
+            /* fall through */ // gcc-7 needs this comment.
             // else, fall through to default case
         default:
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -94,7 +94,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String MISSING_HOST_COUNT = "missingHostCount";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
-
+    public static final String MESH_ONE_REJOIN_MSG = "Only one host can rejoin at a time. Host";
     /**
      * Helper method that takes a comma delimited list of host specs, validates it,
      * and converts it to a set of valid coordinators
@@ -349,7 +349,7 @@ public class MeshProber implements JoinAcceptor {
     }
 
     @Override
-    public void detract(int hostId) {
+    public void detract(ZooKeeper zooKeeper, int hostId) {
         checkArgument(hostId >= 0, "host id %s is not greater or equal to 0", hostId);
         Map<Integer,HostCriteria> expect;
         Map<Integer,HostCriteria> update;
@@ -360,6 +360,7 @@ public class MeshProber implements JoinAcceptor {
                 .putAll(Maps.filterKeys(expect, not(equalTo(hostId))))
                 .build();
         } while (!m_hostCriteria.compareAndSet(expect, update));
+        CoreZK.removeRejoinNodeIndicatorForHost(zooKeeper, hostId);
     }
 
     @Override
@@ -453,8 +454,7 @@ public class MeshProber implements JoinAcceptor {
             if (rejoiningHost == -1) {
                 return new JoinAcceptor.PleaDecision(null, true, false);
             } else {
-                String msg = "Only one host can rejoin at a time. Host "
-                      + rejoiningHost + " is still rejoining.";
+                String msg = MESH_ONE_REJOIN_MSG + rejoiningHost + " is still rejoining.";
                 return new JoinAcceptor.PleaDecision(msg, false, true);
             }
         }
@@ -718,24 +718,32 @@ public class MeshProber implements JoinAcceptor {
 
         @Override @Generated("by eclipse's equals and hashCode source generators")
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             Determination other = (Determination) obj;
-            if (hostCount != other.hostCount)
+            if (hostCount != other.hostCount) {
                 return false;
-            if (paused != other.paused)
+            }
+            if (paused != other.paused) {
                 return false;
-            if (startAction != other.startAction)
+            }
+            if (startAction != other.startAction) {
                 return false;
+            }
             if (terminusNonce == null) {
-                if (other.terminusNonce != null)
+                if (other.terminusNonce != null) {
                     return false;
-            } else if (!terminusNonce.equals(other.terminusNonce))
+                }
+            } else if (!terminusNonce.equals(other.terminusNonce)) {
                 return false;
+            }
             return true;
         }
 

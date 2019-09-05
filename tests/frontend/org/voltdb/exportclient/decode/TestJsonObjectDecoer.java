@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,15 @@
 package org.voltdb.exportclient.decode;
 
 import static org.junit.Assert.assertEquals;
+import static org.voltdb.VoltType.BIGINT;
+import static org.voltdb.VoltType.DECIMAL;
+import static org.voltdb.VoltType.FLOAT;
+import static org.voltdb.VoltType.INTEGER;
+import static org.voltdb.VoltType.SMALLINT;
+import static org.voltdb.VoltType.STRING;
+import static org.voltdb.VoltType.TIMESTAMP;
+import static org.voltdb.VoltType.TINYINT;
+import static org.voltdb.VoltType.VARBINARY;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -31,8 +40,6 @@ import java.math.MathContext;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
 import org.voltdb.VoltType;
-
-import static org.voltdb.VoltType.*;
 
 public class TestJsonObjectDecoer extends BaseForDecoderTests {
 
@@ -46,13 +53,11 @@ public class TestJsonObjectDecoer extends BaseForDecoderTests {
         return expected[typeIndex.get(t)];
     }
 
-    JsonObjectDecoder.Builder builder = JsonObjectDecoder.builder();
-
     @Test
-    public void testStarightForwardDecode() throws Exception {
-        builder.columnNames(NAMES).columnTypes(TYPES);
+    public void testStraightForwardDecode() throws Exception {
+        JsonObjectDecoder.Builder builder = JsonObjectDecoder.builder();
         JsonObjectDecoder jod = builder.build();
-        JSONObject jo = jod.decode(null, row);
+        JSONObject jo = jod.decode(0L, "mytable", TYPES, NAMES, null, row);
 
         assertEquals(expectedFor(TIMESTAMP),jo.get("timeStampField"));
         assertEquals(expectedFor(DECIMAL),jo.get("decimalField"));
@@ -67,9 +72,10 @@ public class TestJsonObjectDecoer extends BaseForDecoderTests {
 
     @Test
     public void testUnmangledFieldNames() throws Exception {
-        builder.camelCaseFieldNames(false).columnNames(NAMES).columnTypes(TYPES);
+        JsonObjectDecoder.Builder builder = JsonObjectDecoder.builder();
+        builder.camelCaseFieldNames(false);
         JsonObjectDecoder jod = builder.build();
-        JSONObject jo = jod.decode(null, row);
+        JSONObject jo = jod.decode(0L, "mytable", TYPES, NAMES, null, row);
 
         assertEquals(expectedFor(TIMESTAMP),jo.get("TIME_STAMP_FIELD"));
         assertEquals(expectedFor(DECIMAL),jo.get("DECIMAL_FIELD"));

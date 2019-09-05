@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,21 +45,10 @@
 
 #include "sendexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/sendnode.h"
 
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
 
 namespace voltdb {
 
@@ -67,8 +56,8 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           const ExecutorVector&)
 {
     VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getInputTableCount() == 1);
+    vassert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    vassert(m_abstractNode->getInputTableCount() == 1);
     return true;
 }
 
@@ -76,12 +65,12 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
 
     Table* inputTable = m_abstractNode->getInputTable();
-    assert(inputTable);
-    VOLT_DEBUG("send input:\n%s\n", inputTable->debug().c_str());
+    vassert(inputTable);
+    VOLT_TRACE("send input:\n%s\n", inputTable->debug().c_str());
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
     m_engine->send(inputTable);
-    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
+    VOLT_TRACE("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;
 }

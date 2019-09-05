@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,16 @@
 
 package org.voltdb.exportclient.decode;
 
+import static org.voltdb.exportclient.decode.RowDecoder.Builder.camelCaseNameLowerFirst;
+
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TimeZone;
 
@@ -44,7 +47,6 @@ import org.voltdb.types.VoltDecimalHelper;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.FluentIterable;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Converts an object array containing an exported row values into an
@@ -52,34 +54,25 @@ import com.google_voltpatches.common.collect.ImmutableList;
  */
 public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
-    protected final String m_tableName;
     protected final String m_packageName;
-    protected final Schema m_schema;
+    protected Map<Long, Schema> m_schemas = new HashMap<>();
+    protected Map<Long, FieldNameDecoder []> m_fieldDecoders = new HashMap<>();
     protected final SimpleDateFormat m_dtfmt =
             new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
-    protected final FieldNameDecoder [] m_fieldDecoders;
 
     /**
      * Generate an avro schema with the given table column types, and prepares per column field
      * decoders. All TINYINT, SMALLINT column types are cast to avro integer types. TIMESTAMP
      * is cast to avro long field (containing millis since epoch)
      *
-     * @param columnTypes table column types
-     * @param columnNames table column names
      * @param firstFieldOffset
      * @param tableName avro record type name
      * @param packageName avro record package name space (equivalent to java packages)
      */
-    protected AvroDecoder(List<VoltType> columnTypes,
-            List<String> columnNames, int firstFieldOffset,
-            String tableName, String packageName, TimeZone tz) {
+    protected AvroDecoder(int firstFieldOffset, String packageName, TimeZone tz) {
 
-        super(columnTypes, columnNames, firstFieldOffset);
+        super(firstFieldOffset);
 
-        Preconditions.checkArgument(
-                tableName != null && !tableName.trim().isEmpty(),
-                "table name is null or empty"
-                );
         Preconditions.checkArgument(
                 packageName != null && !packageName.trim().isEmpty(),
                 "package name is null or empty"
@@ -89,47 +82,52 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
                 "time zone name is null"
                 );
 
-        m_tableName = tableName;
         m_packageName = packageName;
         m_dtfmt.setTimeZone(tz);
-
-        FieldAssembler<Schema> fa =
-                SchemaBuilder.record(m_tableName).namespace(m_packageName).fields();
-        List<FieldNameDecoder> decoders = new ArrayList<>();
-
-        int fieldPos = 0;
-        for (Entry<String, DecodeType> e: m_typeMap.entrySet()) {
-            e.getValue().accept(typeBuilderVisitor, fa.name(e.getKey()).type(), null);
-            decoders.add(e.getValue().accept(decodingVisitor, fieldPos++, null));
-        }
-
-        m_schema = fa.endRecord();
-        m_fieldDecoders = decoders.toArray(new FieldNameDecoder[0]);
     }
 
-    /**
-     * @return the export table associated avro schema
-     */
-    public Schema getSchema() {
-        return m_schema;
+    public Schema getSchema(long generation, String tableName, List<VoltType> columnTypes, List<String> names) {
+        Schema schema = m_schemas.get(generation);
+        if (schema != null) {
+            return schema;
+        }
+
+        FieldAssembler<Schema> schemaFields =
+                SchemaBuilder.record(tableName).namespace(m_packageName).fields();
+        List<String> xformedColumnNames = FluentIterable.from(names).transform(camelCaseNameLowerFirst).toList();
+        Map<String, DecodeType> typeMap = getTypeMap(generation, columnTypes, xformedColumnNames);
+
+        List<FieldNameDecoder> decoders = new ArrayList<>();
+        int fieldPos = 0;
+        for (Entry<String, DecodeType> e: typeMap.entrySet()) {
+            e.getValue().accept(typeBuilderVisitor, schemaFields.name(e.getKey()).type(), null);
+            decoders.add(e.getValue().accept(decodingVisitor, fieldPos++, null));
+        }
+        schema = schemaFields.endRecord();
+        m_schemas.put(generation, schema);
+        FieldNameDecoder [] fieldDecoders = decoders.toArray(new FieldNameDecoder[0]);
+        m_fieldDecoders.put(generation, fieldDecoders);
+
+        return schema;
     }
 
     @Override
-    public GenericRecord decode(GenericRecord ignored, Object[] fields)
+    public GenericRecord decode(long generation, String tableName, List<VoltType> types, List<String> names, GenericRecord ignored, Object[] fields)
             throws RuntimeException {
 
         Preconditions.checkArgument(
                 fields != null && fields.length > m_firstFieldOffset,
                 "null or inapropriately sized export row array"
         );
-
-        GenericData.Record to = new GenericData.Record(m_schema);
+        Schema schema = getSchema(generation, tableName, types, names);
+        FieldNameDecoder [] fieldDecoders = m_fieldDecoders.get(generation);
+        GenericData.Record to = new GenericData.Record(schema);
         for (
                 int i = m_firstFieldOffset, j = 0;
-                i < fields.length && j < m_fieldDecoders.length;
+                i < fields.length && j < fieldDecoders.length;
                 ++i, ++j
         ) {
-            m_fieldDecoders[j].decode(to, fields[i]);
+            fieldDecoders[j].decode(to, fields[i]);
         }
         return to;
     }
@@ -356,26 +354,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
     public static class Builder extends RowDecoder.Builder {
 
         protected String m_packageName = "volt.db";
-        protected String m_tableName;
         protected TimeZone m_timeZone = TimeZone.getDefault();
-
-        public Builder tableName(String tableName) {
-            m_tableName = convertToCamelCase(tableName, true);
-            return this;
-        }
-
-        @Override
-        public Builder columnNames(List<String> columnNames) {
-            super.columnNames(FluentIterable.from(columnNames).transform(camelCaseNameLowerFirst).toList());
-            return this;
-        }
-
-        @Override
-        public Builder columnTypeMap(LinkedHashMap<String, VoltType> map) {
-            columnNames(ImmutableList.copyOf(map.keySet()));
-            super.columnTypes(ImmutableList.copyOf(map.values()));
-            return this;
-        }
 
         public Builder packageName(String packageName) {
             m_packageName = packageName;
@@ -393,10 +372,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
         public AvroDecoder build() {
             return new AvroDecoder(
-                    m_columnTypes,
-                    m_columnNames,
                     m_firstFieldOffset,
-                    m_tableName,
                     m_packageName,
                     m_timeZone
                     );
@@ -404,9 +380,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
         @Override
         public String toString() {
-            return "Builder [m_packageName=" + m_packageName + ", m_tableName="
-                    + m_tableName + ", m_columnTypes=" + m_columnTypes
-                    + ", m_columnNames=" + m_columnNames
+            return "Builder [m_packageName=" + m_packageName
                     + ", m_firstFieldOffset=" + m_firstFieldOffset + "]";
         }
     }
@@ -422,11 +396,6 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
         protected DelegateBuilder(DelegateBuilder delegateBuilder) {
             super(delegateBuilder.getDelegateAs(Builder.class));
             m_delegateBuilder = delegateBuilder.getDelegateAs(Builder.class);
-        }
-
-       public DelegateBuilder tableName(String tableName) {
-            m_delegateBuilder.tableName(tableName);
-            return this;
         }
 
         public DelegateBuilder packageName(String packageName) {

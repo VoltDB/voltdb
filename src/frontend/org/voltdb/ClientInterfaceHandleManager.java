@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
@@ -42,10 +43,15 @@ public class ClientInterfaceHandleManager
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
     //Add an extra bit so compared to the 14-bits in txnids so there
-    //can be a short circuit read partition id
+    //can be a short circuit read partition id or NT procedure partition id.
+    //
+    //NT procedure partition id is also a fake partition id, it is used to
+    //track NT procedure invocation separately because NT procedure
+    //doesn't care about mastership change
     static final int PART_ID_BITS = 15;
     static final int MP_PART_ID = (1 << (PART_ID_BITS - 1)) - 1;
     static final int SHORT_CIRCUIT_PART_ID = MP_PART_ID + 1;
+    static final int NT_PROC_PART_ID = SHORT_CIRCUIT_PART_ID + 1;
     static final long PART_ID_SHIFT = 48;
     static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
 
@@ -179,13 +185,15 @@ public class ClientInterfaceHandleManager
             long creationTimeNanos,
             String procName,
             long initiatorHSId,
-            boolean isShortCircuitReadOrNTProc)
+            boolean isShortCircuitRead)
     {
         assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
-        if (isShortCircuitReadOrNTProc) {
+        if (isShortCircuitRead) {
             partitionId = SHORT_CIRCUIT_PART_ID;
         } else if (!isSinglePartition) {
             partitionId = MP_PART_ID;
+        } else if (initiatorHSId == ClientInterface.NTPROC_JUNK_ID) {
+            partitionId = NT_PROC_PART_ID;
         }
 
         PartitionInFlightTracker tracker = m_trackerMap.get(partitionId);
@@ -286,26 +294,40 @@ public class ClientInterfaceHandleManager
         }
     }
 
+    private void collectAndRemovePartitionInFlightRequests(Integer partitionId, Long initiatorHSId, List<Iv2InFlight> retval) {
+        PartitionInFlightTracker partitionStuff = m_trackerMap.get(partitionId);
+        if (partitionStuff != null) {
+            Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
+            while (iter.hasNext()) {
+                Entry<Long, Iv2InFlight> entry = iter.next();
+                if (entry.getValue().m_initiatorHSId != initiatorHSId) {
+                    if (tmLog.isTraceEnabled()) {
+                        tmLog.trace("cleared response for handle " + entry.getKey());
+                    }
+                    iter.remove();
+                    retval.add(entry.getValue());
+                    m_outstandingTxns--;
+                    m_acg.reduceBackpressure(entry.getValue().m_messageSize);
+                }
+            }
+        }
+    }
+
     List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId, Long initiatorHSId) {
         assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
 
-        if (!m_trackerMap.containsKey(partitionId)) return retval;
-
         /*
          * Clear pending responses
          */
-        PartitionInFlightTracker partitionStuff = m_trackerMap.get(partitionId);
-        Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<Long, Iv2InFlight> entry = iter.next();
-            if (entry.getValue().m_initiatorHSId != initiatorHSId) {
-                iter.remove();
-                retval.add(entry.getValue());
-                m_outstandingTxns--;
-                m_acg.reduceBackpressure(entry.getValue().m_messageSize);
-            }
+        collectAndRemovePartitionInFlightRequests(partitionId, initiatorHSId, retval);
+        if (partitionId == MP_PART_ID) {
+            collectAndRemovePartitionInFlightRequests(SHORT_CIRCUIT_PART_ID, initiatorHSId, retval);
         }
+
+        // No need to clear NP_PROC_PART_ID bucket during mastership change,
+        // because all NT procedure handles are from local invocations
+
         return retval;
     }
 

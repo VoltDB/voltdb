@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,13 +41,11 @@ public class RejectingExportClient extends ExportClientBase {
         public DiscardDecoder(AdvertisedDataSource source) {
             super(source);
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " + source.partitionId
-                    + " table " + source.tableName
-                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Kafka Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        public boolean processRow(ExportRow rowinst) throws RestartBlockException {
             throw new RestartBlockException(true);
         }
 

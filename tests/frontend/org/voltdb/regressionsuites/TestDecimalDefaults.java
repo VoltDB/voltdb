@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,13 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestDecimalDefaults extends RegressionSuite
 {
@@ -52,8 +53,10 @@ public class TestDecimalDefaults extends RegressionSuite
                                  "PRIMARY KEY(A1));"
                                  );
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);", "T.A1: 0");
-        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;", "T.A1: 0");
+        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);",
+                new ProcedurePartitionData("T", "A1"));
+        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;",
+                new ProcedurePartitionData("T", "A1"));
         return builder;
     }
 

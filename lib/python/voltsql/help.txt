@@ -1,0 +1,20 @@
+VOLTSQL -- an interactive SQL interpreter with command completion. Lists available SQL keywords as you type. Use arrow keys to select.
+
+COMMANDS
+  exit / quit -- quit voltsql
+  examine -- View SQL execution plan
+  exec -- execute stored procedures
+  help -- display this text
+  show / list -- List tables, procedures, classes
+  refresh -- refresh schema
+
+OPTIONS (press specified key to enable/disable each option)
+
+[F2] SMART COMPLETION
+Adds schema elements (table, column, function name) to command completion.
+    
+[F3] MULTILINE
+Lets you enter multiples lines before processing. Press ESC then ENTER to execute the statement. When off, each line is processed when you press ENTER. 
+
+[F4] AUTO REFRESH
+Refreshes the schema after each statement is processed. When off, refresh the schema manually with the UPDATE command.

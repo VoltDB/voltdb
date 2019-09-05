@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETUPLEVALUEEXPRESSION_H
-#define HSTORETUPLEVALUEEXPRESSION_H
+#pragma once
 
 #include "expressions/abstractexpression.h"
 #include "common/tabletuple.h"
@@ -57,27 +56,23 @@ namespace voltdb {
 class TupleValueExpression : public AbstractExpression {
   public:
     TupleValueExpression(const int tableIdx, const int valueIdx)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx)
-    {
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx) {
         VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx %d", m_type, tableIdx, valueIdx);
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         if (tuple_idx == 0) {
-            assert(tuple1);
-            if ( ! tuple1 ) {
-                throw SerializableEEException("TupleValueExpression::"
-                                              "eval:"
-                                              " Couldn't find tuple 1 (possible index scan planning error)");
+            vassert(tuple1);
+            if (! tuple1 ) {
+                throw SerializableEEException(
+                        "TupleValueExpression::eval: Couldn't find tuple 1 (possible index scan planning error)");
             }
             return tuple1->getNValue(value_idx);
-        }
-        else {
-            assert(tuple2);
-            if ( ! tuple2 ) {
-                throw SerializableEEException("TupleValueExpression::"
-                                              "eval:"
-                                              " Couldn't find tuple 2 (possible index scan planning error)");
+        } else {
+            vassert(tuple2);
+            if (! tuple2 ) {
+                throw SerializableEEException(
+                        "TupleValueExpression::eval: Couldn't find tuple 2 (possible index scan planning error)");
             }
             return tuple2->getNValue(value_idx);
         }
@@ -93,9 +88,8 @@ class TupleValueExpression : public AbstractExpression {
 
   protected:
 
-    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int tuple_idx;           // which tuple
     const int value_idx;           // which (offset) column of the tuple
 };
 
 }
-#endif

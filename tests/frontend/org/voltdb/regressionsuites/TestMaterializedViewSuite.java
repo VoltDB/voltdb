@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,9 +53,9 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncatePeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
-import com.google_voltpatches.common.collect.Lists;
+import org.junit.Test;
 
-import junit.framework.Test;
+import com.google_voltpatches.common.collect.Lists;
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
@@ -67,14 +67,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     private static final int[] yesAndNo = new int[]{1, 0};
     private static final int[] never = new int[]{0};
 
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
-        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class, TruncateMatViewDataMP.class,
-        TruncateTables.class, TruncatePeople.class
-    };
-
     // For comparing tables with FLOAT columns
     private static final double EPSILON = 0.000001;
 
@@ -83,7 +75,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     private void truncateBeforeTest(Client client) {
-        // TODO Auto-generated method stub
         VoltTable[] results = null;
         try {
             results = client.callProcedure("TruncateMatViewDataMP").getResults();
@@ -149,7 +140,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
-    private void subtestENG7872SinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testENG7872SinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -247,8 +239,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         verifyENG6511(client);
     }
 
+    @Test
+    public void testENG6511() throws IOException, ProcCallException {
+        testENG6511(false);
+        testENG6511(true);
+    }
+
     // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
-    private void subtestENG6511(boolean singlePartition) throws IOException, ProcCallException
+    private void testENG6511(boolean singlePartition) throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -286,25 +284,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
     }
 
-    public void testSinglePartition() throws IOException, ProcCallException
-    {
-        subtestInsertSinglePartition();
-        subtestDeleteSinglePartition();
-        subtestUpdateSinglePartition();
-        subtestSinglePartitionWithPredicates();
-        subtestMinMaxSinglePartition();
-        subtestMinMaxSinglePartitionWithPredicate();
-        subtestIndexMinMaxSinglePartition();
-        subtestIndexMinMaxSinglePartitionWithPredicate();
-        subtestNullMinMaxSinglePartition();
-        subtestCountStarAnywhereSimple();
-        subtestCountStarAnywhereMultiple();
-        subtestENG7872SinglePartition();
-        subtestENG6511(false);
-    }
-
-
-    private void subtestInsertSinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testInsertSinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -344,7 +325,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(2, results[0].getRowCount());
     }
 
-    private void subtestDeleteSinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testDeleteSinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -410,7 +392,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    private void subtestUpdateSinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testUpdateSinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -455,7 +438,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(3L, r2.getLong(4));
     }
 
-    private void subtestSinglePartitionWithPredicates() throws IOException, ProcCallException
+    @Test
+    public void testSinglePartitionWithPredicates() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -507,7 +491,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    private void subtestMinMaxSinglePartition() throws IOException, ProcCallException {
+    @Test
+    public void testMinMaxSinglePartition() throws IOException, ProcCallException {
         Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
@@ -596,7 +581,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     }
 
-    private void subtestMinMaxSinglePartitionWithPredicate() throws IOException, ProcCallException {
+    @Test
+    public void testMinMaxSinglePartitionWithPredicate() throws IOException, ProcCallException {
         Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
@@ -656,7 +642,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     }
 
-    private void subtestIndexMinMaxSinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testIndexMinMaxSinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -737,7 +724,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(10, t.getLong(4));
     }
 
-    private void subtestIndexMinMaxSinglePartitionWithPredicate() throws IOException, ProcCallException
+    @Test
+    public void testIndexMinMaxSinglePartitionWithPredicate() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -805,7 +793,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     }
 
-    private void subtestNullMinMaxSinglePartition() throws IOException, ProcCallException
+    @Test
+    public void testNullMinMaxSinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -871,7 +860,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(9, t.getLong(4));
     }
 
-    private void subtestCountStarAnywhereSimple() throws IOException, ProcCallException
+    @Test
+    public void testCountStarAnywhereSimple() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -937,7 +927,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(9, t.getLong(4));
     }
 
-    private void subtestCountStarAnywhereMultiple() throws IOException, ProcCallException
+    @Test
+    public void testCountStarAnywhereMultiple() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1024,7 +1015,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(3000, (int)(t.getDouble(6)));
     }
 
-    private void subtestENG7872MP() throws IOException, ProcCallException
+    @Test
+    public void testENG7872MP() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1104,19 +1096,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "4", "0.0", "10");
     }
 
-    public void testMPAndRegressions() throws IOException, ProcCallException
-    {
-        subtestMultiPartitionSimple();
-        subtestInsertReplicated();
-        subtestInsertAndOverflowSum();
-        subtestENG798();
-        subtestIndexed();
-        subtestMinMaxMultiPartition();
-        subtestENG7872MP();
-        subtestENG6511(true);
-    }
-
-    private void subtestMultiPartitionSimple() throws IOException, ProcCallException
+    @Test
+    public void testMultiPartitionSimple() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1167,7 +1148,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                    (results[0].getRowCount() == 4) || (results2[0].getRowCount() == 4));
     }
 
-    private void subtestInsertReplicated() throws IOException, ProcCallException
+    @Test
+    public void testInsertReplicated() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1194,7 +1176,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    private void subtestInsertAndOverflowSum() throws IOException, ProcCallException
+    @Test
+    public void testInsertAndOverflowSum() throws IOException, ProcCallException
     {
         if (isHSQL()) {
             return;
@@ -1236,7 +1219,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     /** Test a view that re-orders the source table's columns */
-    private void subtestENG798() throws IOException, ProcCallException
+    @Test
+    public void testENG798() throws IOException, ProcCallException
     {
         if (isHSQL()) {
             return;
@@ -1252,7 +1236,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
 
-    private void subtestIndexed() throws IOException, ProcCallException
+    @Test
+    public void testIndexed() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1404,7 +1389,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
          *    Senior,Lexington,2
          */
         results = client.callProcedure("@AdHoc",
-                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
+                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge'").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());
@@ -1430,7 +1415,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals("Concord", results[0].getString(0));
     }
 
-    private void subtestMinMaxMultiPartition() throws IOException, ProcCallException {
+    @Test
+    public void testMinMaxMultiPartition() throws IOException, ProcCallException {
         Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
@@ -1700,6 +1686,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult, EPSILON);
     }
 
+    @Test
     public void testViewOnJoinQuery() throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -1969,6 +1956,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
+    @Test
     public void testViewOnGeoJoin() throws Exception {
         if (isHSQL()) {
             return;
@@ -1994,6 +1982,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertContentOfTable(new Object[][]{{1, 1}, {3, 2}, {5, 1}, {6, 1}}, vresult);
     }
 
+    @Test
     public void testEng11024() throws Exception {
         // Regression test for ENG-11024, found by sqlcoverage
         Client client = getClient();
@@ -2020,6 +2009,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, vt.asScalarLong());
     }
 
+    @Test
     public void testUpdateAndMinMax() throws Exception {
         Client client = getClient();
 
@@ -2089,6 +2079,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             {-4, 2, -12}}, vt);
     }
 
+    @Test
     public void testEng11043() throws Exception {
         Client client = getClient();
 
@@ -2152,6 +2143,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertTablesAreEqual(prefix + "v27", vtExpected, vtActual, EPSILON);
     }
 
+    @Test
     public void testEng11047() throws Exception {
         Client client = getClient();
 
@@ -2214,6 +2206,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     // Regression test for ENG-11074
+    @Test
     public void testEng11074() throws Exception {
         Client client = getClient();
         VoltTable      vt;
@@ -2231,6 +2224,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     // Repro for ENG-11080
+    @Test
     public void testEng11080() throws Exception {
         Client client = getClient();
 
@@ -2276,6 +2270,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
 
+    @Test
     public void testEng11100() throws Exception {
         Client client = getClient();
         String[] stmts = {
@@ -2336,6 +2331,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(numExc, 2);
     }
 
+    @Test
     public void testCreateViewWithParams() throws Exception {
         Client client = getClient();
 
@@ -2359,6 +2355,45 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 expectedMsg);
     }
 
+    @Test
+    public void testEng13694() throws Exception {
+        // We used to sometimes fail when updating a materialized view
+        // which was the join of a replicated table and a partitioned
+        // table.  This only happened with fairly large tables.
+        // We don't run this with valgrind.  It's too slow, and
+        // it's not likely to cause uncaught memory leaks anyway.
+        if (!isValgrind()) {
+            Client client = getClient();
+            final int num_prows = 10000;
+            final int num_rrows = 1000;
+            Long[][] prows = new Long[num_prows][2];
+            for (int idx = 0; idx < num_prows; idx += 1) {
+                prows[idx][0] = (long) idx;
+                prows[idx][1] = (long) (idx + 100);
+            }
+            Long[][] rrows = new Long[num_rrows][2];
+            for (int idx = 0; idx < num_rrows; idx +=1) {
+                rrows[idx][0] = (long) idx;
+                rrows[idx][1] = (long) (idx + 100);
+            }
+            shuffleArray(prows);
+            shuffleArray(rrows);
+            // Load up the P1 table.
+            for (int idx = 0; idx < num_prows; idx += 1) {
+                client.callProcedure("ENG13694_P1.insert", prows[idx][0], prows[idx][1]);
+            }
+            // Load up the R1 table.  This is where we expect a crash.
+            for (int idx = 0; idx < num_rrows; idx += 1) {
+                client.callProcedure("ENG13694_R1.insert", rrows[idx][0], rrows[idx][1]);
+            }
+            // Delete the R1 table.  We could see a crash here as well.
+            for (int idx = 0; idx < num_rrows; idx += 1) {
+                client.callProcedure("ENG13694_R1.delete", rrows[idx][0]);
+            }
+        }
+    }
+
+    @Test
     public void testEng11203() throws Exception {
         // This test case has AdHoc DDL, so it cannot be ran in the HSQL backend.
         if (! isHSQL()) {
@@ -2431,6 +2466,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
+    @Test
     public void testEng11314() throws Exception {
         Client client = getClient();
         String[] insertT1 = {
@@ -2479,6 +2515,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                    msg.contains(pattern));
     }
 
+    @Test
     public void testNowFailed() throws Exception {
         String sql;
         sql = "CREATE VIEW MV AS SELECT L.ID, COUNT(*) FROM ENG11495 AS L JOIN ENG11495 AS R ON L.TS = NOW GROUP BY L.ID";
@@ -2489,6 +2526,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
     }
 
+    @Test
     public void testENG11935() throws Exception {
         // to_timestamp function is not implemented in the HSQL backend, skip HSQL.
         if (isHSQL()) {
@@ -2518,6 +2556,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertContentOfTable(expectedAnswer, vt);
     }
 
+    // procedures used by these tests
+    static final Class<?>[] MP_PROCEDURES = {
+        AddThing.class, TruncateMatViewDataMP.class, AggThings.class,
+        TruncateTables.class, TruncatePeople.class
+    };
+
     /**
      * Build a list of the tests that will be run when TestMaterializedViewSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -2526,7 +2570,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
      *
      * @return The TestSuite containing all the tests to be run.
      */
-    static public Test suite() {
+    static public junit.framework.Test suite() {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMaterializedViewSuite.class);
 
@@ -2538,7 +2582,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         String schemaPath = url.getPath();
         project.addSchema(schemaPath);
 
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+
+        project.addProcedure(AddPerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(DeletePerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(UpdatePerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(AggAges.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(SelectAllPeople.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(OverflowTest.class, "OVERFLOWTEST.COL_1: 1");
+        project.addProcedure(Eng798Insert.class, "ENG798.C1: 0");
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend

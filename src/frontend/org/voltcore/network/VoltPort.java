@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -205,25 +205,29 @@ public class VoltPort implements Connection
         final int read = m_readStream.read(m_channel, maxBytes, m_pool);
 
         if (read == -1) {
-            disableReadSelection();
-
-            if (m_channel.socket().isConnected()) {
-                try {
-                    m_channel.socket().shutdownInput();
-                } catch (SocketException e) {
-                    //Safe to ignore to these
-                }
-            }
-
-            m_isShuttingDown = true;
-            m_handler.stopping(this);
-
-            /*
-             * Allow the write queue to drain if possible
-             */
-            enableWriteSelection();
+            handleReadStreamEOF();
         }
         return read;
+    }
+
+    protected void handleReadStreamEOF() throws IOException {
+        disableReadSelection();
+
+        if (m_channel.socket().isConnected()) {
+            try {
+                m_channel.socket().shutdownInput();
+            } catch (SocketException e) {
+                //Safe to ignore to these
+            }
+        }
+
+        m_isShuttingDown = true;
+        m_handler.stopping(this);
+
+        /*
+         * Allow the write queue to drain if possible
+         */
+        enableWriteSelection();
     }
 
     protected final void drainWriteStream() throws IOException {

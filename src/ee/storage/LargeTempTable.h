@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,16 +15,18 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VOLTDB_LARGETEMPTABLE_H
-#define VOLTDB_LARGETEMPTABLE_H
+#pragma once
 
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
+#include "executors/abstractexecutor.h"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
 
 class LargeTempTableBlock;
+class ProgressMonitorProxy;
 
 /**
  * A large temp table class that uses LargeTempTableCache to request
@@ -50,74 +52,85 @@ class LargeTempTableBlock;
  */
 class LargeTempTable : public AbstractTempTable {
 
-    friend class TableFactory;
+    std::vector<LargeTempTableBlockId> m_blockIds {};
 
+    LargeTempTableBlock* m_blockForWriting = nullptr;
+
+    friend class TableFactory;
+    void getEmptyBlock();
 public:
 
     /** return the iterator for this table */
-    TableIterator iterator();
+    TableIterator iterator() override;
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
-    TableIterator iteratorDeletingAsWeGo() {
-        m_iter.reset(m_blockIds.begin());
-        m_iter.setTempTableDeleteAsGo(true);
-        return m_iter;
-    }
+    TableIterator iteratorDeletingAsWeGo() override;
 
     /** Delete all the tuples in this table */
-    void deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
+    void deleteAllTuples(bool freeAllocatedStrings, bool fallible) override {
         return deleteAllTempTuples();
     }
 
     /** Delete all the tuples in this table */
-    virtual void deleteAllTempTuples();
+    void deleteAllTempTuples() override;
 
     /** insert a tuple into this table */
-    bool insertTuple(TableTuple& tuple);
+    bool insertTuple(TableTuple& tuple) override;
 
     /** insert a tuple into this table */
-    virtual void insertTempTuple(TableTuple &source) {
+    void insertTempTuple(TableTuple &source) override {
         insertTuple(source);
     }
 
     /** To unpin the last written block when all inserts are
         complete. */
-    virtual void finishInserts();
+    void finishInserts() override;
+
+    /**
+     * Sort this table using the given compare function.  Also apply
+     * the given limit and offset.
+     */
+    void sort(ProgressMonitorProxy *pmp, const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
+
+    /** Releases the specified block.  Called by delete-as-you-go
+        iterators.  Returns an iterator pointing to the next block
+        id. */
+    std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) override;
 
     /** Return the number of large temp table blocks used by this
         table */
-    size_t allocatedBlockCount() const {
+    size_t allocatedBlockCount() const override {
         return m_blockIds.size();
     }
 
     /** The type of this table, useful for debugging */
-    std::string tableType() const {
+    std::string tableType() const override {
         return "LargeTempTable";
     }
 
     /** This method seems to be used by some plan nodes, but the
         particulars are unclear. */
-    std::vector<uint64_t> getBlockAddresses() const {
+    std::vector<uint64_t> getBlockAddresses() const override {
         throwSerializableEEException("Invalid call to getBlockAddresses() on LargeTempTable");
     }
 
     /** Return a table stats object for this table (unimplemented) */
-    voltdb::TableStats* getTableStats() {
+    voltdb::TableStats* getTableStats() override {
         throwSerializableEEException("Invalid call to getTableStats() on LargeTempTable");
     }
 
     /** return a tuple object pointing to the address where the next
         tuple should be inserted. */
-    void nextFreeTuple(TableTuple* tuple);
+    void nextFreeTuple(TableTuple* tuple) override;
 
     /** Return the temp table limits object for this table. (Currently none) */
-    virtual const TempTableLimits* getTempTableLimits() const {
+    const TempTableLimits* getTempTableLimits() const override {
         return NULL;
     }
 
     /** Prints useful info about this table */
-    virtual std::string debug(const std::string& spacer) const;
+    std::string debug(const std::string& spacer) const override;
 
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();
@@ -125,30 +138,31 @@ public:
     /**
      * Swap the contents of this table with another.
      */
-    virtual void swapContents(AbstractTempTable* otherTable) {
-        // There is no reason that this can't be supported.  TODO: add
-        // support for this operation and related unit tests.  Things
-        // to think about: enforce restriction on pinned blocks, or
-        // whether or not table can be swapped if inserts are still
-        // ongoing?
-        throwSerializableEEException("swapContents not supported on large temp tables");
+    void swapContents(AbstractTempTable* otherTable) override;
+
+    std::vector<LargeTempTableBlockId>& getBlockIds() {
+        return m_blockIds;
+    }
+
+    const std::vector<LargeTempTableBlockId>& getBlockIds() const {
+        return m_blockIds;
+    }
+
+    std::vector<LargeTempTableBlockId>::iterator disownBlock(std::vector<LargeTempTableBlockId>::iterator pos) {
+        m_tupleCount -= ExecutorContext::getExecutorContext()->lttBlockCache().getBlockTupleCount(*pos);
+        return m_blockIds.erase(pos);
+    }
+
+    void inheritBlock(LargeTempTableBlockId blockId) {
+        m_tupleCount += ExecutorContext::getExecutorContext()->lttBlockCache().getBlockTupleCount(blockId);
+        m_blockIds.push_back(blockId);
+
     }
 
 protected:
 
     LargeTempTable();
-
-private:
-
-    void getEmptyBlock();
-
-    std::vector<int64_t> m_blockIds;
-
-    TableIterator m_iter;
-
-    LargeTempTableBlock* m_blockForWriting;
 };
 
 }
 
-#endif // VOLTDB_LARGETEMPTABLE_H

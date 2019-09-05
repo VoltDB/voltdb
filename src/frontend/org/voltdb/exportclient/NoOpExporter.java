@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,12 +39,12 @@ public class NoOpExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+        public boolean processRow(ExportRow row) throws ExportDecoderBase.RestartBlockException {
             return true;
         }
 
         @Override
-        public void onBlockCompletion() {
+        public void onBlockCompletion(ExportRow row) {
         }
     }
 

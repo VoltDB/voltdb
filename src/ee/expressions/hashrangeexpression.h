@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,12 +50,10 @@ public:
 };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert(tuple1);
+        vassert(tuple1);
         if ( ! tuple1 ) {
             throw SerializableEEException(
-                    "TupleValueExpression::"
-                    "eval:"
-                    " Couldn't find tuple 1 (possible index scan planning error)");
+                    "TupleValueExpression::eval: Couldn't find tuple 1 (possible index scan planning error)");
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
 
@@ -77,8 +75,8 @@ public:
         int32_t min = 0;
         int32_t max = num_ranges - 1;
         while (min <= max) {
-            assert(min >= 0);
-            assert(max >= 0);
+            vassert(min >= 0);
+            vassert(max >= 0);
             uint32_t mid = (min + max) >> 1;
             if (ranges[mid].second < hash) {
                 min = mid + 1;

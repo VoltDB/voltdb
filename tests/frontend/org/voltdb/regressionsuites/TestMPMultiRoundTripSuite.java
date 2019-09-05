@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -215,7 +215,7 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
 
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { LoadP1.class, LoadR1.class, MultiRoundP1Count.class,
+    static final Class<?>[] MP_PROCEDURES = { LoadP1.class, LoadR1.class, MultiRoundP1Count.class,
                                            MultiRoundR1Count.class,
                                            MultiRoundMixedReads.class,
                                            MultiRoundMixReadsAndWrites.class,
@@ -250,7 +250,7 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         // Single-part update
         project.addStmtProcedure("UpdateP1SP", "update p1 set b2 = 2 where key = ?", "p1.key:0");
 
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
 
         try {
             project.addLiteralSchema(

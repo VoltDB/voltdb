@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,10 +23,10 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.TestCase;
 
 public class IndexOrderPlayground extends TestCase {
     public void testCompile() throws Exception {
@@ -53,9 +53,12 @@ public class IndexOrderPlayground extends TestCase {
         builder.addPartitionInfo("table1", "column1");
         builder.addPartitionInfo("table2", "column1");
         builder.addPartitionInfo("table3", "column1");
-        builder.addStmtProcedure("SelectT1", "select * from table1 where column1 = ? and column2 = ?;", "table1.column1:0");
-        builder.addStmtProcedure("SelectT2", "select * from table2 where column1 = ? and column2 = ?;", "table1.column1:0");
-        builder.addStmtProcedure("SelectT3", "select * from table3 where column1 = ? and column2 = ?;", "table1.column1:0");
+        builder.addStmtProcedure("SelectT1", "select * from table1 where column1 = ? and column2 = ?;",
+                new ProcedurePartitionData("table1", "column1", "0"));
+        builder.addStmtProcedure("SelectT2", "select * from table2 where column1 = ? and column2 = ?;",
+                new ProcedurePartitionData("table2", "column1", "0"));
+        builder.addStmtProcedure("SelectT3", "select * from table3 where column1 = ? and column2 = ?;",
+                new ProcedurePartitionData("table3", "column1", "0"));
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("indexordertest.jar"), 1, 1, 0);
         assertTrue(success);
     }

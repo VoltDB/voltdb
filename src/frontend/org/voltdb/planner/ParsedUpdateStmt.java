@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,8 +41,8 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedUpdateStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedUpdateStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -96,5 +96,10 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
 
 }

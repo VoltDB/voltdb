@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,7 +38,7 @@ import java.util.Random;
 import java.util.zip.GZIPInputStream;
 
 import com.google_voltpatches.common.collect.Sets;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.After;
 import org.junit.Before;
@@ -58,10 +58,12 @@ public class TestVoltTrace {
         m_tempDir = VoltFile.createTempFile(FILE_NAME_PREFIX, null);
         assertTrue(m_tempDir.delete());
         assertTrue(m_tempDir.mkdir());
+        closeFilterIfOn();
     }
 
     @After
     public void tearDown() throws Exception {
+        closeFilterIfOn();
         VoltTrace.closeAllAndShutdown(null, 0);
         VoltFile.recursivelyDelete(m_tempDir);
         m_tempDir = null;
@@ -148,6 +150,36 @@ public class TestVoltTrace {
         sender.run();
 
         verifyFileContents(sender.getSentList(), VoltTrace.closeAllAndShutdown(m_tempDir.getAbsolutePath(), 0));
+    }
+
+    @Test
+    public void testTraceFilterState() throws Exception {
+        // The filter is turned off by default
+        assertTrue(!VoltTrace.isFilterOn());
+        assertTrue(VoltTrace.getFilterTime() == 0);
+
+        // Turn on the filter
+        final double FILTER_TIME_1 = 678;
+        VoltTrace.turnOnFilter(FILTER_TIME_1);
+        assertTrue(VoltTrace.isFilterOn());
+        assertTrue(VoltTrace.getFilterTime() == FILTER_TIME_1);
+
+        // Reset the filter time
+        final double FILTER_TIME_2 = 800;
+        VoltTrace.turnOnFilter(FILTER_TIME_2);
+        assertTrue(VoltTrace.isFilterOn());
+        assertTrue(VoltTrace.getFilterTime() == FILTER_TIME_2);
+
+        // Turn off the filter
+        VoltTrace.turnOffFilter();
+        assertTrue(!VoltTrace.isFilterOn());
+        assertTrue(VoltTrace.getFilterTime() == 0);
+    }
+
+    private void closeFilterIfOn() {
+        if (VoltTrace.isFilterOn()) {
+            VoltTrace.turnOffFilter();
+        }
     }
 
     private ArrayList<VoltTrace.TraceEventType> m_allEventTypes = new ArrayList<>(EnumSet.allOf(VoltTrace.TraceEventType.class));

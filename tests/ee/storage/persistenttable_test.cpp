@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,11 +21,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-//#define STUPIDUNIT_ASSERT_BREAKPOINT 1
-
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/Tools.hpp"
+#include "test_utils/TupleComparingTest.hpp"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/types.h"
@@ -36,46 +37,39 @@
 #include "indexes/tableindex.h"
 
 #include "storage/persistenttable.h"
-#include "storage/table.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 
 #include "boost/scoped_ptr.hpp"
+#include "common/debuglog.h"
 
-#include "common/FixUnusedAssertHack.h"
+using namespace voltdb;
 
-using voltdb::ExecutorContext;
-using voltdb::NValue;
-using voltdb::PersistentTable;
-using voltdb::Table;
-using voltdb::TableFactory;
-using voltdb::TableTuple;
-using voltdb::TupleSchemaBuilder;
-using voltdb::VALUE_TYPE_BIGINT;
-using voltdb::VALUE_TYPE_VARCHAR;
-using voltdb::ValueFactory;
-using voltdb::VoltDBEngine;
-using voltdb::tableutil;
-
-class PersistentTableTest : public Test {
+class PersistentTableTest : public TupleComparingTest {
 public:
     PersistentTableTest()
-        : m_engine(new VoltDBEngine())
-        , m_undoToken(0)
+        : m_undoToken(0)
         , m_uniqueId(0)
     {
+        m_engine.reset(new VoltDBEngine());
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
+                             1,     // sitesPerHost
                              0,     // hostId
                              "",    // hostname
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
-                             false, // don't create DR replicated stream
+                             true,  // this is the loweest SiteId/PartitionId
                              95);   // compaction threshold
         m_engine->setUndoToken(m_undoToken);
+    }
+    ~PersistentTableTest()
+    {
+        m_engine.reset();
+        voltdb::globalDestroyOncePerProcess();
     }
 
 protected:
@@ -101,7 +95,7 @@ protected:
     }
 
     void commit() {
-        m_engine->releaseUndoToken(m_undoToken);
+        m_engine->releaseUndoToken(m_undoToken, false);
         ++m_undoToken;
         m_engine->setUndoToken(m_undoToken);
     }
@@ -122,8 +116,8 @@ protected:
             ""
             "set /clusters#cluster/databases#database schema \"eJwlTDkCgDAI230NDSWUtdX/f8mgAzkBeoLBkZMBEw6C59cwrDRumLJiap5O07L9rStkqd0M8ZGa36ehHXZL52rGcng4USjf1wuc0Rgz\"\n"
             "add /clusters#cluster/databases#database tables T\n"
-            "set /clusters#cluster/databases#database/tables#T isreplicated true\n"
-            "set $PREV partitioncolumn null\n"
+            "set /clusters#cluster/databases#database/tables#T isreplicated false\n"
+            "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#T/columns#PK\n"
             "set $PREV estimatedtuplecount 0\n"
             "set $PREV materializer null\n"
             "set $PREV signature \"T|bv\"\n"
@@ -170,8 +164,8 @@ protected:
             "set $PREV foreignkeytable null\n"
 
             "add /clusters#cluster/databases#database tables X\n"
-            "set /clusters#cluster/databases#database/tables#X isreplicated true\n"
-            "set $PREV partitioncolumn null\n"
+            "set /clusters#cluster/databases#database/tables#X isreplicated false\n"
+            "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#T/columns#PK\n"
             "set $PREV estimatedtuplecount 0\n"
             "set $PREV materializer null\n"
             "set $PREV signature \"X|bv\"\n"
@@ -231,7 +225,7 @@ protected:
         ASSERT_EQ(nTuples > 0, iterator.hasNext());
         ASSERT_EQ(nTuples, table->activeTupleCount());
         ASSERT_EQ(nIndexes, table->indexCount());
-        BOOST_FOREACH (auto index, table->allIndexes()) {
+        for (auto index : table->allIndexes()) {
             ASSERT_EQ(nTuples, index->getSize());
         }
     }
@@ -242,41 +236,54 @@ private:
     int64_t m_uniqueId;
 };
 
+
+namespace {
+
+template<class ValueType>
+TableTuple findTuple(Table* table, ValueType key) {
+    TableIterator iterator = table->iterator();
+    TableTuple iterTuple(table->schema());
+    while (iterator.next(iterTuple)) {
+        if (Tools::nvalueCompare(iterTuple.getNValue(0), key) == 0) {
+            return iterTuple;
+        }
+    }
+
+    return TableTuple(); // null tuple
+}
+
+}
+
 TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     // Load a catalog where active/active DR is turned on for the database,
     // And we have a table "T" which is being DRed.
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
-    PersistentTable* table =
+
+    PersistentTable *table =
             engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     ASSERT_EQ(true, table->hasDRTimestampColumn());
     ASSERT_EQ(0, table->getDRTimestampColumnIndex());
 
-    const voltdb::TupleSchema* schema = table->schema();
+    const voltdb::TupleSchema *schema = table->schema();
     ASSERT_EQ(1, schema->hiddenColumnCount());
 
-    voltdb::StandAloneTupleStorage storage(schema);
-    TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
-
-    NValue bigintNValues[] = {
-        ValueFactory::getBigIntValue(1900),
-        ValueFactory::getBigIntValue(1901),
-        ValueFactory::getBigIntValue(1902)
-    };
-
-    NValue stringNValues[] = {
-        ValueFactory::getTempStringValue("Je me souviens"),
-        ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
-        ValueFactory::getTempStringValue("Splendor sine occasu")
+    typedef std::tuple<int64_t, std::string> StdTuple;
+    std::vector<StdTuple> stdTuples{
+        StdTuple{1900, "Je me souviens"},
+        StdTuple{1901, "Ut Incepit Fiedelis Sic Permanet"},
+        StdTuple{1902, "Splendor sine occasu"}
     };
 
     // Let's do some inserts into the table.
     beginWork();
-    for (int i = 0; i < 3; ++i) {
-        srcTuple.setNValue(0, bigintNValues[i]);
-        srcTuple.setNValue(1, stringNValues[i]);
+
+    voltdb::StandAloneTupleStorage storage(schema);
+    TableTuple srcTuple = storage.tuple();
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        Tools::initTuple(&srcTuple, stdTuple);
         table->insertTuple(srcTuple);
     }
 
@@ -289,67 +296,64 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     TableTuple tuple(schema);
     auto iterator = table->iteratorDeletingAsWeGo();
-    int i = 0;
     const int timestampColIndex = table->getDRTimestampColumnIndex();
-    while (iterator.next(tuple)) {
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        TableTuple tuple = findTuple(table, std::get<0>(stdTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
         // DR timestamp is set for each row.
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-        ++i;
+        ASSERT_TUPLES_EQ(stdTuple, tuple);
     }
 
     // Now let's update the middle tuple with a new value, and make
     // sure the DR timestamp changes.
     beginWork();
 
-    NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
-    iterator = table->iteratorDeletingAsWeGo();
-    ASSERT_TRUE(iterator.next(tuple));
-    ASSERT_TRUE(iterator.next(tuple));
-    TableTuple& tempTuple = table->copyIntoTempTuple(tuple);
-    tempTuple.setNValue(1, newStringData);
-
+    StdTuple newStdTuple{1901, "Nunavut Sannginivut"};
+    tuple = findTuple(table, std::get<0>(newStdTuple));
+    TableTuple &tempTuple = table->copyIntoTempTuple(tuple);
+    tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::get<1>(newStdTuple)));
     table->updateTupleWithSpecificIndexes(tuple,
                                           tempTuple,
                                           table->allIndexes());
 
-    // verify the updated tuple has the new timestamp.
+    // Verify updated tuple has the new timestamp.
     int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
     ASSERT_NE(drTimestampNew, drTimestampOrig);
 
     NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
     iterator = table->iteratorDeletingAsWeGo();
-    i = 0;
-    while (iterator.next(tuple)) {
+    for (int i = 0; i < 3; ++i) {
+        StdTuple expectedTuple;
+        if (i == 1) {
+            expectedTuple = newStdTuple;
+        }
+        else {
+            expectedTuple = stdTuples[i];
+        }
+
+        TableTuple tuple = findTuple(table, std::get<0>(expectedTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
+        // DR timestamp is set for each row.
         if (i == 1) {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(newStringData));
         }
         else {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
         }
-
-        ++i;
+        ASSERT_TUPLES_EQ(expectedTuple, tuple);
     }
 
     // After rolling back, we should have all our original values,
     // including the DR timestamp.
     rollback();
 
-    i = 0;
-    iterator = table->iteratorDeletingAsWeGo();
-    while (iterator.next(tuple)) {
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        TableTuple tuple = findTuple(table, std::get<0>(stdTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
+        // DR timestamp is set for each row.
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-        ++i;
+        ASSERT_TUPLES_EQ(stdTuple, tuple);
     }
 }
 
@@ -364,7 +368,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     const int tuplesToInsert = 10;
     added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
+    ASSERT_TRUE(added);
     commit();
 
     size_t blockCount = table->allocatedBlockCount();
@@ -374,8 +378,8 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
 
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
-    table->truncateTable(engine);
+    ASSERT_TRUE(added);
+    table->truncateTable(engine, false);
     commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
@@ -386,7 +390,6 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
 }
 
 TEST_F(PersistentTableTest, SwapTablesTest) {
-    bool added;
     PersistentTable* namedTable;
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
@@ -440,8 +443,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert, 0);
@@ -477,8 +479,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     ASSERT_NE(NULL, dupTable);
 
     // Populate the empty table currently swapped to table
-    added = tableutil::addRandomTuples(table, tuplesToInsert*3);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*3));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*3, tuplesToInsert);
@@ -622,7 +623,8 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
 
-    dupTable->truncateTable(engine);
+    // X is not a partitioned table.
+    dupTable->truncateTable(engine, false);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
 
     ASSERT_NE(NULL, dupTable);
@@ -663,7 +665,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    dupTable->truncateTable(engine);
+    dupTable->truncateTable(engine, false);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 
@@ -697,8 +699,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     // Test writes and swaps in the same aborted transaction.
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*2));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
@@ -714,8 +715,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*4));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);
@@ -735,8 +735,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*2));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
@@ -752,8 +751,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
 
-    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
-    assert(added);
+    ASSERT_TRUE(tableutil::addRandomTuples(table, tuplesToInsert*4));
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,18 +35,18 @@ import genqa.VerifierUtils.Config;
 
 public class JDBCGetData {
     static Connection conn;
-    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
-    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
+    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE_JDBC\" where \"ROWID\" = ?;";
+    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE_JDBC\" where \"ROWID\" = ?;";
     static PreparedStatement selectStmt = null;
-
+    private static Config config;
     /**
      * Connect and prepare the select to make the per row handling
      * as efficient as possible, though it's still pretty pokey
      * @param config
      * @return
      */
-    public static Connection jdbcConnect(Config config) {
-
+    public static Connection jdbcConnect(Config lconfig) {
+        config = lconfig;
         /* some jdbc drivers may not support connection timout semantics,
            so pre-test the connection.
          */
@@ -75,11 +75,6 @@ public class JDBCGetData {
         try {
             conn = DriverManager.getConnection(connectString, myProp);
             System.out.println("Connected!");
-            if ( config.usegeo ) {
-                selectStmt = conn.prepareStatement(selectGeoSql);
-            } else {
-                selectStmt = conn.prepareStatement(selectSql);
-            }
         } catch (SQLException e) {
             System.err.println("Could not connect to the database with connect string " + connectString + ", exception: " + e);
             e.printStackTrace();
@@ -91,6 +86,13 @@ public class JDBCGetData {
     static ResultSet jdbcRead(long rowid) {
         ResultSet rs = null;
         try {
+            if ( selectStmt == null ) {
+                if ( config.usegeo ) {
+                    selectStmt = conn.prepareStatement(selectGeoSql);
+                } else {
+                    selectStmt = conn.prepareStatement(selectSql);
+                }
+            }
             selectStmt.setLong(1, rowid);
             rs = selectStmt.executeQuery();
         } catch (SQLException e) {

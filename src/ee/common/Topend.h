@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,20 +17,22 @@
 
 #ifndef TOPEND_H_
 #define TOPEND_H_
-#include "common/ids.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
-
 #include <string>
 #include <queue>
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
 
+#include "common/ids.h"
+#include "common/FatalException.hpp"
+#include "common/LargeTempTableBlockId.hpp"
+#include "common/types.h"
+
 namespace voltdb {
 class Table;
 class Pool;
-class StreamBlock;
+class ExportStreamBlock;
+class DrStreamBlock;
 class LargeTempTableBlock;
 
 /*
@@ -62,18 +64,19 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
     virtual void pushExportBuffer(
-            int64_t exportGeneration,
             int32_t partitionId,
-            std::string signature,
-            StreamBlock *block,
-            bool sync,
-            bool endOfStream) = 0;
+            std::string tableName,
+            ExportStreamBlock *block) = 0;
+    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
+    // are managed (they really don't belong in row buffers).
+    virtual void pushEndOfStream(
+            int32_t partitionId,
+            std::string tableName) = 0;
 
-    virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+    virtual int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block) = 0;
 
-    virtual void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) = 0;
+    virtual void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) = 0;
 
     virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -93,13 +96,18 @@ class Topend {
     virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block) = 0;
 
     /** Delete any data for the specified block that is stored on disk. */
-    virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) = 0;
 
     // Call into the Java top end to execute a user-defined function.
     // The function ID for the function to be called and the parameter data is stored in a
     // buffer shared by the top end and the EE.
     // The VoltDBEngine will serialize them into the buffer before calling this function.
     virtual int32_t callJavaUserDefinedFunction() = 0;
+    virtual int32_t callJavaUserDefinedAggregateStart(int functionId) = 0;
+    virtual int32_t callJavaUserDefinedAggregateAssemble() = 0;
+    virtual int32_t callJavaUserDefinedAggregateCombine() = 0;
+    virtual int32_t callJavaUserDefinedAggregateWorkerEnd() = 0;
+    virtual int32_t callJavaUserDefinedAggregateCoordinatorEnd() = 0;
 
     // Call into the Java top end to resize the ByteBuffer allocated for the UDF
     // when the current buffer size is not large enough to hold all the parameters.
@@ -131,13 +139,13 @@ public:
 
     void crashVoltDB(voltdb::FatalException e);
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+    int64_t getFlushedExportBytes(int32_t partitionId);
+    virtual void pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block);
+    virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
-    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
+    int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
-
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -153,14 +161,20 @@ public:
 
     virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    virtual bool releaseLargeTempTableBlock(int64_t blockId);
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
+    int32_t callJavaUserDefinedAggregateStart(int functionId);
+    int32_t callJavaUserDefinedAggregateAssemble();
+    int32_t callJavaUserDefinedAggregateCombine();
+    int32_t callJavaUserDefinedAggregateWorkerEnd();
+    int32_t callJavaUserDefinedAggregateCoordinatorEnd();
     void resizeUDFBuffer(int32_t size);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
-    std::deque<boost::shared_ptr<StreamBlock> > blocks;
+    std::deque<boost::shared_ptr<DrStreamBlock> > drBlocks;
+    std::deque<boost::shared_ptr<ExportStreamBlock> > exportBlocks;
     std::deque<boost::shared_array<char> > data;
     bool receivedDRBuffer;
     bool receivedExportBuffer;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,13 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CONSTRAINTFAILUREEXCEPTION_H_
-#define CONSTRAINTFAILUREEXCEPTION_H_
+#pragma once
 
 #include "common/SQLException.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/tabletuple.h"
+#include "storage/persistenttable.h"
 
 #include <string>
 
@@ -42,7 +42,8 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
+    ConstraintFailureException(Table *table, TableTuple tuple,
+            TableTuple otherTuple, ConstraintType type, PersistentTableSurgeon *surgeon =  NULL);
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -51,10 +52,11 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message);
+    ConstraintFailureException(Table *table, TableTuple tuple,
+            std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
 
-    virtual const std::string message() const;
-    virtual ~ConstraintFailureException();
+    virtual std::string message() const;
+    virtual ~ConstraintFailureException() throw();
 
     const TableTuple* getConflictTuple() const { return &m_tuple; }
     const TableTuple* getOriginalTuple() const { return &m_otherTuple; }
@@ -65,8 +67,8 @@ protected:
     TableTuple m_tuple;
     TableTuple m_otherTuple;
     ConstraintType m_type;
+    PersistentTableSurgeon *m_surgeon;
 };
 
 }
 
-#endif /* CONSTRAINTFAILUREEXCEPTION_H_ */

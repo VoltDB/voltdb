@@ -406,6 +406,30 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(importerDetails);
             });
         };
+        
+        this.getExportTableInformation = function (onInformationLoaded) {
+            var exportDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getExportTableDetails(connection, exportDetails);
+                onInformationLoaded(exportDetails);
+            });
+        };
+
+        this.getThroughputGraphInformation = function (onInformationLoaded) {
+            var throughputDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getThroughputDetails(connection, throughputDetails);
+                onInformationLoaded(throughputDetails);
+            });
+        };
+
+        this.getQueuedGraphInformation = function (onInformationLoaded) {
+            var queuedDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getQueuedDetails(connection, queuedDetails);
+                onInformationLoaded(queuedDetails);
+            });
+        };
 
         //Check if DR is enable or not
         this.GetDrStatusInformation = function (onInformationLoaded) {
@@ -478,7 +502,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //Get Cluster Id 
+        //Get Cluster Id
         this.GetDrInformations = function (onInformationLoaded) {
             var replicationData = {};
             VoltDBService.GetDrReplicationInformation(function (connection) {
@@ -730,7 +754,7 @@ function alertNodeClicked(obj) {
                     adminConfigValues['configuration'] = data["export"].configuration;
                 }
 
-                //Advanced 
+                //Advanced
                 if (data.heartbeat != null) {
                     adminConfigValues['heartBeatTimeout'] = data.heartbeat.timeout;
                 }
@@ -751,7 +775,7 @@ function alertNodeClicked(obj) {
                             adminConfigValues['memorylimit'] = data.systemsettings.resourcemonitor.memorylimit.size;
                         }
                     }
-                    
+
                     if (data.systemsettings.resourcemonitor != null) {
                         if (data.systemsettings.resourcemonitor.disklimit != null) {
                             adminConfigValues['disklimit'] = data.systemsettings.resourcemonitor.disklimit;
@@ -775,7 +799,7 @@ function alertNodeClicked(obj) {
 
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
-                    
+
                     if (data.paths.droverflow != null)
                         adminConfigValues['drOverflowPath'] = data.paths.droverflow.path;
                 }
@@ -864,7 +888,7 @@ function alertNodeClicked(obj) {
                 }
 
                 //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
-                //otherwise to a updatedSystemOverview 
+                //otherwise to a updatedSystemOverview
                 if (voltDbRenderer.isHost) {
                     currentServerOverview[singleData[1]] = singleData[2];
 
@@ -1182,14 +1206,9 @@ function alertNodeClicked(obj) {
                 return;
             } else {
                 voltDbRenderer.drTablesArray = [];
-                voltDbRenderer.exportTablesArray = [];
                 for (var key in tableData) {
                     if (tableData[key]['drEnabled'] == "true") {
                         voltDbRenderer.drTablesArray.push(tableData[key]['TABLE_NAME']);
-                    }
-
-                    if (tableData[key]['TABLE_TYPE1'] == "EXPORT") {
-                        voltDbRenderer.exportTablesArray.push(tableData[key]['TABLE_NAME']);
                     }
                 }
             }
@@ -1293,8 +1312,8 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_MEMORY' + suffix] == null) {
                 return;
             }
-            connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
 
+            connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME")
                     hostNameIndex = counter;
                 else if (columnInfo["name"] == "TUPLEDATA")
@@ -1313,7 +1332,6 @@ function alertNodeClicked(obj) {
                     javaMaxHeapIndex = counter;
                 counter++;
             });
-
 
             connection.Metadata['@Statistics_MEMORY' + suffix].data.forEach(function (memoryInfo) {
                 jQuery.each(hostNameList, function (id, val) {
@@ -1415,6 +1433,136 @@ function alertNodeClicked(obj) {
                     importerDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                     importerDetails["OUTSTANDING_REQUESTS"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
 
+                });
+            }
+        };
+        
+        var getExportTableDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "TUPLE_PENDING"
+                    || columnInfo["name"] == "SOURCE" || columnInfo["name"] == "TARGET"
+                    || columnInfo["name"] == "ACTIVE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var tuple_count = {}; // For keeping separate sums for each id
+                var tuple_pending = {};
+                var id = "";
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
+                    }
+                    if(isNaN(tuple_count[id])){ // Catches when tuple_count has not started tracking a certain id
+                        tuple_count[id] = 0;
+                    }
+                    if(isNaN(tuple_pending[id])){
+                        tuple_pending[id] = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("TARGET")) { // Add property for each group of data we want to get
+                        exporterDetails["TARGET"] = {};
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
+                        exporterDetails["TUPLE_COUNT"] = {};
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
+                        exporterDetails["TUPLE_PENDING"] = {};
+                    }
+                    if (!exporterDetails.hasOwnProperty("ACTIVE")) {
+                        exporterDetails["ACTIVE"] = {};
+                    }
+                    
+                    
+                    tuple_count[id] += info[colIndex["TUPLE_COUNT"]];
+                    tuple_pending[id] += info[colIndex["TUPLE_PENDING"]];
+                    
+                    exporterDetails["TARGET"][id] = info[colIndex["TARGET"]];
+                    exporterDetails["TUPLE_COUNT"][id] = tuple_count[id];
+                    exporterDetails["TUPLE_PENDING"][id] = tuple_pending[id];
+                    exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                    exporterDetails["ACTIVE"][id] = info[colIndex["ACTIVE"]];
+                });
+            }
+        };
+        
+        var getThroughputDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "SOURCE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var tuple_count = {};
+                var id = "";
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
+                    }
+                    if(isNaN(tuple_count[id])){
+	                    tuple_count[id] = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
+                        exporterDetails["TUPLE_COUNT"] = {};
+                    }
+                    tuple_count[id] += info[colIndex["TUPLE_COUNT"]];
+                    exporterDetails["TUPLE_COUNT"][id] = tuple_count[id];
+                    exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                });
+            }
+        };
+
+        var getQueuedDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_PENDING" || columnInfo["name"] == "SOURCE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var tuple_count = {};
+                var id = "";
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(id != info[colIndex["SOURCE"]]){
+                        id = info[colIndex["SOURCE"]];
+                    }
+                    if(isNaN(tuple_count[id])){
+	                    tuple_count[id] = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_PENDING")) {
+                        exporterDetails["TUPLE_PENDING"] = {};
+                    }
+                    tuple_count[id] += info[colIndex["TUPLE_PENDING"]];
+                    exporterDetails["TUPLE_PENDING"][id] = tuple_count[id];
+                    exporterDetails["TUPLE_PENDING"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
             }
         };
@@ -2275,7 +2423,7 @@ function alertNodeClicked(obj) {
                 if (!snapshotDetails.hasOwnProperty(hostName)) {
                     snapshotDetails[hostName] = [];
                 }
-                var snapshot = {                    
+                var snapshot = {
                     "TIMESTAMP": info[colIndex["TIMESTAMP"]],
                     "PATH": info[colIndex["PATH"]],
                     "START_TIME": info[colIndex["START_TIME"]],
@@ -2691,11 +2839,11 @@ function alertNodeClicked(obj) {
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
             var procedures = connection.Metadata['@SystemCatalog_PROCEDURES' + suffix].data;
             var procedureColumns = connection.Metadata['@SystemCatalog_PROCEDURECOLUMNS' + suffix].data;
+            const rawExportStreams = connection.Metadata['@Statistics_EXPORT' + suffix].data;
 
             var tables = [];
             var exports = [];
             var views = [];
-
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
                 var isView = false;
@@ -2718,6 +2866,12 @@ function alertNodeClicked(obj) {
                     exports[tableName] = item;
                 else
                     tables[tableName] = item;
+            }
+
+            // update the stream schema from @Statistic EXPORT.
+            for (var k = 0; k < rawExportStreams.length; k++) {
+                const streamName = rawExportStreams[k][5];
+                exports[streamName] = { name: streamName, key: null, indexes: null, columns: null };
             }
 
             connection.Metadata['tables'] = tables;
@@ -2858,6 +3012,16 @@ function alertNodeClicked(obj) {
             var partitionData = {};
             var averageRowCount = 0;
 
+            // update the exportTablesArray from @Statistics EXPORT.
+            if (connection.Metadata["@Statistics_EXPORT"] !== undefined || connection.Metadata["@Statistics_EXPORT"] != null) {
+                const rawExportStreams = connection.Metadata['@Statistics_EXPORT'].data;
+                const exportTablesSet = new Set();
+                for (let i = 0; i < rawExportStreams.length; i++) {
+                    exportTablesSet.add(rawExportStreams[i][5]);
+                }
+                voltDbRenderer.exportTablesArray = Array.from(exportTablesSet);
+            }
+
             if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     tableMetadata = connection.Metadata["@Statistics_TABLE"].data;
                     tableData = {};
@@ -2938,7 +3102,7 @@ function alertNodeClicked(obj) {
 })(window);
 
 
-//Navigation responsive	
+//Navigation responsive
 $(function () {
     $('#toggleMenu').click(function () {
         $("#nav").slideToggle('slow');
@@ -2959,4 +3123,3 @@ $(window).resize(function () {
         $("#nav").css('display', 'none');
     }
 });
-

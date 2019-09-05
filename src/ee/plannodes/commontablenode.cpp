@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,7 +50,13 @@
 namespace voltdb {
 
 void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
+    if (obj.hasKey("RECURSIVE_STATEMENT_ID")) {
+        m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
+    }
+    else {
+        m_recursiveStmtId = -1;
+    }
+
     m_commonTableName = obj.valueForKey("COMMON_TABLE_NAME").asStr();
 }
 

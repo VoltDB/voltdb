@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Map;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
+import org.voltdb.dtxn.TransactionState;
 
 /**
  * InitiatorMessageHandler delivers messages to internal Initiator components.
@@ -32,7 +33,8 @@ import org.voltdb.CommandLog;
  */
 public interface InitiatorMessageHandler
 {
-    void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState);
 
     void setCommandLog(CommandLog cl);
     void setMailbox(Mailbox mailbox);

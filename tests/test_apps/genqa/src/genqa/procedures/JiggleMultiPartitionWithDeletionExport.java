@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,24 +24,27 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.DeprecatedProcedureAPIAccess;
-
-@ProcInfo(
-    singlePartition = false
-)
 
 public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
+    // SQL on "replicated_table"
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM replicated_table WHERE rowid = ?");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     public final SQLStmt update = new SQLStmt("UPDATE replicated_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM replicated_table WHERE rowid = ?");
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_replicated_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    // templated sql on "export_replicated_table_<target>"
+    String template = "INSERT INTO export_replicated_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
+
+    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
+    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
+    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
+    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
 
     public VoltTable[] run(long rowid, long ignore)
     {
@@ -66,8 +69,10 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                 voltQueueSQL(delete, rowid);
                 // Export deletion
                 VoltTableRow row = item.fetchRow(0);
-                voltQueueSQL(
-                              export
+                SQLStmt [] statements = {export_kafka,export_rabbit,export_file,export_jdbc};
+                for (SQLStmt stmt: statements) {
+                    voltQueueSQL(
+                              stmt
                             , txid
                             , rowid
                             , row.get( 1, VoltType.TINYINT)
@@ -92,6 +97,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                             , row.get(20, VoltType.STRING)
                             , row.get(21, VoltType.STRING)
                             );
+                }
             }
             else
             {
@@ -139,7 +145,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                             , record.type_null_bigint
                             , record.type_not_null_bigint
                             , record.type_null_timestamp
-                            , record.type_not_null_timestamp
+                            // , record.type_not_null_timestamp
                             , record.type_null_float
                             , record.type_not_null_float
                             , record.type_null_decimal
@@ -156,7 +162,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
         // Execute last SQL batch
         voltExecuteSQL(true);
 
-        // Retun to caller
+        // Return to caller
         return null;
     }
 }

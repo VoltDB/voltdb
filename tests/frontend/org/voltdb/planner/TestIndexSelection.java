@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -240,7 +239,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
     // This tests recognition of prefix parameters and constants to prefer an index that
     // would use a greater number of key components AND would give the desired ordering.
-    public void testEng2541Plan() throws JSONException {
+    public void testEng2541Plan() {
         AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
         // System.out.println("DEBUG: " + pn.toExplainPlanString());
@@ -251,8 +250,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
     // This tests recognition of a prefix parameter and upper bound to prefer an index that would
     // use a greater number of key components even though another index would give the desired ordering.
-    public void testEng4792PlanWithCompoundEQLTEOrderedByPK()
-            throws JSONException {
+    public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
         // System.out.println("DEBUG: " + pn.toExplainPlanString());
         pn = pn.getChild(0);
@@ -418,6 +416,12 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select * from c where f > 0 and (e > 0 or d < 5);");
         checkScanUsesIndex(pn, "PARTIAL_IDX_OR_EXPR");
         checkIndexPredicateIsNull(pn);
+
+        // ENG-15719
+        // CREATE INDEX partial_idx_8 ON c (b) WHERE abs(a) > 0;
+        pn = compile("SELECT COUNT(b) FROM c WHERE abs(a) > 0;");
+        checkScanUsesIndex(pn, "PARTIAL_IDX_8");
+        checkIndexPredicateContains(pn, "A");
     }
 
     public void testPartialIndexComparisonPredicateExactMatch() {
@@ -580,6 +584,17 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select b from c where b > 0 and d > 0;");
         checkScanUsesIndex(pn, "PARTIAL_IDX_3");
         checkIndexSkipNullPredicateIsNull(pn, true);
+    }
+
+    public void testENG15616PenalizeGeoIndex() {
+        AbstractPlanNode pn;
+
+        pn = compile("SELECT R.VCHAR_INLINE_MAX FROM R WHERE NOT R.TINY = R.TINY;");
+        assertEquals(1, pn.getChildCount());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode) pn;
+        assertFalse(ispn.getTargetIndexName().equalsIgnoreCase("IDX"));
     }
 
     private void checkDualIndexedJoin(AbstractPlanNode pn,

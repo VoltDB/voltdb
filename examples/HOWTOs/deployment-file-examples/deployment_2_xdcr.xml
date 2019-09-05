@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <dr id="2" role="xdcr">
+        <connection source="node1,node2,node3" />  
+    </dr>
+    <cluster sitesperhost="4" kfactor="1"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="false" frequency="2m" />
+    <commandlog enabled="true">
+        <frequency/>
+    </commandlog>
+
+    <systemsettings>
+        <temptables maxsize="200"/>
+        <snapshot/>
+        <elastic/>
+        <query/>
+        <resourcemonitor>
+            <memorylimit/>
+        </resourcemonitor>
+    </systemsettings>
+    <security enabled="false"/>
+</deployment>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,58 +37,134 @@ import org.voltdb.types.VoltDecimalHelper;
  */
 public class ExportEncoder {
 
-    public static ByteBuffer getEncodedTable(VoltTable table)
-    throws IOException {
+    static class SizeWriter {
+        final FastSerializer m_fs;
+        final int m_writePos;
 
-        // get the table
-        FastSerializer fs = new FastSerializer(false, true);
-        table.resetRowPosition();
-        while (table.advanceRow()) {
-            byte[] rowData = encodeRow(table);
-            fs.writeInt(rowData.length);
-            fs.write(rowData);
+        SizeWriter(FastSerializer fs) throws IOException {
+            m_fs = fs;
+            m_writePos = fs.getPosition();
+            m_fs.writeInt(0);
         }
-        byte[] data = fs.getBytes();
 
-        // write the table with a length prefix
-        fs = new FastSerializer(false, false);
-        fs.writeInt(data.length);
-        fs.write(data);
-
-        return fs.getBuffer();
+        void finishWrite() throws IOException {
+            int bookmark = m_fs.getPosition();
+            m_fs.setPosition(m_writePos);
+            m_fs.writeInt(bookmark - m_writePos - 4);
+            m_fs.setPosition(bookmark);
+        }
     }
 
-    static byte[] encodeRow(VoltTable table)
+    static void writeSchema(FastSerializer fs, VoltTable table, String tableName) throws IOException {
+        SizeWriter schemaSize = new SizeWriter(fs);
+
+        fs.writeString(tableName);
+        VoltType type;
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            fs.writeString(table.getColumnName(i));         // name
+
+            type = table.getColumnType(i);
+            fs.writeByte(type.getValue());                  // type
+
+            int columnLength = 0;
+            if (type.isVariableLength()) {
+                if (type.equals(VoltType.STRING)) {
+                    columnLength = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
+                } else {
+                    columnLength = VoltType.MAX_VALUE_LENGTH;
+                }
+            } else {
+                columnLength = type.getLengthInBytesForFixedTypes();
+            }
+            fs.writeInt(columnLength);                      // length
+        }
+        schemaSize.finishWrite();
+    }
+
+    static byte[] encodeRow(VoltTable table, String tableName, int partitionColumnIndex, long generation)
     throws IOException {
 
         FastSerializer fs = new FastSerializer(false, true);
-        int colCount = table.getColumnCount();
+        try {
+            writeSchema(fs, table, tableName);
 
-        // pack the null flags
-        int nullArrayLen = ((colCount + 7) & -8) >> 3;
-        boolean[] nullArray = new boolean[colCount];
-        byte[] nullBits = new byte[nullArrayLen];
-        for (int i = 0; i < colCount; i++) {
-            nullArray[i] = isColumnNull(i, table);
-            if (nullArray[i]) {
-                int index = i >> 3;
-                int bit = i % 8;
-                byte mask = (byte) (0x80 >>> bit);
-                nullBits[index] = (byte) (nullBits[index] | mask);
+            int colCount = table.getColumnCount();
+
+            SizeWriter rowSize = new SizeWriter(fs);
+            fs.writeInt(partitionColumnIndex);
+            // column count
+            fs.writeInt(colCount);
+            // pack the null flags
+            int nullArrayLen = ((colCount + 7) & -8) >> 3;
+            boolean[] nullArray = new boolean[colCount];
+            byte[] nullBits = new byte[nullArrayLen];
+            for (int i = 0; i < colCount; i++) {
+                nullArray[i] = isColumnNull(i, table);
+                if (nullArray[i]) {
+                    int index = i >> 3;
+                    int bit = i % 8;
+                    byte mask = (byte) (0x80 >>> bit);
+                    nullBits[index] = (byte) (nullBits[index] | mask);
+                }
             }
-        }
-        fs.write(nullBits);
+            fs.write(nullBits);
 
-        // write the non-null columns
-        for (int i = 0; i < colCount; i++) {
-            if (!nullArray[i]) {
-                encodeColumn(fs, i, table);
+            // write the non-null columns
+            for (int i = 0; i < colCount; i++) {
+                if (!nullArray[i]) {
+                    encodeColumn(fs, i, table);
+                }
             }
-        }
+            rowSize.finishWrite();
 
-        final byte[] bytes = fs.getBytes();
-        fs.discard();
-        return bytes;
+            final byte[] bytes = fs.getBytes();
+            return bytes;
+        } finally {
+            fs.discard();
+        }
+    }
+
+    static byte[] encodeTable(VoltTable table, String tableName, int partitionColumnIndex, long generation)
+    throws IOException {
+
+        FastSerializer fs = new FastSerializer(false, true);
+        try {
+            writeSchema(fs, table, tableName);
+            while (table.advanceRow()) {
+                SizeWriter rowSize = new SizeWriter(fs);
+                fs.writeInt(partitionColumnIndex);
+                int colCount = table.getColumnCount();
+                // column count
+                fs.writeInt(colCount);
+                // pack the null flags
+                int nullArrayLen = ((colCount + 7) & -8) >> 3;
+                boolean[] nullArray = new boolean[colCount];
+                byte[] nullBits = new byte[nullArrayLen];
+                for (int i = 0; i < colCount; i++) {
+                    nullArray[i] = isColumnNull(i, table);
+                    if (nullArray[i]) {
+                        int index = i >> 3;
+                        int bit = i % 8;
+                        byte mask = (byte) (0x80 >>> bit);
+                        nullBits[index] = (byte) (nullBits[index] | mask);
+                    }
+                }
+                fs.write(nullBits);
+
+                // write the non-null columns
+                for (int i = 0; i < colCount; i++) {
+                    if (!nullArray[i]) {
+                        encodeColumn(fs, i, table);
+                    }
+                }
+                rowSize.finishWrite();
+                System.out.println("Row done.");
+            }
+            final byte[] bytes = fs.getBytes();
+            return bytes;
+        } finally {
+            fs.discard();
+        }
     }
 
     static boolean isColumnNull(int index, VoltTable table) {

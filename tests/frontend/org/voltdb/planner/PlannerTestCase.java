@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,16 +24,16 @@
 package org.voltdb.planner;
 
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.EmptyStackException;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -42,19 +42,30 @@ import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanMatcher;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.PlannerType;
 import org.voltdb.types.SortDirectionType;
 
 import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
-    private PlannerTestAideDeCamp m_aide;
+    protected PlannerTestAideDeCamp m_aide;
     private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
     final private int m_defaultParamCount = 0;
     private String m_noJoinOrder = null;
+    private PlannerType m_plannerType = PlannerType.VOLTDB;
 
+    public PlannerTestCase() {
+        super();
+    }
+
+    PlannerTestCase(PlannerType plannerType) {
+        super();
+        m_plannerType = plannerType;
+    }
     /**
      * @param sql
      * @return
@@ -77,7 +88,7 @@ public class PlannerTestCase extends TestCase {
     protected void failToCompile(String sql, String... patterns) {
         int paramCount = countQuestionMarks(sql);
         try {
-            List<AbstractPlanNode> unexpected = m_aide.compile(sql, paramCount,
+            List<AbstractPlanNode> unexpected = m_aide.compile(m_plannerType, sql, paramCount,
                     m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             printExplainPlan(unexpected);
             fail("Expected planner failure, but found success.");
@@ -99,7 +110,7 @@ public class PlannerTestCase extends TestCase {
     protected CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
         CompiledPlan cp = null;
         try {
-            cp = m_aide.compileAdHocPlan(sql, detMode);
+            cp = m_aide.compileAdHocPlan(m_plannerType, sql, detMode);
             assertTrue(cp != null);
         }
         catch (Exception ex) {
@@ -125,22 +136,30 @@ public class PlannerTestCase extends TestCase {
                                             boolean inferPartitioning,
                                             boolean forcedSP,
                                             DeterminismMode detMode) {
-        CompiledPlan cp = null;
-        try {
-            cp = m_aide.compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
-            assertTrue(cp != null);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        CompiledPlan cp =
+                m_aide.compileAdHocPlan(m_plannerType, sql, inferPartitioning, forcedSP, detMode);
+        assertNotNull("CompiledPlan is NULL", cp);
         return cp;
     }
 
-    protected CompiledPlan compileAdHocPlan(String sql,
-                                            boolean inferPartitioning,
-                                            boolean forcedSP) {
-        return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
+    /**
+     * This is exactly like compileAdHocPlan, but it may throw an
+     * error.  We added this because we sometimes call this from a
+     * planner test just to find out if a string compiles.  We
+     * need to know more about failures than just that they failed.
+     * We need to know why the failed so we can check the error
+     * messages.
+     *
+     * @param sql
+     * @return
+     */
+    protected CompiledPlan compileAdHocPlanThrowing(String sql,
+                                                    boolean inferPartitioning,
+                                                    boolean forcedSP,
+                                                    DeterminismMode detMode) {
+        CompiledPlan cp = compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
+        assertNotNull("CompiledPlan is NULL", cp);
+        return cp;
     }
 
     protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
@@ -190,7 +209,7 @@ public class PlannerTestCase extends TestCase {
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder) {
         //* enable to debug */ System.out.println("DEBUG: compileWithJoinOrderToFragments(\"" + sql + "\", " + planForSinglePartition + ", \"" + joinOrder + "\")");
-        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
+        List<AbstractPlanNode> pn = m_aide.compile(m_plannerType, sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);
@@ -309,6 +328,10 @@ public class PlannerTestCase extends TestCase {
     }
 
 
+    protected VoltXMLElement compileToXML(String SQL) throws HSQLParseException {
+        return m_aide.compileToXML(SQL);
+    }
+
     protected void setupSchema(URL ddlURL, String basename,
                                boolean planForSinglePartition) throws Exception {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
@@ -329,7 +352,7 @@ public class PlannerTestCase extends TestCase {
         return m_aide.getCatalog();
     }
 
-    Database getDatabase() {
+    protected Database getDatabase() {
         return m_aide.getDatabase();
     }
 
@@ -347,15 +370,19 @@ public class PlannerTestCase extends TestCase {
         return explain;
     }
 
-    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
-        String explainStr1, explainStr2;
-        List<AbstractPlanNode> pns = compileToFragments(sql1);
-        explainStr1 = buildExplainPlan(pns);
-        pns = compileToFragments(sql2);
-        explainStr2 = buildExplainPlan(pns);
-
-        assertEquals(explainStr1, explainStr2);
+    protected void checkQueriesPlansAreDifferent(String sql1, String sql2, String msg) {
+        assertFalse(msg, areQueryPlansEqual(sql1, sql2));
     }
+
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        assertEquals(buildExplainPlan(compileToFragments(sql1)), buildExplainPlan(compileToFragments(sql2)));
+    }
+
+    private boolean areQueryPlansEqual(String sql1, String sql2) {
+        return buildExplainPlan(compileToFragments(sql1))
+                .equals(buildExplainPlan(compileToFragments(sql2)));
+    }
+
 
     /**
      * Call this function to verify that an order by plan node has the
@@ -684,7 +711,18 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
-    protected class PlanWithInlineNodes {
+    private String planNodeListString(List<PlanNodeType> list) {
+        StringBuilder buf = new StringBuilder();
+        String sep = "";
+        for (PlanNodeType pnt : list) {
+            buf.append(sep)
+               .append(pnt.name());
+            sep = ", ";
+        }
+        return buf.toString();
+    }
+
+    protected static class PlanWithInlineNodes implements PlanMatcher {
         PlanNodeType m_type = null;
 
         List<PlanNodeType> m_branches = new ArrayList<>();
@@ -695,92 +733,305 @@ public class PlannerTestCase extends TestCase {
             }
         }
 
+        @Override
         public String match(AbstractPlanNode node) {
             PlanNodeType mainNodeType = node.getPlanNodeType();
             if (m_type != mainNodeType) {
-                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
-                                     m_type, mainNodeType);
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s "
+                                     + "at plan node id %d.",
+                                     m_type, mainNodeType,
+                                     node.getPlanNodeId());
             }
             for (PlanNodeType nodeType : m_branches) {
                 AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
                 if (inlineNode == null) {
-                    return String.format("Expected inline node type %s but didn't find it.",
-                                         nodeType.name());
+                    return String.format("Expected inline node type %s but didn't find it "
+                                         + "at plan node id %d.",
+                                         nodeType.name(),
+                                         node.getPlanNodeId());
                 }
             }
             if (m_branches.size() != node.getInlinePlanNodes().size()) {
-                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
+                StringBuilder buf = new StringBuilder();
+                String sep = "";
+                for (PlanNodeType pnt : m_branches) {
+                    buf.append(sep).append(pnt.name());
+                }
+                String expected = buf.toString();
+                buf = new StringBuilder();
+                sep = "";
+                for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
+                    buf.append(sep).append(entry.getKey().name());
+                    sep = ", ";
+                }
+                String found = buf.toString();
+                return String.format("Expected %d inline nodes (%s), found %d (%s) at node id %d.",
+                                     m_branches.size(),
+                                     expected,
+                                     node.getInlinePlanNodes().size(),
+                                     found,
+                                     node.getPlanNodeId());
             }
             return null;
         }
     }
 
+    protected static PlanWithInlineNodes planWithInlineNodes(PlanNodeType mainType,
+                                                             PlanNodeType ... inlineTypes) {
+        return new PlanWithInlineNodes(mainType, inlineTypes);
+    }
+
+    /**
+     * Make a PlanMatcher out of an object.  The object
+     * really wants to be a PlanMatcher itself.  But it's
+     * very convenient to just allow a plan node type here,
+     * so we relax the type system.
+     *
+     * @param obj
+     * @return
+     */
+    private static PlanMatcher makePlanMatcher(Object obj) {
+        if (obj instanceof PlanNodeType) {
+            return (node) -> {
+                        PlanNodeType pnt = (PlanNodeType)obj;
+                        if (node.getPlanNodeType() != (PlanNodeType)obj) {
+                            return String.format("Expected Plan Node Type %s not %s at node id %d",
+                                                 pnt.name(),
+                                                 node.getPlanNodeType().name(),
+                                                 node.getPlanNodeId());
+                        }
+                        return null;
+                    };
+        }
+        else if (obj instanceof PlanMatcher) {
+            return (PlanMatcher)obj;
+        }
+        else {
+            throw new PlanningErrorException("Bad fragment specification type.");
+        }
+    }
+
+    protected static class FragmentSpec implements PlanMatcher {
+        private List<PlanMatcher> m_nodeSpecs = new ArrayList<>();
+
+        public FragmentSpec(Object ... nodeSpecs) {
+            for (int idx = 0; idx < nodeSpecs.length; idx += 1) {
+                m_nodeSpecs.add(makePlanMatcher(nodeSpecs[idx]));
+            }
+        }
+
+        @Override
+        public String match(AbstractPlanNode node) {
+            int idx;
+            for (idx = 0; node != null && idx < m_nodeSpecs.size(); idx += 1) {
+                PlanMatcher pm = m_nodeSpecs.get(idx);
+                String err = pm.match(node);
+                if (err != null) {
+                    return err;
+                }
+                // Nodes with multiple children, such as join
+                // nodes, will have their own matchers, and will
+                // stop here.
+                if (node.getChildCount() > 0) {
+                    node = node.getChild(0);
+                }
+                else {
+                    node = null;
+                }
+            }
+            if (idx < m_nodeSpecs.size()) {
+                return "Expected "
+                       + (m_nodeSpecs.size() + 1)
+                       + " nodes in plan, not "
+                       + (idx+1) ;
+            }
+            if (node != null) {
+                return "Expected fewer nodes in plan at node "
+                       + (idx + 1)
+                       + ": "
+                       + node.getPlanNodeType();
+            }
+            return null;
+        }
+    }
+
+    protected static FragmentSpec fragSpec(Object ... nodeSpecs) {
+        return new FragmentSpec(nodeSpecs);
+    }
+
+    protected static class SomeOrNoneOrAllOf implements PlanMatcher {
+        boolean m_needAll;
+        boolean m_needSome;
+        String m_failMessage;
+        List<PlanMatcher> m_allMatchers = new ArrayList<>();
+
+        /**
+         * Match some or none or all of a set of conditions.
+         * <ul>
+         *   <li>To match all conditions specify needAll true.</li>
+         *   <li>To match at least one condition specify needSome true and needAll false.</li>
+         *   <li>To match none of the conditions specify needSome and needAll to be both false.</li>
+         * </ul>
+         *
+         * @param needAll If this is true we need to match all conditions.  If
+         *                this is false then the semantics depends on needSome.
+         * @param needSome If this is true we need only match some conditions.
+         *                 If this and needAll are both false we need to fail
+         *                 all the conditions.
+         * @param failMessage The error message to return if we can't find
+         *                    anything better.
+         * @param matchers The conditions to match.  These can be either PlanNodeType
+         *                 enumerals or else PlanMatcher objects.  At least one
+         *                 matcher must be specified.
+         */
+        public SomeOrNoneOrAllOf(boolean needAll, boolean needSome, String failMessage, Object ...matchers) {
+            m_needAll = needAll;
+            m_needSome = needAll || needSome;
+            m_failMessage = failMessage;
+            if (matchers.length == 0) {
+                throw new PlanningErrorException("Need at least one matcher here.");
+            }
+            for (Object obj : matchers) {
+                m_allMatchers.add(makePlanMatcher(obj));
+            }
+        }
+
+        @Override
+        public String match(AbstractPlanNode node) {
+            for (PlanMatcher pm : m_allMatchers) {
+                String error = pm.match(node);
+                if (error != null) {
+                    if (m_needAll) {
+                        return error;
+                    }
+                }
+                else if (!m_needAll) {
+                    // We didn't get an error message and
+                    // we need some to be true but maybe not
+                    // all.  So return null, which is success.
+                    if (m_needSome) {
+                        return null;
+                    }
+                    else {
+                        // We got a successful match, but we didn't
+                        // want any.  So return the fallback message.
+                        return m_failMessage;
+                    }
+                }
+            }
+            if (m_needAll) {
+                // if m_needAll is true, then we never
+                // saw an error.  Otherwise we would have
+                // returned earlier.  So return null, which
+                // is success.
+                return null;
+            }
+            // If m_needAll is false and m_needSome is true
+            // then we must have seen nothing but failures.
+            // So this is a failure.
+            if (m_needSome) {
+                return m_failMessage;
+            }
+            else {
+                // If m_needAll and m_needSome are both
+                // false then we want to match no condition.
+                // But that's exactly what we have seen, so
+                // we want to return null, which is success.
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Match all the given node specifications.  Specifications
+     * after the first failure are not evaluated.
+     *
+     * Note that, unlike someOf or noneOf, there is no fail
+     * message.  The first failing specification is the error
+     * message.
+     *
+     * @param nodeSpecs  The specifications.
+     * @return
+     */
+    protected PlanMatcher allOf(PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(true, true, "This cannot happen.", (Object[])nodeSpecs);
+    }
+
+    /**
+     * Match at least one of the given node specifications.  Only specifications
+     * up until the first success are evaluated.
+     *
+     * @param failMessage A message to return if no specification succeeds.
+     * @param nodeSpecs The specifications.
+     * @return
+     */
+    protected PlanMatcher someOf(String failMessage, PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, true, failMessage, (Object[])nodeSpecs);
+    }
+    /**
+     * Ensure that no specification succeeds.
+     *
+     * @param failMessage A message to return if some specification succeeds.
+     *                    We need this because success is denoted by a null error message.
+     * @param nodeSpecs The specifications.
+     * @return
+     */
+    protected PlanMatcher noneOf(String failMessage, PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, false, failMessage, (Object[])nodeSpecs);
+    }
     /**
      * Validate a plan.  This is kind of like
      * PlannerTestCase.compileToTopDownTree.  The differences are
      * <ol>
-     *   <li>We can compile MP plans and SP plans, and</li>
-     *   <li>The boundaries between fragments in MP plans
-     *       are marked with PlanNodeType.INVALID.</li>
-     *   <li>We can describe inline nodes pretty easily.</li>
+     *   <li>We can compile MP plans and SP plans</li>
+     *   <li>We can describe plan nodes with inline nodes
+     *       pretty handily.</li>
      * </ol>
      *
-     * See TestWindowFunctions.testWindowFunctionWithIndex for examples
-     * of the use of this function.
+     * See TestWindowFunctions.testWindowFunctionWithIndex or
+     * TestPlansInsertIntoSelect for examples of the use of this
+     * function.  TestUnion also has a function which uses this
+     * scheme.
      *
-     * @param SQL The statement text.
-     * @param numberOfFragments The number of expected fragments.
-     * @param types The plan node types of the inline and out-of-line nodes.
-     *              If types[idx] is a PlanNodeType, then the node should
-     *              have no inline children.  If types[idx] is an object of
-     *              type PlanWithInlineNode then it has the main node type,
-     *              and node types of the inline children as well.
+     * @param SQL The SQL statement text.
+     * @param types Specifications of the plans for the fragments.
+     *              These are most easily specified with the function
+     *              fragSpec.
      */
     protected void validatePlan(String SQL,
-                                int numberOfFragments,
-                                Object ...types) {
-        List<AbstractPlanNode> fragments = compileToFragments(SQL);
-        assertEquals(String.format("Expected %d fragments, not %d",
-                                   numberOfFragments,
-                                   fragments.size()),
-                     numberOfFragments,
-                     fragments.size());
-        int idx = 0;
-        int fragment = 1;
-        // The index of the last PlanNodeType in types.
-        int nchildren = types.length;
-        System.out.printf("Plan for <%s>\n", SQL);
-        for (AbstractPlanNode plan : fragments) {
-            printPlanNodes(plan, fragment, numberOfFragments);
-            // The boundaries between fragments are
-            // marked with PlanNodeType.INVALID.
-            if (fragment > 1) {
-                assertEquals("Expected a fragment to start here",
-                             PlanNodeType.INVALID,
-                             types[idx]);
-                idx += 1;
-            }
-            fragment += 1;
-            for (;plan != null; idx += 1) {
-                if (types.length <= idx) {
-                    fail(String.format("Expected %d plan nodes, but found more.", types.length));
-                }
-                if (types[idx] instanceof PlanNodeType) {
-                    assertEquals(String.format("Expected %s plan node but found %s", types[idx], plan.getPlanNodeType()),
-                                 types[idx], plan.getPlanNodeType());
-                } else if (types[idx] instanceof PlanWithInlineNodes) {
-                    PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];
-                    String error = branch.match(plan);
-                    if (error != null) {
-                        fail(error);
-                    }
-                } else {
-                    fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
-                }
-                plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
-            }
+                                FragmentSpec ... spec) {
+        // All this System.out.printf nonsense should be changed
+        // to a log message somehow.
+        List<AbstractPlanNode> fragments;
+        if (spec.length > 1) {
+            fragments = compileToFragments(SQL);
+        } else {
+            fragments = new ArrayList<>();
+            fragments.add(compileForSinglePartition(SQL));
         }
-        assertEquals(nchildren, idx);
+        System.out.printf("SQL: %s\n", SQL);
+        for (int idx = 0; idx < fragments.size(); idx += 1) {
+            AbstractPlanNode node = fragments.get(idx);
+            System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
+            printJSONString(node);
+        }
+        assertEquals(String.format("Expected %d fragments, not %d",
+                                   spec.length,
+                                   fragments.size()),
+                     spec.length,
+                     fragments.size());
+        for (int idx = 0; idx < fragments.size(); idx += 1) {
+            String error = spec[idx].match(fragments.get(idx));
+            assertNull(error, error);
+        }
     }
 
+    private void printJSONString(AbstractPlanNode node) {
+        try {
+            String jsonString = PlanSelector.outputPlanDebugString(node);
+            System.out.printf("Json:\n%s\n", jsonString);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
 }

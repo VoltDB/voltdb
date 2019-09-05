@@ -70,7 +70,7 @@
          };
 
         this.GetClusterInformation = function (onConnectionAdded) {
-            this.processTask(onConnectionAdded, "CLUSTER_INFORMATION", ['@SystemInformation'], ["OVERVIEW"], [undefined]);
+            this.processTask(onConnectionAdded, "CLUSTER_INFORMATION", ['@SystemInformation'], ["OVERVIEW"], []);
         };
 
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
@@ -78,9 +78,9 @@
         };
 
         this.GetDataTablesInformation = function (onConnectionAdded) {
-             var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
-             var parameters = ["TABLE", "TABLES"];
-             var values = ['0', undefined];
+             var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog'];
+             var parameters = ["TABLE", "EXPORT", "TABLES"];
+             var values = ['0', '0', undefined];
              this.processTask(onConnectionAdded, "DATABASE_INFORMATION", procedureNames, parameters, values);
         };
 
@@ -146,10 +146,14 @@
             this.processTask(onConnectionAdded, "GRAPH_IMPORTER", ['@Statistics'], ["IMPORTER"], ['0']);
         };
 
+        this.GetExporterInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "GRAPH_EXPORT", ['@Statistics'], ["EXPORT"], ['0']);
+        };
+
         this.GetTableInformation = function (onConnectionAdded) {
-            var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
-            var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
-            var values = ['0', '0', undefined];
+            var procedureNames = ['@Statistics', '@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+            var parameters = ["TABLE", "INDEX", "EXPORT", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+            var values = ['0', '0', '0', undefined];
             this.processTaskAdmin(onConnectionAdded, "TABLE_INFORMATION", procedureNames, parameters, values, true, false);
         };
 
@@ -409,7 +413,7 @@
 
         //Check if cluster is replica or not
         this.GetClusterReplicaInformation = function (onConnectionAdded) {
-            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], ['0']);
+            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], []);
         };
 
         this.GetDrRoleInformation = function (onConnectionAdded) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,12 +19,6 @@
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-#include "logging/LogManager.h"
-
-#include <cstdio>
-#include <sstream>
-#include <algorithm>
-#include <set>
 
 namespace voltdb {
 Pool* NValue::getTempStringPool() {
@@ -128,96 +122,85 @@ std::string NValue::debug() const {
     std::ostringstream buffer;
     std::string out_val;
     const char* ptr;
-
+    int32_t length;
     buffer << getTypeName(type) << "::";
     if (isNull()) {
-        buffer << "<NULL>";
-        return buffer.str();
+       buffer << "<NULL>";
+       return buffer.str();
     }
 
     switch (type) {
-    case VALUE_TYPE_BOOLEAN:
-        buffer << (getBoolean() ? "true" : "false");
-        break;
-    case VALUE_TYPE_TINYINT:
-        buffer << static_cast<int32_t>(getTinyInt());
-        break;
-    case VALUE_TYPE_SMALLINT:
-        buffer << getSmallInt();
-        break;
-    case VALUE_TYPE_INTEGER:
-        buffer << getInteger();
-        break;
-    case VALUE_TYPE_BIGINT:
-        buffer << getBigInt();
-        break;
-    case VALUE_TYPE_DOUBLE:
-        buffer << getDouble();
-        break;
-    case VALUE_TYPE_VARCHAR:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
-        break;
+       case VALUE_TYPE_BOOLEAN:
+          buffer << (getBoolean() ? "true" : "false");
+          break;
+       case VALUE_TYPE_TINYINT:
+          buffer << static_cast<int32_t>(getTinyInt());
+          break;
+       case VALUE_TYPE_SMALLINT:
+          buffer << getSmallInt();
+          break;
+       case VALUE_TYPE_INTEGER:
+          buffer << getInteger();
+          break;
+       case VALUE_TYPE_BIGINT:
+          buffer << getBigInt();
+          break;
+       case VALUE_TYPE_DOUBLE:
+          buffer << getDouble();
+          break;
+       case VALUE_TYPE_VARCHAR:
+          ptr = getObject_withoutNull(length);
+          out_val = std::string(ptr, length);
+          buffer << "[" << length << "]";
+          buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
+          break;
+       case VALUE_TYPE_VARBINARY:
+          ptr = getObject_withoutNull(length);
+          out_val = std::string(ptr, length);
+          buffer << "[" << length << "]";
+          buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
+          break;
+       case VALUE_TYPE_DECIMAL:
+          buffer << createStringFromDecimal();
+          break;
+       case VALUE_TYPE_TIMESTAMP:
+          try {
+             std::stringstream ss;
+             streamTimestamp(ss);
+             buffer << ss.str();
+          } catch (const SQLException &) {
+             buffer << "<out of range timestamp:" << getBigInt() << ">";
+          } catch (...) {
+             buffer << "<exception when converting timestamp:" << getBigInt() << ">";
+          }
+          break;
+       case VALUE_TYPE_POINT:
+          buffer << getGeographyPointValue().toString();
+          break;
+       case VALUE_TYPE_GEOGRAPHY:
+          buffer << getGeographyValue().toString();
+          break;
+       default:
+          buffer << "(no details)";
+          break;
     }
-    case VALUE_TYPE_VARBINARY:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
-        break;
-    }
-    case VALUE_TYPE_DECIMAL:
-        buffer << createStringFromDecimal();
-        break;
-    case VALUE_TYPE_TIMESTAMP: {
-        try {
-            std::stringstream ss;
-            streamTimestamp(ss);
-            buffer << ss.str();
-        }
-        catch (const SQLException &) {
-            buffer << "<out of range timestamp:" << getBigInt() << ">";
-        }
-        catch (...) {
-            buffer << "<exception when converting timestamp:" << getBigInt() << ">";
-        }
-        break;
-    }
-    case VALUE_TYPE_POINT:
-        buffer << getGeographyPointValue().toString();
-        break;
-    case VALUE_TYPE_GEOGRAPHY:
-        buffer << getGeographyValue().toString();
-        break;
-    default:
-        buffer << "(no details)";
-        break;
-    }
-    std::string ret(buffer.str());
-    return (ret);
+    return buffer.str();
 }
 
 int32_t NValue::serializedSize() const {
     switch (m_valueType) {
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY: {
-            int32_t length = sizeof(int32_t);
-            if (! isNull()) {
-                int32_t valueLength;
-                getObject_withoutNull(&valueLength);
-                length += valueLength;
-            }
-            return length;
-        }
-    default:
-        return getTupleStorageSize(m_valueType);
+       case VALUE_TYPE_VARCHAR:
+       case VALUE_TYPE_VARBINARY:
+       case VALUE_TYPE_GEOGRAPHY:
+          if (! isNull()) {
+             int32_t valueLength;
+             getObject_withoutNull(valueLength);
+             return sizeof(int32_t) + valueLength;
+          } else {
+              return sizeof(int32_t);
+          }
+       default:
+          return getTupleStorageSize(m_valueType);
     }
 }
 
@@ -225,7 +208,7 @@ int32_t NValue::serializedSize() const {
  * Serialize sign and value using radix point (no exponent).
  */
 std::string NValue::createStringFromDecimal() const {
-    assert(!isNull());
+    vassert(!isNull());
     std::ostringstream buffer;
     TTInt scaledValue = getDecimal();
     if (scaledValue.IsSign()) {
@@ -270,11 +253,8 @@ void NValue::createDecimalFromString(const std::string &txt) {
      */
     for (int ii = (setSign ? 1 : 0); ii < static_cast<int>(txt.size()); ii++) {
         if ((txt[ii] < '0' || txt[ii] > '9') && txt[ii] != '.') {
-            char message[4096];
-            snprintf(message, 4096, "Invalid characters in decimal string: %s",
-                     txt.c_str());
-            throw SQLException(SQLException::volt_decimal_serialization_error,
-                               message);
+            throwSQLException(SQLException::volt_decimal_serialization_error,
+                    "Invalid characters in decimal string: %s", txt.c_str());
         }
     }
 
@@ -284,7 +264,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
         const std::size_t wholeStringSize = wholeString.size();
         if (wholeStringSize > 26) {
             throw SQLException(SQLException::volt_decimal_serialization_error,
-                               "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+                    "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
         }
         TTInt whole(wholeString);
         if (setSign) {
@@ -297,7 +277,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
 
     if (txt.find( '.', separatorPos + 1) != std::string::npos) {
         throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Too many decimal points");
+                "Too many decimal points");
     }
 
     // This is set to 1 if we carry in the scale.
@@ -370,16 +350,14 @@ void NValue::createDecimalFromString(const std::string &txt) {
 }
 
 struct NValueList {
-    static int allocationSizeForLength(size_t length)
-    {
+    static int allocationSizeForLength(size_t length) {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
         // This allocation has the advantage of getting freed via NValue::free.
         return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
     }
 
-    void* operator new(size_t size, char* placement)
-    {
+    void* operator new(size_t size, char* placement) {
         return placement;
     }
     void operator delete(void*, char*) {}
@@ -388,8 +366,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
-    {
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool) {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
         }
@@ -412,8 +389,7 @@ struct NValueList {
  * explicit cast operators and and/or constant promotions as needed.
  * @return a VALUE_TYPE_BOOLEAN NValue.
  */
-bool NValue::inList(const NValue& rhs) const
-{
+bool NValue::inList(const NValue& rhs) const {
     //TODO: research: does the SQL standard allow a null to match a null list element
     // vs. returning FALSE or NULL?
     const bool lhsIsNull = isNull();
@@ -434,8 +410,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
-{
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool) {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
     int trueSize = NValueList::allocationSizeForLength(length);
@@ -447,22 +422,20 @@ void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPo
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-void NValue::allocateANewNValueList(size_t length, ValueType elementType)
-{
+void NValue::allocateANewNValueList(size_t length, ValueType elementType) {
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, NULL);
     ::memset(storage, 0, trueSize);
     new (storage) NValueList(length, elementType);
 }
 
-void NValue::setArrayElements(std::vector<NValue> &args) const
-{
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+void NValue::setArrayElements(std::vector<NValue> &args) const {
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
     // Assign each of the elements.
     int ii = (int)args.size();
-    assert(ii == listOfNValues->m_length);
+    vassert(ii == listOfNValues->m_length);
     while (ii--) {
         listOfNValues->m_values[ii] = args[ii];
     }
@@ -470,24 +443,22 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-int NValue::arrayLength() const
-{
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+int NValue::arrayLength() const {
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
-const NValue& NValue::itemAtIndex(int index) const
-{
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+const NValue& NValue::itemAtIndex(int index) const {
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
-    assert(index >= 0);
-    assert(index < listOfNValues->m_length);
+    vassert(index >= 0);
+    vassert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];
 }
 
-void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const
-{
+void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
+        std::vector<NValue> &outList) const {
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
@@ -517,8 +488,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     }
 }
 
-void NValue::streamTimestamp(std::stringstream& value) const
-{
+void NValue::streamTimestamp(std::stringstream& value) const {
     int64_t epoch_micros = getTimestamp();
     if (epochMicrosOutOfRange(epoch_micros)) {
         throwOutOfRangeTimestampInput("CAST");
@@ -535,21 +505,20 @@ void NValue::streamTimestamp(std::stringstream& value) const
         // and converting it to 1000000 micros
         micro += 1000000;
     }
-    char mbstr[27];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
+    char mbstr[64];    // Format: "YYYY-MM-DD HH:MM:SS."- 27 characters + terminator
+                       //         But GCC-7 thinks it may be longer.  So we need
+                       //         extra space.
     snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
              (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
              (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
     value << mbstr;
 }
 
-inline static void throwTimestampFormatError(const std::string &str)
-{
-    char message[4096];
+inline static void throwTimestampFormatError(const std::string &str) {
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
-             "or \'YYYY-MM-DD\'",
-             str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
-    throw SQLException(SQLException::dynamic_sql_error, message);
+    throwSQLException(SQLException::dynamic_sql_error,
+            "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'or \'YYYY-MM-DD\'",
+            str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
 }
 
 int64_t NValue::parseTimestampString(const std::string &str)
@@ -651,6 +620,7 @@ int64_t NValue::parseTimestampString(const std::string &str)
         if (micro >= 2000000 || micro < 1000000) {
             throwTimestampFormatError(str);
         }
+        /* fall through */ // gcc-7 needs this comment.
     case 10:
         if (date_str.at(4) != '-' || date_str.at(7) != '-') {
             throwTimestampFormatError(str);

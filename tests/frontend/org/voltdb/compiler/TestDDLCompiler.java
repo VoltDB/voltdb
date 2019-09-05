@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -635,7 +635,7 @@ public class TestDDLCompiler extends TestCase {
 
     public void testNullAnnotation() throws IOException {
 
-        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
+        Catalog catalog  = TPCCProjectBuilder.getTPCCSchemaCatalog();
         Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         for(Table t : catalog_db.getTables()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.ConstraintType;
 
@@ -138,6 +139,16 @@ public class ConstraintFailureException extends SQLException {
     @Override
     protected SerializableExceptions getExceptionType() {
         return SerializableExceptions.ConstraintFailureException;
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.GRACEFUL_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "CONSTRAINT VIOLATION";
     }
 
     @Override

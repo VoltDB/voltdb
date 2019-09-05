@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -39,55 +39,13 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- *//* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
- *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
  */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */package org.voltdb.planner.eegentests;
+package org.voltdb.planner.eegentests;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -99,9 +57,9 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlanSelector;
 import org.voltdb.planner.PlannerTestCase;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -207,13 +165,21 @@ public class EEPlanGenerator extends PlannerTestCase {
         "     return TestSuite::globalInstance()->runAll();\n" +
         "}\n";
 
-    private String m_sourceDir = "tests/ee";
-
-    private boolean m_namesOnly = false;
-
-    protected String getPlanString(String sqlStmt) throws JSONException {
-        return getPlanString(sqlStmt, 0);
-    }
+    //
+    // This holds the full path name of the directory into which we will
+    // put generated EE unit tests.
+    //
+    private String m_testGenPath;
+    //
+    // This is the last path component of the previous.
+    //
+    private String m_testGenDir;
+    //
+    // This holds the full path name of the file which contains names
+    // of generated tests.  The names are listed one test name per line.
+    // Each test name is the full path name to the test file.
+    //
+    private String m_testNamesFile;
 
     protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
@@ -519,8 +485,6 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param testConfig
          */
         public void addTest(TestConfig testConfig) {
-            System.err.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
-            System.err.flush();
             m_testConfigs.add(testConfig);
         }
 
@@ -863,10 +827,6 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("%s/%s\n", testFolder, testClassName);
-        if (m_namesOnly) {
-            return;
-        }
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -884,6 +844,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         params.put("ALL_TESTS",             db.getAllTests(params));
         params.put("DATABASE_CONFIG_BODY",  db.getDatabaseConfigBody(params));
         writeTestFile(testFolder, testClassName, params);
+        writeTestFileName(String.format("%s/%s/%s\n", m_testGenDir, testFolder, testClassName), true);
     }
 
     public static boolean typeMatch(Object elem, VoltType type, int size) {
@@ -910,46 +871,98 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
     }
 
+    private String readFile(File path) throws IOException {
+        return(new String(Files.readAllBytes(Paths.get(path.getAbsolutePath()))));
+    }
+
+    /*
+     * Only write the file if it is different from the
+     * existing contents.  This saves building sometimes.
+     */
     private void writeFile(File path, String contents) throws Exception {
         PrintWriter out = null;
+        String oldContents = null;
         try {
-            out = new PrintWriter(path);
-            out.print(contents);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (Exception ex) {
-                    ;
+            oldContents = readFile(path);
+        } catch (IOException ex) {
+            oldContents = "";
+        }
+        if (!oldContents.equals(contents)) {
+            try {
+                out = new PrintWriter(path);
+                out.print(contents);
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (Exception ex) {
+                        ;
+                    }
                 }
             }
         }
     }
 
-    protected void processArgs(String args[]) {
+    protected void processArgs(String args[]) throws PlanningErrorException {
         for (int idx = 0; idx < args.length; idx += 1) {
             String arg = args[idx];
-            if ("--generated-dir".equals(arg)) {
-                idx += 1;
-                if (idx < args.length) {
-                    m_sourceDir = args[idx];
-                } else {
-                    throw new IllegalArgumentException("No argument for --generated-dir.");
+            if (arg.startsWith("--generated-source-dir=")) {
+                m_testGenPath = arg.substring("--generated-source-dir=".length());
+                // Pull out the last component.  We
+                // need this later on, to put the source in the
+                // right directory.
+                String[] paths = m_testGenPath.split("/");
+                if (paths.length == 0) {
+                    throw new PlanningErrorException(
+                            String.format("--generated-source-dir argument \"%s\" is malformed.",
+                                          arg));
                 }
-            } else if ("--names-only".equals(arg)) {
-                m_namesOnly  = true;
+                m_testGenDir = paths[paths.length - 1];
+            } else if (arg.startsWith("--test-names-file=")) {
+                m_testNamesFile = arg.substring("--test-names-file=".length());
+            } else {
+                throw new PlanningErrorException("Unknown generated sources argument: " + arg);
             }
+        }
+        if (m_testGenPath == null) {
+            throw new PlanningErrorException("--generated-source-dir argument is missing in call to EEPlanGenerator.java");
+        }
+        if (m_testNamesFile == null) {
+            throw new PlanningErrorException("--test-names-file argument is missing in call to EEPlanGenerator.java");
+        }
+    }
+
+    /**
+     * Write the named string to the output file.
+     *
+     * @param name The string to write.
+     * @param append If true, then append to the file.  Otherwise truncate the file first.
+     * @throws FileNotFoundException
+     */
+    protected void writeTestFileName(String name,
+                                     boolean append) throws FileNotFoundException {
+        File outFileName = new File(m_testNamesFile);
+        if ( ! outFileName.exists() ) {
+            append = false;
+        }
+        try (PrintStream ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFileName, append)))) {
+            ps.print(name);
         }
     }
 
     private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
         String template = TESTFILE_TEMPLATE;
+        // This could be made much faster by looking for all the strings
+        // with a regular expression, rather than one at a time.
         for (Map.Entry<String, String> entry : params.entrySet()) {
             String pattern = "@" + entry.getKey() + "@";
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/%s", m_sourceDir, testFolder));
+        if (template.isEmpty()) {
+            throw new PlanningErrorException("Cannot create C++ Unit Test source from template.  This is a bug.");
+        }
+        File outputDir = new File(String.format("%s/%s", m_testGenPath, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }

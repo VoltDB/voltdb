@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,12 +24,14 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-import junit.framework.Test;
-
+import org.junit.After;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -49,19 +51,11 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+import org.voltdb_testprocs.regressionsuites.failureprocs.InsertReplicatedAfterDupPartitionedInsert;
+
+import junit.framework.Test;
 
 public class TestFailuresSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
-        BadDecimalToVarcharCompare.class,
-        ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
-        DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
-        InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -108,32 +102,20 @@ public class TestFailuresSuite extends RegressionSuite {
     {
         System.out.println("STARTING testBadFloatToVarcharCompare");
         Client client = getClient();
-
-        boolean threw = false;
         try
         {
             client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
+            fail("Should have failed");
         }
         catch (ProcCallException e)
         {
-            if (!isHSQL())
-            {
-                if ((e.getMessage().contains("SQL ERROR")) &&
-                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT")))
-                {
-                    threw = true;
-                }
-                else
-                {
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                threw = true;
+            if (!isHSQL() &&
+                    (! e.getMessage().contains("SQL ERROR") ||
+                            !e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT"))) {
+                e.printStackTrace();
+                fail(e.getMessage());
             }
         }
-        assertTrue(threw);
     }
 
     // Subcase of ENG-800
@@ -445,6 +427,30 @@ public class TestFailuresSuite extends RegressionSuite {
         }
     }
 
+    public void testReplicatedInsertAfterBadPartitionedInsert() throws IOException {
+        if (isValgrind()) {
+            return;
+        }
+        System.out.println("STARTING testReplicatedInsertAfterBadPartitionedInsert");
+        Client client = getClient();
+
+        try {
+            client.callProcedure("InsertReplicatedAfterDupPartitionedInsert", 0);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().startsWith("VOLTDB ERROR: CONSTRAINT VIOLATION"));
+        }
+
+        try {
+            ((ClientImpl)client).callProcedureWithClientTimeout(100, "PartitionedSelect", 100, TimeUnit.MILLISECONDS);
+        }
+        catch (ProcCallException e) {
+            m_fatalFailure = true;
+            fail();
+        }
+    }
+
+
     public void testAppStatus() throws Exception {
         System.out.println("STARTING testAppStatus");
         Client client = getClient();
@@ -481,6 +487,17 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(response.getAppStatus(), 4);
     }
 
+
+    // procedures used by these tests
+    static final Class<?>[] MP_PROCEDURES = {
+        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
+        BadDecimalToVarcharCompare.class,
+        WorkWithBigString.class, InsertBigString.class,
+        ReturnAppStatus.class,
+        InsertReplicatedAfterDupPartitionedInsert.class
+    };
+
+
     /**
      * Build a list of the tests that will be run when TestFailuresSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -494,8 +511,31 @@ public class TestFailuresSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+
+        project.addProcedure(BatchTooBig.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(SelectBigString.class,
+                new ProcedurePartitionData("FIVEK_STRING", "P", "0"));
+        project.addProcedure(DivideByZero.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(InsertLotsOfData.class,
+                new ProcedurePartitionData("WIDE", "P", "0"));
+        project.addProcedure(FetchTooMuch.class,
+                new ProcedurePartitionData("FIVEK_STRING", "P", "0"));
+        project.addProcedure(CleanupFail.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(TooFewParams.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "1"));
+        project.addProcedure(ViolateUniqueness.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(ViolateUniquenessAndCatchException.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+
+
+        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);",
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addStmtProcedure("PartitionedSelect", "SELECT * FROM NEW_ORDER;");
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend

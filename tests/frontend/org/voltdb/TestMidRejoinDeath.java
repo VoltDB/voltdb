@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             VoltProjectBuilder builder = getBuilderForTest();
             builder.setSecurityEnabled(true, true);
 
-            cluster = new LocalCluster("rejoin.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
+            cluster = new LocalCluster("rejoin.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
             //TODO: Till we figure out snapshot save on same machine.
             cluster.setNewCli(false);
             cluster.setJavaProperty("rejoindeathtest", null);
@@ -102,8 +102,12 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             }
         }
         finally {
-            if (client != null) client.close();
-            if (cluster != null) cluster.shutDown();
+            if (client != null) {
+                client.close();
+            }
+            if (cluster != null) {
+                cluster.shutDown();
+            }
         }
     }
 

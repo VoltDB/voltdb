@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,18 +45,18 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     public static class Stream {
         // src -> (dest1, dest2,...)
         public final Multimap<Long, Long> streamPairs;
-        // the partition the ranges associate to
-        public final Integer newPartition;
+
+        public final Long lowestSiteSinkHSId;
 
         /**
          * @param streamPairs     src - > (dest1, dest2,...)
          * @param newPartition    New partition for this stream, if not null, will create a
          *                        post-snapshot task to increment the partition count
          */
-        public Stream(Multimap<Long, Long> streamPairs, Integer newPartition)
+        public Stream(Multimap<Long, Long> streamPairs, Long lowestSiteSinkHSId)
         {
             this.streamPairs = ImmutableMultimap.copyOf(streamPairs);
-            this.newPartition = newPartition;
+            this.lowestSiteSinkHSId = lowestSiteSinkHSId;
         }
     }
 
@@ -75,6 +75,14 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
                                        boolean shouldTruncate)
     {
         super(tables);
+
+        this.streams = ImmutableList.copyOf(streams);
+        this.shouldTruncate = shouldTruncate;
+    }
+
+    public StreamSnapshotRequestConfig(List<Table> tables, int newPartitionCount, List<Stream> streams,
+            boolean shouldTruncate) {
+        super(tables, newPartitionCount);
 
         this.streams = ImmutableList.copyOf(streams);
         this.shouldTruncate = shouldTruncate;
@@ -99,11 +107,9 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             for (int i = 0; i < streamArray.length(); i++) {
                 JSONObject streamObj = streamArray.getJSONObject(i);
 
-                Integer newPartition = null;
-                if (!streamObj.isNull("newPartition")) {
-                    newPartition = Integer.parseInt(streamObj.getString("newPartition"));
-                }
-                Stream config = new Stream(parseStreamPairs(streamObj), newPartition);
+                Long lowestSiteSinkHSId = Long.parseLong(streamObj.getString("lowestSiteSinkHSId"));
+
+                Stream config = new Stream(parseStreamPairs(streamObj), lowestSiteSinkHSId);
 
                 builder.add(config);
             }
@@ -150,9 +156,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         for (Stream stream : streams) {
             stringer.object();
 
-            stringer.keySymbolValuePair("newPartition", stream.newPartition == null ?
-                                               null : Integer.toString(stream.newPartition));
-
+            stringer.keySymbolValuePair("lowestSiteSinkHSId", stream.lowestSiteSinkHSId);
             stringer.key("streamPairs").object();
             for (Map.Entry<Long, Collection<Long>> entry : stream.streamPairs.asMap().entrySet()) {
                 stringer.key(Long.toString(entry.getKey())).array();

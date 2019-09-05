@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,23 +23,27 @@
 
 package org.voltdb.export;
 
-import java.io.File;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 public class TestExportV2Suite extends TestExportBaseSocketExport {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private static final int k_factor = 1;
 
     @Override
@@ -47,9 +51,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();
@@ -60,16 +62,18 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
     /**
      * Multi-table test
      */
+    @Test
     public void testExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
         final Client client = getClient();
+        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -79,27 +83,33 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
             m_verifier.addRow(client,
-                    "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            m_verifier.addRow(client,
-                    "ALLOW_NULLS_GRP", i, convertValsToRow(i, 'I', rowdata));
-            Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
-            Object[] paramsGrp = convertValsToParams("ALLOW_NULLS_GRP", i, rowdata);
-            client.callProcedure("Insert", params);
-            client.callProcedure("Insert", paramsGrp);
+                    "S_ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            Object[] params = convertValsToParams("S_ALLOW_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertAllowNulls", params);
 
             // add data to a second (streaming) table.
             rowdata = TestSQLTypesSuite.m_defaultValues;
             m_verifier.addRow(client,
-                    "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            m_verifier.addRow(client,
-                    "NO_NULLS_GRP", i, convertValsToRow(i, 'I', rowdata));
-            params = convertValsToParams("NO_NULLS", i, rowdata);
-            paramsGrp = convertValsToParams("NO_NULLS_GRP", i, rowdata);
-            client.callProcedure("Insert", params);
-            client.callProcedure("Insert", paramsGrp);
+                    "S_NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            params = convertValsToParams("S_NO_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
         }
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+    }
+
+    @Test
+    public void testExportControlParams() throws Exception {
+        System.out.println("testFlowControl");
+        final Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+
+        String[] targets = {"custom"};
+        ClientResponse r = client.callProcedure("@ExportControl", "S_ALLOW_NULLS", targets, "release");
+        assert(r.getStatus() == ClientResponse.SUCCESS);
+        assert(r.getResults()[0].getRowCount() == 0);
     }
 
     public TestExportV2Suite(final String name) {
@@ -123,85 +133,24 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         project.setSecurityEnabled(true, true);
         project.addRoles(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-allownulls-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("NO_NULLS");
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        wireupExportTableToSocketExport("NO_NULLS_GRP");
-        project.addProcedures(PROCEDURES);
-
-
-        // JNI, single server
-        // Use the cluster only config. Multiple topologies with the extra catalog for the
-        // Add drop tests is harder. Restrict to the single (complex) topology.
-        //
-        //        config = new LocalSingleProcessServer("export-ddl.jar", 2,
-        //                                              BackendTarget.NATIVE_EE_JNI);
-        //        config.compile(project);
-        //        builder.addServerConfig(config);
-
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        wireupExportTableToSocketExport("S_NO_NULLS");
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
+        project.addProcedures(NONULLS_PROCEDURES);
 
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 6, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);
-
-
-        /*
-         * compile a catalog without the NO_NULLS table for add/drop tests
-         */
-        config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        project = new VoltProjectBuilder();
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        project.addProcedures(PROCEDURES2);
-        compile = config.compile(project);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml"));
-        assertTrue(compile);
-        /*
-         * compile a catalog with an added table for add/drop tests
-         */
-        config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        project = new VoltProjectBuilder();
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-export-ddl-with-target.sql"));
-
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("ADDED_TABLE");
-        wireupExportTableToSocketExport("NO_NULLS");  // streamed table
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        wireupExportTableToSocketExport("ADDED_TABLE_GRP");
-        wireupExportTableToSocketExport("NO_NULLS_GRP"); // streamed table
-
-        project.addProcedures(PROCEDURES);
-        project.addProcedures(PROCEDURES3);
-        compile = config.compile(project);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml"));
-        assertTrue(compile);
-
         return builder;
     }
 }

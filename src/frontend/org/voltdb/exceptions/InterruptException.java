@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
+
+import org.voltdb.client.ClientResponse;
 
 /**
  * Thrown when it has been decided that a query is taking too
@@ -46,5 +48,15 @@ public class InterruptException extends SerializableException {
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.GRACEFUL_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "Transaction Interrupted";
     }
 }

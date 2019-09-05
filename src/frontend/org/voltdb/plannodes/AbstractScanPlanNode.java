@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -87,12 +88,25 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             if (m_tableScan instanceof StmtTargetTableScan) {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
                 getTablesAndIndexesFromSubqueries(tablesRead, indexes);
-            } else {
-                assert(m_tableScan instanceof StmtSubqueryScan);
+            }
+            else if (m_tableScan instanceof StmtSubqueryScan) {
                 getChild(0).getTablesAndIndexes(tablesRead, indexes);
+            }
+            else {
+                // This is the only other choice.
+                assert(m_tableScan instanceof StmtCommonTableScan);
+                getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
             }
         }
     }
+
+    protected void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
+                                                                      Collection<String> indexes) {
+        // Search the base and recursive plans.
+        StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
+        ctScan.getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
+    }
+
 
     @Override
     public void validate() throws Exception {
@@ -114,7 +128,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (SchemaColumn col : m_tableScanSchema.getColumns())
+        for (SchemaColumn col : m_tableScanSchema)
         {
             if (!m_targetTableName.equals(col.getTableName()))
             {
@@ -250,6 +264,25 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return m_isSubQuery;
     }
 
+    /**
+     * Is this a scan of a common table?
+     * @return a boolean value indicating whether this is a common table scan.
+     */
+    public boolean isCommonTableScan() {
+        // This function is only used to determine the output schema at planning time.
+        // The StmtCommonTableScan, like all other types of TableScan class, is not
+        // serialized to JSON format.
+        // Therefore, when coming back to the scan plan nodes after the planning is done,
+        // we cannot use this function to determine whether a scan is CTE scan or not.
+        // SeqScanPlanNode has a separate boolean flag which is serialized with the JSON string.
+        // Use isCommonTableScan() method in SeqScanPlanNode to test if it is a CTE scan.
+        return (m_tableScan instanceof StmtCommonTableScan);
+    }
+
+    public boolean isPersistentTableScan() {
+        return (! isCommonTableScan()) && (! isSubQuery());
+    }
+
     @Override
     public void generateOutputSchema(Database db) {
         // fill in the table schema if we haven't already
@@ -318,7 +351,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             int difftor = 0;
-            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
+            for (SchemaColumn col : m_tableScanSchema) {
                 col.setDifferentiator(difftor);
                 ++difftor;
                 AbstractExpression colExpr = col.getExpression();
@@ -359,6 +392,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = childNode.getOutputSchema();
             // step to transfer derived table schema to upper level
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
+        }
+        else if (isCommonTableScan()) {
+            m_tableSchema = new NodeSchema();
+            StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
+            for (SchemaColumn col : ctScan.getOutputSchema()) {
+                m_tableSchema.addColumn(col.clone());
+            }
         }
         else {
             m_tableSchema = new NodeSchema();
@@ -417,7 +457,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // With no inline projection to define the output columns,
             // iterate through the output schema TVEs
             // and sort them by table schema index order.
-            for (SchemaColumn col : m_outputSchema.getColumns()) {
+            for (SchemaColumn col : m_outputSchema) {
                 AbstractExpression colExpr = col.getExpression();
                 // At this point, they'd better all be TVEs.
                 assert(colExpr instanceof TupleValueExpression);

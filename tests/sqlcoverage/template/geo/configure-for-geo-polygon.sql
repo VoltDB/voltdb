@@ -34,13 +34,16 @@
 {@idcol = "ID"}
 
 {@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
+{@insertselectcols = "ID+16, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
 {@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], _value[float null50]"}
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions
 {@optionalfn = "_geofun"}
 {@plus10 = ""} -- You cannot add to a polygon
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "ID, AsText(PT1), AsText(POLY1), AsText(POLY2), AsText(POLY3), RATIO"}
 {@lhsstar = "LHS.ID, AsText(LHS.PT1), AsText(LHS.POLY1), AsText(LHS.POLY2), AsText(LHS.POLY3)"}
 {@updatecolumn = "POLY3"}
 {@updatesource = "POLY1"}
 {@updatevalue = "_value[polygon null25]"}
+{@updatecolumn2 = "POLY2"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "3"} -- maximum depth, in Recursive CTE tests

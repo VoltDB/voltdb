@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,19 +24,13 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.DeprecatedProcedureAPIAccess;
-
-@ProcInfo(
-    partitionInfo = "export_geo_partitioned_table.rowid:0",
-    singlePartition = true
-)
 
 public class JiggleExportGeoSinglePartition extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt(
-            "INSERT INTO export_geo_partitioned_table "
+    public final SQLStmt export_jdbc = new SQLStmt(
+            "INSERT INTO export_geo_partitioned_table_jdbc "
             + "(txnid, rowid, rowid_group, type_null_tinyint, "
             + "type_not_null_tinyint, type_null_smallint, "
             + "type_not_null_smallint, type_null_integer, type_not_null_integer, "
@@ -98,7 +92,7 @@ public class JiggleExportGeoSinglePartition extends VoltProcedure {
         /**/
 
         voltQueueSQL(
-                     export
+                     export_jdbc
                      , txid
                      , rowid
                      , record.rowid_group

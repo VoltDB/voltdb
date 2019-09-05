@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,11 +40,12 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannerv2.utils.AbstractPlanNodeVisitor;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -127,6 +128,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     protected AbstractPlanNode() {
         m_id = NEXT_PLAN_NODE_ID++;
+    }
+
+    public int resetPlanNodeIds(int nextId) {
+        nextId = overrideId(nextId);
+        for (AbstractPlanNode inNode : getInlinePlanNodes().values()) {
+            // Inline nodes also need their ids to be overridden to make sure
+            // the subquery node ids are also globaly unique
+            nextId = inNode.resetPlanNodeIds(nextId);
+        }
+
+        for (int i = 0; i < getChildCount(); i++) {
+            AbstractPlanNode child = getChild(i);
+            assert(child != null);
+            nextId = child.resetPlanNodeIds(nextId);
+        }
+
+        return nextId;
     }
 
     public int overrideId(int newId) {
@@ -468,6 +486,19 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * If the output schema of this node is a cheap copy of
+     * some other node's schema, and we decide to change the
+     * output true output schema, we can change this to the
+     * updated schema.
+     *
+     * @param childSchema
+     */
+    public void setOutputSchema(NodeSchema childSchema) {
+        assert( ! m_hasSignificantOutputSchema);
+        m_outputSchema = childSchema;
+    }
+
+    /**
      * Find the true output schema.  This may be in some child
      * node.  This seems to be the search order when constructing
      * a plan node in the EE.
@@ -503,38 +534,90 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * node, which will be the usual DML schema.  This has one
      * long integer column counting the number of rows inserted.
      *
-     * @param node
+     * @param resetBack If this is true, we walk back the
+     *                  chain of parent plan nodes, updating
+     *                  the output schema in ancestor nodes
+     *                  with the true output schema.  If we
+     *                  somehow change the true output schema
+     *                  we want to be able to change all the
+     *                  ones which are copies of the true
+     *                  output schema.
      * @return The true output schema.  This will never return null.
      */
-    public final NodeSchema getTrueOutputSchema() throws PlanningErrorException {
-        AbstractPlanNode child = this;
-        NodeSchema childSchema = getOutputSchema();
+    public final NodeSchema getTrueOutputSchema(boolean resetBack) throws PlanningErrorException {
+        AbstractPlanNode child;
+        NodeSchema answer = null;
         //
         // Note: This code is translated from the C++ code in
-        //       AbstractExecutor::getOutputSchema.  It's considerably
+        //       AbstractPlanNode::getOutputSchema.  It's considerably
         //       different there, but I think this has the corner
         //       cases covered correctly.
-        while (childSchema == null || ( ! child.m_hasSignificantOutputSchema) ) {
+        for (child = this;
+                child != null;
+                child = (child.getChildCount() == 0) ? null : child.getChild(0)) {
+            NodeSchema childSchema;
+            if (child.m_hasSignificantOutputSchema) {
+                childSchema = child.getOutputSchema();
+                assert(childSchema != null);
+                answer = childSchema;
+                break;
+            }
             AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
             if (childProj != null) {
+                AbstractPlanNode schemaSrc = null;
                 AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
                 if (inlineInsertNode != null) {
-                    child = inlineInsertNode;
+                    schemaSrc = inlineInsertNode;
                 } else {
-                    child = childProj;
+                    schemaSrc = childProj;
                 }
-                childSchema = child.getOutputSchema();
-            } else if (child.getChildCount() > 0) {
-                child = child.getChild(0);
-            } else {
-                // We've gone to the end of the plan.  This is a
-                // failure in the EE.
-                assert(false);
-                throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+                childSchema = schemaSrc.getOutputSchema();
+                if (childSchema != null) {
+                    answer = childSchema;
+                    break;
+                }
             }
         }
-        assert(childSchema != null);
-        return childSchema;
+        if (child == null) {
+            // We've gone to the end of the plan.  This is a
+            // failure in the EE.
+            assert(false);
+            throw new PlanningErrorException("AbstractPlanNode with no true output schema.  Please notify VoltDB Support.");
+        }
+        // Trace back the chain of parents and reset the
+        // output schemas of the parent.  These will all be
+        // exactly the same.  Note that the source of the
+        // schema may be an inline plan node.  So we need
+        // to set the child's output schema to be the answer.
+        // If the schema source is the child node itself, this will
+        // set the the output schema to itself, so no harm
+        // will be done.
+        if (resetBack) {
+            do {
+                if (child instanceof AbstractJoinPlanNode) {
+                    // In joins with inlined aggregation, the inlined
+                    // aggregate node is the one that determines the schema.
+                    // (However, the enclosing join node still has its
+                    // "m_hasSignificantOutputSchema" bit set.)
+                    //
+                    // The method resolveColumnIndexes will overwrite
+                    // a join node's schema if there is aggregation.  In order
+                    // to avoid undoing the work we've done here, we must
+                    // also update the inlined aggregate node.
+                    AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(child);
+                    if (aggNode != null) {
+                        aggNode.setOutputSchema(answer);
+                    }
+                }
+
+                if (! child.m_hasSignificantOutputSchema) {
+                    child.setOutputSchema(answer);
+                }
+
+                child = (child.getParentCount() == 0) ? null : child.getParent(0);
+            } while (child != null);
+        }
+        return answer;
     }
 
     /**
@@ -860,7 +943,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param aeClass AbstractExpression class to search for
      * @param collection set to populate with expressions that this node has
      */
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
             Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
@@ -868,7 +951,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
-        // and the output column expressions if there were no projection
+        // add the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
             schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
@@ -1007,8 +1090,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair(Members.ID.name(), m_id);
-        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), getPlanNodeType().toString());
-
+        String planNodeType = getPlanNodeType().toString();
+        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), planNodeType);
         if (m_inlineNodes.size() > 0) {
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
             int i = 0;
@@ -1041,8 +1124,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (int colNo = 0; colNo < m_outputSchema.getColumns().size(); colNo += 1) {
-                SchemaColumn column = m_outputSchema.getColumns().get(colNo);
+            for (int colNo = 0; colNo < m_outputSchema.size(); colNo += 1) {
+                SchemaColumn column = m_outputSchema.getColumn(colNo);
                 column.toJSONString(stringer, true, colNo);
             }
             stringer.endArray();
@@ -1091,7 +1174,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
-        if (( ! m_verboseExplainForDebugging) && (getPlanNodeType() == PlanNodeType.PROJECTION)) {
+        boolean skipCurrentNode = ! m_verboseExplainForDebugging
+                                 && getPlanNodeType() == PlanNodeType.PROJECTION;
+        if (skipCurrentNode) {
             extraIndent = "";
         }
         else {
@@ -1145,6 +1230,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             // inline nodes shouldn't have children I hope
             assert(m_isInline == false);
+            if (skipCurrentNode) {
+                // If the current node is skipped, I would like to pass the skip indentation
+                // flag on to the next level.
+                node.setSkipInitalIndentationForExplain(m_skipInitalIndentationForExplain);
+            }
             node.explainPlan_recurse(sb, indent + extraIndent);
         }
     }
@@ -1359,4 +1449,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_children.get(0).adjustDifferentiatorField(tve);
     }
 
+    public void setHaveSignificantOutputSchema(boolean hasSignificantOutputSchema) {
+        m_hasSignificantOutputSchema = hasSignificantOutputSchema;
+    }
+
+    /**
+     * Traverse the plan node tree to allow a visitor interact with each node.
+     */
+    public void acceptVisitor(AbstractPlanNodeVisitor visitor) {
+        visitor.visitNode(this);
+    }
 }

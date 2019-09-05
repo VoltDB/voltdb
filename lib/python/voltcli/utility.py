@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -840,18 +840,12 @@ def get_java_version(javaHome="java", verbose=False):
         version.stdout.close()
         out, err = grep.communicate()
         version.wait()
-        if "1.8" in out:
-            if verbose:
-                return out
-            else:
-                return "1.8"
-        elif "1.7" in out:
-            if verbose:
-                return out
-            else:
-                return "1.7"
-        else:
-            return ""
+        if verbose:
+            return out
+        for version in ('11.0', '1.8', '1.7'):
+            if version in out:
+                return version
+        return ""
     except (OSError):
         return ""
 

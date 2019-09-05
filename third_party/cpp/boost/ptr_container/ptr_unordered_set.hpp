@@ -18,7 +18,13 @@
 
 #include <boost/ptr_container/indirect_fun.hpp>
 #include <boost/ptr_container/ptr_set_adapter.hpp>
+#include <boost/ptr_container/detail/ptr_container_disable_deprecated.hpp>
 #include <boost/unordered_set.hpp>
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 namespace boost
 {
@@ -29,16 +35,18 @@ namespace boost
         class Hash           = boost::hash<Key>,
         class Pred           = std::equal_to<Key>,
         class CloneAllocator = heap_clone_allocator,
-        class Allocator      = std::allocator<void*>
+        class Allocator      = std::allocator< typename ptr_container_detail::void_ptr<Key>::type >
     >
     class ptr_unordered_set : 
-        public ptr_set_adapter< Key, 
-                                boost::unordered_set<void*,void_ptr_indirect_fun<Hash,Key>,
-                                                     void_ptr_indirect_fun<Pred,Key>,Allocator>,
+        public ptr_set_adapter< Key, boost::unordered_set<
+            typename ptr_container_detail::void_ptr<Key>::type,
+            void_ptr_indirect_fun<Hash,Key>,
+            void_ptr_indirect_fun<Pred,Key>,Allocator>,
                                 CloneAllocator, false >
     {
-        typedef ptr_set_adapter< Key, 
-                                 boost::unordered_set<void*,void_ptr_indirect_fun<Hash,Key>,
+        typedef ptr_set_adapter< Key, boost::unordered_set<
+                           typename ptr_container_detail::void_ptr<Key>::type,
+                                 void_ptr_indirect_fun<Hash,Key>,
                                  void_ptr_indirect_fun<Pred,Key>,Allocator>,
                                  CloneAllocator, false >
              base_type;
@@ -236,5 +244,9 @@ namespace boost
     }
 
 }
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic pop
+#endif
 
 #endif

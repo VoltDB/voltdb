@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -40,9 +40,9 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
     private boolean m_bestAndOnlyPlanWasGenerated = false;
     final private boolean m_targetIsExportTable;
 
-    InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
+    InsertSubPlanAssembler(AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning, boolean targetIsExportTable) {
-        super(db, parsedStmt, partitioning);
+        super(parsedStmt, partitioning);
         m_targetIsExportTable = targetIsExportTable;
     }
 

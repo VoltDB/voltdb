@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
@@ -41,8 +42,8 @@ import org.voltdb.StarvationTracker;
 class MpRoSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
-    static int DEFAULT_MAX_POOL_SIZE = 20;
-    static int INITIAL_POOL_SIZE = 1;
+    static final int MAX_POOL_SIZE = Integer.getInteger("MPI_READ_POOL_SIZE", 3);
+    static final int INITIAL_POOL_SIZE = 1;
 
     class MpRoSiteContext {
         final private SiteTaskerQueue m_queue;
@@ -110,7 +111,6 @@ class MpRoSitePool {
     private final InitiatorMailbox m_initiatorMailbox;
     private CatalogContext m_catalogContext;
     private ThreadFactory m_poolThreadFactory;
-    private final int m_poolSize;
     private volatile boolean m_shuttingDown = false;
 
     MpRoSitePool(
@@ -129,12 +129,7 @@ class MpRoSitePool {
             CoreUtils.getThreadFactory("RO MP Site - " + CoreUtils.hsIdToString(m_siteId),
                     CoreUtils.MEDIUM_STACK_SIZE);
 
-        Integer poolSize = Integer.getInteger("mpiReadPoolSize");
-        if (poolSize == null) {
-            poolSize = DEFAULT_MAX_POOL_SIZE;
-        }
-        m_poolSize = poolSize;
-        tmLog.info("Setting maximum size of MPI read pool to: " + m_poolSize);
+        tmLog.info("Setting maximum size of MPI read pool to: " + MAX_POOL_SIZE);
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
@@ -208,7 +203,7 @@ class MpRoSitePool {
         if (m_shuttingDown) {
             return false;
         }
-        return (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
+        return (!m_idleSites.isEmpty() || m_busySites.size() < MAX_POOL_SIZE);
     }
 
     /**

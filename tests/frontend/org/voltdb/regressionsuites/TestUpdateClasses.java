@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -100,6 +100,16 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
+            // --- ENG-17189: DDLs being processed twice --- starts
+            assertTrue(new VoltCompiler(false)
+                    .compileDDLString("CREATE TABLE V0(id BIGINT);",
+                            Configuration.getPathToCatalogForTest("ENG17189.jar")));
+            assertEquals(ClientResponse.SUCCESS,
+                    m_client.callProcedure("@AdHoc", "CREATE TABLE V0(id1 BIGINT)").getStatus());
+            assertEquals(ClientResponse.SUCCESS,
+                    m_client.callProcedure("@AdHoc", "DROP TABLE V0").getStatus());
+            // --- ENG-17189: DDLs being processed twice --- ends
+
             ClientResponse resp;
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
             System.out.println(resp.getResults()[0]);
@@ -109,7 +119,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                         PROC_CLASSES[0].getCanonicalName()));
             boolean threw = false;
             try {
-                resp = m_client.callProcedure(PROC_CLASSES[0].getSimpleName());
+                m_client.callProcedure(PROC_CLASSES[0].getSimpleName());
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage().contains("was not found"));
@@ -121,7 +131,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // only 1 param
             threw = false;
             try {
-                resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes());
+                m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes());
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage().contains("UpdateClasses system procedure requires exactly two parameters"));
@@ -132,7 +142,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // wrong jarfile param type
             threw = false;
             try {
-                resp = m_client.callProcedure("@UpdateClasses", 10L, null);
+                m_client.callProcedure("@UpdateClasses", 10L, null);
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage().contains("UpdateClasses system procedure takes the jarfile bytes as a byte array"));
@@ -171,8 +181,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             results = resp.getResults()[0];
             assertEquals(10L, results.asScalarLong());
-        }
-        finally {
+        } finally {
             teardownSystem();
         }
     }
@@ -931,7 +940,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 fail("Invalid SQLStmt should fail during UpdateClasses");
             } catch (ProcCallException e) {
                 assertTrue(e.getMessage().contains("Failed to plan for statement"));
-                assertTrue(e.getMessage().contains("user lacks privilege or object not found: TT_INVALID_QUERY"));
+                assertTrue(e.getMessage().contains("object not found: TT_INVALID_QUERY"));
             }
         }
         finally {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,10 +34,12 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,35 +74,38 @@ import org.voltdb.exportclient.decode.CSVEntityDecoder;
 import org.voltdb.exportclient.decode.EndpointExpander;
 
 public class TestHttpExportClient extends ExportClientTestBase {
-    static File schemaOut;
-    LocalTestServer server = null;
+    static File m_schemaOut;
+    LocalTestServer m_server = null;
     VoltTable m_table;
+    static final long DEFAULT_PARTITION_ID = 0L;
+    static final long OPERATION = 1;
+    long m_testStartTime = System.currentTimeMillis();;
 
     void setupServer() throws Exception
     {
-        server = new LocalTestServer(null, null);
-        server.start();
+        m_server = new LocalTestServer(null, null);
+        m_server.start();
     }
 
     @BeforeClass
     public static void setupClass() throws Exception
     {
-        schemaOut = File.createTempFile("avro-schema.", ".tmp");
-        if (!schemaOut.delete() || !schemaOut.mkdir()) {
-            throw new RuntimeException("Cannot create avro schema directory\"" + schemaOut + "\"");
+        m_schemaOut = File.createTempFile("avro-schema.", ".tmp");
+        if (!m_schemaOut.delete() || !m_schemaOut.mkdir()) {
+            throw new RuntimeException("Cannot create avro schema directory\"" + m_schemaOut + "\"");
         }
-        if (   !schemaOut.isDirectory()
-            || !schemaOut.canRead()
-            || !schemaOut.canWrite()
-            || !schemaOut.canExecute()) {
-            throw new RuntimeException("Cannot access avro schema directory\"" + schemaOut + "\"");
+        if (   !m_schemaOut.isDirectory()
+            || !m_schemaOut.canRead()
+            || !m_schemaOut.canWrite()
+            || !m_schemaOut.canExecute()) {
+            throw new RuntimeException("Cannot access avro schema directory\"" + m_schemaOut + "\"");
         }
     }
 
     @AfterClass
     public static void tearDownClass() throws Exception
     {
-        FileUtils.deleteDirectory(schemaOut);
+        FileUtils.deleteDirectory(m_schemaOut);
     }
 
     @Override
@@ -116,10 +121,10 @@ public class TestHttpExportClient extends ExportClientTestBase {
     public void tearDown() throws Exception
     {
         m_table.clearRowData();
-        if (server != null) {
-            server.stop();
+        if (m_server != null) {
+            m_server.stop();
         }
-        server = null;
+        m_server = null;
     }
 
     @Test
@@ -401,7 +406,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
                     System.err.println(body);
                 }
             }
-        }, true);
+        }, m_testStartTime, true);
 
         assertTrue(success.get());
     }
@@ -459,7 +464,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
                 }
 
             }
-        }, true);
+        }, m_testStartTime, true);
 
         assertTrue(success.get());
     }
@@ -575,7 +580,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
         final Properties config = new Properties();
         final AtomicReference<byte[]> header = new AtomicReference<>();
 
-        config.setProperty("avro.schema.location", new File(schemaOut,"%t.json").toString());
+        config.setProperty("avro.schema.location", new File(m_schemaOut,"%t.json").toString());
         config.setProperty("type", "avro");
         config.setProperty("avro.compress","true");
 
@@ -583,6 +588,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
             @Override
             public void handle(HttpRequest httpRequest, HttpResponse httpResponse, HttpContext httpContext) throws HttpException, IOException
             {
+                System.out.println("URI is: " + httpRequest.getRequestLine().getUri() + " Method is: " + httpRequest.getRequestLine().getMethod());
                 if (httpRequest.getRequestLine().getMethod().equalsIgnoreCase("PUT") &&
                     httpRequest.getHeaders("Connection")[0].getValue().startsWith("Keep-Alive") &&
                     httpRequest.getHeaders("Content-Type").length > 0 &&
@@ -610,18 +616,20 @@ public class TestHttpExportClient extends ExportClientTestBase {
                     httpRequest.getHeaders("Expect")[0].getValue().startsWith("100-continue")) {
                     final URI uri = URI.create(httpRequest.getRequestLine().getUri());
 
+                    System.out.println(uri.toString() + " query:" + (uri.getQuery() == null ? "null" : uri.getQuery()));
                     if (uri.getQuery() != null && uri.getQuery().contains("redirected")) {
 
                         if (httpRequest instanceof HttpEntityEnclosingRequest) try {
                             HttpEntityEnclosingRequest post = (HttpEntityEnclosingRequest)httpRequest;
 
-                            Schema schema = new Schema.Parser().parse(new File(schemaOut,"yankeelover.json"));
+                            Schema schema = new Schema.Parser().parse(new File(m_schemaOut,"yankeelover.json"));
                             GenericDatumReader<GenericRecord> ardr = new GenericDatumReader<>(schema);
                             ByteArrayOutputStream baos = new ByteArrayOutputStream(16 * 1024);
                             GenericRecord gr;
 
                             baos.write(header.get());
-                            post.getEntity().writeTo(baos);
+                            HttpEntity entity = post.getEntity();
+                            entity.writeTo(baos);
                             DataFileReader<GenericRecord> fileReader =
                                     new DataFileReader<>(new SeekableByteArrayInput(baos.toByteArray()), ardr);
                             Iterator<GenericRecord> aitr = fileReader.iterator();
@@ -658,7 +666,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
         final Properties config = new Properties();
         final AtomicReference<byte[]> header = new AtomicReference<>();
 
-        config.setProperty("avro.schema.location", new File(schemaOut,"%t.json").toString());
+        config.setProperty("avro.schema.location", new File(m_schemaOut,"%t.json").toString());
         config.setProperty("type", "avro");
         config.setProperty("avro.compress","true");
         config.setProperty("httpfs.enable","true");
@@ -699,17 +707,21 @@ public class TestHttpExportClient extends ExportClientTestBase {
                         if (httpRequest instanceof HttpEntityEnclosingRequest) try {
                             HttpEntityEnclosingRequest post = (HttpEntityEnclosingRequest)httpRequest;
 
-                            Schema schema = new Schema.Parser().parse(new File(schemaOut,"yankeelover.json"));
+                            Schema schema = new Schema.Parser().parse(new File(m_schemaOut,"yankeelover.json"));
                             GenericDatumReader<GenericRecord> ardr = new GenericDatumReader<>(schema);
                             ByteArrayOutputStream baos = new ByteArrayOutputStream(16 * 1024);
                             GenericRecord gr;
 
                             baos.write(header.get());
-                            post.getEntity().writeTo(baos);
+                            HttpEntity entity = post.getEntity();
+                            entity.writeTo(baos);
                             DataFileReader<GenericRecord> fileReader =
                                     new DataFileReader<>(new SeekableByteArrayInput(baos.toByteArray()), ardr);
                             Iterator<GenericRecord> aitr = fileReader.iterator();
 
+                            if (!aitr.hasNext()) {
+                                System.out.println("no next record found !!!");
+                            }
                             gr = aitr.next();
                             fileReader.close();
                             if (! new Integer(1).equals(gr.get("tinyint"))) {
@@ -744,7 +756,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
 
         final Properties config = new Properties();
 
-        config.setProperty("avro.schema.location", new File(schemaOut,"%t.json").toString());
+        config.setProperty("avro.schema.location", new File(m_schemaOut,"%t.json").toString());
         config.setProperty("contentType", "avro");
 
         roundtripTest("/webhdfs/v1/root/%t/%g/%p.avro", config, new HttpRequestHandler() {
@@ -848,7 +860,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
 
         final Properties config = new Properties();
 
-        config.setProperty("avro.schema.location", new File(schemaOut,"%t.json").toString());
+        config.setProperty("avro.schema.location", new File(m_schemaOut,"%t.json").toString());
         config.setProperty("contentType", "avro");
 
         roundtripTest("/webhdfs/v1/root/%t/%g/%p.avro", config, new HttpRequestHandler() {
@@ -1180,10 +1192,15 @@ public class TestHttpExportClient extends ExportClientTestBase {
     @Test
     public void testRoll() throws Exception
     {
-        final CountDownLatch count = new CountDownLatch(5);
+        final int rolls= 5;
+        final int rollTimePeriod = 17;
+        Semaphore received= new Semaphore(0);
 
-        setupServer();
-        server.register("*", new HttpRequestHandler() {
+        final Properties config = new Properties();
+        config.setProperty("period", Integer.toString(rollTimePeriod));
+        String endpoint = "/webhdfs/v1/root/%d/%t/%g/%p.csv";
+
+        HttpRequestHandler requestHandler = new HttpRequestHandler() {
             @Override
             public void handle(HttpRequest httpRequest, HttpResponse httpResponse, HttpContext httpContext) throws HttpException, IOException
             {
@@ -1191,9 +1208,8 @@ public class TestHttpExportClient extends ExportClientTestBase {
                     httpRequest.getHeaders("Connection")[0].getValue().startsWith("Keep-Alive")) {
                     final URI uri = URI.create(httpRequest.getRequestLine().getUri());
 
-
                     if (uri.getQuery().contains("op=MKDIRS")) {
-                        count.countDown();
+                        received.release();
                     } else if (uri.getQuery().contains("redirected")) {
                         //no op
                     } else {
@@ -1204,57 +1220,61 @@ public class TestHttpExportClient extends ExportClientTestBase {
                     System.err.println(httpRequest.toString());
                 }
             }
-        });
-
-        final HttpExportClient dut = new HttpExportClient();
-        EndpointExpander.setDateFormatForTest("yyyyMMdd'T'HH.mm.ss.SSSS");
-
-        final Properties config = new Properties();
-        config.setProperty("period", "17");
-        config.setProperty("endpoint", "http:/" + server.getServiceAddress().toString() + "/webhdfs/v1/root/%d/%t/%g/%p.csv");
-        dut.configure(config);
-
-        dut.constructExportDecoder(constructTestSource(false, 0));
-
-        assertTrue("Count remaining: " + count.getCount(), count.await(20, TimeUnit.SECONDS));
+        };
+        boolean sucess = false;
+        for (int i = 0; i < rolls; ++i) {
+            roundtripTest(endpoint, config, requestHandler, m_testStartTime+i, (i % 2) == 0);
+            sucess = received.tryAcquire(rollTimePeriod*2, TimeUnit.MILLISECONDS);
+            assert(sucess);
+        }
     }
 
-    protected void roundtripTest(final String endpointPath, final Properties config, final HttpRequestHandler handler) throws Exception
-    {
-        roundtripTest(endpointPath, config, handler, false);
-    }
-
-    protected void roundtripTest(final String endpointPath, final Properties config, final HttpRequestHandler handler, boolean useNullValues) throws Exception {
-        setupServer();
-        server.register("*", handler);
-
-        final HttpExportClient dut = new HttpExportClient();
-        config.setProperty("endpoint", "http:/" + server.getServiceAddress().toString() + endpointPath);
-        dut.configure(config);
-
-        final ExportDecoderBase decoder = dut.constructExportDecoder(constructTestSource(false, 0));
-        long l = System.currentTimeMillis();
+    private void populateTable(long value, boolean useNullValues) {
         if (useNullValues) {
-            m_table.addRow(l, l, l, 0, l, l,
+            m_table.addRow(value, value, value, DEFAULT_PARTITION_ID, OPERATION, value,
                     VoltType.NULL_TINYINT,
                     /* partitioning column */ (short) 2,
                     3, 4, VoltType.NULL_FLOAT, VoltType.NULL_TIMESTAMP, VoltType.NULL_STRING_OR_VARBINARY, new BigDecimal(88),
                     VoltType.NULL_POINT, VoltType.NULL_GEOGRAPHY);
         } else {
-            m_table.addRow(l, l, l, 0, l, l,
+            m_table.addRow(value, value, value, DEFAULT_PARTITION_ID, 1, value,
                     (byte) 1,
                     /* partitioning column */ (short) 2,
                     3, 4, 5.5, 6, "x x", new BigDecimal(88),
                     GEOG_POINT, GEOG);
         }
         m_table.advanceRow();
-        byte[] rowBytes = ExportEncoder.encodeRow(m_table);
+    }
 
+    protected void roundtripTest(final String endpointPath, final Properties config, final HttpRequestHandler handler) throws Exception {
+        roundtripTest(endpointPath, config, handler, m_testStartTime, false);
+    }
+
+    protected void roundtripTest(final String endpointPath, final Properties config, final HttpRequestHandler handler, long headerValue, boolean useNullValues) throws Exception {
+        setupServer();
+        m_server.register("*", handler);
+
+        final HttpExportClient dut = new HttpExportClient();
+        config.setProperty("endpoint", "http:/" + m_server.getServiceAddress().toString() + endpointPath);
+        dut.configure(config);
+
+        final ExportDecoderBase decoder = dut.constructExportDecoder(constructTestSource(false, 0));
+        populateTable(headerValue, useNullValues);
+        byte[] bufBytes = ExportEncoder.encodeRow(m_table, "yankeelover", 7, 32L);
+
+        ByteBuffer bb = ByteBuffer.wrap(bufBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        int size = bb.getInt(); // row size
+        byte [] rowBytes = new byte[size];
+        bb.get(rowBytes);
         while (true) {
             try {
-                decoder.onBlockStart();
-                decoder.processRow(rowBytes.length, rowBytes);
-                decoder.onBlockCompletion();
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, rowBytes);
+                decoder.onBlockStart(row);
+                decoder.processRow(row);
+                decoder.onBlockCompletion(row);
                 break;
             } catch (ExportDecoderBase.RestartBlockException e) {
                 assertTrue(e.requestBackoff);

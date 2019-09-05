@@ -39,7 +39,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.BinaryOutputArchive;
 import org.apache.jute_voltpatches.Record;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ACLCallback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.Children2Callback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback;
@@ -820,12 +819,13 @@ public class ClientCnxn {
                 eventThread.queueEvent(we);
                 return;
             }
-            if (pendingQueue.size() == 0) {
-                throw new IOException("Nothing in the queue, but got "
-                        + replyHdr.getXid());
-            }
+
             Packet packet = null;
             synchronized (pendingQueue) {
+                if (pendingQueue.size() == 0) {
+                    throw new IOException("Nothing in the queue, but got "
+                            + replyHdr.getXid());
+                }
                 packet = pendingQueue.remove();
             }
             /*
@@ -889,8 +889,10 @@ public class ClientCnxn {
                     } else if (!initialized) {
                         readConnectResult();
                         enableRead();
-                        if (!outgoingQueue.isEmpty()) {
-                            enableWrite();
+                        synchronized (outgoingQueue) {
+                            if (!outgoingQueue.isEmpty()) {
+                                enableWrite();
+                            }
                         }
                         lenBuffer.clear();
                         incomingBuffer = lenBuffer;
@@ -904,8 +906,8 @@ public class ClientCnxn {
                     }
                 }
             }
-            if (sockKey.isWritable()) {
-                synchronized (outgoingQueue) {
+            synchronized (outgoingQueue) {
+                if (sockKey.isWritable()) {
                     if (!outgoingQueue.isEmpty()) {
                         ByteBuffer pbb = outgoingQueue.getFirst().bb;
                         sock.write(pbb);
@@ -915,16 +917,18 @@ public class ClientCnxn {
                             if (p.header != null
                                     && p.header.getType() != OpCode.ping
                                     && p.header.getType() != OpCode.auth) {
-                                pendingQueue.add(p);
+                                synchronized (pendingQueue) {
+                                    pendingQueue.add(p);
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (outgoingQueue.isEmpty()) {
-                disableWrite();
-            } else {
-                enableWrite();
+                if (outgoingQueue.isEmpty()) {
+                    disableWrite();
+                } else {
+                    enableWrite();
+                }
             }
             return packetReceived;
         }
@@ -1141,10 +1145,12 @@ public class ClientCnxn {
                                 primeConnection(k);
                             }
                         } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
-                            if (outgoingQueue.size() > 0) {
-                                // We have something to send so it's the same
-                                // as if we do the send now.
-                                lastSend = now;
+                            synchronized (outgoingQueue) {
+                                if (outgoingQueue.size() > 0) {
+                                    // We have something to send so it's the same
+                                    // as if we do the send now.
+                                    lastSend = now;
+                                }
                             }
                             if (doIO()) {
                                 lastHeard = now;
@@ -1152,10 +1158,12 @@ public class ClientCnxn {
                         }
                     }
                     if (zooKeeper.state == States.CONNECTED) {
-                        if (outgoingQueue.size() > 0) {
-                            enableWrite();
-                        } else {
-                            disableWrite();
+                        synchronized (outgoingQueue) {
+                            if (outgoingQueue.size() > 0) {
+                                enableWrite();
+                            } else {
+                                disableWrite();
+                            }
                         }
                     }
                     selected.clear();
@@ -1339,7 +1347,19 @@ public class ClientCnxn {
     private int xid = 1;
 
     synchronized private int getXid() {
-        return xid++;
+        int currentXid = xid;
+        xid++;
+
+        //xids are assumed to be non-negative, except as special xids, -2 for ping, and -4 for auth.
+        //If the xid overflows, the system could hang when a non-auth packet uses -4 for xid.
+        //xids are only used to match requests and responses. So resetting it to 1 as it overflows
+        //should be safe. The odds of an existing in-flight operation that happened 2147483647 operations ago still
+        //lingering around or causing any confusion seems beyond unlikely.
+        if (xid < 0) {
+            xid = 1;
+        }
+
+        return currentXid;
     }
 
     public ReplyHeader submitRequest(RequestHeader h, Record request,

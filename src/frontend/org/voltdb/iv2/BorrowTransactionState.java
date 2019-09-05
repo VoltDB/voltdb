@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,7 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.BorrowTaskMessage;
 
 /**
  * BorrowTransactionState represents the execution of a borrowed
@@ -29,9 +29,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
  */
 public class BorrowTransactionState extends ParticipantTransactionState
 {
-    BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    BorrowTransactionState(long txnId, BorrowTaskMessage notice)
     {
-        super(txnId, notice, true);
+        super(txnId, notice, true, false);
     }
 
     @Override

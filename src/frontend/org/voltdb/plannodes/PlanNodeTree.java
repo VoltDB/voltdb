@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,8 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -44,14 +46,14 @@ public class PlanNodeTree implements JSONString {
     }
 
     // Subquery ID / subquery plan node list map. The top level statement always has id = 0
-    protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<Integer, List<AbstractPlanNode>>();
+    protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<>();
 
     public PlanNodeTree() {
     }
 
     public PlanNodeTree(AbstractPlanNode root_node) {
         try {
-            List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
+            List<AbstractPlanNode> nodeList = new ArrayList<>();
             m_planNodesListMap.put(0, nodeList);
             constructTree(nodeList, root_node);
         }
@@ -97,7 +99,16 @@ public class PlanNodeTree implements JSONString {
             stringer.key(Members.PLAN_NODES).array(m_planNodesListMap.get(0));
         }
         else {
+            /*
+             * Make PLAN_NODES_LISTS point to an empty array, A.
+             */
             stringer.key(Members.PLAN_NODES_LISTS).array();
+            /*
+             * For each entry, <N, P>, in the m_planNodesListMap, add a new
+             * object PS named NS to the end of the array, where PS is the
+             * stringified representation of P, and NS is the stringified
+             * representation of S.
+             */
             for (Map.Entry<Integer, List<AbstractPlanNode>> planNodes : m_planNodesListMap.entrySet()) {
                 stringer.object();
                 stringer.keySymbolValuePair(Members.STATEMENT_ID, planNodes.getKey());
@@ -139,24 +150,52 @@ public class PlanNodeTree implements JSONString {
         // Connect the parent and child statements
         for (List<AbstractPlanNode> nextPlanNodes : m_planNodesListMap.values()) {
             for (AbstractPlanNode node : nextPlanNodes) {
-                findPlanNodeWithPredicate(node);
+                connectNodesIfNecessary(node);
             }
+        }
+    }
+
+    /**
+     * Connect the base and the recursive (if there is one) query plan nodes
+     * to the scan plan node.
+     * @param node The common table scan plan node.
+     */
+    private void connectCTENodesIfAny(SeqScanPlanNode node) {
+        if (! node.isCommonTableScan()) {
+            return;
+        }
+        Integer CTEBaseNodeId = node.getCTEBaseNodeId();
+        assert(CTEBaseNodeId != null);
+        AbstractPlanNode CTEBaseNode = m_planNodesListMap.get(CTEBaseNodeId).get(0);
+        assert(CTEBaseNode instanceof CommonTablePlanNode);
+        node.setCTEBaseNode(CTEBaseNode);
+
+        CommonTablePlanNode cteNode = (CommonTablePlanNode)CTEBaseNode;
+        Integer CTERecursiveNodeId = cteNode.getRecursiveNodeId();
+        if (CTERecursiveNodeId != null) {
+            cteNode.setRecursiveNode(m_planNodesListMap.get(CTERecursiveNodeId).get(0));
         }
     }
 
     /**
      * Scan node, join node can have predicate, so does the Aggregate node (Having clause).
      */
-    private void findPlanNodeWithPredicate(AbstractPlanNode node) {
+    private void connectNodesIfNecessary(AbstractPlanNode node) {
         NodeSchema outputSchema = node.getOutputSchema();
         if (outputSchema != null) {
-            for (SchemaColumn col : outputSchema.getColumns()) {
+            for (SchemaColumn col : outputSchema) {
                 connectPredicateStmt(col.getExpression());
             }
         }
         if (node instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
             connectPredicateStmt(scanNode.getPredicate());
+            // If this is common table scan, we connect the scan node to the
+            // plan nodes for the base and recursive query.
+            if (scanNode instanceof SeqScanPlanNode) {
+                SeqScanPlanNode seqScanNode = (SeqScanPlanNode)scanNode;
+                connectCTENodesIfAny(seqScanNode);
+            }
         } else if (node instanceof AbstractJoinPlanNode) {
             AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode)node;
             connectPredicateStmt(joinNode.getPreJoinPredicate());
@@ -168,7 +207,7 @@ public class PlanNodeTree implements JSONString {
         }
 
         for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
-            findPlanNodeWithPredicate(inlineNode);
+            connectNodesIfNecessary(inlineNode);
         }
     }
 
@@ -214,7 +253,7 @@ public class PlanNodeTree implements JSONString {
      * @throws JSONException
      */
     private void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
-        List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
+        List<AbstractPlanNode> planNodes = new ArrayList<>();
         int size = jArray.length();
 
         try {
@@ -277,10 +316,43 @@ public class PlanNodeTree implements JSONString {
             assert(nextexpr instanceof AbstractSubqueryExpression);
             AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();
-            List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
+            List<AbstractPlanNode> planNodes = new ArrayList<>();
             assert(!m_planNodesListMap.containsKey(stmtId));
             m_planNodesListMap.put(stmtId, planNodes);
             constructTree(planNodes, subqueryExpr.getSubqueryNode());
+        }
+        if (node instanceof SeqScanPlanNode) {
+            // If this is a CTE scan, then we need to attach the
+            // base and recursive plans.  Both go into new elements
+            // of the plan list.
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode)node;
+            StmtCommonTableScan scan = seqScanNode.getCommonTableScan();
+            if (scan != null) {
+                List<AbstractPlanNode> planNodes = new ArrayList<>();
+                CompiledPlan basePlanNode = scan.getBestCostBasePlan();
+                Integer baseStmtId = scan.getBaseStmtId();
+                if ( ! m_planNodesListMap.containsKey(baseStmtId.intValue())) {
+                    // We may see the same scan several times in the tree.  That's
+                    // ok, but only try to put the scan in the lists once.
+                    m_planNodesListMap.put(baseStmtId, planNodes);
+                    constructTree(planNodes, basePlanNode.rootPlanGraph);
+                    if (scan.isRecursiveCTE()) {
+                        CompiledPlan recursivePlanNode = scan.getBestCostRecursivePlan();
+                        Integer recursiveStmtId = scan.getRecursiveStmtId();
+                        // We should not have added this yet.  We know
+                        // we didn't add the base plan.  If we added a statement id
+                        // which is the same as that of the
+                        // recursive plan without the base plan that would
+                        // be evidence of confusion.
+                        assert((recursiveStmtId != null) && !m_planNodesListMap.containsKey(recursiveStmtId));
+                        // Need a new list of Plan Nodes for the recursive case, as it's
+                        // a new plan.
+                        planNodes = new ArrayList<>();
+                        m_planNodesListMap.put(recursiveStmtId, planNodes);
+                        constructTree(planNodes, recursivePlanNode.rootPlanGraph);
+                    }
+                }
+            }
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,9 +45,11 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
+import org.voltdb.MockVoltDB;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -80,6 +82,9 @@ public class TestSpSchedulerSpHandle extends TestCase
     public void setUp()
     {
         msgGen = new RandomMsgGenerator();
+        MockVoltDB mockVoltDB = new MockVoltDB();
+        mockVoltDB.setKFactor(2);
+        VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
     }
 
     public void createObjs() throws JSONException
@@ -99,7 +104,7 @@ public class TestSpSchedulerSpHandle extends TestCase
                                                           any(CommandLog.DurabilityListener.class),
                                                           any(TransactionTask.class));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor, true);
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);
@@ -121,7 +126,7 @@ public class TestSpSchedulerSpHandle extends TestCase
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas, null);
+        dut.updateReplicas(replicas, null, null);
         int msgcount = 0;
         for (int i = 0; i < 4000; i++) {
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();

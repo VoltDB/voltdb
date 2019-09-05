@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,9 +45,10 @@ class PersistentTableLogTest : public Test {
 public:
     PersistentTableLogTest() {
         m_engine = new voltdb::VoltDBEngine();
-        int partitionCount = htonl(1);
-        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        int partitionCount = 1;
+        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
+        m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -117,6 +118,7 @@ public:
     ~PersistentTableLogTest() {
         delete m_engine;
         delete m_table;
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable(bool withPK = true) {
@@ -133,7 +135,7 @@ public:
                                              BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, false, m_tableSchema);
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -218,7 +220,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;
 
@@ -231,7 +233,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom(serialize_in, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
@@ -263,7 +265,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;
 
@@ -276,13 +278,13 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom(serialize_in, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
-    m_engine->releaseUndoToken(INT64_MIN + 3);
+    m_engine->releaseUndoToken(INT64_MIN + 3, false);
 
     ASSERT_FALSE(m_table->lookupTupleForUndo(tuple).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)1000);

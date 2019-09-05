@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,10 +33,6 @@ public class DummyTransactionResponseMessage extends VoltMessage {
     private long m_txnId;
     private long m_spHandle;
     private long m_spiHSId;
-
-    //The flag used for MigratePartitionLeader operation, indicating that the task was created
-    //when the site was leader partition
-    boolean m_isForOldLeader = false;
 
     /** Empty constructor for de-serialization */
     public DummyTransactionResponseMessage()
@@ -73,8 +69,7 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // txnId
             + 8 // m_spHandle
-            + 8 // SPI HSId
-            + 1;//m_forLeader
+            + 8; // SPI HSId
         return msgsize;
     }
 
@@ -85,7 +80,6 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         buf.putLong(m_txnId);
         buf.putLong(m_spHandle);
         buf.putLong(m_spiHSId);
-        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -96,7 +90,6 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
         m_spiHSId = buf.getLong();
-        m_isForOldLeader = buf.get() == 1;
     }
 
     @Override
@@ -109,15 +102,6 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         sb.append(" SPI HSID: ").append(CoreUtils.hsIdToString(m_spiHSId));
 
         return sb.toString();
-    }
-
-    public void setForOldLeader(boolean forLeader) {
-        m_isForOldLeader = forLeader;
-    }
-
-    public boolean isForOldLeader() {
-        return m_isForOldLeader;
-
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,8 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-
-import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -56,23 +54,17 @@ import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionJavaEr
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionParamSerializationError;
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionUpdateConstraintError;
 
+import junit.framework.Test;
+
 public class TestRollbackSuite extends RegressionSuite {
 
     // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        SinglePartitionJavaError.class,
-        SinglePartitionJavaAbort.class,
-        SinglePartitionConstraintError.class,
+    static final Class<?>[] MP_PROCEDURES = {
         MultiPartitionJavaError.class,
         MultiPartitionJavaAbort.class,
         MultiPartitionConstraintError.class,
         MultiPartitionParamSerializationError.class,
-        SinglePartitionUpdateConstraintError.class,
-        SinglePartitionConstraintFailureAndContinue.class,
-        SinglePartitionParamSerializationError.class,
         SelectAll.class,
-        ReadMatView.class,
-        FetchNORowUsingIndex.class,
         InsertAllTypes.class,
         AllTypesJavaError.class,
         AllTypesJavaAbort.class,
@@ -1060,7 +1052,18 @@ public class TestRollbackSuite extends RegressionSuite {
         project.addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"));
         project.addDefaultPartitioning();
         project.addPartitionInfo("ALL_TYPES", "ID");
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(FetchNORowUsingIndex.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(ReadMatView.class, "NEW_ORDER.NO_W_ID: 0");
+
+        project.addProcedure(SinglePartitionJavaError.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(SinglePartitionJavaAbort.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(SinglePartitionConstraintError.class, "NEW_ORDER.NO_W_ID: 0");
+
+        project.addProcedure(SinglePartitionUpdateConstraintError.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(SinglePartitionConstraintFailureAndContinue.class, "NEW_ORDER.NO_W_ID: 0");
+        project.addProcedure(SinglePartitionParamSerializationError.class, "ALL_TYPES.ID: 0");
+
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
         boolean success;

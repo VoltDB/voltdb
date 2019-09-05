@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
@@ -84,6 +85,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_internalInterface = m_internalInterface;
         cl.m_drAgentPortStart = m_drAgentPortStart;
         cl.m_httpPort = m_httpPort;
+        cl.m_drPublicHost = m_drPublicHost;
+        cl.m_drPublicPort = m_drPublicPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
         cl.m_startMode = m_startMode;
@@ -98,8 +101,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
         cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
-        cl.m_userSchema = m_userSchema;
-        cl.m_stagedClassesPath = m_stagedClassesPath;
+        cl.m_userSchemas = m_userSchemas;
+        cl.m_stagedClassesPaths = m_stagedClassesPaths;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -128,6 +131,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_newCli = m_newCli;
         cl.m_sslEnable = m_sslEnable;
         cl.m_sslExternal = m_sslExternal;
+        cl.m_sslInternal = m_sslInternal;
         cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
@@ -339,7 +343,9 @@ public class CommandLine extends VoltDB.Configuration
 
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
-        if (m_newCli) return this;
+        if (m_newCli) {
+            return this;
+        }
 
         this.voltFilePrefix = voltFilePrefix;
         return this;
@@ -538,8 +544,9 @@ public class CommandLine extends VoltDB.Configuration
          */
         cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
 
-        if (rmi_host_name != null)
+        if (rmi_host_name != null) {
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
+        }
         cmdline.add("-Dlog4j.configuration=" + log4j);
         if (m_vemTag != null) {
             cmdline.add("-D" + VEM_TAG_PROPERTY + "=" + m_vemTag);
@@ -548,7 +555,6 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xloggc:"+ volt_root + "/" + VEM_GC_ROLLOVER_FILE_NAME+" -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles="+VEM_GC_ROLLOVER_FILE_COUNT+" -XX:GCLogFileSize="+VEM_GC_ROLLOVER_FILE_SIZE);
         }
         cmdline.add(maxHeap);
-        cmdline.add("-XX:+UseParNewGC");
         cmdline.add("-XX:+UseConcMarkSweepGC");
         cmdline.add("-XX:+CMSParallelRemarkEnabled");
         cmdline.add("-XX:+UseTLAB");
@@ -606,9 +612,9 @@ public class CommandLine extends VoltDB.Configuration
 
         // add default keystore, truststore
         if (m_sslEnable) {
-            cmdline.add("-Djavax.net.ssl.keyStore=keystore");
+            cmdline.add("-Djavax.net.ssl.keyStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.keyStorePassword=password");
-            cmdline.add("-Djavax.net.ssl.trustStore=keystore");
+            cmdline.add("-Djavax.net.ssl.trustStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.trustStorePassword=password");
         }
 
@@ -661,6 +667,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalSSL");
         }
 
+        if (m_sslInternal) {
+            cmdline.add("internalSSL");
+        }
+
         cmdline.add("host");
         if (!m_coordinators.isEmpty()) {
             cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
@@ -694,6 +704,15 @@ public class CommandLine extends VoltDB.Configuration
         {
             cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
         }
+        if (m_drPublicHost != null || m_drPublicPort != VoltDB.DISABLED_PORT) {
+            cmdline.add("drpublic");
+            String param = (m_drPublicHost != null && !m_drPublicHost.isEmpty()) ? m_drPublicHost : "";
+            if (m_drPublicPort != VoltDB.DISABLED_PORT) {
+                param = (param.isEmpty()) ? Integer.toString(m_drPublicPort)
+                                          : param + ":" + Integer.toString(m_drPublicPort);
+            }
+            cmdline.add(param);
+        }
 
         if (target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             cmdline.add("valgrind");
@@ -721,8 +740,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
-        if (m_userSchema != null) {
-            cmdline.add("schema"); cmdline.add(m_userSchema.getAbsolutePath());
+        if (m_userSchemas != null) {
+            cmdline.add("schema");
+            cmdline.add(m_userSchemas.stream().map(File::getAbsolutePath).collect(Collectors.joining(",")));
         }
 
         if (customCmdLn != null && !customCmdLn.trim().isEmpty())
@@ -764,11 +784,6 @@ public class CommandLine extends VoltDB.Configuration
         }
         if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
-        }
-
-        if (m_sitesperhost != VoltDB.UNDEFINED) {
-            cmdline.add("sitesperhost");
-            cmdline.add(Integer.toString(m_sitesperhost));
         }
 
         //Add mesh and hostcount for probe only.

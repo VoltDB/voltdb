@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ReplicationRole;
@@ -41,15 +42,14 @@ public class Promote extends UpdateApplicationBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-
         return updateApplication("@UpdateApplicationCatalog",
                                 null,
                                 null,
                                 new String[0],
+                                Collections.emptyList(),
                                 null,
-                                true, /* isPromotion */
-                                useDDLSchema);
+                                true /* isPromotion */
+                                );
     }
 
 }

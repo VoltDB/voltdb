@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,19 +38,11 @@ import org.voltdb.VoltTable;
 
 public class InsertImportWithCount4 extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
-    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable4 " + sqlSuffix);
-    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ? and value = ?");
-    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(?, ?, 4)");
-
+    public final SQLStmt importInsert = new SQLStmt("UPSERT INTO kafkaImportTable4 " + sqlSuffix);
+    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ?");
     public long run(long key, long value)
     {
-        voltQueueSQL(incrementMirrorRow, EXPECT_SCALAR_LONG, key, value);
-        VoltTable[] queryresult = voltExecuteSQL();
-        VoltTable result = queryresult[0];
-        long rowsUpdated = result.fetchRow(0).getLong(0);
-        if (rowsUpdated == 0) { // row
-            voltQueueSQL(insertError, key, value);
-        }
+        voltQueueSQL(incrementMirrorRow, EXPECT_SCALAR_LONG, key);
         voltQueueSQL(importInsert, key, value);
         voltExecuteSQL(true);
         return 0;

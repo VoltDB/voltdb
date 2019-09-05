@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export>
+        <configuration enabled="true" type="file" target="grammartarget">
+            <property name="nonce">gramtarg</property>
+            <property name="type">csv</property>
+            <property name="with-schema">false</property>
+            <property name="batched">false</property>
+            <property name="period">1</property>
+            <property name="outdir">exportdata</property>
+        </configuration>
+    </export>
+</deployment>

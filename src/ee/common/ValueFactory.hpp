@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VALUEFACTORY_HPP_
-#define VALUEFACTORY_HPP_
+#pragma once
 
 #include "common/NValue.hpp"
 
@@ -66,11 +65,11 @@ public:
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     static NValue getStringValue(const std::string& value, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), pool);
     }
 
     /// Constructs a value copied into temporary thread-local storage.
-    static NValue getTempStringValue(const std::string value) {
+    static NValue getTempStringValue(const std::string& value) {
         return NValue::getTempStringValue(value.c_str(), value.length());
     }
 
@@ -258,6 +257,7 @@ public:
         }
         throwDynamicSQLException("Default value parsing error.");
     }
+
+    static NValue getRandomValue(ValueType type, uint32_t maxLength, Pool* pool = NULL);
 };
 }
-#endif /* VALUEFACTORY_HPP_ */

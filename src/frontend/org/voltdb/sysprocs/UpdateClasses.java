@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
@@ -45,13 +46,14 @@ public class UpdateClasses extends UpdateApplicationBase {
         }
 
         logCatalogUpdateInvocation("@UpdateClasses");
-
+        // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
         return updateApplication("@UpdateClasses",
                                 jarfileBytes,
                                 classesToDeleteSelector,
                                 new String[0],
+                                Collections.emptyList(),
                                 null,
-                                false, /* isPromotion */
-                                useDDLSchema);
+                                false /* isPromotion */
+                                );
     }
 }

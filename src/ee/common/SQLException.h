@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,12 +15,24 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SQLEXCEPTION_H_
-#define SQLEXCEPTION_H_
+#pragma once
 
 #include "common/SerializableEEException.h"
 
-#define throwDynamicSQLException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::SQLException( SQLException::dynamic_sql_error, reallysuperbig_nonce_message); }
+#define throwSQLException(type, ...) do {                       \
+   char msg[8192];                                              \
+   snprintf(msg, sizeof msg, __VA_ARGS__);                      \
+   msg[sizeof msg - 1] = '\0';                                  \
+   throw voltdb::SQLException(type, msg);            \
+} while (false)
+
+#define throwDynamicSQLException(...) {                                   \
+    char message[8192];                                                   \
+    snprintf(message, sizeof message, __VA_ARGS__);                       \
+    message[sizeof message - 1] = '\0';                                   \
+    throw voltdb::SQLException(SQLException::dynamic_sql_error, message); \
+}
+
 namespace voltdb {
 class ReferenceSerializeOutput;
 
@@ -49,11 +61,11 @@ public:
     static const char* volt_decimal_serialization_error;
     static const char* volt_user_defined_function_error;
 
-    SQLException(std::string sqlState, std::string message);
-    SQLException(std::string sqlState, int error_no, std::string message);
-    SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
-    SQLException(std::string sqlState, std::string message, int internalFlags);
-    virtual ~SQLException() {}
+    SQLException(std::string const& sqlState, std::string const& message);
+    SQLException(std::string const& sqlState, int error_no, std::string const& message);
+    SQLException(std::string const& sqlState, std::string const& message, VoltEEExceptionType type);
+    SQLException(std::string const& sqlState, std::string const& message, int internalFlags);
+    virtual ~SQLException() throw() {}
 
     const std::string& getSqlState() const { return m_sqlState; }
 
@@ -66,11 +78,10 @@ public:
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
 private:
-    std::string m_sqlState;
+    std::string const m_sqlState;
 
     // internal and not sent to java
     const int m_internalFlags;
 };
 }
 
-#endif /* SQLEXCEPTION_H_ */

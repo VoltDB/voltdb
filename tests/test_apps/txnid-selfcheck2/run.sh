@@ -124,6 +124,7 @@ function async-benchmark() {
         --progresstimeout=20 \
         --usecompression=false \
         --allowinprocadhoc=false
+        # --enabledthreads=partttlMigratelt,replttlMigratelt
         # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
         # --sslfile=./keystore.props

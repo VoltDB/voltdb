@@ -1395,6 +1395,10 @@ public class Expression {
             return;
         }
 
+        if (e.opType == OpTypes.USER_DEFINED_AGGREGATE) {
+            return;
+        }
+
         if (stopAtTypeSet.contains(e.opType)) {
             return;
         }
@@ -1528,6 +1532,7 @@ public class Expression {
 
         // logicals - other predicates
         prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
+        prototypes.put(OpTypes.STARTS_WITH,   (new VoltXMLElement("operation")).withValue("optype", "startswith"));
         prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
@@ -1559,6 +1564,7 @@ public class Expression {
         prototypes.put(OpTypes.WINDOWED_MAX,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_max"));
         prototypes.put(OpTypes.WINDOWED_MIN,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_min"));
         prototypes.put(OpTypes.WINDOWED_SUM,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_sum"));
+        prototypes.put(OpTypes.WINDOWED_ROW_NUMBER,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_row_number"));
 
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
@@ -1568,6 +1574,9 @@ public class Expression {
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
+
+        // user defined aggregate function
+        prototypes.put(OpTypes.USER_DEFINED_AGGREGATE, (new VoltXMLElement("aggregation")).withValue("optype", "user_defined_aggregate"));
     }
 
     /**
@@ -1582,12 +1591,14 @@ public class Expression {
     static class SimpleColumnContext {
         final Session m_session;
         final List<Expression> m_displayCols;
+        final int m_indexLimitVisible;
         final java.util.Set<Integer> m_ignoredDisplayColIndexes = new java.util.HashSet<>();
         private int m_startKey = -1;
 
-        SimpleColumnContext(Session session, List<Expression> displayCols) {
+        SimpleColumnContext(Session session, List<Expression> displayCols, int indexLimitVisible) {
             m_session = session;
             m_displayCols = displayCols;
+            m_indexLimitVisible = indexLimitVisible;
         }
 
         SimpleColumnContext withStartKey(int startKey) {
@@ -1624,7 +1635,7 @@ public class Expression {
         }
 
         public boolean disabledTheColumnForDisplay(int jj) {
-            return m_ignoredDisplayColIndexes.contains(jj);
+            return jj >= m_indexLimitVisible || m_ignoredDisplayColIndexes.contains(jj);
         }
 
 
@@ -1636,7 +1647,7 @@ public class Expression {
      * @throws HSQLParseException
      */
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
-        return voltGetXML(new SimpleColumnContext(session, null), null);
+        return voltGetXML(new SimpleColumnContext(session, null, 0), null);
     }
 
     /**
@@ -1686,6 +1697,14 @@ public class Expression {
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
         exp.attributes.put("id", getUniqueId(context.m_session));
+
+        if (opType == OpTypes.USER_DEFINED_AGGREGATE) {
+            if (this instanceof ExpressionAggregate) {
+                ExpressionAggregate tempExpr = (ExpressionAggregate) this;
+                exp.attributes.put("user_aggregate_id", Integer.toString(tempExpr.getUserAggregateId()));
+                exp.attributes.put("name", tempExpr.getName());
+            }
+        }
 
         if (realAlias != null) {
             exp.attributes.put("alias", realAlias);
@@ -1771,6 +1790,13 @@ public class Expression {
             FunctionSQL fn = (FunctionSQL)this;
             return fn.voltAnnotateFunctionXML(exp);
 
+        case OpTypes.USER_DEFINED_AGGREGATE:
+            exp.attributes.put("valuetype", dataType.getNameString());
+            if (((ExpressionAggregate)this).isDistinctAggregate) {
+                throw Error.runtimeError(ErrorCode.X_UDAF01, "User-defined aggregate function does not support the 'distinct' keyword");
+            }
+            return exp;
+
         case OpTypes.COUNT:
         case OpTypes.SUM:
         case OpTypes.AVG:
@@ -1819,6 +1845,7 @@ public class Expression {
 
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_ROW_NUMBER:
         case OpTypes.WINDOWED_COUNT:
         case OpTypes.WINDOWED_MIN:
         case OpTypes.WINDOWED_MAX:
@@ -2009,7 +2036,7 @@ public class Expression {
         resolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
-        return voltGetXML(new SimpleColumnContext(session, null), null);
+        return voltGetXML(new SimpleColumnContext(session, null, 0), null);
     }
 
     // A VoltDB extension to support indexed expressions
@@ -2026,7 +2053,7 @@ public class Expression {
 
     // A VoltDB extension to convert columnref expression for a column that is part of the USING clause
     // into a COALESCE expression
-    // columnref                    operation operator_case_when
+    //      columnref                   operation operator_case_when
     //      columnref T1.C      ->      operation is_null
     //      columnref T2.C                  columnref T1.C
     //                                  operation operator_alternative
@@ -2056,7 +2083,10 @@ public class Expression {
         exp.children.clear();
 
         // There should be at least 2 columnref expressions
-        assert(uniqueColumnrefs.size() > 1);
+        if (uniqueColumnrefs.size() < 2) {
+            throw Error.error(ErrorCode.X_42581, "Cannot distinguish column reference between two tables. "
+                    + "Use fully qualified names including the table name or alias to avoid ambiguous references");
+        }
         VoltXMLElement lastAlternativeExpr = null;
         VoltXMLElement resultColaesceExpr = null;
         while (true) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,20 +23,11 @@
 
 package org.voltdb_testprocs.regressionsuites.fixedsql;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class BoxedByteArrays extends VoltProcedure {
-
-//    CREATE TABLE ENG_539 (
-//            ID      INTEGER NOT NULL,
-//            VARBIN  VARBINARY(3),
-//            BIG     BIGINT,
-//            PRIMARY KEY (ID)
-//          );
-
     public final SQLStmt anInsert = new SQLStmt
             ("INSERT INTO ENG_539 VALUES (?, ?, ?);");
 
@@ -55,7 +46,7 @@ public class BoxedByteArrays extends VoltProcedure {
 
         switch(inpType) {
             case "VARBIN":
-                voltQueueSQL(anInsert, id, (Object)varbin, null);
+                voltQueueSQL(anInsert, id, varbin, null);
                 break;
             case "STR":
                 voltQueueSQL(anInsert, id, inpString, null);

@@ -18,13 +18,16 @@
 {@idcol = "ID"}
 
 {@insertcols = "ID, PAST, PRESENT, FUTURE, RATIO"}
+{@insertselectcols = "ID+16, PAST, PRESENT, FUTURE, RATIO"}
 {@insertvals = "_id, _value[timestamp], _value[timestamp], _value[timestamp], _value[int64]"}
 {@onefun = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@optionalfn = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@plus10 = ""} -- You cannot add to a timestamp
-{@rankorderbytype = "timestamp"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "timestamp"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
-{@updatecolumn = "PAST"}
-{@updatesource = "_value[timestamp]"}
+{@updatecolumn = "PRESENT"}
+{@updatesource = "PAST"}
 {@updatevalue = "_value[timestamp]"}
+{@updatecolumn2 = "FUTURE"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "3"} -- maximum depth, in Recursive CTE tests

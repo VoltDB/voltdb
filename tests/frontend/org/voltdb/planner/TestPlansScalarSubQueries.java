@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,7 +53,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
     }
@@ -65,7 +65,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
@@ -87,7 +87,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         NodeSchema schema = pn.getOutputSchema();
         assertEquals(3, schema.size());
-        SchemaColumn col = schema.getColumns().get(2);
+        SchemaColumn col = schema.getColumn(2);
         assertTrue(col != null);
         assertEquals("STORE_CATEGORY", col.getColumnName());
         assertTrue(col.getExpression() instanceof ScalarValueExpression);
@@ -133,7 +133,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         // correlated
         sql = "select franchise_id, sum((select count(category) from store_types where type_id = stores.franchise_id)) as stores_in_category_AdHoc "
                 + " from stores group by franchise_id;";
-        failToCompile(sql, "user lacks privilege or object not found: STORES.FRANCHISE_ID");
+        failToCompile(sql, "object not found: STORES.FRANCHISE_ID");
     }
 
     public void testSelectParameterScalar() {
@@ -143,7 +143,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();

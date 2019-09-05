@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -52,6 +52,7 @@
 
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
+#include "operatorexpression.h"
 
 namespace voltdb {
 
@@ -61,7 +62,7 @@ public:
     static AbstractExpression* expressionFactory(PlannerDomValue obj,
                                                  ExpressionType et, ValueType vt, int vs,
                                                  AbstractExpression* lc, AbstractExpression* rc,
-                                                 const std::vector<AbstractExpression*>* arguments);
+                                                 const std::vector<AbstractExpression*>& arguments);
 
     static AbstractExpression* comparisonFactory(PlannerDomValue obj,ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
@@ -73,8 +74,7 @@ public:
 
     /** If the passed vector contains only TupleValueExpression, it
      * returns ColumnIds of them, otherwise NULL.*/
-    static boost::shared_array<int>
-    convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions);
+    static boost::shared_array<int> convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
     /** If the passed vector contains only ParameterValueExpression, it
      * returns ParamIds of them, otherwise NULL.*/
@@ -82,13 +82,22 @@ public:
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
     /** Returns ColumnIds of TupleValueExpression expressions from passed axpression.*/
-    static void
-    extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds);
+    static void extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int>&);
+    static std::vector<int> extractTupleValuesColumnIdx(const AbstractExpression* expr);
 
-    // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
-    static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
+    static AbstractExpression* operatorFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
-    static AbstractExpression* vectorFactory(ValueType vt, const std::vector<AbstractExpression*>* args);
+    static AbstractExpression* vectorFactory(ValueType vt, const std::vector<AbstractExpression*>& args);
+
+    /**
+     * Given the table index and column index, return an expression of `col IS NULL`.
+     */
+    static OperatorIsNullExpression* columnIsNull(const int tableIndex, const int valueIndex);
+
+    /**
+     * Given the table index and column index, return an expression of `col IS NOT NULL`.
+     */
+    static OperatorNotExpression* columnNotNull(const int tableIndex, const int valueIndex);
 
 };
 

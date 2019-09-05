@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,7 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.DELETE;
-    };
+    }
 
     public boolean isTruncate() {
         return m_truncate;

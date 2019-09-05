@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../../tests/test_apps/osm-import/lib/commons-compress-1.9.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../tests/test_apps/osm-import/lib/osmosis-core-0.44.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../tests/test_apps/osm-import/lib/osmosis-xml-0.44.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../tests/test_apps/osm-import/lib/osmosis-pgsimple-0.44.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../tests/test_apps/osm-import/lib/postgis-jdbc-1.3.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _EE_STORAGE_TEMPTABLELIMITS_H_
-#define _EE_STORAGE_TEMPTABLELIMITS_H_
+#pragma once
 
 #include <stdint.h>
 
@@ -29,12 +28,7 @@ namespace voltdb {
 class TempTableLimits {
 public:
     TempTableLimits(int64_t memoryLimit = 1024 * 1024 * 100, int64_t logThreshold = -1)
-        : m_currMemoryInBytes(0)
-        , m_peakMemoryInBytes(0)
-        , m_logThreshold(logThreshold)
-        , m_memoryLimit(memoryLimit)
-        , m_logLatch(false)
-    { }
+        : m_logThreshold(logThreshold) , m_memoryLimit(memoryLimit) { }
 
     /**
      * Track an increase in the amount of memory accumulated in temp tables.
@@ -50,10 +44,10 @@ public:
 
 private:
     /// The current amount of memory used by temp tables for this plan fragment.
-    int64_t m_currMemoryInBytes;
+    int64_t m_currMemoryInBytes = 0;
     /// The high water amount of memory used by temp tables
     /// during the current execution of this plan fragment.
-    int64_t m_peakMemoryInBytes;
+    int64_t m_peakMemoryInBytes = 0;
     /// The memory allocation at which a log message will be generated.
     /// A negative value disables this behavior.
     const int64_t m_logThreshold;
@@ -62,9 +56,8 @@ private:
     const int64_t m_memoryLimit;
     /// True if we have already generated a log message for
     /// exceeding the log threshold and not yet dropped below it.
-    bool m_logLatch;
+    bool m_logLatch = false;
 };
 
 } // namespace voltdb
 
-#endif // _EE_STORAGE_TEMPTABLELIMITS_H_

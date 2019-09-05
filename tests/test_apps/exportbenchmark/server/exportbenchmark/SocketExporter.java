@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,6 +41,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportRow;
+import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -52,6 +54,11 @@ import java.util.Properties;
  * Export class for performance measuring.
  * Export statistics are checked for timestamps, and performance metrics are
  * periodically pushed to a UDP socket for collection.
+ *
+ * Note: due to the way timerStart is managed, the statistics are only
+ * valid for the first execution of the test client. If the system is not
+ * restarted between executions of the test client, then the first interval
+ * reported will be much longer and will skew the test results.
  */
 public class SocketExporter extends ExportClientBase {
 
@@ -82,7 +89,6 @@ public class SocketExporter extends ExportClientBase {
 
     class SocketExportDecoder extends ExportDecoderBase {
         long transactions = 0;
-        long totalDecodeTime = 0;
         long timerStart = 0;
 
         SocketExportDecoder(AdvertisedDataSource source) {
@@ -96,41 +102,38 @@ public class SocketExporter extends ExportClientBase {
          *   -Partition ID
          */
         public void sendStatistics() {
-            if (timerStart > 0) {
-                ByteBuffer buffer = ByteBuffer.allocate(1024);
-                Long endTime = System.currentTimeMillis();
+            // Do not count the time spent sending the stats
+            Long endTime = System.currentTimeMillis();
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
 
-                // Create message
-                JSONObject message = new JSONObject();
-                try {
-                    message.put("transactions", transactions);
-                    message.put("decodeTime", totalDecodeTime);
-                    message.put("startTime", timerStart);
-                    message.put("endTime", endTime);
-                    message.put("partitionId", m_source.partitionId);
-                } catch (JSONException e) {
-                    m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
-                }
-
-                String messageString = message.toString();
-                buffer.clear();
-                buffer.put((byte)messageString.length());
-                buffer.put(messageString.getBytes());
-                buffer.flip();
-
-                // Send message over socket
-                try {
-                    int sent = channel.send(buffer, address);
-                    if (sent != messageString.getBytes().length+1) {
-                        // Should always send the whole packet.
-                        m_logger.error("Error sending entire stats message");
-                    }
-                } catch (IOException e) {
-                    m_logger.error("Couldn't send stats to socket");
-                }
-                transactions = 0;
-                totalDecodeTime = 0;
+            // Create message
+            JSONObject message = new JSONObject();
+            try {
+                message.put("transactions", transactions);
+                message.put("startTime", timerStart);
+                message.put("endTime", endTime);
+                message.put("partitionId", getPartition());
+            } catch (JSONException e) {
+                m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
             }
+
+            String messageString = message.toString();
+            buffer.clear();
+            buffer.put((byte)messageString.length());
+            buffer.put(messageString.getBytes());
+            buffer.flip();
+
+            // Send message over socket
+            try {
+                int sent = channel.send(buffer, address);
+                if (sent != messageString.getBytes().length+1) {
+                    // Should always send the whole packet.
+                    m_logger.error("Error sending entire stats message");
+                }
+            } catch (IOException e) {
+                m_logger.error("Couldn't send stats to socket");
+            }
+            transactions = 0;
             timerStart = System.currentTimeMillis();
         }
 
@@ -141,31 +144,24 @@ public class SocketExporter extends ExportClientBase {
             } catch (IOException ignore) {}
         }
 
-        @Override
         /**
          * Logs the transactions, and determines how long it take to decode
          * the row.
          */
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        @Override
+        public boolean processRow(ExportRow r) throws RestartBlockException {
+            // Start reporting stats from first row of first block
+            if (timerStart == 0) {
+                timerStart = System.currentTimeMillis();
+            }
             // Transaction count
             transactions++;
-
-            // Time decodeRow
-            try {
-                long startTime = System.nanoTime();
-                decodeRow(rowData);
-                long endTime = System.nanoTime();
-
-                totalDecodeTime += endTime - startTime;
-            } catch (IOException e) {
-                m_logger.error(e.getLocalizedMessage());
-            }
 
             return true;
         }
 
         @Override
-        public void onBlockCompletion() {
+        public void onBlockCompletion(ExportRow r) {
             if (transactions > 0)
                 sendStatistics();
         }

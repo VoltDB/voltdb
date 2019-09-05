@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,7 +47,7 @@
 #define COMPACTINGTREEMULTIMAPINDEX_H_
 
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
 #include "structures/CompactingMap.h"
@@ -67,6 +67,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     typedef typename MapType::iterator MapIterator;
     typedef std::pair<MapIterator, MapIterator> MapRange;
 
+
     ~CompactingTreeMultiMapIndex() {};
 
     static MapIterator& castToIter(IndexCursor& cursor) {
@@ -77,14 +78,12 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyEndIter);
     }
 
-    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
-    {
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
         ++m_inserts;
         m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntryDo(const TableTuple *tuple)
-    {
+    bool deleteEntryDo(const TableTuple *tuple) {
         ++m_deletes;
         MapIterator iter = findTuple(*tuple);
         if (iter.isEnd()) {
@@ -99,7 +98,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
      */
     bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
-        assert(originalTuple.address() != destinationTuple.address());
+        vassert(originalTuple.address() != destinationTuple.address());
         // The KeyType will always depend on tuple address, excpet for CompactingTreeMultiIndexTest.
         if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
@@ -190,10 +189,48 @@ class CompactingTreeMultiMapIndex : public TableIndex
         }
     }
 
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) {
+        // do moveToGreaterThanKey(), null values in the search key will be treated as maximum
+
+        // IntsKey will pack the key data into uint64, so we can not tell if it is
+        // a NULL value then (a TINYINT NULL is a valid value in INT).
+        // In that case, we will change all numeric null key values into maximum.
+        for (int i = 0; i < searchKey->getSchema()->totalColumnCount(); i++) {
+            if (searchKey->getNValue(i).isNull()) {
+                const ValueType valueType = searchKey->getSchema()->columnType(i);
+                switch (valueType) {
+                    case VALUE_TYPE_BIGINT:
+                        searchKey->setNValue(i, ValueFactory::getBigIntValue(INT64_MAX));
+                        break;
+                    case VALUE_TYPE_INTEGER:
+                        searchKey->setNValue(i, ValueFactory::getIntegerValue(INT32_MAX));
+                        break;
+                    case VALUE_TYPE_SMALLINT:
+                        searchKey->setNValue(i, ValueFactory::getSmallIntValue(INT16_MAX));
+                        break;
+                    case VALUE_TYPE_TINYINT:
+                        searchKey->setNValue(i, ValueFactory::getTinyIntValue(INT8_MAX));
+                        break;
+                    default: // other null types will be handled in GenericComparator
+                        break;
+                }
+            }
+        }
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.upperBoundNullAsMax(KeyType(searchKey));
+        // find prev entry
+        if (mapIter.isEnd()) {
+            moveToEnd(false, cursor);
+        } else {
+            cursor.m_forward = false;
+            mapIter.movePrev();
+        }
+    }
+
     // only be called after moveToGreaterThanKey() for LTE case
     void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -211,7 +248,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     void moveToPriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -310,7 +347,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
     }
 
@@ -338,8 +375,21 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
+    }
+
+    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const {
+        cursor.m_forward = forward;
+        MapIterator &mapConstIter = castToIter(cursor);
+        mapConstIter = m_entries.findRank(denseRank);
+
+        if (mapConstIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+        return true;
     }
 
     size_t getSize() const { return m_entries.size(); }
@@ -377,8 +427,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return MapIterator();
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple) const
-    {
+    MapIterator findTuple(const TableTuple &originalTuple) const {
         // TODO: couldn't remove this, because of CompactingTreeMultiIndexTest in eecheck
         // code will force to use non-pointer-key.
         if (KeyType::keyDependsOnTupleAddress()) {

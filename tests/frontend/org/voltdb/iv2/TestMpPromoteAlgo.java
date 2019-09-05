@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,8 +26,8 @@ package org.voltdb.iv2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -48,8 +48,8 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -113,7 +113,7 @@ public class TestMpPromoteAlgo
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig);
+            ofTotal, handle, handle, versionedHashinatorConfig, Long.MIN_VALUE);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -130,69 +130,15 @@ public class TestMpPromoteAlgo
         return m;
     }
 
-
-//    Iv2RepairLogResponseMessage makeStaleResponse(long handle, long requestId)
-//    {
-//        Iv2RepairLogResponseMessage m = makeFragResponse(handle);
-//        when(m.getRequestId()).thenReturn(requestId);
-//        return m;
-//    }
-
     @BeforeClass
     static public void initializeHashinator() {
-        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initialize(ElasticHashinator.class, TheHashinator.getConfigureBytes(8));
     }
 
     @Before
     public void setUp() {
         m_hashinatorConfig = TheHashinator.getCurrentVersionedConfigCooked();
     }
-
-    // verify that responses are correctly unioned and ordered.
-//    @Test
-//    public void testUnion() throws Exception
-//    {
-//        MpPromoteAlgo algo = new MpPromoteAlgo(new ArrayList<Long>(), null, "Test");
-//
-//        // returned handles in a non-trivial order, with duplicates.
-//        // txns 1-5 are complete. 6 is not complete.
-//        // txn 5 returns frag(s) and complete(s).
-//        final Boolean t = true; final Boolean f = false;
-//        long returnedHandles[]  = new long[]{txnEgo(1L), txnEgo(5L), txnEgo(2L), txnEgo(5L), txnEgo(6L), txnEgo(3L), txnEgo(5L), txnEgo(1L)};
-//        boolean isComplete[] = new boolean[]{t,  f,  t,  t,  f,  t,  f,  t};
-//
-//        long expectedUnion[] = new long[]{txnEgo(1L), txnEgo(2L), txnEgo(3L), txnEgo(5L), txnEgo(6L)};
-//        boolean expectComp[] = new boolean[]{t, t, t, t, f};
-//
-//        Iv2RepairLogResponseMessage makeCompleteResponse = makeCompleteResponse(returnedHandles[0], uig.getNextUniqueId());
-//        System.out.println("txnEgo: " + returnedHandles[0] + " m.handle(): " + makeCompleteResponse.getHandle());
-//
-//        for (int ii=0; ii < isComplete.length; ii++) {
-//            if (isComplete[ii]) {
-//                algo.addToRepairLog(makeCompleteResponse(returnedHandles[ii], uig.getNextUniqueId()));
-//            }
-//            else {
-//                algo.addToRepairLog(makeFragResponse(returnedHandles[ii], uig.getNextUniqueId()));
-//            }
-//        }
-//
-//        // assert one log entry per transaction and that complete trumped frag.
-//        assertEquals(expectedUnion.length, algo.m_repairLogUnion.size());
-//        int i = 0;
-//        for (Iv2RepairLogResponseMessage li : algo.m_repairLogUnion) {
-//            System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.makeZero(0).getTxnId() + " shifted zero: " + (TxnEgo.makeZero(0).getTxnId() << 14));
-//            assertEquals(li.getTxnId(), expectedUnion[i]);
-//            if (expectComp[i]) {
-//                assertTrue(li.getPayload() instanceof CompleteTransactionMessage);
-//            }
-//            else {
-//                assertTrue(li.getPayload() instanceof FragmentTaskMessage);
-//            }
-//            i++;
-//        }
-//    }
-
 
     // verify that algo asks initMailbox to send the expected repair messages.
     @Test
@@ -206,7 +152,8 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
+                new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -237,7 +184,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
 
         // check if the hashinator was updated to the newer version
@@ -256,7 +203,8 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
+                new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
 
@@ -304,7 +252,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        inOrder.verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
 
         assertEquals(txnEgo(1003L), result.get().m_txnId);
     }
@@ -321,7 +269,8 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
+                new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -355,7 +304,8 @@ public class TestMpPromoteAlgo
         masters.add(1L);
         masters.add(2L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
+                new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -375,7 +325,7 @@ public class TestMpPromoteAlgo
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
         needsRepair.add(2L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
     }
 
@@ -431,7 +381,8 @@ public class TestMpPromoteAlgo
         survivors.add(0l);
         survivors.add(1l);
         survivors.add(2l);
-        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox, "bleh ");
+        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, 5, mbox,
+                new MpRestartSequenceGenerator(0, false), "bleh ");
         Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), true);
@@ -450,7 +401,9 @@ public class TestMpPromoteAlgo
         List<TransactionInfoBaseMessage> finalStream = new ArrayList<TransactionInfoBaseMessage>();
         for (Iv2RepairLogResponseMessage li : dut.m_repairLogUnion) {
             VoltMessage msg = dut.createRepairMessage(li);
-            finalStream.add((TransactionInfoBaseMessage)msg);
+            if (msg != null) {
+                finalStream.add((TransactionInfoBaseMessage)msg);
+            }
         }
         // Check the sanity of the repair stream generated by the MPI.
         long lastTxnId = Long.MIN_VALUE;

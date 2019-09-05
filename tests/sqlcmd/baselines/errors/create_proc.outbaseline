@@ -14,13 +14,17 @@ Things will not go well if this test is not starting with an empty class list.
 create procedure from class sqlcmdtest.Trivial;
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -67,13 +71,17 @@ Command succeeded.
 
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -104,13 +112,17 @@ create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -189,13 +201,17 @@ Command succeeded.
 create procedure from class sqlcmdtest.Trivial;
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -247,13 +263,17 @@ create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -313,13 +333,17 @@ drop procedure Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -380,13 +404,17 @@ create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -446,13 +474,17 @@ drop procedure Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   

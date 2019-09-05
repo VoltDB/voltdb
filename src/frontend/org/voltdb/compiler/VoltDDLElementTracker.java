@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
@@ -46,6 +47,8 @@ public class VoltDDLElementTracker {
             new HashMap<>();
     // map from export group name to a sorted set of table names in that group
     final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
+    final Map<String, String> m_persistentTableTargetMap = new HashMap<>();
+
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
     final Map<String, String> m_drTables = new LinkedHashMap<>();
@@ -145,12 +148,8 @@ public class VoltDDLElementTracker {
      * @throws VoltCompilerException when there is no corresponding tracked
      *   procedure
      */
-    public void addProcedurePartitionInfoTo( String procedureName, String partitionInfo)
+    public void addProcedurePartitionInfoTo(String procedureName, ProcedurePartitionData data)
             throws VoltCompilerException {
-
-        assert procedureName != null && ! procedureName.trim().isEmpty();
-        assert partitionInfo != null && ! partitionInfo.trim().isEmpty();
-
         ProcedureDescriptor descriptor = m_procedureMap.get(procedureName);
         if( descriptor == null) {
             throw m_compiler.new VoltCompilerException(String.format(
@@ -159,20 +158,20 @@ public class VoltDDLElementTracker {
         }
 
         // need to re-instantiate as descriptor fields are final
-        if( descriptor.m_singleStmt == null) {
-            // the longer form costructor asserts on singleStatement
-            descriptor = m_compiler.new ProcedureDescriptor(
+        if( descriptor.m_stmtLiterals == null) {
+            // the longer form constructor asserts on singleStatement
+            descriptor = new VoltCompiler.ProcedureDescriptor(
                     descriptor.m_authGroups,
                     descriptor.m_class,
-                    partitionInfo);
+                    data);
         }
         else {
-            descriptor = m_compiler.new ProcedureDescriptor(
+            descriptor = new VoltCompiler.ProcedureDescriptor(
                     descriptor.m_authGroups,
                     descriptor.m_className,
-                    descriptor.m_singleStmt,
+                    descriptor.m_stmtLiterals,
                     descriptor.m_joinOrder,
-                    partitionInfo,
+                    data,
                     false,
                     descriptor.m_class);
         }
@@ -193,25 +192,32 @@ public class VoltDDLElementTracker {
      * @param targetName
      * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable(String tableName, String targetName)
-    {
+    void addExportedTable(String tableName, String targetName, boolean isStream) {
         assert tableName != null && ! tableName.trim().isEmpty();
         assert targetName != null && ! targetName.trim().isEmpty();
 
         // store uppercase in the catalog as typename
         targetName = targetName.toUpperCase();
 
-        // insert the table's name into the export group
-        NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
-        if (tableGroup == null) {
-            tableGroup = new TreeSet<>();
-            m_exportsByTargetName.put(targetName, tableGroup);
+        if (isStream) {
+            // insert the table's name into the export group
+            NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
+            if (tableGroup == null) {
+                tableGroup = new TreeSet<>();
+                m_exportsByTargetName.put(targetName, tableGroup);
+            }
+            tableGroup.add(tableName);
+            return;
         }
-        tableGroup.add(tableName);
+        m_persistentTableTargetMap.put(tableName, targetName);
+
     }
 
-    void removeExportedTable(String tableName)
-    {
+    void removeExportedTable(String tableName, boolean isStream) {
+        if (!isStream) {
+            m_persistentTableTargetMap.remove(tableName);
+            return;
+        }
         for (Entry<String, NavigableSet<String>> groupTables : m_exportsByTargetName.entrySet()) {
             if(groupTables.getValue().remove(tableName)) {
                 break;
@@ -225,6 +231,10 @@ public class VoltDDLElementTracker {
      */
     NavigableMap<String, NavigableSet<String>> getExportedTables() {
         return m_exportsByTargetName;
+    }
+
+    Map<String, String> getPersistentTableTargetMap() {
+        return m_persistentTableTargetMap;
     }
 
     void addDRedTable(String tableName, String action)

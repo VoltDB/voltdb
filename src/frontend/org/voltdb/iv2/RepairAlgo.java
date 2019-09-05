@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.Future;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 // Some comments on threading and organization.
@@ -46,12 +47,15 @@ import org.voltcore.messaging.VoltMessage;
  */
 public interface RepairAlgo
 {
+    static final VoltLogger repairLogger = new VoltLogger("REPAIR");
+
     public static class RepairResult
     {
         public final long m_txnId;
-
-        RepairResult(long txnId) {
+        public final long m_repairTruncationHandle;
+        RepairResult(long txnId, long repairTruncationHandle) {
             m_txnId = txnId;
+            m_repairTruncationHandle = repairTruncationHandle;
         }
     }
 

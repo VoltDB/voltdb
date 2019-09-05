@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -45,6 +45,9 @@ def pause(runner):
         actionMessage = 'Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics'
         try:
             checkstats.check_exporter(runner)
+            status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+            if status <> 0:
+                runner.abort('The cluster has failed to quiesce with status: %d' % status)
             checkstats.check_dr_producer(runner)
         except StatisticsProcedureException as proex:
             runner.info('The previous command has timed out and stopped waiting... The cluster is in a paused state.')

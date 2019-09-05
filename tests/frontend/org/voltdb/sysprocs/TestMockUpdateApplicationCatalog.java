@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -47,6 +47,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestMockUpdateApplicationCatalog {
@@ -54,9 +55,14 @@ public class TestMockUpdateApplicationCatalog {
     private VoltDB.Configuration m_config;
     private Client m_client;
 
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
+    static private void addBaseProcedures(VoltProjectBuilder project) {
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                "NEW_ORDER.NO_W_ID: 2");
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                "WAREHOUSE.W_ID: 0");
+    }
 
     @Before
     public void setUp() throws Exception
@@ -78,7 +84,7 @@ public class TestMockUpdateApplicationCatalog {
         builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
-        builder.addProcedures(BASEPROCS);
+        addBaseProcedures(builder);
         success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar"), 1, 1, 0);
         assert(success);
 

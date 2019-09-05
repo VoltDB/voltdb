@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,6 +44,10 @@ public:
         *comp = comparisons + 1;
         return lhs.compare(rhs);
     }
+
+    int compareWithoutPointer(const std::string &lhs, const std::string &rhs) const {
+        return operator()(lhs, rhs);
+    }
 };
 
 class IntComparator {
@@ -52,6 +56,10 @@ public:
         if (lhs > rhs) return 1;
         else if (lhs < rhs) return -1;
         else return 0;
+    }
+
+    int compareWithoutPointer(const int &lhs, const int &rhs) const {
+        return operator()(lhs, rhs);
     }
 };
 
@@ -154,7 +162,7 @@ TEST_F(CompactingMapTest, SimpleUniqueRank) {
 
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator volti;
     bool sucess;
-    int64_t rankasc;
+    int64_t ranklower;
 
     for (int val = 1; val < 10; val++) {
         sucess = volt.insert(std::pair<int,int>(val, val));
@@ -162,10 +170,10 @@ TEST_F(CompactingMapTest, SimpleUniqueRank) {
     }
 
     sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(!sucess);
-    rankasc = volt.rankAsc(3);
-    if (rankasc != 3)
-        printf("false: <SimpleUniqueRank> expected %d, but got %ld\n", 3, (long)rankasc);
-    ASSERT_TRUE(rankasc == 3);
+    ranklower = volt.rankLower(3);
+    if (ranklower != 3)
+        printf("false: <SimpleUniqueRank> expected %d, but got %ld\n", 3, (long)ranklower);
+    ASSERT_TRUE(ranklower == 3);
 
     ASSERT_TRUE(volt.verify());
     ASSERT_TRUE(volt.verifyRank());
@@ -211,11 +219,11 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 for (it = stl.begin(); it != stli; it++) {
                         ct++;
                 }
-                int64_t rankasc = volt.rankAsc(val);
-                if (rankasc != ct)
-                    printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)ct, (long)rankasc);
-                ASSERT_TRUE(rankasc == ct);
-                volti = volt.findRank(rankasc);
+                int64_t ranklower = volt.rankLower(val);
+                if (ranklower != ct)
+                    printf("false: unique_rankLower expected %ld, but got %ld\n", (long)ct, (long)ranklower);
+                ASSERT_TRUE(ranklower == ct);
+                volti = volt.findRank(ranklower);
                 ASSERT_TRUE(volti.key() == val);
 
             }
@@ -232,11 +240,11 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 for (it = stl.begin(); it != stli; it++) {
                         ct++;
                 }
-                int64_t rankasc= volt.rankAsc(val);
-                if (rankasc != ct)
-                    printf("false: DEPULICATE... unique_rankAsc expected %ld, but got %ld\n", (long)ct, (long)rankasc);
-                ASSERT_TRUE(rankasc == ct);
-                volti = volt.findRank(rankasc);
+                int64_t ranklower= volt.rankLower(val);
+                if (ranklower != ct)
+                    printf("false: DEPULICATE... unique_rankLower expected %ld, but got %ld\n", (long)ct, (long)ranklower);
+                ASSERT_TRUE(ranklower == ct);
+                volti = volt.findRank(ranklower);
                 ASSERT_TRUE(volti.key() == val);
 
             }
@@ -270,7 +278,7 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     ASSERT_TRUE(volt.verify());
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator volti;
     bool sucess;
-    int64_t rankasc, rankupper;
+    int64_t ranklower, rankupper;
 
     sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
@@ -283,16 +291,16 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
 
-    rankasc = volt.rankAsc(1); ASSERT_TRUE(rankasc == 1);
-    rankasc = volt.rankAsc(2); ASSERT_TRUE(rankasc == 2);
-    rankasc = volt.rankAsc(3); ASSERT_TRUE(rankasc == 3);
-    rankasc = volt.rankAsc(5); ASSERT_TRUE(rankasc == 6);
-    rankasc = volt.rankAsc(6); ASSERT_TRUE(rankasc == 7);
-    rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
+    ranklower = volt.rankLower(1); ASSERT_TRUE(ranklower == 1);
+    ranklower = volt.rankLower(2); ASSERT_TRUE(ranklower == 2);
+    ranklower = volt.rankLower(3); ASSERT_TRUE(ranklower == 3);
+    ranklower = volt.rankLower(5); ASSERT_TRUE(ranklower == 6);
+    ranklower = volt.rankLower(6); ASSERT_TRUE(ranklower == 7);
+    ranklower = volt.rankLower(8); ASSERT_TRUE(ranklower == 9);
     // key is not in Map, return -1 always
-    rankasc = volt.rankAsc(0); ASSERT_TRUE(rankasc == -1);
-    rankasc = volt.rankAsc(7); ASSERT_TRUE(rankasc == -1);
-    rankasc = volt.rankAsc(12); ASSERT_TRUE(rankasc == -1);
+    ranklower = volt.rankLower(0); ASSERT_TRUE(ranklower == -1);
+    ranklower = volt.rankLower(7); ASSERT_TRUE(ranklower == -1);
+    ranklower = volt.rankLower(12); ASSERT_TRUE(ranklower == -1);
 
     rankupper = volt.rankUpper(1); ASSERT_TRUE(rankupper == 1);
     rankupper = volt.rankUpper(2); ASSERT_TRUE(rankupper == 2);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,6 +40,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltProcedure;
@@ -55,6 +56,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
@@ -75,36 +77,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
     static final int K = MiscUtils.isPro() ? 1 : 0;
-
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
-
-    static Class<?>[] BASEPROCS_OPROCS =  { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                            org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                            org.voltdb.benchmark.tpcc.procedures.delivery.class,
-                                            org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1.class};
-
-
-    static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class,
-                                        org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class };
-
-    static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
-
-    static Class<?>[] SOMANYPROCS =   { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.neworder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
-                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName.class,
-                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class,
-                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class,
-                                        org.voltdb.benchmark.tpcc.procedures.slev.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     // testUpdateHonkingBigCatalog constants and statistics. 100/100/40 makes a ~2MB jar.
     private static final int HUGE_TABLES = 100;
@@ -1025,6 +997,60 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         return URLEncoder.encode(temp.getAbsolutePath(), "UTF-8");
     }
 
+    // procedures used by these tests
+    static Class<?>[] SOMANYPROCS =   { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                        org.voltdb.benchmark.tpcc.procedures.neworder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
+                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName.class,
+                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class,
+                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class,
+                                        org.voltdb.benchmark.tpcc.procedures.slev.class,
+                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
+    static void addProcedures_BASE(VoltProjectBuilder project) {
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID"));
+    }
+
+    static void addProcedures_OPROCS(VoltProjectBuilder project) {
+        addProcedures_BASE(project);
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1.class,
+                new ProcedurePartitionData("O1", "PKEY", "0"));
+    }
+
+    static void addProcedures_EXPANDED(VoltProjectBuilder project) {
+        addProcedures_BASE(project);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class,
+                new ProcedurePartitionData("ORDER_LINE", "OL_W_ID", "2"));
+    }
+
+    static void addProcedures_CONFLICT(VoltProjectBuilder project) {
+        project.addProcedure(org.voltdb.catalog.InsertNewOrder.class,
+                new ProcedurePartitionData("HISTORY", "H_W_ID", "4"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID"));
+    }
+
+    static void addProcedures_SOMANY(VoltProjectBuilder project) {
+        addProcedures_BASE(project);
+
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.neworder.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID", "0"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID", "0"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID", "0"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.slev.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID", "0"));
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -1055,7 +1081,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
@@ -1072,7 +1098,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // We piggy-back the heartbeat change here.
         RoleInfo groups[] = new RoleInfo[] {new RoleInfo("group1", false, false, true, false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
-        ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
+        ProcedureInfo procInfo = new ProcedureInfo(InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"), new String[] {"group1"});
 
         config = new LocalCluster("catalogupdate-cluster-base-secure.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -1093,7 +1120,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS_OPROCS);
+        addProcedures_OPROCS(project);
         project.setElasticDuration(100);
         project.setElasticThroughput(50);
         compile = config.compile(project);
@@ -1108,7 +1135,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
             project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;");
             project.addDefaultPartitioning();
-            project.addProcedures(BASEPROCS_OPROCS);
+            addProcedures_OPROCS(project);
             compile = config.compile(project);
             assertTrue(compile);
             MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
@@ -1126,7 +1153,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);");
 
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
@@ -1143,7 +1170,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
 
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml"));
@@ -1153,7 +1180,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(EXPANDEDPROCS);
+        addProcedures_EXPANDED(project);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
@@ -1181,7 +1208,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(CONFLICTPROCS);
+        addProcedures_CONFLICT(project);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
@@ -1191,7 +1218,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(SOMANYPROCS);
+        addProcedures_SOMANY(project);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
@@ -1202,7 +1229,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
         compile = config.compile(project);
@@ -1214,7 +1241,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
         // build the jarfile
         compile = config.compile(project);
@@ -1226,7 +1253,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
         compile = config.compile(project);
@@ -1242,7 +1269,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addSchema(hugeSchemaURL);
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         compile = config.compile(project);
         assertTrue(compile);
         hugeCompileElapsed = (System.currentTimeMillis() - t) / 1000.0;
@@ -1254,7 +1281,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addProcedures_BASE(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
         compile = config.compile(project);

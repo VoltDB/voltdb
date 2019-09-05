@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -26,6 +27,13 @@ public class InComparisonExpression extends ComparisonExpression {
 
     public InComparisonExpression() {
         super(ExpressionType.COMPARE_IN);
+    }
+
+    public InComparisonExpression(AbstractExpression left, AbstractExpression right) {
+        this();
+        setLeft(left);
+        setRight(right);
+        setValueType(VoltType.BOOLEAN);
     }
 
     @Override
@@ -50,6 +58,15 @@ public class InComparisonExpression extends ComparisonExpression {
         if (!(m_right instanceof VectorValueExpression) && !(m_right instanceof ParameterValueExpression)) {
             throw new Exception("ERROR: The right node for '" + this + "' is not a list or a parameter");
         }
+    }
+
+    /**
+     * A "x in (a, b, c)" relation cannot be reversed as "x > y" to "y < x", so
+     * we return itself.
+     */
+    @Override
+    public ComparisonExpression reverseOperator() {
+       return this;
     }
 
     @Override

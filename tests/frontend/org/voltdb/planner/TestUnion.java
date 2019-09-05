@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -36,6 +37,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class TestUnion extends PlannerTestCase {
 
@@ -622,13 +624,43 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
     }
 
+    public void testENG13536() throws JSONException {
+        String SQL = "( (SELECT * FROM T3 ORDER BY C LIMIT 1) "
+                   + "UNION ALL "
+                   + "( SELECT * FROM T3 ) ) "
+                   + "ORDER BY C DESC";
+        validatePlan(SQL,
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.UNION,
+                              allOf(planWithInlineNodes(PlanNodeType.ORDERBY,
+                                                        PlanNodeType.LIMIT),
+                                      // This is an order by node.  We know this
+                                      // already from the test above.  This is an
+                                      // example of using a lambda to test a node.
+                                      // One could add any computation here.  Of
+                                      // course, a tastier way to do this would be
+                                      // to have the lambda be statically defined
+                                      // in PlannerTestCase.  But this works better
+                                      // as an example.
+                                    (node) -> {
+                                        OrderByPlanNode obpn = (OrderByPlanNode)node;
+                                        if (obpn.getSortDirections().get(0) != SortDirectionType.ASC) {
+                                            return "Expected ascending order by node.";
+                                        }
+                                        return null;
+                                    }),
+                              planWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                  PlanNodeType.PROJECTION)));
+    }
+
     private void checkOrderByNode(AbstractPlanNode pn, String columns[], int[] idxs) {
         assertTrue(pn != null);
         assertTrue(pn instanceof OrderByPlanNode);
         OrderByPlanNode opn = (OrderByPlanNode) pn;
         assertEquals(columns.length, opn.getOutputSchema().size());
         for(int i = 0; i < columns.length; ++i) {
-            SchemaColumn col = opn.getOutputSchema().getColumns().get(i);
+            SchemaColumn col = opn.getOutputSchema().getColumn(i);
             assertEquals(columns[i], col.getColumnAlias());
             AbstractExpression colExpr = col.getExpression();
             assertEquals(ExpressionType.VALUE_TUPLE, colExpr.getExpressionType());

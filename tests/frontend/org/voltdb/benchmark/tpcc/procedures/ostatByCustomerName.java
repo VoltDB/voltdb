@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,7 +49,6 @@
  */
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -62,10 +61,6 @@ import org.voltdb.VoltType;
 //2) Set of Repeating data, represented as a Nx5 table representing several order-lines each with fields ol_supply_w_id, ol_i_id, ol_quantity, ol_amount, ol_delivery_d.
 //See TPC-C (Revision 5.9) Section 2.6.3.4 for more
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class ostatByCustomerName extends VoltProcedure {
     private final VoltTable result_template = new VoltTable(
         new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),

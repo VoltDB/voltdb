@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,25 +35,20 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import com.google_voltpatches.common.base.Throwables;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -62,13 +57,13 @@ import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.ProClass;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -117,8 +112,9 @@ public class Inits {
                 catch (InterruptedException e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-                if (iw instanceof COMPLETION_WORK)
+                if (iw instanceof COMPLETION_WORK) {
                     return;
+                }
                 //hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
@@ -141,8 +137,12 @@ public class Inits {
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
         for (Class<?> cls : declaredClasses) {
             // skip base classes and fake classes
-            if (cls == InitWork.class) continue;
-            if (cls == COMPLETION_WORK.class) continue;
+            if (cls == InitWork.class) {
+                continue;
+            }
+            if (cls == COMPLETION_WORK.class) {
+                continue;
+            }
 
             if (InitWork.class.isAssignableFrom(cls)) {
                 InitWork instance = null;
@@ -371,11 +371,9 @@ public class Inits {
             if (m_rvdb.getStartAction() == StartAction.CREATE) {
                 // We may have received a staged catalog from the leader.
                 // Check if it matches ours.
-                boolean isEmptyCatalog = false;
                 if (m_rvdb.m_pathToStartupCatalog == null) {
                     String drRole = m_rvdb.getCatalogContext().getCluster().getDrrole();
                     m_rvdb.m_pathToStartupCatalog = Inits.createEmptyStartupJarFile(drRole).getAbsolutePath();
-                    isEmptyCatalog = true;
                 }
                 InMemoryJarfile thisNodeCatalog = null;
                 try {
@@ -384,30 +382,7 @@ public class Inits {
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
                 if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
-                    final StringBuilder sb = new StringBuilder("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.");
-                    sb.append("\n");
-                    sb.append("Current node catalog hash: ").append(Arrays.toString(thisNodeCatalog.getSha1Hash()));
-                    if (isEmptyCatalog) {
-                        sb.append(" is empty catalog");
-                    }
-                    sb.append("ZK catalog hash: ").append(Arrays.toString(catalogStuff.catalogHash));
-
-                    try {
-                        final Catalog newCat = new Catalog();
-                        newCat.execute(CatalogUtil.getSerializedCatalogStringFromJar(new InMemoryJarfile(catalogStuff.catalogBytes)));
-
-                        final Catalog thisNodeCat = new Catalog();
-                        thisNodeCat.execute(CatalogUtil.getSerializedCatalogStringFromJar(new InMemoryJarfile(thisNodeCatalog.getFullJarBytes())));
-
-                        final CatalogDiffEngine diff = new CatalogDiffEngine(thisNodeCat, newCat);
-                        sb.append("\nCatalog diff: ").append(diff.commands());
-                        sb.append("\nErrors: ").append(diff.errors());
-                    } catch (IOException e) {
-                        sb.append("\nError diffing catalogs: ").append(e.getMessage())
-                          .append("\n").append(Throwables.getStackTraceAsString(e));
-                    }
-
-                    VoltDB.crashGlobalVoltDB(sb.toString(), false, null);
+                    VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
                 }
             }
 
@@ -426,12 +401,19 @@ public class Inits {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0)) {
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
+            }
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
+            try {
+                catalog.execute(serializedCatalog);
+            } catch (CatalogException e) {
+                // Disallow recovering from an incompatible Enterprise catalog.
+                VoltDB.crashLocalVoltDB(e.getLocalizedMessage());
+            }
+
             serializedCatalog = null;
 
             // note if this fails it will print an error first
@@ -477,7 +459,8 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
+                        DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole()),
+                        m_rvdb.getConfig().m_startAction))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
@@ -498,135 +481,12 @@ public class Inits {
 
             if (logConfig.getEnabled()) {
                 if (m_config.m_isEnterprise) {
-                    try {
-                        Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
-                                                                   "Command logging", false);
-                        if (loggerClass != null) {
-                            final Constructor<?> constructor = loggerClass.getConstructor(boolean.class,
-                                                                                          int.class,
-                                                                                          int.class,
-                                                                                          String.class,
-                                                                                          String.class);
-                            m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
-                                                                                       logConfig.getFsyncinterval(),
-                                                                                       logConfig.getMaxtxns(),
-                                                                                       VoltDB.instance().getCommandLogPath(),
-                                                                                       VoltDB.instance().getCommandLogSnapshotPath());
-                        }
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
-                    }
+                    m_rvdb.m_commandLog = ProClass.newInstanceOf("org.voltdb.CommandLogImpl", "Command logging",
+                            ProClass.HANDLER_LOG, logConfig.getSynchronous(), logConfig.getFsyncinterval(),
+                            logConfig.getMaxtxns(), VoltDB.instance().getCommandLogPath(),
+                            VoltDB.instance().getCommandLogSnapshotPath());
                 }
             }
-        }
-    }
-
-    class SetupSSL extends InitWork {
-        private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
-        private static final String DEFAULT_KEYSTORE_PASSWD = "password";
-
-        @Override
-        public void run() {
-            SslType sslType = m_deployment.getSsl();
-            m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
-            if (m_config.m_sslEnable) {
-                try {
-                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                    m_config.m_sslContextFactory.start();
-                    hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
-                    m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
-                    m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
-                    if (m_config.m_sslExternal || m_config.m_sslDR) {
-                        m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
-                    }
-                    if (m_config.m_sslExternal) {
-                        hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
-                    }
-                    if (m_config.m_sslDR) {
-                        hostLog.info("SSL enabled for DR port. Please enable SSL on consumer clusters' DR connections.");
-                    }
-                    CipherExecutor.SERVER.startup();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
-                }
-            }
-        }
-
-        private String getResourcePath(String resource) {
-            URL res = this.getClass().getResource(resource);
-            return res == null ? resource : res.getPath();
-        }
-
-        private SslContextFactory getSSLContextFactory(SslType sslType) {
-            SslContextFactory sslContextFactory = new SslContextFactory();
-            String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-            keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
-            if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
-                throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
-            }
-            if (! new File(keyStorePath).exists()) {
-                throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
-            }
-            sslContextFactory.setKeyStorePath(keyStorePath);
-
-            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
-            if (m_config.m_sslEnable && null == keyStorePassword) {
-                keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
-            }
-            if (keyStorePassword == null) {
-                throw new IllegalArgumentException("An SSL keystore password was not specified.");
-            }
-            sslContextFactory.setKeyStorePassword(keyStorePassword);
-
-            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-            if (m_config.m_sslEnable) {
-                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-            }
-            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-                throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
-            }
-            if (! new File(trustStorePath).exists()) {
-                throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
-            }
-            sslContextFactory.setTrustStorePath(trustStorePath);
-
-            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-            if (m_config.m_sslEnable && null == trustStorePassword) {
-                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
-            }
-            if (trustStorePassword == null) {
-                throw new IllegalArgumentException("An SSL truststore password was not specified.");
-            }
-            sslContextFactory.setTrustStorePassword(trustStorePassword);
-            // exclude weak ciphers
-            sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
-                    "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
-            sslContextFactory.setKeyManagerPassword(keyStorePassword);
-            return sslContextFactory;
-        }
-
-        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
-            String sysProp = System.getProperty(sysPropName, "");
-
-            // allow leading/trailing blanks for password, not otherwise
-            if (!sysProp.isEmpty()) {
-                if ("password".equals(valueType)) {
-                    return sysProp;
-                } else {
-                    if (!sysProp.trim().isEmpty()) {
-                        return sysProp.trim();
-                    }
-                }
-            }
-            String value = null;
-            if (store != null) {
-                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-            }
-            return value;
         }
     }
 
@@ -637,28 +497,19 @@ public class Inits {
         @Override
         public void run() {
             if (m_config.m_isEnterprise && m_deployment.getSnmp() != null && m_deployment.getSnmp().isEnabled()) {
-                try {
-                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.snmp.SnmpTrapSenderImpl",
-                                                               "SNMP Adapter", false);
-                    if (loggerClass != null) {
-                        final Constructor<?> constructor = loggerClass.getConstructor();
-                        m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
+                m_rvdb.m_snmp = ProClass.newInstanceOf("org.voltdb.snmp.SnmpTrapSenderImpl", "SNMP Adapter",
+                        ProClass.HANDLER_LOG);
+                if (m_rvdb.m_snmp != null) {
                         m_rvdb.m_snmp.initialize(
                                 m_deployment.getSnmp(),
                                 m_rvdb.getHostMessenger(),
                                 m_rvdb.getCatalogContext().cluster.getDrclusterid());
-                    }
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);
                 }
             }
         }
     }
 
     class StartHTTPServer extends InitWork {
-        StartHTTPServer() {
-            dependsOn(SetupSSL.class);
-        }
 
         //Setup http server with given port and interface
         private void setupHttpServer(String httpInterface, String publicInterface,
@@ -669,8 +520,8 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, m_config.m_sslContextFactory, mustListen
-                            );
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort,
+                            m_config.m_sslContextFactory, mustListen);
                     success = true;
                     break;
                 } catch (Exception e1) {
@@ -743,8 +594,9 @@ public class Inits {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
             // allow command line override
-            if (m_config.m_adminPort > 0)
+            if (m_config.m_adminPort > 0) {
                 adminPort = m_config.m_adminPort;
+            }
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
             //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
@@ -919,12 +771,12 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-                if (catalog != null) {
-                    m_statusTracker.setNodeState(NodeState.RECOVERING);
-                }
+
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others.
                 if (catalog != null) {
+                    m_statusTracker.set(NodeState.RECOVERING);
+
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
@@ -941,11 +793,20 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                // Only do version check when c/l is enabled.
+                                // Recover from a terminus snapshot generated from a different version,
+                                // the terminus snapshot marker will be deleted. If c/l is not enabled,
+                                // either on community edition or enterprise edition but with the feature
+                                // turned off, there is no truncation snapshot when cluster completes
+                                // initialization. So if cluster crashes before new snapshot is written,
+                                // it will have no viable snapshot to recover again. Bypass version check
+                                // when c/l is disabled resolves this issue.
+                                if (clenabled == true && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                                     VoltDB.crashLocalVoltDB(String.format(
-                                            "Unable to load version %s catalog \"%s\" "
-                                                    + "from snapshot into a version %s server.",
-                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                                "Cannot load command logs from one version (%s) into a different version of VoltDB (%s). " +
+                                                "To upgrade the VoltDB software, first use \"voltadmin shutdown --save\", then " +
+                                                "upgrade and restart.", catalogVersion, serverVersion),
+                                            false, null);
                                     return;
                                 }
                                 // upgrade the catalog - the following will save the recpmpiled catalog

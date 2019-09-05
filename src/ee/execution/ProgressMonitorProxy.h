@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,27 +22,18 @@
 
 namespace voltdb {
 
+class AbstractExecutor;
+
 class ProgressMonitorProxy {
 public:
-    ProgressMonitorProxy(ExecutorContext* executorContext, AbstractExecutor* exec)
-        : m_executorContext(executorContext)
-        , m_limits(NULL)
-        , m_tuplesRemainingUntilReport(
-              executorContext->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
-        , m_countDown(m_tuplesRemainingUntilReport)
-    {
-        const AbstractTempTable *tt = exec->getTempOutputTable();
-        if (tt != NULL) {
-            m_limits = tt->getTempTableLimits();
-        }
-    }
+    ProgressMonitorProxy(ExecutorContext* executorContext, AbstractExecutor* exec);
 
     void countdownProgress()
     {
-        if (--m_countDown == 0) {
+        if (--m_countDown <= 0) {
             m_tuplesRemainingUntilReport =
                 m_executorContext->pushTuplesProcessedForProgressMonitoring(m_limits,
-                                                                   m_tuplesRemainingUntilReport);
+                                                                            m_tuplesRemainingUntilReport);
             m_countDown = m_tuplesRemainingUntilReport;
         }
     }

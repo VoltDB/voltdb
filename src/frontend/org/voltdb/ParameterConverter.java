@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,8 +24,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.regex.Pattern;
+import java.nio.ByteBuffer;
 
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.types.GeographyPointValue;
@@ -105,6 +106,9 @@ public class ParameterConverter {
         }
         else if (value != null) {
             Class<?> clz = value.getClass();
+            if (ByteBuffer.class.isAssignableFrom(clz) && ByteBuffer.class.isAssignableFrom(expectedClz)) {
+                return true;
+            }
             if (clz != expectedClz) {
                 // skip this without linking to it (used for sysprocs)
                 return expectedClz.getSimpleName().equals("SystemProcedureExecutionContext") &&
@@ -180,7 +184,7 @@ public class ParameterConverter {
         }
 
         throw new VoltTypeException(
-                "tryToMakeCompatible: Unable to convert string "
+                "Unable to convert string "
                 + value + " to "  + expectedClz.getName()
                 + " value for target parameter.");
     }
@@ -273,7 +277,7 @@ public class ParameterConverter {
                 param == null ? "NULL" : param.getClass().getName(),
                 expectedClz.getName());
         System.err.flush();
-        // */
+         */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
@@ -358,10 +362,16 @@ public class ParameterConverter {
             if (expectedClz == byte[].class) return param;
             if (expectedClz == Byte[].class) return ArrayUtils.toObject((byte[]) param);
             // allow byte arrays to be passed into string parameters
-            else if (expectedClz == String.class) {
+            if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
-                if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
-                else return value;
+                if (value.equals(Constants.CSV_NULL)) {
+                    return nullValueForType(expectedClz);
+                } else {
+                    return value;
+                }
+            }
+            if (ByteBuffer.class.isAssignableFrom(expectedClz)) {
+                return ByteBuffer.wrap((byte[])param);
             }
         }
         // null sigils. (ning - if we're not checking if the sigil matches the expected type,
@@ -413,7 +423,7 @@ public class ParameterConverter {
                 } catch (ArithmeticException e) {}
             }
             throw new VoltTypeException(
-                            "tryToMakeCompatible: The provided value: (" + param.toString() +
+                            "The provided value: (" + param.toString() +
                             ") of type: " + inputClz.getName() +
                             " is out of range for the target parameter type: " +
                             expectedClz.getName());
@@ -439,7 +449,7 @@ public class ParameterConverter {
         if (isIntClass(expectedClz) && (numberParam != null)) {
             long val = numberParam.longValue();
             if (val == VoltType.NULL_INTEGER) {
-                throw new VoltTypeException("tryToMakeCompatible: The provided long value: ("
+                throw new VoltTypeException("The provided long value: ("
                         + param.toString() + ") might be interpreted as integer null. " +
                                 "Try explicitly using a int parameter.");
             }
@@ -451,7 +461,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_SMALLINT) {
-                    throw new VoltTypeException("tryToMakeCompatible: The provided int or long value: ("
+                    throw new VoltTypeException("The provided int or long value: ("
                             + param.toString() + ") might be interpreted as smallint null. " +
                                     "Try explicitly using a short parameter.");
                 }
@@ -464,7 +474,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class) || (inputClz == Short.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_TINYINT) {
-                    throw new VoltTypeException("tryToMakeCompatible: The provided short, int or long value: ("
+                    throw new VoltTypeException("The provided short, int or long value: ("
                             + param.toString() + ") might be interpreted as tinyint null. " +
                                     "Try explicitly using a byte parameter.");
                 }
@@ -622,7 +632,7 @@ public class ParameterConverter {
         }
 
         throw new VoltTypeException(
-                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
+                "The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
     }
 

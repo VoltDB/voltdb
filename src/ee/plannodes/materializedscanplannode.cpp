@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,8 +16,6 @@
  */
 
 #include "materializedscanplannode.h"
-
-#include "expressions/abstractexpression.h"
 
 #include <sstream>
 
@@ -40,7 +38,7 @@ std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const
 void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
-    assert(!m_tableRowsExpression);
+    vassert(!m_tableRowsExpression);
     m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
     m_sortDirection = SORT_DIRECTION_TYPE_ASC;
     if (obj.hasNonNullKey("SORT_DIRECTION")) {

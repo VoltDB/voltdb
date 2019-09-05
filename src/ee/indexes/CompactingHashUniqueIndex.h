@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,7 +47,7 @@
 #define COMPACTINGHASHUNIQUEINDEX_H_
 
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 
 #include "indexes/tableindex.h"
 #include "structures/CompactingHashTable.h"
@@ -90,7 +90,7 @@ class CompactingHashUniqueIndex : public TableIndex
      */
     bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
-        assert(originalTuple.address() != destinationTuple.address());
+        vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {

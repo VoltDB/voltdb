@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,7 +50,6 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -59,10 +58,6 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.Constants;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class delivery extends VoltProcedure {
     private final VoltTable result_template = new VoltTable(
         new VoltTable.ColumnInfo("d_id", VoltType.TINYINT),

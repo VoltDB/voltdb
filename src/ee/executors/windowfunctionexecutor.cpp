@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,16 +17,7 @@
 
 #include "executors/windowfunctionexecutor.h"
 
-#include <sstream>
-#include <memory>
-#include <limits.h>
-
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
-#include "expressions/dateconstants.h"
-#include "plannodes/windowfunctionnode.h"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
@@ -48,8 +39,8 @@ struct TableWindow {
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
-                << m_middleEdge.getLocation() << ", Leading: "
-                << m_leadingEdge.getLocation() << "], "
+                << m_middleEdge.getFoundTuples() << ", Leading: "
+                << m_leadingEdge.getFoundTuples() << "], "
                 << "ssize = " << m_orderByGroupSize
                 << "\n";
         return stream.str();
@@ -126,6 +117,15 @@ struct WindowAggregate {
      * next group.
      */
     virtual void endGroup(TableWindow &window,
+                          WindowFunctionExecutor::EdgeType edgeType) {
+        ;
+    }
+
+    /**
+     * Do calculations after row insertion to end the current row and start the
+     * next row.
+     */
+    virtual void endRow(TableWindow &window,
                           WindowFunctionExecutor::EdgeType edgeType) {
         ;
     }
@@ -217,6 +217,33 @@ public:
 };
 
 /**
+ * Row number returns a unique number for each row starting with 1.
+ */
+class WindowedRowNumberAgg : public WindowAggregate {
+public:
+    WindowedRowNumberAgg() {
+        m_value = ValueFactory::getBigIntValue(1);
+        m_needsLookahead = false;
+    }
+
+    virtual ~WindowedRowNumberAgg() {
+    }
+
+    virtual const char *getAggName() const {
+        return "ROW_NUMBER";
+    }
+
+    virtual void endRow(TableWindow &window, WindowFunctionExecutor::EdgeType etype) {
+        m_value = m_value.op_add(m_one);
+    }
+
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = ValueFactory::getBigIntValue(1);
+    }
+};
+
+/**
  * Count is a bit like rank, but we need to contrive
  * to calculate when the argument expression is null,
  * and add the count of non-null rows to the count output
@@ -287,7 +314,7 @@ public:
      * order by group.
      */
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
-        assert(argVals.size() == 1);
+        vassert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
@@ -332,7 +359,7 @@ public:
      * order by group.
      */
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
-        assert(argVals.size() == 1);
+        vassert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
@@ -365,7 +392,7 @@ public:
      * order by group.
      */
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
-        assert(argVals.size() == 1);
+        vassert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             if (m_value.isNull()) {
                 m_value = argVals[0];
@@ -431,7 +458,7 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node,
 {
     VOLT_TRACE("WindowFunctionExecutor::p_init(start)");
     WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     if (!node->isInline()) {
         setTempOutputTable(executorVector);
@@ -442,10 +469,10 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node,
      */
     m_memoryPool.purge();
 
-    assert( getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( getInProgressOrderByKeyTuple().isNullTuple());
-    assert( getLastPartitionByKeyTuple().isNullTuple());
-    assert( getLastOrderByKeyTuple().isNullTuple());
+    vassert( getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( getLastPartitionByKeyTuple().isNullTuple());
+    vassert( getLastOrderByKeyTuple().isNullTuple());
 
     m_partitionByKeySchema = TupleSchema::createTupleSchema(m_partitionByExpressions);
     m_orderByKeySchema = TupleSchema::createTupleSchema(m_orderByExpressions);
@@ -474,6 +501,9 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK:
         answer = new (memoryPool) WindowedDenseRankAgg();
         break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER:
+        answer = new (memoryPool) WindowedRowNumberAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT:
         answer = new (memoryPool) WindowedCountAgg();
         break;
@@ -487,11 +517,7 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
         answer = new (memoryPool) WindowedSumAgg();
         break;
     default:
-        {
-            char message[128];
-            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
+        throwSerializableEEException("Unknown aggregate type %d", agg_type);
     }
     return answer;
 }
@@ -506,7 +532,7 @@ inline void WindowFunctionExecutor::initAggInstances()
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         aggs[ii] = getWindowedAggInstance(m_memoryPool,
                                           m_aggTypes[ii]);
-        assert(aggs[ii] != NULL);
+        vassert(aggs[ii] != NULL);
     }
 }
 
@@ -536,6 +562,13 @@ inline void WindowFunctionExecutor::endGroupForAggs(TableWindow &tableWindow, Ed
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         aggs[ii]->endGroup(tableWindow, edgeType);
+    }
+}
+
+inline void WindowFunctionExecutor::endRowForAggs(TableWindow &tableWindow, EdgeType edgeType) {
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        aggs[ii]->endRow(tableWindow, edgeType);
     }
 }
 
@@ -571,7 +604,7 @@ inline void WindowFunctionExecutor::insertOutputTuple()
 int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
                                           const TableTuple &tuple2) const {
     const TupleSchema *schema = tuple1.getSchema();
-    assert (schema == tuple2.getSchema());
+    vassert(schema == tuple2.getSchema());
 
     for (int ii = schema->columnCount() - 1; ii >= 0; --ii) {
         int cmp = tuple2.getNValue(ii)
@@ -610,10 +643,10 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     VOLT_TRACE("windowFunctionExecutor::p_execute(start)\n");
     // Input table
     Table * input_table = m_abstractNode->getInputTable();
-    assert(input_table);
+    vassert(input_table);
     VOLT_TRACE("WindowFunctionExecutor: input table\n%s", input_table->debug().c_str());
     m_inputSchema = input_table->schema();
-    assert(m_inputSchema);
+    vassert(m_inputSchema);
 
     /*
      * Do this after setting the m_inputSchema.
@@ -661,6 +694,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
+            endRowForAggs(tableWindow, etype);
         }
         endGroupForAggs(tableWindow, etype);
         VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());
@@ -671,7 +705,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType, TableWindow &tableWindow)
+WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType edgeType, TableWindow &tableWindow)
 {
     // This is just an alias for the buffered input tuple.
     TableTuple &nextTuple = getBufferedInputTuple();
@@ -736,8 +770,8 @@ void WindowFunctionExecutor::initPartitionByKeyTuple(const TableTuple& nextTuple
     /*
      * The partition by keys should not be null tuples.
      */
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
     /*
      * Swap the data, so that m_inProgressPartitionByKey
      * gets m_lastPartitionByKey's data and vice versa.
@@ -747,8 +781,8 @@ void WindowFunctionExecutor::initPartitionByKeyTuple(const TableTuple& nextTuple
     /*
      * The partition by keys should still not be null tuples.
      */
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
     /*
      * Calculate the partition by key values.  Put them in
      * getInProgressPartitionByKeyTuple().
@@ -763,8 +797,8 @@ void WindowFunctionExecutor::initOrderByKeyTuple(const TableTuple& nextTuple)
     /*
      * The OrderByKey should not be null tuples.
      */
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
     /*
      * Swap the data pointers.  No data is moved.
      */
@@ -772,8 +806,8 @@ void WindowFunctionExecutor::initOrderByKeyTuple(const TableTuple& nextTuple)
     /*
      * Still should not be null tuples.
      */
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
     /*
      * Calculate the order by key values.
      */
@@ -783,27 +817,27 @@ void WindowFunctionExecutor::initOrderByKeyTuple(const TableTuple& nextTuple)
     /*
      * Still should not be null tuples.
      */
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
 }
 
 void WindowFunctionExecutor::swapPartitionByKeyTupleData() {
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
     void* inProgressData = getInProgressPartitionByKeyTuple().address();
     void* nextData = getLastPartitionByKeyTuple().address();
     getInProgressPartitionByKeyTuple().move(nextData);
     getLastPartitionByKeyTuple().move(inProgressData);
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
 }
 
 void WindowFunctionExecutor::swapOrderByKeyTupleData() {
     /*
      * Should not be null tuples.
      */
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
     void* inProgressData = getInProgressOrderByKeyTuple().address();
     void* nextData = getLastOrderByKeyTuple().address();
     getInProgressOrderByKeyTuple().move(nextData);
@@ -811,8 +845,8 @@ void WindowFunctionExecutor::swapOrderByKeyTupleData() {
     /*
      * Still should not be null tuples.
      */
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
 }
 
 
@@ -822,11 +856,11 @@ void WindowFunctionExecutor::p_execute_finish() {
     /*
      * The working tuples should not be null.
      */
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
-    assert( ! getBufferedInputTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getBufferedInputTuple().isNullTuple());
     getInProgressPartitionByKeyTuple().move(NULL);
     getInProgressOrderByKeyTuple().move(NULL);
     getLastPartitionByKeyTuple().move(NULL);
@@ -835,21 +869,21 @@ void WindowFunctionExecutor::p_execute_finish() {
     /*
      * The working tuples have just been set to null.
      */
-    assert( getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( getInProgressOrderByKeyTuple().isNullTuple());
-    assert( getLastPartitionByKeyTuple().isNullTuple());
-    assert( getLastOrderByKeyTuple().isNullTuple());
-    assert( getBufferedInputTuple().isNullTuple());
+    vassert( getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( getLastPartitionByKeyTuple().isNullTuple());
+    vassert( getLastOrderByKeyTuple().isNullTuple());
+    vassert( getBufferedInputTuple().isNullTuple());
     m_memoryPool.purge();
     VOLT_DEBUG("WindowFunctionExecutor::p_execute_finish() end\n");
 }
 
 void WindowFunctionExecutor::initWorkingTupleStorage() {
-    assert( getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( getInProgressOrderByKeyTuple().isNullTuple());
-    assert( getLastPartitionByKeyTuple().isNullTuple());
-    assert( getLastOrderByKeyTuple().isNullTuple());
-    assert( getBufferedInputTuple().isNullTuple());
+    vassert( getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( getLastPartitionByKeyTuple().isNullTuple());
+    vassert( getLastOrderByKeyTuple().isNullTuple());
+    vassert( getBufferedInputTuple().isNullTuple());
 
     m_inProgressPartitionByKeyStorage.init(m_partitionByKeySchema, &m_memoryPool);
     m_lastPartitionByKeyStorage.init(m_partitionByKeySchema, &m_memoryPool);
@@ -867,11 +901,11 @@ void WindowFunctionExecutor::initWorkingTupleStorage() {
 
     m_bufferedInputStorage.allocateActiveTuple();
 
-    assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( ! getInProgressOrderByKeyTuple().isNullTuple());
-    assert( ! getLastPartitionByKeyTuple().isNullTuple());
-    assert( ! getLastOrderByKeyTuple().isNullTuple());
-    assert( ! getBufferedInputTuple().isNullTuple());
+    vassert( ! getInProgressPartitionByKeyTuple().isNullTuple());
+    vassert( ! getInProgressOrderByKeyTuple().isNullTuple());
+    vassert( ! getLastPartitionByKeyTuple().isNullTuple());
+    vassert( ! getLastOrderByKeyTuple().isNullTuple());
+    vassert( ! getBufferedInputTuple().isNullTuple());
 
 }
 } /* namespace voltdb */

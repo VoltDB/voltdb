@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,23 @@
 #include "common/NValue.hpp"
 
 /**
+ * A helpful macro that can be used by tests that inherit from the class below:
+ * Example: (for TableTuple with schema BIGINT, VARCHAR)
+ *       voltdb::TableTuple tuple = ...;
+ *       typedef std::tuple<int64_t, std::string> Tuple;
+ *       ASSERT_TUPLES_EQ(Tuple{32, "foo"}, tuple);
+ *
+ * May also be used with two instances of voltdb::TableTuple.
+ */
+#define ASSERT_TUPLES_EQ(refTuple, voltdbTuple) \
+    do { \
+        bool rc = assertTuplesEqual(refTuple, voltdbTuple, __FILE__, __LINE__); \
+        if (! rc) { \
+            return; \
+        } \
+    } while (0)
+
+/**
  * EE unit tests can inherit from this class to use the handy methods
  * below to assert that voltdb::TableTuples contain expected values.
  */
@@ -61,10 +78,18 @@ protected:
 
         Example: (for TableTuple with schema BIGINT, VARCHAR)
         typedef std::tuple<int64_t, std::string> Tuple;
-        assertTuplesEqual(Tuple{32, "foo"}, &tuple);
+        ASSERT_TUPLES_EQ(Tuple{32, "foo"}, &tuple);
     */
     template<typename Tuple>
-    bool assertTuplesEqual(const Tuple& expectedTuple, voltdb::TableTuple* actualTuple);
+    bool assertTuplesEqual(const Tuple& expectedTuple,
+                           const voltdb::TableTuple& actualTuple,
+                           const std::string& theFile,
+                           int theLine);
+
+    bool assertTuplesEqual(const voltdb::TableTuple& expectedTuple,
+                           const voltdb::TableTuple& actualTuple,
+                           const std::string& theFile,
+                           int theLine);
 
 private:
     inline bool assertTupleValuesEqualHelper(voltdb::TableTuple* tuple, int index);
@@ -136,20 +161,25 @@ template<typename Tuple, int I>
 struct AssertTuplesEqualHelper {
     static bool impl(Test* theTest,
                      const Tuple& expectedTuple,
-                     voltdb::TableTuple *actualTuple) {
+                     const voltdb::TableTuple& actualTuple,
+                     const std::string& theFile,
+                     int theLine) {
         int compareResult = Tools::nvalueCompare(std::get<I>(expectedTuple),
-                                                 actualTuple->getNValue(I));
+                                                 actualTuple.getNValue(I));
         if (compareResult != 0) {
             std::ostringstream oss;
             oss << "Values at column " << I << " are not equal; "
                 << "expected: " << Tools::nvalueFromNative(std::get<I>(expectedTuple)).debug()
-                << ", actual: " << actualTuple->getNValue(I).debug();
-            theTest->fail(__FILE__, __LINE__, oss.str().c_str());
+                << ", actual: " << actualTuple.getNValue(I).debug();
+            theTest->fail(theFile.c_str(), theLine, oss.str().c_str());
             return false;
         }
 
-        return AssertTuplesEqualHelper<Tuple, I - 1>::impl(theTest, expectedTuple,
-                                                           actualTuple);
+        return AssertTuplesEqualHelper<Tuple, I - 1>::impl(theTest,
+                                                           expectedTuple,
+                                                           actualTuple,
+                                                           theFile,
+                                                           theLine);
     }
 };
 
@@ -157,7 +187,9 @@ template<typename Tuple>
 struct AssertTuplesEqualHelper<Tuple, -1> {
     static bool impl(Test*,
                      const Tuple& expectedTuple,
-                     voltdb::TableTuple *actualTuple) {
+                     const voltdb::TableTuple& actualTuple,
+                     const std::string& theFile,
+                     int theLine) {
         return true;
     }
 };
@@ -165,19 +197,54 @@ struct AssertTuplesEqualHelper<Tuple, -1> {
 
 template<typename Tuple>
 bool TupleComparingTest::assertTuplesEqual(const Tuple& expectedTuple,
-                                           voltdb::TableTuple* actualTuple) {
+                                           const voltdb::TableTuple& actualTuple,
+                                           const std::string& theFile,
+                                           int theLine) {
     const std::size_t numColumns = std::tuple_size<Tuple>::value;
-    if (numColumns != actualTuple->columnCount()) {
+    if (numColumns != actualTuple.columnCount()) {
         std::ostringstream oss;
         oss << "Column count mismatch, expected: "
-            << numColumns << ", actual: " << actualTuple->columnCount();
+            << numColumns << ", actual: " << actualTuple.columnCount();
         FAIL(oss.str().c_str());
     }
 
-    return AssertTuplesEqualHelper<Tuple, numColumns - 1>::impl(this, expectedTuple, actualTuple);
+    return AssertTuplesEqualHelper<Tuple, numColumns - 1>::impl(this,
+                                                                expectedTuple,
+                                                                actualTuple,
+                                                                theFile,
+                                                                theLine);
 }
 
+bool TupleComparingTest::assertTuplesEqual(const voltdb::TableTuple& expectedTuple,
+                                           const voltdb::TableTuple& actualTuple,
+                                           const std::string& theFile,
+                                           int theLine) {
+    int expectedColumnCount = expectedTuple.columnCount();
+    int actualColumnCount = actualTuple.columnCount();
+    if (expectedColumnCount != actualColumnCount) {
+        std::ostringstream oss;
+        oss << "Tuple does not have expected number of columns; "
+            << "expected: " << expectedColumnCount
+            << ", actual: " << actualColumnCount;
+        fail(theFile.c_str(), theLine, oss.str().c_str());
+        return false;
+    }
 
+    for (int i = 0; i < expectedColumnCount; ++i) {
+        voltdb::NValue expectedVal = expectedTuple.getNValue(i);
+        voltdb::NValue actualVal = actualTuple.getNValue(i);
+        int compareResult = Tools::nvalueCompare(expectedVal, actualVal);
+        if (compareResult != 0) {
+            std::ostringstream oss;
+            oss << "Values at column " << i << " are not equal; "
+                << "expected: " << expectedVal.debug()
+                << ", actual: " << actualVal.debug();
+            fail(theFile.c_str(), theLine, oss.str().c_str());
+            return false;
+        }
+    }
 
+    return true;
+}
 
 #endif // TUPLECOMPARINGTEST_HPP

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,18 +17,9 @@
 
 #include <iostream>
 #include "tablecountexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
-#include "execution/ExecutorVector.h"
-#include "expressions/abstractexpression.h"
 #include "plannodes/tablecountnode.h"
 #include "storage/persistenttable.h"
-#include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
@@ -37,10 +28,10 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Table Count Executor");
 
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubqueryScan() ||
+    vassert(dynamic_cast<TableCountPlanNode*>(abstract_node));
+    vassert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubqueryScan() ||
            dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
-    assert(abstract_node->getOutputSchema().size() == 1);
+    vassert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -50,21 +41,20 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool TableCountExecutor::p_execute(const NValueArray &params) {
     TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getPredicate() == NULL);
+    vassert(node);
+    vassert(node->getPredicate() == NULL);
 
     Table* output_table = node->getOutputTable();
-    assert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert(output_table);
+    vassert((int)output_table->columnCount() == 1);
 
     int64_t rowCounts = 0;
     if (node->isSubqueryScan()) {
         Table* input_table = node->getChildren()[0]->getOutputTable();
-        assert(input_table);
+        vassert(input_table);
         AbstractTempTable* temp_table = dynamic_cast<AbstractTempTable*>(input_table);
         if ( ! temp_table) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "May not iterate a streamed table.");
+            throw SerializableEEException("May not iterate a streamed table.");
         }
         rowCounts = temp_table->tempTableTupleCount();
     } else {

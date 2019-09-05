@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,10 @@
 
 package org.voltdb.exportclient;
 
+
+import static org.voltdb.exportclient.ExportRow.getFirstField;
+
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
@@ -29,18 +30,15 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
-import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.types.GeographyPointValue;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+
 
 /**
  * Provide the basic functionality of decoding tuples from our export wire
@@ -50,7 +48,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 public abstract class ExportDecoderBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
-    public static final int INTERNAL_FIELD_COUNT = 6;
+    public static final int INTERNAL_FIELD_COUNT = ExportRow.INTERNAL_FIELD_COUNT;
     public static final int PARTITION_ID_INDEX = 3;
 
     public static class RestartBlockException extends Exception {
@@ -73,71 +71,29 @@ public abstract class ExportDecoderBase {
         BASE64,
         HEX
     }
-
-    protected AdvertisedDataSource m_source;
-    // This is available as a convenience, could go away.
-    protected final ArrayList<VoltType> m_tableSchema;
+    protected final int m_partition;
+    protected final long m_startTS;
+    //If true we have detected an old style connector.
+    private boolean m_legacy = false;
+    //Only used for legacy connector which picks up schema from ADS
+    protected final ArrayList<VoltType> m_tableSchema = new ArrayList<>();
+    //Only used for legacy connector which picks up schema from ADS
     private int m_partitionColumnIndex = PARTITION_ID_INDEX;
-    private final ExportFormat m_exportFormat;
+    //Only used for legacy connector which picks up schema from ADS
+    protected final AdvertisedDataSource m_source;
+    //Only used for legacy connector which picks up schema from ADS
+    final ExportRow m_legacyRow;
 
-    public ExportDecoderBase(AdvertisedDataSource source) {
-        m_source = source;
-        m_tableSchema = source.columnTypes;
-        m_exportFormat = source.exportFormat;
-        setPartitionColumnName(source.getPartitionColumnName());
-    }
+    //Used by new style connector to pickup schema information from previous record.
+    ExportRowSchema m_rowSchema;
+    public ExportDecoderBase(AdvertisedDataSource ads) {
+        m_source = ads;
+        m_startTS = System.currentTimeMillis();
+        m_partition = ads.partitionId;
 
-    /**
-     * Process a row of octets from the Export stream. Overridden by subclasses
-     * to provide whatever specific processing is desired by this ELClient
-     *
-     * @param rowSize
-     *            the length of the row (in octets)
-     * @param rowData
-     *            a byte array containing the row data
-     * @return whether or not the row processing was successful
-     */
-    abstract public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException;
-
-    abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
-
-    /**
-     * Finalize operation upon block completion - provides a means for a
-     * specific decoder to flush data to disk - virtual method
-     */
-    public void onBlockCompletion() throws RestartBlockException {
-    }
-
-    /**
-     * Notify that a new block of data is going to be processed now
-     */
-    public void onBlockStart() throws RestartBlockException {
-
-    }
-
-    public ListeningExecutorService getExecutor() {
-        return CoreUtils.LISTENINGSAMETHREADEXECUTOR;
-    }
-
-    //Used for override of column for partitioning.
-    public final void setPartitionColumnName(String partitionColumnName) {
-        if (partitionColumnName == null || partitionColumnName.trim().isEmpty()) {
-            return;
-        }
-        int idx = -1;
-        for (String name : m_source.columnNames) {
-            if (name.equalsIgnoreCase(partitionColumnName)) {
-                idx = m_source.columnNames.indexOf(name);
-                break;
-            }
-        }
-        if (idx == -1) {
-            m_partitionColumnIndex = PARTITION_ID_INDEX;
-            m_logger.error("Export configuration error: specified " + m_source.tableName + "." + partitionColumnName
-                    + " does not exist. A default partition or routing key will be used.");
-        } else {
-            m_partitionColumnIndex = idx;
-        }
+        m_tableSchema.addAll(ads.columnTypes);
+        setPartitionColumnName(m_source.getPartitionColumnName());
+        m_legacyRow = new ExportRow(ads.tableName, ads.columnNames, m_tableSchema, ads.columnLengths, null, null, m_partitionColumnIndex, ads.partitionId, ads.m_generation);
     }
 
     public static class ExportRowData {
@@ -161,69 +117,11 @@ public abstract class ExportDecoderBase {
      * @throws IOException
      */
     protected ExportRowData decodeRow(byte[] rowData) throws IOException {
-        switch(m_exportFormat) {
-        case FOURDOTFOUR: return decodeTuple(rowData);
-        case ORIGINAL: return decodeTupleLegacy(rowData);
-        default: throw new IOException("Unknown export format: " + m_exportFormat.name());
-        }
+        ExportRow row = ExportRow.decodeRow(m_legacyRow, getPartition(), m_startTS, rowData);
+        return new ExportRowData(row.values, row.partitionValue, row.partitionId);
     }
 
-    private ExportRowData decodeTuple(byte[] rowData) throws IOException {
-        Preconditions.checkState(
-                m_exportFormat == ExportFormat.FOURDOTFOUR,
-                "decoder may be called on curently formatted row data"
-                );
-        ByteBuffer bb = ByteBuffer.wrap(rowData);
-        bb.order(ByteOrder.LITTLE_ENDIAN);
-
-        Object[] retval = new Object[m_tableSchema.size()];
-        Object pval = null;
-
-        boolean[] is_null = extractNullFlags(bb);
-        for (int i = 0; i < m_tableSchema.size(); ++i) {
-            if (is_null[i]) {
-                retval[i] = null;
-            } else {
-                retval[i] = decodeNextColumn(bb, m_tableSchema.get(i));
-            }
-            if (i == m_partitionColumnIndex) {
-                pval = retval[i];
-            }
-        }
-        return new ExportRowData(retval, pval, m_source.partitionId);
-    }
-
-    private ExportRowData decodeTupleLegacy(byte[] rowData) throws IOException {
-        Preconditions.checkState(
-                m_exportFormat == ExportFormat.ORIGINAL,
-                "leagacy decoder may be called on legacy row data"
-                );
-
-        FastDeserializer fds = new FastDeserializer(rowData, ByteOrder.LITTLE_ENDIAN);
-
-        Object[] retval = new Object[m_tableSchema.size()];
-        boolean[] is_null = extractNullFlags(fds);
-        Object pval = null;
-
-        for (int i = 0; i < m_tableSchema.size(); i++) {
-            if (is_null[i]) {
-                retval[i] = null;
-            } else {
-                retval[i] = decodeNextColumnLegacy(fds, m_tableSchema.get(i));
-            }
-            if (i == m_partitionColumnIndex) {
-                pval = retval[i];
-            }
-        }
-
-        return new ExportRowData(retval, pval, m_source.partitionId);
-    }
-
-    //Based on your skipinternal value return index of first field.
-    public int getFirstField(boolean skipinternal) {
-        return skipinternal ? INTERNAL_FIELD_COUNT : 0;
-    }
-
+    //This is for legacy connector.
     public boolean writeRow(Object row[], CSVWriter writer, boolean skipinternal,
             BinaryEncoding binaryEncoding, SimpleDateFormat dateFormatter) {
 
@@ -290,405 +188,101 @@ public abstract class ExportDecoderBase {
         return retval;
     }
 
-    // This does not decode an arbitrary column because fds keeps getting
-    // consumed.
-    // Rather, it decodes the next non-null column in the FastDeserializer
-    Object decodeNextColumn(ByteBuffer bb, VoltType columnType)
-            throws IOException {
-        Object retval = null;
-        switch (columnType) {
-        case TINYINT:
-            retval = decodeTinyInt(bb);
-            break;
-        case SMALLINT:
-            retval = decodeSmallInt(bb);
-            break;
-        case INTEGER:
-            retval = decodeInteger(bb);
-            break;
-        case BIGINT:
-            retval = decodeBigInt(bb);
-            break;
-        case FLOAT:
-            retval = decodeFloat(bb);
-            break;
-        case TIMESTAMP:
-            retval = decodeTimestamp(bb);
-            break;
-        case STRING:
-            retval = decodeString(bb);
-            break;
-        case VARBINARY:
-            retval = decodeVarbinary(bb);
-            break;
-        case DECIMAL:
-            retval = decodeDecimal(bb);
-            break;
-        case GEOGRAPHY_POINT:
-            retval = decodeGeographyPoint(bb);
-            break;
-        case GEOGRAPHY:
-            retval = decodeGeography(bb);
-            break;
-        default:
-            throw new IOException("Invalid column type: " + columnType);
+    //Used for override of column for partitioning. This is for legacy connector only.
+    public final int setPartitionColumnName(String partitionColumnName) {
+        if (partitionColumnName == null || partitionColumnName.trim().isEmpty()) {
+            return PARTITION_ID_INDEX;
         }
-
-        return retval;
-    }
-
-    // This does not decode an arbitrary column because fds keeps getting
-    // consumed.
-    // Rather, it decodes the next non-null column in the FastDeserializer
-    @Deprecated
-    Object decodeNextColumnLegacy(FastDeserializer fds, VoltType columnType)
-            throws IOException {
-        Object retval = null;
-        switch (columnType) {
-        case TINYINT:
-            retval = decodeTinyIntLegacy(fds);
-            break;
-        case SMALLINT:
-            retval = decodeSmallIntLegacy(fds);
-            break;
-        case INTEGER:
-            retval = decodeIntegerLegacy(fds);
-            break;
-        case BIGINT:
-            retval = decodeBigInt(fds);
-            break;
-        case FLOAT:
-            retval = decodeFloat(fds);
-            break;
-        case TIMESTAMP:
-            retval = decodeTimestamp(fds);
-            break;
-        case STRING:
-            retval = decodeString(fds);
-            break;
-        case VARBINARY:
-            retval = decodeVarbinary(fds);
-            break;
-        case DECIMAL:
-            retval = decodeDecimalLegacy(fds);
-            break;
-        default:
-            // Note: we can come here for the case of GEOGRAPHY or GEOGRAPHY_POINT data.
-            // These types were added in VoltDB 6.0 aren't supported for export format
-            // version older than 4.4.
-            throw new IOException("Invalid column type: " + columnType);
+        int idx = -1;
+        for (String name : m_source.columnNames) {
+            if (name.equalsIgnoreCase(partitionColumnName)) {
+                idx = m_source.columnNames.indexOf(name);
+                break;
+            }
         }
-        ;
-        return retval;
-    }
-
-    /**
-     * Read a decimal according to the Export encoding specification.
-     *
-     * @param fds
-     *            Fastdeserializer containing Export stream data
-     * @return decoded BigDecimal value
-     * @throws IOException
-     */
-    @Deprecated
-    static public BigDecimal decodeDecimalLegacy(final FastDeserializer fds)
-            throws IOException {
-        final int strlength = fds.readInt();
-        final byte[] strdata = new byte[strlength];
-        fds.readFully(strdata);
-        final String str = new String(strdata);
-        BigDecimal bd = null;
-        try {
-            bd = new BigDecimal(str);
-        } catch (Exception e) {
-            System.out.println("error creating decimal from string(" + str
-                    + ")");
-            e.printStackTrace();
+        if (idx == -1) {
+            m_partitionColumnIndex = PARTITION_ID_INDEX;
+            m_logger.error("Export configuration error: specified " + m_source.tableName + "." + partitionColumnName
+                    + " does not exist. A default partition or routing key will be used.");
+        } else {
+            m_partitionColumnIndex = idx;
         }
-        return bd;
+        return m_partitionColumnIndex;
     }
 
     /**
-     * Read a decimal according to the Four Dot Four encoding specification.
+     * Process a row of octets from the Export stream. Overridden by subclasses
+     * to provide whatever specific processing is desired by this ELClient
      *
-     * @param fds
-     *            Fastdeserializer containing Export stream data
-     * @return decoded BigDecimal value
-     * @throws IOException
+     * @param row Decoded Export Data
+     * @return whether or not the row processing was successful
+     * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
      */
-    @Deprecated
-    static public BigDecimal decodeDecimal(final FastDeserializer fds)
-            throws IOException {
-        final int scale = fds.readByte();
-        final int precisionBytes = fds.readByte();
-        final byte[] bytes = new byte[precisionBytes];
-        fds.readFully(bytes);
-        return new BigDecimal(new BigInteger(bytes), scale);
+    public boolean processRow(ExportRow row) throws RestartBlockException {
+        throw new UnsupportedOperationException("processRow must be implemented.");
+    }
+
+    public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        throw new UnsupportedOperationException("processRow must be implemented.");
+    }
+
+    abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
+
+    /**
+     * Finalize operation upon block completion - provides a means for a
+     * specific decoder to flush data to disk - virtual method
+     * @param row The last row for the block
+     * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
+     */
+    public void onBlockCompletion(ExportRow row) throws RestartBlockException {
     }
 
     /**
-     * Read a decimal according to the Four Dot Four encoding specification.
-     *
-     * @param bb
-     *            ByteBuffer containing Export stream data
-     * @return decoded BigDecimal value
+     * Notify that a new block of data is going to be processed now
+     * @param row first row of the block.
+     * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
      */
-    static public BigDecimal decodeDecimal(final ByteBuffer bb) {
-        final int scale = bb.get();
-        final int precisionBytes = bb.get();
-        final byte[] bytes = new byte[precisionBytes];
-        bb.get(bytes);
-        return new BigDecimal(new BigInteger(bytes), scale);
+    public void onBlockStart(ExportRow row) throws RestartBlockException {
+
     }
 
     /**
-     * Read a string according to the Export encoding specification
-     *
-     * @param fds
-     * @throws IOException
+     * Finalize operation upon block completion - provides a means for a
+     * specific decoder to flush data to disk - virtual method
+     * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
      */
-    @Deprecated
-    static public String decodeString(final FastDeserializer fds)
-            throws IOException {
-        final int strlength = fds.readInt();
-        final byte[] strdata = new byte[strlength];
-        fds.readFully(strdata);
-        return new String(strdata);
+    public void onBlockCompletion() throws RestartBlockException {
     }
 
     /**
-     * Read a string according to the Export encoding specification
-     *
-     * @param bb
-     * @throws IOException
+     * Notify that a new block of data is going to be processed now
+     * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
      */
-    static public String decodeString(final ByteBuffer bb) {
-        final int strlength = bb.getInt();
-        final int position = bb.position();
-        String decoded = new String(bb.array(), bb.arrayOffset() + position, strlength, Charsets.UTF_8);
-        bb.position(position + strlength);
-        return decoded;
+    public void onBlockStart() throws RestartBlockException {
+
     }
 
-    /**
-     * Read a varbinary according to the Export encoding specification
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public Object decodeVarbinary(final FastDeserializer fds)
-            throws IOException {
-        final int length = fds.readInt();
-        final byte[] data = new byte[length];
-        fds.readFully(data);
-        return data;
+    public ListeningExecutorService getExecutor() {
+        return CoreUtils.LISTENINGSAMETHREADEXECUTOR;
     }
 
-    /**
-     * Read a varbinary according to the Export encoding specification
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public Object decodeVarbinary(final ByteBuffer bb) {
-        final int length = bb.getInt();
-        final byte[] data = new byte[length];
-        bb.get(data);
-        return data;
+    public int getPartition() {
+        return m_partition;
     }
 
-    /**
-     * Read a timestamp according to the Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public TimestampType decodeTimestamp(final FastDeserializer fds)
-            throws IOException {
-        final Long val = fds.readLong();
-        return new TimestampType(val);
+    public void setLegacy(boolean legacy) {
+        m_legacy = legacy;
     }
 
-    /**
-     * Read a timestamp according to the Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public TimestampType decodeTimestamp(final ByteBuffer bb) {
-        final Long val = bb.getLong();
-        return new TimestampType(val);
+    public boolean isLegacy() {
+        return m_legacy;
     }
 
-    /**
-     * Read a float according to the Export encoding specification
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public double decodeFloat(final FastDeserializer fds)
-            throws IOException {
-        return fds.readDouble();
+    public void setExportRowSchema(ExportRowSchema row) {
+        m_rowSchema = row;
     }
 
-    /**
-     * Read a float according to the Export encoding specification
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public double decodeFloat(final ByteBuffer bb) {
-        return bb.getDouble();
-    }
-
-    /**
-     * Read a bigint according to the Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public long decodeBigInt(final FastDeserializer fds)
-            throws IOException {
-        return fds.readLong();
-    }
-
-    /**
-     * Read a bigint according to the Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public long decodeBigInt(final ByteBuffer bb) {
-        return bb.getLong();
-    }
-
-    /**
-     * Read an integer according to the Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public int decodeIntegerLegacy(final FastDeserializer fds)
-            throws IOException {
-        return (int) fds.readLong();
-    }
-
-    /**
-     * Read an integer according to the Four Dot Four Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public int decodeInteger(final FastDeserializer fds)
-            throws IOException {
-        return fds.readInt();
-    }
-
-    /**
-     * Read an integer according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public int decodeInteger(final ByteBuffer bb) {
-        return bb.getInt();
-    }
-
-    /**
-     * Read a small int according to the Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public short decodeSmallIntLegacy(final FastDeserializer fds)
-            throws IOException {
-        return (short) fds.readLong();
-    }
-
-    /**
-     * Read a small int according to the Four Dot Four Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public short decodeSmallInt(final FastDeserializer fds)
-            throws IOException {
-        return fds.readShort();
-    }
-
-    /**
-     * Read a small int according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public short decodeSmallInt(final ByteBuffer bb) {
-        return bb.getShort();
-    }
-
-    /**
-     * Read a tiny int according to the Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public byte decodeTinyIntLegacy(final FastDeserializer fds)
-            throws IOException {
-        return (byte) fds.readLong();
-    }
-
-    /**
-     * Read a tiny int according to the Four Dot Four Export encoding specification.
-     *
-     * @param fds
-     * @throws IOException
-     */
-    @Deprecated
-    static public byte decodeTinyInt(final FastDeserializer fds)
-            throws IOException {
-        return fds.readByte();
-    }
-
-    /**
-     * Read a tiny int according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public byte decodeTinyInt(final ByteBuffer bb) {
-        return bb.get();
-    }
-
-    /**
-     * Read a point according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public GeographyPointValue decodeGeographyPoint(final ByteBuffer bb) {
-        return GeographyPointValue.unflattenFromBuffer(bb);
-    }
-
-    /**
-     * Read a geography according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public GeographyValue decodeGeography(final ByteBuffer bb) {
-        final int strLength = bb.getInt();
-        final int startPosition = bb.position();
-        GeographyValue gv = GeographyValue.unflattenFromBuffer(bb);
-        assert(bb.position() - startPosition == strLength);
-        return gv;
+    public ExportRowSchema getExportRowSchema() {
+        return m_rowSchema;
     }
 }

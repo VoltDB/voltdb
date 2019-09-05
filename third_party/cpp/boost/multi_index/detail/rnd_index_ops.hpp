@@ -1,4 +1,4 @@
-/* Copyright 2003-2009 Joaquin M Lopez Munoz.
+/* Copyright 2003-2015 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -9,14 +9,13 @@
 #ifndef BOOST_MULTI_INDEX_DETAIL_RND_INDEX_OPS_HPP
 #define BOOST_MULTI_INDEX_DETAIL_RND_INDEX_OPS_HPP
 
-#if defined(_MSC_VER)&&(_MSC_VER>=1200)
+#if defined(_MSC_VER)
 #pragma once
 #endif
 
 #include <boost/config.hpp> /* keep it first to prevent nasty warns in MSVC */
 #include <algorithm>
 #include <boost/multi_index/detail/rnd_index_ptr_array.hpp>
-#include <functional>
 
 namespace boost{
 
@@ -30,8 +29,7 @@ namespace detail{
 
 template<typename Node,typename Allocator,typename Predicate>
 Node* random_access_index_remove(
-  random_access_index_ptr_array<Allocator>& ptrs,Predicate pred
-  BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(Node))
+  random_access_index_ptr_array<Allocator>& ptrs,Predicate pred)
 {
   typedef typename Node::value_type value_type;
   typedef typename Node::impl_ptr_pointer impl_ptr_pointer;
@@ -55,8 +53,7 @@ Node* random_access_index_remove(
 
 template<typename Node,typename Allocator,class BinaryPredicate>
 Node* random_access_index_unique(
-  random_access_index_ptr_array<Allocator>& ptrs,BinaryPredicate binary_pred
-  BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(Node))
+  random_access_index_ptr_array<Allocator>& ptrs,BinaryPredicate binary_pred)
 {
   typedef typename Node::value_type       value_type;
   typedef typename Node::impl_ptr_pointer impl_ptr_pointer;
@@ -86,8 +83,7 @@ template<typename Node,typename Allocator,typename Compare>
 void random_access_index_inplace_merge(
   const Allocator& al,
   random_access_index_ptr_array<Allocator>& ptrs,
-  BOOST_DEDUCED_TYPENAME Node::impl_ptr_pointer first1,Compare comp
-  BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(Node))
+  BOOST_DEDUCED_TYPENAME Node::impl_ptr_pointer first1,Compare comp)
 {
   typedef typename Node::value_type       value_type;
   typedef typename Node::impl_pointer     impl_pointer;
@@ -126,11 +122,12 @@ void random_access_index_inplace_merge(
 /* auxiliary stuff */
 
 template<typename Node,typename Compare>
-struct random_access_index_sort_compare:
-  std::binary_function<
-    typename Node::impl_pointer,
-    typename Node::impl_pointer,bool>
+struct random_access_index_sort_compare
 {
+  typedef typename Node::impl_pointer first_argument_type;
+  typedef typename Node::impl_pointer second_argument_type;
+  typedef bool                        result_type;
+
   random_access_index_sort_compare(Compare comp_=Compare()):comp(comp_){}
 
   bool operator()(
@@ -151,8 +148,7 @@ template<typename Node,typename Allocator,class Compare>
 void random_access_index_sort(
   const Allocator& al,
   random_access_index_ptr_array<Allocator>& ptrs,
-  Compare comp
-  BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(Node))
+  Compare comp)
 {
   /* The implementation is extremely simple: an auxiliary
    * array of pointers is sorted using stdlib facilities and
@@ -176,7 +172,6 @@ void random_access_index_sort(
 
   if(ptrs.size()<=1)return;
 
-  typedef typename Node::value_type         value_type;
   typedef typename Node::impl_pointer       impl_pointer;
   typedef typename Node::impl_ptr_pointer   impl_ptr_pointer;
   typedef random_access_index_sort_compare<

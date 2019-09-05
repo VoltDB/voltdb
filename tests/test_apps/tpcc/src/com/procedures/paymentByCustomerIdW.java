@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,7 +50,6 @@
 
 package com.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -62,10 +61,6 @@ import org.voltdb.types.TimestampType;
  * Warehouse/District related queries. See deps.pdf for dependencies between the queries
  * in original paymentByCustomerId.
  */
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0", //partition on W_ID
-    singlePartition = true
-)
 public class paymentByCustomerIdW extends VoltProcedure {
 
     public final SQLStmt getWarehouse = new SQLStmt("SELECT W_NAME, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP FROM WAREHOUSE WHERE W_ID = ?;"); //w_id

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,7 +21,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+#define TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+
 #include "execution/VoltDBEngine.h"
+#include "common/SynchronizedThreadLock.h"
 #include "common/Topend.h"
 
 /**
@@ -70,14 +74,22 @@ private:
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
+                             1,     // sitesPerHost
                              0,     // hostId
                              "",    // hostname
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              tempTableMemoryLimitInBytes,
-                             false, // don't create DR replicated stream
+                             true, // this is lowest site/engineId
                              95);   // compaction threshold
         m_engine->setUndoToken(0);
+    }
+    UniqueEngine()
+    {
+        if (m_engine.get() != NULL) {
+            m_engine.reset();
+            voltdb::SynchronizedThreadLock::destroy();
+        }
     }
 
     std::unique_ptr<voltdb::Topend> m_topend;
@@ -122,3 +134,5 @@ private:
     int64_t m_tempTableMemoryLimit;
     std::unique_ptr<voltdb::Topend> m_topend;
 };
+
+#endif // EE_TESTS_TEST_UTILS_UNIQUEENGINE_HPP

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,17 +18,25 @@
 package org.voltdb;
 
 public enum DRIdempotencyResult {
-    SUCCESS((byte) 0),    // Is the expect next DR ID
-    DUPLICATE((byte) -1), // Is a duplicate DR ID seen before
-    GAP((byte) 1);        // Is way in the future
+    SUCCESS((byte) 0, false),    // Is the expected next DR ID
+    DUPLICATE((byte) -1, true),  // Is a duplicate DR ID seen before
+    GAP((byte) 1, true),         // Is way in the future
+    AMBIGUOUS((byte) -2, false); // DR was applied to a new partition that did not have a tracker
 
     private final byte m_id;
-    DRIdempotencyResult(byte id) {
+    private final boolean m_failure;
+
+    DRIdempotencyResult(byte id, boolean failure) {
         m_id = id;
+        m_failure = failure;
     }
 
     public byte id() {
         return m_id;
+    }
+
+    public boolean isFailure() {
+        return m_failure;
     }
 
     public static DRIdempotencyResult fromID(byte id) {
@@ -38,6 +46,8 @@ public enum DRIdempotencyResult {
             return DUPLICATE;
         } else if (GAP.id() == id) {
             return GAP;
+        } else if (AMBIGUOUS.id() == id) {
+            return AMBIGUOUS;
         } else {
             throw new IllegalArgumentException("Invalid DRIdempotencyResult ID " + id);
         }

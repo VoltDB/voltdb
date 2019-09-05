@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
@@ -174,9 +175,22 @@ public abstract class JoinNode implements Cloneable {
         return equivalenceSet;
     }
 
-    protected abstract void collectEquivalenceFilters(
-            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes);
+    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
+                                                     Set<AbstractExpression>> equivalenceSet,
+                                             ArrayDeque<JoinNode> joinNodes) {
+        if ( ! m_whereInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
+                                                      equivalenceSet);
+        }
+        // HSQL sometimes tags single-table filters in inner joins as join clauses
+        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+        // conditions that determine partitioning, so process them as where clauses.
+        if ( ! m_joinInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
+                                                      equivalenceSet);
+        }
+    }
 
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
@@ -210,7 +224,7 @@ public abstract class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return ExpressionUtil.combinePredicates(out);
+        return ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, out);
     }
 
     protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }
@@ -278,7 +292,7 @@ public abstract class JoinNode implements Cloneable {
      * Returns a list of immediate sub-queries which are part of this query.
      * @return List<AbstractParsedStmt> - list of sub-queries from this query
      */
-    public void extractSubQueries(List<StmtSubqueryScan> subQueries) { }
+    abstract public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans);
 
     /**
      * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
@@ -366,7 +380,10 @@ public abstract class JoinNode implements Cloneable {
         return false;
     }
 
-    public abstract void analyzeJoinExpressions(List<AbstractExpression> noneList);
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
+        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+    }
 
     /**
      * Apply implied transitive constant filter to join expressions
@@ -523,4 +540,6 @@ public abstract class JoinNode implements Cloneable {
             checkExpressions.addAll(checkExpressions);
         }
     }
+
+    abstract public boolean hasSubqueryScans();
 }

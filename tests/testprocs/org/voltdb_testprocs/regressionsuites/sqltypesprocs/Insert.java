@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,17 +25,11 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
-
-@ProcInfo (
-    partitionInfo = "NO_NULLS.PKEY: 1",
-    singlePartition = true
-)
 
 public class Insert extends InsertBase {
 
@@ -82,18 +76,6 @@ public class Insert extends InsertBase {
         }
         else if (tablename.equals("ALLOW_NULLS")) {
             voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("NO_NULLS_GRP")) {
-            voltQueueSQL(i_no_nulls_grp, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("ALLOW_NULLS_GRP")) {
-            voltQueueSQL(i_allow_nulls_grp, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
                          a_geography_point, a_geography);

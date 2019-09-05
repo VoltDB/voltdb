@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -66,7 +66,7 @@ namespace voltdb {
 template<typename OP>
 NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
 {
-    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+    vassert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
     NValue fallback_result = OP::includes_equality() ? NValue::getTrue() : NValue::getFalse();
     int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
@@ -115,8 +115,8 @@ public:
         : AbstractExpression(et, left, right),
           m_quantifier(quantifier)
     {
-        assert(left != NULL);
-        assert(right != NULL);
+        vassert(left != NULL);
+        vassert(right != NULL);
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
@@ -161,7 +161,7 @@ struct NValueExtractor
     template<typename OP>
     NValue compare(const TableTuple& tuple) const
     {
-        assert(tuple.getSchema()->columnCount() == 1);
+        vassert(tuple.getSchema()->columnCount() == 1);
         return compare<OP>(tuple.getNValue(0));
     }
 
@@ -243,7 +243,7 @@ struct TupleExtractor
     template<typename OP>
     NValue compare(const NValue& nvalue) const
     {
-        assert(m_tuple.getSchema()->columnCount() == 1);
+        vassert(m_tuple.getSchema()->columnCount() == 1);
         NValue lvalue = m_tuple.getNValue(0);
         if (lvalue.isNull() && OP::isNullRejecting()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
@@ -259,7 +259,7 @@ struct TupleExtractor
         return m_tuple.isNullTuple() ? "NULL" : m_tuple.debug("TEMP");
     }
 
-    const ValueType& getNullValue()
+    ValueType getNullValue()
     {
         return m_null_tuple.tuple();
     }
@@ -269,14 +269,14 @@ private:
         int subqueryId = ValuePeeker::peekInteger(value);
         ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
         Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-        assert(table != NULL);
+        vassert(table != NULL);
         return table;
     }
 
     Table* m_table;
     TableIterator m_iterator;
     ValueType m_tuple;
-    const StandAloneTupleStorage m_null_tuple;
+    StandAloneTupleStorage m_null_tuple;
     int64_t m_size;
 };
 
@@ -312,20 +312,14 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     NValue lvalue = m_left->eval(tuple1, tuple2);
     ValueExtractorOuter outerExtractor(lvalue);
     if (outerExtractor.resultSize() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException("More than one row returned by a scalar/row subquery");
     }
 
     // Evaluate the inner_expr. The return value is a subquery id or a value as well
     NValue rvalue = m_right->eval(tuple1, tuple2);
     ValueExtractorInner innerExtractor(rvalue);
     if (m_quantifier == QUANTIFIER_TYPE_NONE && innerExtractor.resultSize() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw SerializableEEException("More than one row returned by a scalar/row subquery");
     }
 
     if (innerExtractor.resultSize() == 0) {
@@ -341,7 +335,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             // If for the operator, NULL is a valid value in result, construct RHS value
             // with NULL and use that to compare against outer-extractor value.
             const typename ValueExtractorInner::ValueType& innerNullValue = innerExtractor.getNullValue();
-            assert(innerExtractor.hasNullValue());
+            vassert(innerExtractor.hasNullValue());
             return outerExtractor.template compare<OP>(innerNullValue);
         }
         case QUANTIFIER_TYPE_ANY: {
@@ -353,7 +347,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         }
     }
 
-    assert (innerExtractor.resultSize() > 0);
+    vassert (innerExtractor.resultSize() > 0);
     if (!outerExtractor.hasNext() || (outerExtractor.hasNullValue() && OP::isNullRejecting()) ) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
     }

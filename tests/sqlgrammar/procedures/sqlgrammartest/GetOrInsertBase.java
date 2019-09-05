@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,7 +57,7 @@ public class GetOrInsertBase extends VoltProcedure {
         // and related values
         voltQueueSQL(insertQuery,
                 id, id/10, id*10, id*100, id*1000, id*1.1, id*10.1,
-                "abc"+id, "ABC"+id, "XYZ"+id, "{jsonValue:"+id+"}",
+                "abc"+id, "ABC"+id, "XYZ"+id, "xyz"+id, "{jsonValue:"+id+"}",
                 null, null,
                 null, null,
                 null, null, null, null);

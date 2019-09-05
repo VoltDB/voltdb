@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,30 +17,13 @@
 
 package org.voltdb.utils;
 
-import org.voltcore.utils.DeferredSerialization;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.zip.CRC32;
 
 public class PBDUtils {
-    public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
-    {
-        int written = 0;
-        try {
-            final int objSizePosition = mbuf.position();
-            mbuf.position(mbuf.position() + PBDSegment.OBJECT_HEADER_BYTES);
-            final int objStartPosition = mbuf.position();
-            ds.serialize(mbuf);
-            written = mbuf.position() - objStartPosition;
-            mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, PBDSegment.NO_FLAGS);
-        } finally {
-            ds.cancel();
-        }
-        return written;
-    }
 
     public static void writeBuffer(FileChannel fc, ByteBuffer buf, int startPos) throws IOException
     {
@@ -61,5 +44,24 @@ public class PBDUtils {
             pos += read;
         }
         buf.flip();
+    }
+
+    public static int calculateEntryCrc(CRC32 crc, ByteBuffer destBuf, int entryId, char flags) {
+        crc.reset();
+        crc.update(destBuf.remaining());
+        crc.update(entryId);
+        crc.update(flags);
+        crc.update(destBuf);
+        // the checksum here is really an unsigned int, store integer to save 4 bytes
+        return (int) crc.getValue();
+    }
+
+    public static void writeEntryHeader(CRC32 crc, ByteBuffer headerBuf,
+            ByteBuffer destBuf, int entryId, char flag) {
+        int length = destBuf.remaining();
+        headerBuf.putInt(calculateEntryCrc(crc, destBuf, entryId, flag));
+        headerBuf.putInt(length);
+        headerBuf.putInt(entryId);
+        headerBuf.putChar(flag);
     }
 }

@@ -4,12 +4,7 @@
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
 
---- Define "place-holders" used in the queries below
-{_optionaloffset |= ""}
-{_optionaloffset |= "OFFSET 2"}
-{_optionallimitoffset |= ""}
-{_optionallimitoffset |= "LIMIT 4 _optionaloffset"}
-
+--- Define "place-holders" used in some of the queries below
 {_optionalorderbyidlimitoffset |= ""}
 {_optionalorderbyidlimitoffset |= "LIMIT 1000"}
 {_optionalorderbyidlimitoffset |= "ORDER BY @idcol _sortorder _optionallimitoffset"}

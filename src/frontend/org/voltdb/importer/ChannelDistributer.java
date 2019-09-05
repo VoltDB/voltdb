@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -65,7 +65,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Preconditions;
@@ -373,7 +372,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         ImmutableSortedSet.Builder<ChannelSpec> sbldr = null;
         NavigableSet<ChannelSpec> prev = null;
         SetData setter = null;
-
+        NavigableSet<ChannelSpec> masterList = null;
         // retry writes when merging with stale data
         do {
             prev = m_channels.get(stamp);
@@ -388,13 +387,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
             byte [] data = null;
             try {
-                data = asHostData(sbldr.build());
+                masterList = sbldr.build();
+                data = asHostData(masterList);
             } catch (JSONException|IllegalArgumentException e) {
                 throw loggedDistributerException(e, "failed to serialize the registration as json");
             }
 
             setter = new SetData(MASTER_DN, stamp[0], data);
         } while (setter.getCallbackCode() == Code.BADVERSION);
+
+        //synch master channel list after channel registrations.
+        int [] sstamp = new int[]{0};
+        prev = m_channels.get(sstamp);
+        m_channels.compareAndSet(prev, masterList, sstamp[0], stamp[0]);
 
         setter.getStat();
     }
@@ -408,11 +413,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
         Preconditions.checkArgument(
                 importer != null && !importer.trim().isEmpty(),
                 "importer is null or empty"
-                );
-        Preconditions.checkArgument(
-                !m_unregistered.getReference().contains(importer),
-                "cannot re-register importer %s as it was already unregistered",
-                importer
                 );
         callback = checkNotNull(callback, "callback is null");
 
@@ -572,7 +572,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             } catch (Exception callbackException) {
                 throw loggedDistributerException(
                         callbackException,
-                        "failed to invoke the onChange() calback for importer %s",
+                        "failed to invoke the onChange() callback for importer %s",
                         assignment.getImporter()
                         );
             }
@@ -597,7 +597,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         } catch (Exception callbackException) {
             fault = Optional.of(loggedDistributerException(
                     callbackException,
-                    "failed to invoke the onClusterStateChange() calback for importer %s",
+                    "failed to invoke the onClusterStateChange() callback for importer %s",
                     e.getKey()
                     ));
         }
@@ -762,21 +762,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * @return a string tag that summarizes the zk versions of opmode and catalog
      */
     public String getClusterTag() {
-        ClusterTagCallback forCatalog = new ClusterTagCallback();
         ClusterTagCallback forOpMode = new ClusterTagCallback();
-
-        m_zk.exists(VoltZK.catalogbytes, false, forCatalog, null);
         m_zk.exists(VoltZK.operationMode, false, forOpMode, null);
-
-        Stat catalogStat = forCatalog.getStat();
         Stat opModeStat = forOpMode.getStat();
-
-        StringBuilder sb = new StringBuilder(16)
-                .append('c')
-                .append(catalogStat != null ? catalogStat.getVersion() : 0)
-                .append("_o")
-                .append(opModeStat != null ? opModeStat.getVersion() : 0);
-        return sb.toString().intern();
+        return String.valueOf((opModeStat != null ? opModeStat.getVersion() : 0));
     }
 
     /**

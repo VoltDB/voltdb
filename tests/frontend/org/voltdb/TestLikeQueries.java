@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,34 +24,31 @@
 package org.voltdb;
 
 import java.io.IOException;
-
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
+import junit.framework.TestCase;
+
 public class TestLikeQueries extends TestCase {
 
-    static class LikeTest
-    {
+    static class LikeTest {
         String pattern;
         int matches;
         boolean crashes;
         boolean addNot = false;
         String escape  = null;
 
-        public LikeTest(String pattern, int matches) {
+        LikeTest(String pattern, int matches) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = false;
         }
 
-        public LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
+        LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = crashes;
@@ -62,39 +59,32 @@ public class TestLikeQueries extends TestCase {
         public String getClause() {
             String not = (this.addNot ? "NOT " : "");
             String escape = (this.escape != null ? String.format(" ESCAPE '%s'", this.escape) : "");
-            String clause = String.format("%sLIKE '%s'%s", not, this.pattern, escape);
-            return clause;
+            return String.format("%sLIKE '%s'%s", not, this.pattern, escape);
         }
     }
 
     static class NotLikeTest extends LikeTest {
-        public NotLikeTest(String pattern, int matches) {
+        NotLikeTest(String pattern, int matches) {
             super(pattern, matches, false, true, null);
         }
     }
 
     static class EscapeLikeTest extends LikeTest {
-        public EscapeLikeTest(String pattern, int matches, String escape) {
+        EscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, false, false, escape);
         }
     }
 
-    static class UnsupportedLikeTest extends LikeTest {
-        public UnsupportedLikeTest(String pattern, int matches) {
-            super(pattern, matches, true, false, null);
-        }
-    }
-
     static class UnsupportedEscapeLikeTest extends LikeTest {
-        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
+        UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, true, false, escape);
         }
     }
 
     static class LikeTestData {
         public final String val;
-        public final String pat;
-        public LikeTestData(String val, String pat) {
+        final String pat;
+        LikeTestData(String val, String pat) {
             this.val = val;
             this.pat = pat;
         }
@@ -114,6 +104,7 @@ public class TestLikeQueries extends TestCase {
             new LikeTestData("âxxxéyy", "âxxx%"),
             new LikeTestData("â🀲x一xxéyyԱ", "â🀲x一%"),
             new LikeTestData("â🀲x", "â🀲%"),
+            new LikeTestData("ENG-14485", "ENG-14485%%"),
         };
 
     static final LikeTest[] tests = new LikeTest[] {
@@ -137,32 +128,39 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("â🀲x_xxéyyԱ", 1),
             new LikeTest("â🀲x一xxéyy_", 1),
             new LikeTest("â🀲x一xéyyԱ", 0),
+            // ENG-14485 handle two or more consecutive '%' characters
+            new LikeTest("ENG-14485%%%", 1),
+            new LikeTest("%%ENG-14485", 1),
+            new LikeTest("EN%%G-14485", 1),
+            new LikeTest("ENG-144__%%", 1),
+            new LikeTest("%%%", rowData.length),
+
             new NotLikeTest("aaa%", rowData.length - 1),
             new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
             new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
-            new EscapeLikeTest("aaa", 0, "|")
+            new EscapeLikeTest("aaa", 0, "|"),
+            new EscapeLikeTest("abccccccccc%", 1, "c"), // User can choose to confuse himself
     };
 
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
             new LikeTest("â_x一xxéyyԱ", 1),
-            // Patterns that fail (unsupported until we fix the parser)
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };
 
     public static class LikeSuite {
-        public void doTests(Client client, boolean forHSQLcomparison) throws IOException, NoConnectionsException, ProcCallException {
+        public void doTests(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             loadForTests(client);
-            if (forHSQLcomparison == false) {
+            if (! forHSQLcomparison) {
                 doViaStoredProc(client);
             }
             doViaAdHoc(client, forHSQLcomparison);
         }
 
-        private void loadForTests(Client client) throws IOException, NoConnectionsException, ProcCallException {
+        private void loadForTests(Client client) throws IOException, ProcCallException {
             int id = 0;
             for (LikeTestData data : rowData) {
                 id++;
@@ -173,7 +171,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        protected void doViaStoredProc(Client client) throws IOException, NoConnectionsException {
+        private void doViaStoredProc(Client client) throws IOException {
             // Tests based on LikeTest list
             for (LikeTest test : tests) {
                 doTestViaStoredProc(client, test);
@@ -183,7 +181,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doViaAdHoc(Client client, boolean forHSQLcomparison) throws IOException, NoConnectionsException, ProcCallException {
+        private void doViaAdHoc(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             // Test parameter values used as like expression
             for (LikeTest test : tests) {
                 doTestViaAdHoc(client, test);
@@ -215,7 +213,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doTestViaStoredProc(Client client, LikeTest test) throws IOException, NoConnectionsException {
+        private void doTestViaStoredProc(Client client, LikeTest test) throws IOException {
             String procName = null;
             if (test.getClass() == LikeTest.class) {
                 procName = "SelectLike";
@@ -241,7 +239,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doTestViaAdHoc(Client client, LikeTest test) throws IOException, NoConnectionsException {
+        private void doTestViaAdHoc(Client client, LikeTest test) throws IOException {
             String clause = test.getClause();
             String query = String.format("select * from strings where val %s", clause);
             System.out.printf("LIKE clause \"%s\"\n", clause);
@@ -254,7 +252,7 @@ public class TestLikeQueries extends TestCase {
             } catch (ProcCallException e) {
                 System.out.printf("LIKE clause \"%s\" failed\n", clause);
                 System.out.println(e.toString());
-                assertTrue("This failure was unexpected", test.crashes);
+                assertTrue("This failure was unexpected on " + query, test.crashes);
                 System.out.println("(This failure was expected)");
             }
         }
@@ -268,7 +266,7 @@ public class TestLikeQueries extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("STRINGS", "ID");
-        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
+        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);");
         builder.addStmtProcedure("SelectLike", "select * from strings where  val like ?;");
         builder.addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
@@ -294,16 +292,11 @@ public class TestLikeQueries extends TestCase {
         }
         finally {
             if (client != null) client.close();
-            client = null;
 
             if (localServer != null) {
                 localServer.shutdown();
                 localServer.join();
             }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
         }
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -178,9 +178,7 @@ public class InitiatorLeaderMonitor {
 
     private void processInitiatorLeader(int partition, ChildrenCallback cb)
     throws KeeperException, InterruptedException {
-        Object[] result = cb.get();
-        @SuppressWarnings("unchecked")
-        List<String> children = (List<String>) result[3];
+        List<String> children = cb.get();
         if (!children.isEmpty()) {
             Collections.sort(children);
             String leader = children.get(0);

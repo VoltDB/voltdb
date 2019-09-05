@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class, BufferArrayProc.class,
+        VariableBatchSizeMP.class, LastBatchLie.class, BufferArrayProc.class,
         CurrentTimestampProcedure.class
     };
 
@@ -176,7 +176,9 @@ public class TestProcedureAPISuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestProcedureAPISuite.class.getResource("procedureapisuite-ddl.sql"));
         project.addPartitionInfo("P1", "ID");
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(PROCEDURES);
+        project.addProcedure(VariableBatchSizeSP.class, "P1.ID:0");
+
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend

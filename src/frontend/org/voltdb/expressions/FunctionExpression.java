@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,6 +90,11 @@ public class FunctionExpression extends AbstractExpression {
     public FunctionExpression() {
         super();
         setExpressionType(ExpressionType.FUNCTION);
+    }
+
+    public FunctionExpression(String name, String impliedArgs, int id) {
+        this();
+        setAttributes(name, impliedArgs, id);
     }
 
     public void setAttributes(String name, String impliedArgument, int id) {

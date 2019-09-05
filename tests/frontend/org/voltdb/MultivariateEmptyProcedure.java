@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,13 +25,6 @@ package org.voltdb;
 
 import java.util.Date;
 
-import org.voltdb.VoltTable;
-import org.voltdb.ProcInfo;
-
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class MultivariateEmptyProcedure {
     public static VoltTable[] run(long c_id, long c_d_id, long c_w_id,
             String c_first, String c_middle, String c_last,

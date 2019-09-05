@@ -20,3 +20,5 @@ CREATE PROCEDURE FROM class voltkvqa.procedures.Initialize;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures.Get;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures_withexport.Put;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures.Remove;
+CREATE PROCEDURE FROM class voltkvqa.procedures.GetMp;
+CREATE PROCEDURE FROM class voltkvqa.procedures.PutMp;

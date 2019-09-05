@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,10 +43,11 @@ public class ExportMatchers {
     public static final Matcher<VoltMessage> ackMbxMessageIs(
             final int partitionId,
             final String signature,
-            final long uso) {
+            final long seqNo,
+            final long generationId) {
         return new TypeSafeMatcher<VoltMessage>() {
             Matcher<BinaryPayloadMessage> payloadMatcher =
-                    ackPayloadIs(partitionId, signature, uso);
+                    ackPayloadIs(partitionId, signature, seqNo, generationId);
             @Override
             public void describeTo(Description d) {
                 d.appendDescriptionOf(payloadMatcher);
@@ -61,17 +62,19 @@ public class ExportMatchers {
     public static final Matcher<BinaryPayloadMessage> ackPayloadIs(
             final int partitionId,
             final String signature,
-            final long uso) {
+            final long seqNo,
+            final long generationId) {
 
         return new TypeSafeMatcher<BinaryPayloadMessage>() {
             Matcher<AckPayloadMessage> payloadMatcher =
-                    ackMessageIs(partitionId, signature, uso);
+                    ackMessageIs(partitionId, signature, seqNo, generationId);
             @Override
             public void describeTo(Description d) {
                 d.appendText("BinaryPayloadMessage [ partitionId: ")
-                .appendValue(partitionId).appendText(", uso: ")
-                .appendValue(uso).appendText(", signature: ")
-                .appendValue(signature).appendText("]");
+                .appendValue(partitionId).appendText(", seqNo: ")
+                .appendValue(seqNo).appendText(", signature: ")
+                .appendValue(signature).appendText(", generationId: ")
+                .appendValue(generationId).appendText("]");
             }
             @Override
             protected boolean matchesSafely(BinaryPayloadMessage p) {
@@ -90,21 +93,24 @@ public class ExportMatchers {
     static final Matcher<AckPayloadMessage> ackMessageIs(
             final int partitionId,
             final String signature,
-            final long uso) {
+            final long seqNo,
+            final long generationId) {
 
         return new TypeSafeMatcher<AckPayloadMessage>() {
             @Override
             public void describeTo(Description d) {
                 d.appendText("AckPayloadMessage [ partitionId: ")
-                .appendValue(partitionId).appendText(", uso: ")
-                .appendValue(uso).appendText(", signature: ")
-                .appendValue(signature).appendText("]");
+                .appendValue(partitionId).appendText(", seqNo: ")
+                .appendValue(seqNo).appendText(", signature: ")
+                .appendValue(signature).appendText(", generationId: ")
+                .appendValue(generationId).appendText("]");
             }
             @Override
             protected boolean matchesSafely(AckPayloadMessage m) {
                 return equalTo(partitionId).matches(m.getPartitionId())
                         && equalTo(signature).matches(m.getSignature())
-                        && equalTo(uso).matches(m.getUso());
+                        && equalTo(seqNo).matches(m.getSequenceNumber())
+                        && equalTo(generationId).matches((m.getGenerationId()));
             }
         };
     }
@@ -112,10 +118,12 @@ public class ExportMatchers {
     static class AckPayloadMessage {
         int partitionId;
         String signature;
-        long uso;
+        long seqNo;
+        long generationId;
 
         AckPayloadMessage(BinaryPayloadMessage p) {
             ByteBuffer buf = ByteBuffer.wrap(p.m_payload);
+            buf.get(); // skip message type
 
             partitionId = buf.getInt();
 
@@ -124,16 +132,18 @@ public class ExportMatchers {
             buf.get(pSignatureBytes);
             signature = new String( pSignatureBytes, Constants.UTF8ENCODING);
 
-            uso = buf.getLong();
+            seqNo = buf.getLong();
+            generationId = buf.getLong();
         }
 
-        AckPayloadMessage(int partitionId, String signature, long uso) {
+        AckPayloadMessage(int partitionId, String signature, long seqNo, long generationId) {
             Preconditions.checkArgument(signature != null && ! signature.trim().isEmpty());
-            Preconditions.checkArgument(uso >= 0);
+            Preconditions.checkArgument(seqNo >= 0);
 
             this.partitionId = partitionId;
             this.signature = signature;
-            this.uso = uso;
+            this.seqNo = seqNo;
+            this.generationId = generationId;
         }
 
         int getPartitionId() {
@@ -144,18 +154,24 @@ public class ExportMatchers {
             return signature;
         }
 
-        long getUso() {
-            return uso;
+        long getSequenceNumber() {
+            return seqNo;
+        }
+
+        long getGenerationId() {
+            return generationId;
         }
 
         VoltMessage asVoltMessage() {
             byte [] signatureBytes = signature.getBytes(Constants.UTF8ENCODING);
-            ByteBuffer buf = ByteBuffer.allocate(18 + signatureBytes.length);
+            final int msgLen = 1 + 4 + 4 + signatureBytes.length + 8 + 8;
+            ByteBuffer buf = ByteBuffer.allocate(msgLen);
+            buf.put((byte)ExportManager.RELEASE_BUFFER);
             buf.putInt(partitionId);
             buf.putInt(signatureBytes.length);
             buf.put(signatureBytes);
-            buf.putLong(uso);
-            buf.putShort((short )0);
+            buf.putLong(seqNo);
+            buf.putLong(generationId);
 
             return new BinaryPayloadMessage(new byte[0], buf.array());
         }
@@ -167,7 +183,8 @@ public class ExportMatchers {
             result = prime * result + partitionId;
             result = prime * result
                     + ((signature == null) ? 0 : signature.hashCode());
-            result = prime * result + (int) (uso ^ (uso >>> 32));
+            result = prime * result + (int) (seqNo ^ (seqNo >>> 32));
+            result = prime * result + (int) (generationId ^ (generationId >>> 32));
             return result;
         }
 
@@ -187,7 +204,9 @@ public class ExportMatchers {
                     return false;
             } else if (!signature.equals(other.signature))
                 return false;
-            if (uso != other.uso)
+            if (seqNo != other.seqNo)
+                return false;
+            if (generationId != other.generationId)
                 return false;
             return true;
         }
@@ -195,7 +214,8 @@ public class ExportMatchers {
         @Override
         public String toString() {
             return "AckPayloadMessage [partitionId=" + partitionId
-                    + ", signature=" + signature + ", uso=" + uso + "]";
+                    + ", signature=" + signature + ", seqNo=" + seqNo
+                    + ", generationId=" + generationId + "]";
         }
     }
 }

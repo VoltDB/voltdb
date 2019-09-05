@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,22 @@
 namespace voltdb {
 class UndoQuantumReleaseInterest {
 public:
+    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1) {}
     virtual void notifyQuantumRelease() = 0;
     virtual ~UndoQuantumReleaseInterest() {}
+
+    inline bool isNewReleaseInterest(int64_t currentUndoToken) {
+        if (m_lastSeenUndoToken == currentUndoToken) {
+            return false;
+        }
+        else {
+            m_lastSeenUndoToken = currentUndoToken;
+            return true;
+        }
+    }
+    inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
+private:
+    int64_t m_lastSeenUndoToken;
 };
 }
 

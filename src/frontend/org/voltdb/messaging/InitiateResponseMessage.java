@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private boolean m_commit;
     private boolean m_recovering;
     private boolean m_readOnly;
+    private boolean m_mpFragmentSent = false;   // Needed to correctly advance the truncation handle
     private ClientResponseImpl m_response;
 
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
@@ -56,7 +57,12 @@ public class InitiateResponseMessage extends VoltMessage {
 
     //The flag used for MigratePartitionLeader operation, indicating that the task was created
     //when the site was leader partition
-    boolean m_isForOldLeader = false;
+    boolean m_executedOnPreviousLeader = false;
+    int m_hashMismatchPos = -1;
+
+
+    // No need to serialize it
+    public boolean m_isFromNonRestartableSysproc = false;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -218,8 +224,21 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
+    public void setMismatchPos(int pos) {
+        m_hashMismatchPos = pos;
+    }
+
+
     public boolean isReadOnly() {
         return m_readOnly;
+    }
+
+    public void setMpFragmentSent(boolean fragmentSent) {
+        m_mpFragmentSent = fragmentSent;
+    }
+
+    public boolean haveSentMpFragment() {
+        return m_mpFragmentSent;
     }
 
     @Override
@@ -235,7 +254,8 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // read only
             + 1 // node recovering indication
             + 1 // mispartitioned invocation
-            + 1 // createdFromLeader
+            + 1 // for m_executedOnPreviousLeader
+            + 1 // MP fragment was sent to SPIs (used for repair log truncation)
             + m_response.getSerializedSize();
 
         if (m_mispartitioned || isMisrouted()) {
@@ -261,7 +281,8 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
-        buf.put((byte) (m_isForOldLeader == true ? 1 : 0));
+        buf.put((byte) (m_executedOnPreviousLeader == true ? 1 : 0));
+        buf.put((byte) (m_mpFragmentSent  == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         if (m_mispartitioned || isMisrouted()) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
@@ -285,7 +306,8 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
-        m_isForOldLeader = buf.get() == 1;
+        m_executedOnPreviousLeader = buf.get() == 1;
+        m_mpFragmentSent = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
@@ -320,7 +342,7 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  ROLLBACK/ABORT, ");
         int[] hashes = m_response.getHashes();
         if (hashes != null) {
-            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes));
+            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes, m_hashMismatchPos));
         }
         sb.append("\n CLIENT RESPONSE: \n");
         if (m_response == null) {
@@ -328,18 +350,18 @@ public class InitiateResponseMessage extends VoltMessage {
             // TestSpSchedulerDedupe
             sb.append( "NULL" );
         } else {
-            sb.append(m_response.toJSONString());
+            sb.append(m_response.toStatusJSONString());
         }
 
         return sb.toString();
     }
 
-    public void setForOldLeader(boolean forOldLeader) {
-        m_isForOldLeader = forOldLeader;
+    public void setExecutedOnPreviousLeader(boolean forOldLeader) {
+        m_executedOnPreviousLeader = forOldLeader;
     }
 
-    public boolean isForOldLeader() {
-        return m_isForOldLeader;
+    public boolean isExecutedOnPreviousLeader() {
+        return m_executedOnPreviousLeader;
     }
 
     @Override

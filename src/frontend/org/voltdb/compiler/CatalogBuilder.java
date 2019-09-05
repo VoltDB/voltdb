@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,13 +26,10 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 
-import org.voltdb.ProcInfoData;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 
@@ -115,7 +112,6 @@ public class CatalogBuilder {
     List<String> m_elAuthGroups;      // authorized groups
 
     PrintStream m_compilerDebugPrintStream = null;
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
 
     private List<String> m_diagnostics;
 
@@ -285,19 +281,6 @@ public class CatalogBuilder {
         m_compilerDebugPrintStream = out;
     }
 
-    /**
-     * Override the procedure annotation with the specified values for a
-     * specified procedure.
-     *
-     * @param procName The name of the procedure to override the annotation.
-     * @param info The values to use instead of the annotation.
-     */
-    public void overrideProcInfoForProcedure(final String procName, final ProcInfoData info) {
-        assert(procName != null);
-        assert(info != null);
-        m_procInfoOverrides.put(procName, info);
-    }
-
     public byte[] compileToBytes() {
         try {
             File jarFile = File.createTempFile("catalogasbytes", ".jar");
@@ -332,7 +315,6 @@ public class CatalogBuilder {
 
         String[] schemaPath = m_schemas.toArray(new String[0]);
 
-        compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }

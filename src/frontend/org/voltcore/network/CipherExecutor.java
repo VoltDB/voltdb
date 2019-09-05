@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,8 +37,8 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.PooledByteBufAllocator;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 
 public enum CipherExecutor {
 
@@ -101,25 +101,29 @@ public enum CipherExecutor {
     }
 
     public void startup() {
-        if (m_active.compareAndSet(false, true)) synchronized(this) {
-            ThreadFactory thrdfct = CoreUtils.getThreadFactory(
-                    name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
-            m_es = MoreExecutors.listeningDecorator(
-                    Executors.newFixedThreadPool(m_threadCount, thrdfct));
+        if (m_active.compareAndSet(false, true)) {
+            synchronized(this) {
+                ThreadFactory thrdfct = CoreUtils.getThreadFactory(
+                        name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
+                m_es = MoreExecutors.listeningDecorator(
+                        Executors.newFixedThreadPool(m_threadCount, thrdfct));
+            }
         }
     }
 
     public void shutdown() {
-        if (m_active.compareAndSet(true, false)) synchronized(this) {
-            ListeningExecutorService es = m_es;
-            if (es != CoreUtils.LISTENINGSAMETHREADEXECUTOR) {
-                m_es = CoreUtils.LISTENINGSAMETHREADEXECUTOR;
-                es.shutdown();
-                try {
-                    es.awaitTermination(365, TimeUnit.DAYS);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(
-                            "Interrupted while waiting for " + name() + " cipher service shutdown",e);
+        if (m_active.compareAndSet(true, false)) {
+            synchronized(this) {
+                ListeningExecutorService es = m_es;
+                if (es != CoreUtils.LISTENINGSAMETHREADEXECUTOR) {
+                    m_es = CoreUtils.LISTENINGSAMETHREADEXECUTOR;
+                    es.shutdown();
+                    try {
+                        es.awaitTermination(365, TimeUnit.DAYS);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(
+                                "Interrupted while waiting for " + name() + " cipher service shutdown",e);
+                    }
                 }
             }
         }
@@ -157,7 +161,8 @@ public enum CipherExecutor {
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
-                        PooledByteBufAllocator.defaultNormalCacheSize());
+                        PooledByteBufAllocator.defaultNormalCacheSize(),
+                        PooledByteBufAllocator.defaultUseCacheForAllThreads());
     }
 
     // Initialization on demand holder (JSR-133)
@@ -171,7 +176,8 @@ public enum CipherExecutor {
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
-                        512);
+                        512,
+                        PooledByteBufAllocator.defaultUseCacheForAllThreads());
     }
 
     public static CipherExecutor valueOf(SSLEngine engn) {
@@ -192,7 +198,9 @@ public enum CipherExecutor {
      * for debugging purposes
      */
     public static final UUID digest(ByteBuf buf, int offset) {
-        if (offset < 0) return null;
+        if (offset < 0) {
+            return null;
+        }
 
         MessageDigest md = null;
         try {
@@ -217,7 +225,9 @@ public enum CipherExecutor {
      * for debugging purposes
      */
     public static final UUID digest(ByteBuffer buf, int offset) {
-        if (offset < 0) return null;
+        if (offset < 0) {
+            return null;
+        }
         MessageDigest md = null;
         try {
             md = MessageDigest.getInstance("MD5");

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="4" kfactor="0" elastic="enabled" schema="catalog" />
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="catalog" />
     <partition-detection enabled="false" />
     <heartbeat timeout="15"/>
     <httpd port="8080">
         <jsonapi enabled="true"/>
     </httpd>
-    <export enabled="true" target="rabbitmq">
-        <configuration>
+    <export>
+        <configuration enabled="true" target="abc" type="rabbitmq">
             <property name="broker.host">kafka1</property>
             <property name="username">test</property>
             <property name="password">test</property>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,14 +24,13 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestExplainCommandSuite extends RegressionSuite {
 
@@ -47,10 +46,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        String[] strs = {"SELECT COUNT(*) FROM T1 order by A_INT", "SELECT COUNT(*) FROM T1 order by A_INT"};
+        String[] strs = {"SELECT COUNT(*) FROM T1", "SELECT COUNT(*) FROM T1"};
 
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString("EXEcution_PlaN");
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
@@ -61,7 +60,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
         //test the index count node
         vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3 where I3 < 100" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX COUNT") );
@@ -69,26 +68,66 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
         //test expression index usage
         vt = client.callProcedure("@Explain", "SELECT * FROM t3 where I3 + I4 < 100" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX SCAN") );
         }
-}
+    }
 
     public void testExplainProc() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
         vt = client.callProcedure("@ExplainProc", "T1.insert" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
-            String sql = vt.getString(0);
-            String plan = vt.getString(1);
-            assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
-            assertTrue( plan.contains( "INSERT into \"T1\"" ));
-            assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
+            String name = vt.getString(0);
+            String sql = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql0", name);
+            assertEquals("INSERT INTO T1 VALUES (?, ?, ?);", sql);
+            assertTrue(plan.contains("INSERT into \"T1\""));
+            assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
         }
+
+        //test stored procedure loaded from Java class
+        vt = client.callProcedure("@ExplainProc", "JavaProcedure").getResults()[0];
+        for (int i = 0; i < 2; i++) {
+            vt.advanceRow();
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            if (i == 0) {
+                assertEquals("insert", name);
+                assertEquals("insert into t4 values(?);", task);
+                assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+                assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+                assertTrue(plan.contains("INSERT into \"T4\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else {
+                assertEquals("select", name);
+                assertEquals("select * from t4 where A>=?;", task);
+                assertTrue(plan.contains("RETURN RESULTS TO STORED PROCEDURE"));
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T4\""));
+            }
+        }
+    }
+
+    public void testExplainView() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test if the error checking is working properly.
+        verifyProcFails(client, "View T does not exist.", "@ExplainView", "T");
+        verifyProcFails(client, "Table T1 is not a view.", "@ExplainView", "T1");
+
+        vt = client.callProcedure("@ExplainView", "v" ).getResults()[0];
+        vt.advanceRow();
+        String task = vt.getString(0);
+        String plan = vt.getString(1);
+        assertEquals("", task);
+        assertEquals("No query plan is being used.", plan);
     }
 
     public void testExplainSingleTableView() throws IOException, ProcCallException {
@@ -206,15 +245,17 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // -2- select * from t1
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
             assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T1\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
             }
         }
@@ -231,8 +272,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -240,7 +283,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
@@ -259,8 +302,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -270,10 +315,74 @@ public class TestExplainCommandSuite extends RegressionSuite {
             } else if (i == 1) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 2) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
+    }
+
+    private void assertExplainOutput(VoltTable result, String[] expectedExplainations) {
+        while (result.advanceRow()) {
+            System.out.println(result);
+            String plan = result.getString("EXEcution_PlaN");
+            for (String expectedExplaination : expectedExplainations) {
+                assertTrue(plan.contains(expectedExplaination));
+            }
+        }
+    }
+
+    public void testExplainCTE() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String RCTE = // recursive test query
+        "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (\n" +
+        "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID = 0\n" +
+        "    UNION ALL\n" +
+        "    SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME\n" +
+        "      FROM EMPLOYEES E JOIN EMP_PATH EP ON E.MANAGER_ID = EP.EMP_ID\n" +
+        ")\n" +
+        "SELECT * FROM EMP_PATH a JOIN EMP_PATH b ON 1=1 WHERE a.LAST_NAME IS NOT NULL;\n";
+        String[] RCTEExplaination = new String[] {
+        "RETURN RESULTS TO STORED PROCEDURE\n" +
+        " NEST LOOP INNER JOIN\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (A)\"\n",
+        // "   filter by (NOT (column#0 IS NULL))\n",
+        "   MATERIALIZE COMMON TABLE \"EMP_PATH\"\n" +
+        "   START WITH SEQUENTIAL SCAN of \"EMPLOYEES\"\n",
+        // "    filter by (column#2 = 0)\n",
+        "   ITERATE UNTIL EMPTY NEST LOOP INNER JOIN\n",
+        // "    filter by (inner-table.column#0 = column#2)\n",
+        "    SEQUENTIAL SCAN of \"EMPLOYEES (E)\"\n" +
+        "    SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (EP)\"\n" +
+        "     only fetch results from the previous iteration\n\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (B)\"\n"};
+
+        String NRCTE = // non-recursive test query
+        "WITH EMP_BASE(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (\n" +
+        "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID = 0\n" +
+        ")\n" +
+        "SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EB.LEVEL+1, EB.PATH || '/' || E.LAST_NAME\n" +
+        "  FROM EMPLOYEES E JOIN EMP_BASE EB ON E.MANAGER_ID = EB.EMP_ID;\n";
+        String[] NRCTEExplaination = new String[] {
+        "RETURN RESULTS TO STORED PROCEDURE\n" +
+        " NEST LOOP INNER JOIN\n",
+        // "  filter by (inner-table.column#0 = column#2)\n",
+        "  SEQUENTIAL SCAN of \"EMPLOYEES (E)\"\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_BASE (EB)\"\n" +
+        "   MATERIALIZE COMMON TABLE \"EMP_BASE\"\n" +
+        "   FROM SEQUENTIAL SCAN of \"EMPLOYEES\"\n"
+        // "    filter by (column#2 = ?1)\n"
+        };
+
+        vt = client.callProcedure("@Explain", RCTE).getResults()[0];
+        assertExplainOutput(vt, RCTEExplaination);
+        vt = client.callProcedure("@Explain", NRCTE).getResults()[0];
+        assertExplainOutput(vt, NRCTEExplaination);
+        vt = client.callProcedure("@ExplainProc", "RCTE").getResults()[0];
+        assertExplainOutput(vt, RCTEExplaination);
+        vt = client.callProcedure("@ExplainProc", "NRCTE").getResults()[0];
+        assertExplainOutput(vt, NRCTEExplaination);
     }
 
     /**

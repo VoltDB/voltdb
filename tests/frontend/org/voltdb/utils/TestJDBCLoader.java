@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,6 +40,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -276,7 +277,7 @@ public class TestJDBCLoader {
 
         // Call validate partitioning to check if we are good.
         VoltTable valTable;
-        valTable = client.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+        valTable = client.callProcedure("@ValidatePartitioning", TheHashinator.getCurrentHashinator().getConfigBytes()).getResults()[0];
         System.out.println("Validate for JBLAH:\n" + valTable);
         while (valTable.advanceRow()) {
             long miscnt = valTable.getLong("MISPARTITIONED_ROWS");

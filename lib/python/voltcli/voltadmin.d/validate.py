@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,8 @@ from voltcli import utility
 
 def validate_partitioning(runner):
     print 'Validating partitioning...'
-    columns = [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_VARBINARY]
-    response = runner.call_proc('@ValidatePartitioning', columns, [1, None])
+    columns = [VOLT.FastSerializer.VOLTTYPE_VARBINARY]
+    response = runner.call_proc('@ValidatePartitioning', columns, [None])
     mispartitioned_tuples = sum([t[4] for t in response.table(0).tuples()])
     total_hashes = response.table(1).tuple_count()
     mismatched_hashes = total_hashes - sum([t[3] for t in response.table(1).tuples()])

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
@@ -50,15 +51,20 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -199,6 +205,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public long getGenerationId() {
+            return m_context.m_genId;
+        }
+
+        @Override
         public SiteTracker getSiteTrackerForSnapshot() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -257,7 +268,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+                boolean undo, byte[] predicates)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -304,7 +316,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
@@ -456,17 +468,15 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName, VoltTable data, LoadTableCaller caller)
+            throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -494,8 +504,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
-            List<UndoAction> undoActions)
+    public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long beginUndoToken,
+            long spHandle, List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -522,7 +532,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -559,9 +569,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId, String tableSignature)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public boolean deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -582,7 +601,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -621,6 +640,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
@@ -646,12 +675,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
@@ -661,18 +695,22 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setProcedureName(String procedureName) {
+    public void setupProcedure(String procedureName) {
         // don't need to do anything here I think?
     }
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        // TODO Auto-generated method stub
-
+    public void completeProcedure() {
+        // don't need to do anything here
     }
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteUniqueId, byte[] logsData) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 
@@ -715,5 +753,31 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return null;
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        throw new RuntimeException("disableExternalStreams should not be called on MpRoSite");
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        throw new RuntimeException("externalStreamsEnabled should not be called on MpRoSite");
+    }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE / MpRoSitePool.MAX_POOL_SIZE;
     }
 }

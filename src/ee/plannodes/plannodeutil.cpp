@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -44,11 +44,9 @@
  */
 
 #include "plannodes/plannodeutil.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
+#include "plannodes/migratenode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"
@@ -57,9 +55,10 @@
 #include "plannodes/materializenode.h"
 #include "plannodes/materializedscanplannode.h"
 #include "plannodes/mergereceivenode.h"
+#include "plannodes/mergejoinnode.h"
+#include "plannodes/migratenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
-#include "plannodes/projectionnode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/receivenode.h"
 #include "plannodes/commontablenode.h"
@@ -70,7 +69,6 @@
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/windowfunctionnode.h"
-#include <sstream>
 
 namespace voltdb {
 namespace plannodeutil {
@@ -79,9 +77,8 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
     VOLT_TRACE("Creating an empty PlanNode of type '%s'", planNodeToString(type).c_str());
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
-        case (voltdb::PLAN_NODE_TYPE_INVALID): {
+        case (voltdb::PLAN_NODE_TYPE_INVALID):
             throwSerializableEEException("INVALID plan node type");
-        }
             break;
         // ------------------------------------------------------------------
         // SeqScan
@@ -132,6 +129,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::NestLoopIndexPlanNode();
             break;
         // ------------------------------------------------------------------
+        // MergeJoin
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MERGEJOIN):
+            ret = new voltdb::MergeJoinPlanNode();
+            break;
+        // ------------------------------------------------------------------
         // Update
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_UPDATE):
@@ -148,6 +151,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_DELETE):
             ret = new voltdb::DeletePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Migrate
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MIGRATE):
+            ret = new voltdb::MigratePlanNode();
             break;
         // ------------------------------------------------------------------
         // SwapTables
@@ -241,13 +250,13 @@ std::string debug(const voltdb::AbstractPlanNode* node) {
     // TODO: This should display the entire plan tree
     // Use this algorithm: http://search.cpan.org/src/ISAACSON/Text-Tree-1.0/lib/Text/Tree.pm
     //
-    assert(node != NULL);
+    vassert(node != NULL);
     std::string spacer = "";
     return (plannodeutil::debug(node, spacer));
 }
 
 std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer) {
-    assert(node);
+    vassert(node);
     std::ostringstream buffer;
     //VOLT_ERROR("%s", node->getId().debug().c_str());
     buffer <<  spacer << "->" << planNodeToString(node->getPlanNodeType());

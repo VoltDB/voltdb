@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,14 +23,15 @@
 
 package org.voltdb.eng1016;
 
-import junit.framework.TestCase;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.TestCase;
 
 public class Runner extends TestCase {
 
@@ -42,13 +43,14 @@ public class Runner extends TestCase {
 
         project.addStmtProcedure("CreateItem",
                                  "insert into items (id, created) values (?,?);",
-                                 "items.id:0");
+                                 new ProcedurePartitionData("items", "id", "0")
+                                 );
         project.addStmtProcedure("GetItems",
                                  "select id, created from items " +
                                  "where created <= ? and id < ? " +
                                  "order by created desc, id desc " +
                                  "limit ?;",
-                                 "items.id:1");
+                                 new ProcedurePartitionData("items", "id", "1"));
 
         project.addPartitionInfo("items", "id");
         boolean success = project.compile(Configuration.getPathToCatalogForTest("poc.jar"));

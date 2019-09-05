@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,8 +43,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     static LocalCluster m_nonEmptyConfig;
     static LocalCluster m_emptyConfig;
     static LocalCluster m_emptyCatalogConfig;
-
-    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
 
     @Override
     public void setUp() throws Exception
@@ -195,7 +193,8 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-            assertEquals(results[0].getRowCount(), 84);
+            // 6 tables with 12 rows each in the result == 72
+            assertEquals(results[0].getRowCount(), 72);
         }
         catch (Exception ex)
         {

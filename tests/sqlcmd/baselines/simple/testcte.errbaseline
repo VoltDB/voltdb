@@ -1,0 +1,53 @@
+============================================================
+Initializing
+============================================================
+Wrong number of input columns - too many or too few.
+------------------------------------------------------------
+Expect this to fail.  Too many output columns specified.
+SQL error while compiling query: Error in "with cte(id, name, left_rent, right_rent) as (
+  select * from ENG13524_one_row
+) select * from cte" - Too many column names in common table expression CTE
+------------------------------------------------------------
+Expect this to fail.  Too many output columns specified.
+SQL error while compiling query: Error in "with recursive cte(id, name, left_rent, right_rent, bumble) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte" - Too many column names in common table expression CTE
+------------------------------------------------------------
+Expect this to fail.  Too few output columns specified.
+SQL error while compiling query: Error in "with cte(id, name, left_rent) as (
+  select * from ENG13524_cte_data
+) select * from cte" - Too few column names in common table expression CTE
+------------------------------------------------------------
+Expect this to fail.  Too few output columns specified.
+SQL error while compiling query: Error in "with recursive cte(id, name, left_rent) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte" - Too few column names in common table expression CTE
+============================================================
+Check for name leaks out of CTE queries.
+------------------------------------------------------------
+This should fail.  The table cte should not be defined.
+SQL error while compiling query: Error in "select * from cte" - object not found: CTE
+------------------------------------------------------------
+This should fail.  The table cte should not be defined.
+SQL error while compiling query: Error in "select * from cte" - object not found: CTE
+------------------------------------------------------------
+This should succeed.  The table cte above should be cleared.
+------------------------------------------------------------
+This should fail.  The table cte should be gone.
+[Ad Hoc DDL Input:1]: DDL Error: "object not found: CTE in statement [drop table cte]"
+============================================================
+Cleaning up.
+Done.
+============================================================

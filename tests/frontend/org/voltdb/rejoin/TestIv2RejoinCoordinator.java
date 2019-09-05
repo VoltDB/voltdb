@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -185,7 +185,7 @@ public class TestIv2RejoinCoordinator {
         hsids.add(1l);
         hsids.add(2l);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3",
-                                              1, null, false);
+                                              null, null, true);
         verifySent(hsids, msg);
 
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VOLTDBNODEABSTRACTEXECUTOR_H
-#define VOLTDBNODEABSTRACTEXECUTOR_H
+#pragma once
 
 #include "common/InterruptException.h"
 #include "common/tabletuple.h"
@@ -52,8 +51,9 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/AbstractTempTable.hpp"
+#include "common/SynchronizedThreadLock.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <vector>
 
 namespace voltdb {
@@ -89,8 +89,7 @@ class AbstractExecutor {
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
     inline const AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
 
-    inline void cleanupTempOutputTable()
-    {
+    inline void cleanupTempOutputTable() {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
             m_tmpOutputTable->deleteAllTempTuples();
@@ -104,14 +103,17 @@ class AbstractExecutor {
     inline bool outputTempTableIsEmpty() const {
         if (m_tmpOutputTable != NULL) {
             return m_tmpOutputTable->activeTupleCount() == 0;
+        } else {
+            return true;
         }
+    }
 
-        return true;
+    inline void disableReplicatedFlag() {
+        m_replicatedTableOperation = false;
     }
 
     // Compares two tuples based on the provided sets of expressions and sort directions
-    struct TupleComparer
-    {
+    struct TupleComparer {
         TupleComparer(const std::vector<AbstractExpression*>& keys,
                   const std::vector<SortDirectionType>& dirs);
 
@@ -127,15 +129,11 @@ class AbstractExecutor {
     virtual std::string debug() const;
 
   protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
-        m_abstractNode = abstractNode;
-        m_tmpOutputTable = NULL;
-        m_engine = engine;
-    }
+    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) :
+        m_abstractNode(abstractNode), m_engine(engine) { }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*,
-                        const ExecutorVector& executorVector) = 0;
+    virtual bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector) = 0;
 
     /** Concrete executor classes implement execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
@@ -150,20 +148,21 @@ class AbstractExecutor {
      * Set up a single-column temporary output table for DML executors that require one to return their counts.
      * Called from p_init.
      */
-    void setDMLCountOutputTable(TempTableLimits* limits);
+    void setDMLCountOutputTable(TempTableLimits const* limits);
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
-    AbstractTempTable* m_tmpOutputTable;
+    AbstractTempTable* m_tmpOutputTable = nullptr;
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
 
+    /** when true, indicates that we should use the SynchronizedThreadLock for any OperationNode */
+    bool m_replicatedTableOperation = false;
 };
 
 
-inline bool AbstractExecutor::execute(const NValueArray& params)
-{
+inline bool AbstractExecutor::execute(const NValueArray& params) {
     AbstractPlanNode *planNode = getPlanNode();
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  planNode->getPlanNodeId());
 
@@ -194,4 +193,3 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 
 }
 
-#endif

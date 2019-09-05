@@ -1,6 +1,8 @@
 -- Drops all the test UDF's (user-defined functions), and removes the class
 -- containing them, in case they were loaded and created previously
 
+file -inlinebatch END_OF_BATCH_DROP_FUNC
+
 DROP FUNCTION add2Tinyint   IF EXISTS;
 DROP FUNCTION add2Smallint  IF EXISTS;
 DROP FUNCTION add2Integer   IF EXISTS;
@@ -64,6 +66,8 @@ DROP FUNCTION btrimBoxed     IF EXISTS;
 DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
+
+END_OF_BATCH_DROP_FUNC
 
 -- Finally, remove the class containing all the test UDF's (user-defined functions)
 remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,11 +24,11 @@ import java.nio.channels.SocketChannel;
 import javax.net.ssl.SSLEngine;
 
 import org.voltcore.network.CipherExecutor;
-import org.voltcore.network.TLSException;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.CompositeByteBuf;
-import io.netty_voltpatches.buffer.Unpooled;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
 
 public class TLSMessagingChannel extends MessagingChannel {
     private final SSLEngine m_engine;
@@ -68,39 +68,29 @@ public class TLSMessagingChannel extends MessagingChannel {
         return sz;
     }
 
+    /**
+     * Reads the specified number of clear bytes and returns a ByteBuffer with the clear bytes.
+     * If <code>numBytes</code> is <code>NOT_AVAILABLE</code>, it expects the first 4 clear bytes to
+     * contain the number of bytes that should be read and reads accordingly.
+     */
     @Override
-    public ByteBuffer readMessage() throws IOException {
+    public ByteBuffer readBytes(int numBytes) throws IOException {
         final int appsz = applicationBufferSize();
         ByteBuf readbuf = m_ce.allocator().ioBuffer(packetBufferSize());
         CompositeByteBuf msgbb = Unpooled.compositeBuffer();
 
         try {
-            ByteBuf clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-            ByteBuffer src, dst;
-            do {
-                readbuf.clear();
-                if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                    return null;
-                }
-                src = readbuf.nioBuffer();
-                dst = clear.nioBuffer();
-            } while (m_decrypter.tlsunwrap(src, dst) == 0);
+            ByteBuf clear = doUnwrap(readbuf, appsz);
 
-            msgbb.addComponent(true, clear.writerIndex(dst.limit()));
-
-            int needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
+            msgbb.addComponent(true, clear);
+            int needed = numBytes;
+            if (numBytes == NOT_AVAILABLE) {
+                needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
+            }
             while (msgbb.readableBytes() < (needed == NOT_AVAILABLE ? 4 : needed)) {
-                clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-                do {
-                    readbuf.clear();
-                    if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                        return null;
-                    }
-                    src = readbuf.nioBuffer();
-                    dst = clear.nioBuffer();
-                } while (m_decrypter.tlsunwrap(src, dst) == 0);
+                clear = doUnwrap(readbuf, appsz);
 
-                msgbb.addComponent(true, clear.writerIndex(dst.limit()));
+                msgbb.addComponent(true, clear);
 
                 if (needed == NOT_AVAILABLE && msgbb.readableBytes() >= 4) {
                     needed = validateLength(msgbb.readInt());
@@ -114,11 +104,29 @@ public class TLSMessagingChannel extends MessagingChannel {
             assert !msgbb.isReadable() : "read from unblocked channel that received multiple messages?";
 
             return (ByteBuffer)retbb.flip();
-
         } finally {
             readbuf.release();
             msgbb.release();
         }
+    }
+
+    private ByteBuf doUnwrap(ByteBuf readbuf, int appsz) throws IOException {
+        PooledByteBufAllocator allocator = m_ce.allocator();
+        ByteBuf clear = allocator.buffer(appsz);
+        ByteBuffer src;
+        do {
+            readbuf.clear();
+            if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
+                return null;
+            }
+            src = readbuf.nioBuffer();
+        } while (!(clear = m_decrypter.tlsunwrap(src, clear, allocator)).isReadable());
+        return clear;
+    }
+
+    @Override
+    public ByteBuffer readMessage() throws IOException {
+        return readBytes(NOT_AVAILABLE);
     }
 
     @Override
@@ -127,38 +135,16 @@ public class TLSMessagingChannel extends MessagingChannel {
             return 0;
         }
 
-        CompositeByteBuf outbuf = Unpooled.compositeBuffer();
-        ByteBuf msg = Unpooled.wrappedBuffer(message);
-        final int needed = CipherExecutor.framesFor(msg.readableBytes());
-        for (int have = 0; have < needed; ++have) {
-            final int slicesz = Math.min(CipherExecutor.FRAME_SIZE, msg.readableBytes());
-            ByteBuf clear = msg.readSlice(slicesz).writerIndex(slicesz);
-            ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());
-            ByteBuffer src = clear.nioBuffer();
-            ByteBuffer dst = encr.nioBuffer();
-            try {
-                m_encrypter.tlswrap(src, dst);
-            } catch (TLSException e) {
-                outbuf.release();
-                encr.release();
-                throw new IOException("failed to encrypt tls frame", e);
-            }
-            assert !src.hasRemaining() : "encryption wrap did not consume the whole source buffer";
-            encr.writerIndex(dst.limit());
-            outbuf.addComponent(true, encr);
-        }
         int bytesWritten = 0;
+        ByteBuf outputBuf = m_encrypter.tlswrap(message, m_ce.allocator());
         try {
-            while (outbuf.isReadable()) {
-                bytesWritten += outbuf.readBytes(m_socketChannel, outbuf.readableBytes());
+            while (outputBuf.isReadable()) {
+                bytesWritten += outputBuf.readBytes(m_socketChannel, outputBuf.readableBytes());
             }
-        } catch (IOException e) {
-            throw e;
         } finally {
-            outbuf.release();
+            outputBuf.release();
         }
 
-        message.position(message.position() + msg.readerIndex());
         return bytesWritten;
     }
 }

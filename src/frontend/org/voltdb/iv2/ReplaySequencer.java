@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -73,8 +73,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  */
 public class ReplaySequencer
 {
-    static final VoltLogger tmLog = new VoltLogger("TM");
-
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
     private class ReplayEntry {
@@ -136,9 +135,9 @@ public class ReplaySequencer
         @Override
         public String toString()
         {
-            return String.format("(SENTINEL UNIQUEID: %d (%s), %d QUEUED MESSAGES, %s)\n%s",
+            return String.format("(SENTINEL UNIQUEID: %d (%s), %d QUEUED MESSAGES, %s)\n    %s",
                                  m_sentinelUniqueId, m_sentinelUniqueId != null ?
-                                         UniqueIdGenerator.toString(m_sentinelUniqueId) : "",
+                                         UniqueIdGenerator.toShortString(m_sentinelUniqueId) : "",
                                  m_queuedMessages.size(),
                                  m_servedFragment ? "SERVED FRAGMENT" : "",
                                  m_firstFragment);
@@ -364,17 +363,18 @@ public class ReplaySequencer
         return true;
     }
 
-    public void dump(long hsId)
+    public void dump(long hsId, StringBuilder sb)
     {
         final String who = CoreUtils.hsIdToString(hsId);
-        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
+        sb.append(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN UNIQUE ID %d (%s), %s%s",
                                  who,
-                                 m_lastPolledFragmentUniqueId, TxnEgo.txnIdToString(m_lastPolledFragmentUniqueId),
-                                 m_lastSeenUniqueId, TxnEgo.txnIdToString(m_lastSeenUniqueId),
+                                 m_lastPolledFragmentUniqueId, UniqueIdGenerator.toShortString(m_lastPolledFragmentUniqueId),
+                                 m_lastSeenUniqueId, UniqueIdGenerator.toShortString(m_lastSeenUniqueId),
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {
-            tmLog.info(String.format("%s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
+            sb.append(String.format("\n    %s: [REPLAY ENTRY] UNIQUE ID:%s (%s), %s",
+                    who, e.getKey(), UniqueIdGenerator.toShortString(e.getKey()), e.getValue()));
         }
     }
 }

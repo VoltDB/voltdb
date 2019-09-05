@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,10 @@ import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -48,6 +51,7 @@ A brief overview of the serialized format:
 
 COLUMN HEADER:
 [int: column header size in bytes (non-inclusive)]
+[byte: table status code]
 [short: num columns]
 [byte: column type] * num columns
 [string: column name] * num columns
@@ -142,12 +146,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
     private int m_memoizedBufferOffset;
 
+    // cache column indexes for column names used for lookup
+    private HashMap<String,Integer> m_columnNameIndexMap;
+
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
     static final String JSON_TYPE_KEY = "type";
     static final String JSON_SCHEMA_KEY = "schema";
     static final String JSON_DATA_KEY = "data";
     static final String JSON_STATUS_KEY = "status";
+
+    // Positions of data in header
+    private static final int POS_COL_COUNT = Integer.SIZE / Byte.SIZE + 1;
+    private static final int POS_COL_TYPES = POS_COL_COUNT + Short.SIZE / Byte.SIZE;
 
     /**
      * <p>Object that represents the name and schema for a {@link VoltTable} column.
@@ -287,6 +298,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             }
             return name.equals(other.name);
         }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{ name=" + name + ", type=" + type + " }";
+        }
     }
 
     /**
@@ -370,7 +386,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         //  so add 4 bytes.
         m_rowStart = m_buffer.getInt(0) + 4;
 
-        m_colCount = m_buffer.getShort(5);
+        m_colCount = m_buffer.getShort(POS_COL_COUNT);
         m_rowCount = m_buffer.getInt(m_rowStart);
         m_buffer.position(m_buffer.limit());
         m_readOnly = readOnly;
@@ -472,8 +488,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
                 m_buffer.putShort((short) columnCount);
 
-                for (int i = 0; i < columnCount; i++)
+                for (int i = 0; i < columnCount; i++) {
                     m_buffer.put(columns[i].type.getValue());
+                }
                 for (int i = 0; i < columnCount; i++) {
                     if (columns[i].name == null) {
                         m_buffer.position(0);
@@ -508,6 +525,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer.position(m_rowStart);
         m_buffer.putInt(0);
         m_rowCount = 0;
+        m_activeRowIndex = INVALID_ROW_INDEX;
         assert(verifyTableInvariants());
     }
 
@@ -522,9 +540,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         Row retval = new Row(m_position);
         retval.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
         retval.m_wasNull = m_wasNull;
-        if (m_offsets != null)
-            for (int i = 0; i < m_colCount; i++)
+        if (m_offsets != null) {
+            for (int i = 0; i < m_colCount; i++) {
                 retval.m_offsets[i] = m_offsets[i];
+            }
+        }
         retval.m_activeRowIndex = m_activeRowIndex;
         return retval;
     }
@@ -584,8 +604,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             Row retval = new Row(m_position);
             retval.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
             retval.m_wasNull = m_wasNull;
-            for (int i = 0; i < m_colCount; i++)
+            for (int i = 0; i < m_colCount; i++) {
                 retval.m_offsets[i] = m_offsets[i];
+            }
             retval.m_activeRowIndex = m_activeRowIndex;
             return retval;
         }
@@ -609,7 +630,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         // just read the bytes for column types from the buffer into an array
         m_schemaString = new byte[m_colCount];
         int pos = m_buffer.position();
-        m_buffer.position(4 + 1 + 2); //headerLength + status code + column count
+        m_buffer.position(POS_COL_TYPES);
         m_buffer.get(m_schemaString);
         m_buffer.position(pos);
         return m_schemaString;
@@ -622,16 +643,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final String getColumnName(int index) {
         assert(verifyTableInvariants());
-        if ((index < 0) || (index >= m_colCount))
+        if ((index < 0) || (index >= m_colCount)) {
             throw new IllegalArgumentException("Not a valid column index.");
+        }
 
         // move to the start of the list of column names
-        // (this could be done faster by just reading the string lengths
-        //  and skipping ahead)
-        int pos = 4 + 1 + 2 + m_colCount;//headerLength + status code + column count + (m_colCount * colTypeByte)
+        int pos = POS_COL_TYPES + m_colCount;
         String name = null;
-        for (int i = 0; i < index; i++)
+        for (int i = 0; i < index; i++) {
             pos += m_buffer.getInt(pos) + 4;
+        }
         name = readString(pos, METADATA_ENCODING);
         assert(name != null);
 
@@ -644,7 +665,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         assert(verifyTableInvariants());
         assert(index < m_colCount);
         // move to the right place
-        VoltType retval = VoltType.get(m_buffer.get(4 + 1 + 2 + index));//headerLength + status code + column count
+        VoltType retval = VoltType.get(m_buffer.get(POS_COL_TYPES + index));
+
         assert(verifyTableInvariants());
         return retval;
     }
@@ -705,16 +727,25 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     @Override
     public final int getColumnIndex(String name) {
-        assert(verifyTableInvariants());
-        for (int i = 0; i < m_colCount; i++) {
-            if (getColumnName(i).equalsIgnoreCase(name))
-                return i;
+
+        if (m_columnNameIndexMap == null) {
+            m_columnNameIndexMap = new HashMap<String, Integer>(m_colCount);
+            for (int i = 0; i < m_colCount; i++) {
+                m_columnNameIndexMap.put(getColumnName(i).toUpperCase(), Integer.valueOf(i));
+            }
         }
-        String msg = "No Column named '" + name + "'. Existing columns are:";
-        for (int i = 0; i < m_colCount; i++) {
-            msg += "[" + i + "]" + getColumnName(i) + ",";
+
+        Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
+
+        if (cachedIndex == null) {
+            String msg = "No Column named '" + name + "'. Existing columns are:";
+            for (int i = 0; i < m_colCount; i++) {
+                msg += "[" + i + "]" + getColumnName(i) + ",";
+            }
+            throw new IllegalArgumentException(msg);
         }
-        throw new IllegalArgumentException(msg);
+
+        return cachedIndex;
     }
 
     /**
@@ -889,20 +920,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 case STRING: {
                     // Accept byte[] and String
                     if (value instanceof byte[]) {
-                        if (((byte[]) value).length > maxColSize)
+                        if (((byte[]) value).length > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
 
                         // bytes MUST be a UTF-8 encoded string.
                         assert(testForUTF8Encoding((byte[]) value));
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                     }
                     else {
-                        if (((String) value).length() > maxColSize)
+                        if (((String) value).length() > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
 
                         writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
                     }
@@ -915,10 +948,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         value = Encoder.hexDecode((String) value);
                     }
                     if (value instanceof byte[]) {
-                        if (((byte[]) value).length > maxColSize)
+                        if (((byte[]) value).length > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                     }
                     else {
@@ -1082,8 +1116,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_buffer.position(pos);
                 expandBuffer();
                 add(row);
+            } else {
+                throw e;
             }
-            else throw e;
         }
         assert(verifyTableInvariants());
     }
@@ -1117,7 +1152,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
             // where does the type bytes start
             // skip rowstart + status code + colcount
-            int typePos = 4 + 1 + 2;
+            int typePos = POS_COL_TYPES;
 
             for (int col = 0; col < m_colCount; col++) {
                 Object value = values[col];
@@ -1173,8 +1208,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             if (m_buffer.limit() - m_buffer.position() < 32) {
                 expandBuffer();
                 addRow(values);
+            } else {
+                throw e;
             }
-            else throw e;
         }
         finally {
             // constrain buffer limit back to the new position
@@ -1185,9 +1221,23 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     private final void expandBuffer() {
+        expandBuffer(0);
+    }
+
+    private final void expandBuffer(int minSize) {
+        int newSize = m_buffer.capacity();
+        do {
+            // keep doubling the newSize until it is larger than minSize
+            newSize <<= 1;
+        } while (newSize < minSize);
+
+        expandBufferTo(newSize);
+    }
+
+    private void expandBufferTo(int newSize) {
         final int end = m_buffer.position();
         assert(end > m_rowStart);
-        final ByteBuffer buf2 = ByteBuffer.allocate(m_buffer.capacity() * 2);
+        final ByteBuffer buf2 = ByteBuffer.allocate(newSize);
         m_buffer.limit(end);
         m_buffer.position(0);
         buf2.put(m_buffer);
@@ -1237,6 +1287,129 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Add all rows from {@code other} into this VoltTable. Both tables must have the exact same schema including column
+     * names.
+     *
+     * @param other {@link VoltTable} to add to this table
+     * @throws IllegalArgumentException if {@code other} is not compatible with this table
+     */
+    public void addTable(VoltTable other) {
+        if (m_readOnly) {
+            throw new IllegalStateException("Table is read-only. Make a copy before changing.");
+        }
+
+        checkHasExactSchema(other);
+
+        // Allow the buffer to grow to max capacity
+        m_buffer.limit(m_buffer.capacity());
+
+        ByteBuffer rawRows = other.getAllRowsRaw();
+        if (m_buffer.remaining() < rawRows.remaining()) {
+            expandBuffer(m_buffer.capacity() - m_buffer.remaining() + rawRows.remaining());
+        }
+        m_buffer.put(rawRows);
+
+        // constrain buffer limit back to the new position
+        m_buffer.limit(m_buffer.position());
+
+        // increment the rowcount in the member var and in the buffer
+        m_rowCount += other.getRowCount();
+        m_buffer.putInt(m_rowStart, m_rowCount);
+    }
+
+    /**
+     * Add all rows from {@code tables} into this VoltTable. All tables must have the exact same schema including column
+     * names.
+     *
+     * @param tables {@link Collection} of {@link VoltTable}s to add to this table
+     * @throws IllegalArgumentException if any table in {@code tables} is not compatible with this table
+     */
+    public void addTables(Collection<VoltTable> tables) {
+        if (m_readOnly) {
+            throw new IllegalStateException("Table is read-only. Make a copy before changing.");
+        }
+
+        try {
+            // Allow the buffer to grow to max capacity
+            m_buffer.limit(m_buffer.capacity());
+
+            Collection<ByteBuffer> rawTables = new ArrayList<>(tables.size());
+            int totalRawSize = 0;
+            int newRowCounts = 0;
+            for (VoltTable table : tables) {
+                if (table == null) {
+                    continue;
+                }
+                checkHasExactSchema(table);
+                ByteBuffer rawTable = table.getAllRowsRaw();
+                rawTables.add(rawTable);
+                totalRawSize += rawTable.remaining();
+                newRowCounts += table.getRowCount();
+            }
+
+            if (m_buffer.remaining() < totalRawSize) {
+                expandBufferTo(m_buffer.position() + totalRawSize);
+            }
+
+            for (ByteBuffer rawTable : rawTables) {
+                m_buffer.put(rawTable);
+            }
+
+            // increment the rowcount in the member var and in the buffer
+            m_rowCount += newRowCounts;
+            m_buffer.putInt(m_rowStart, m_rowCount);
+        } finally {
+            // constrain buffer limit back to the new position
+            m_buffer.limit(m_buffer.position());
+        }
+    }
+
+    private ByteBuffer getAllRowsRaw() {
+        int origPosition = m_buffer.position();
+        int start = m_rowStart + ROW_COUNT_SIZE;
+        try {
+            m_buffer.position(start);
+            return m_buffer.slice();
+        } finally {
+            m_buffer.position(origPosition);
+        }
+    }
+
+    private void checkHasExactSchema(VoltTable other) {
+        if (!hasExactSchema(other)) {
+            StringBuilder sb = new StringBuilder("Could not merge table with schema ");
+            other.getColumnString(sb).append(" into ");
+            throw new IllegalArgumentException(getColumnString(sb).toString());
+        }
+    }
+
+    private boolean hasExactSchema(VoltTable other) {
+        if (getColumnCount() != other.getColumnCount() || m_rowStart != other.m_rowStart) {
+            return false;
+        }
+
+        // Compare header metadata to make sure column types and names are the same
+        ByteBuffer myDup = m_buffer.duplicate();
+        myDup.position(POS_COL_TYPES).limit(m_rowStart);
+        ByteBuffer otherDup = other.m_buffer.duplicate();
+        otherDup.position(POS_COL_TYPES).limit(m_rowStart);
+
+        return myDup.equals(otherDup);
+    }
+
+    private StringBuilder getColumnString(StringBuilder buffer) {
+        short colCount = m_buffer.getShort(5);
+        buffer.append(" column count: ").append(colCount).append('\n');
+        assert(colCount == m_colCount);
+
+        for (int i = 0; i < m_colCount; i++) {
+            buffer.append('(').append(getColumnName(i)).append(':').append(getColumnType(i).name()).append("), ");
+        }
+
+        return buffer;
+    }
+
+    /**
      * Returns a {@link java.lang.String String} representation of this table.
      * Resulting string will contain schema and all data and will be formatted.
      * @return a {@link java.lang.String String} representation of this table.
@@ -1263,14 +1436,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         byte statusCode = m_buffer.get(4);
         buffer.append(" status code: ").append(statusCode);
 
-        short colCount = m_buffer.getShort(5);
-        buffer.append(" column count: ").append(colCount).append("\n");
-        assert(colCount == m_colCount);
-
-        buffer.append(" cols ");
-        for (int i = 0; i < colCount; i++)
-            buffer.append("(").append(getColumnName(i)).append(":").append(getColumnType(i).name()).append("), ");
-        buffer.append("\n");
+        getColumnString(buffer);
 
         buffer.append(" rows -\n");
 
@@ -1285,17 +1451,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 case INTEGER:
                 case BIGINT:
                     long lval = r.getLong(i);
-                    if (r.wasNull())
+                    if (r.wasNull()) {
                         buffer.append("NULL");
-                    else
+                    } else {
                         buffer.append(lval);
+                    }
                     break;
                 case FLOAT:
                     double dval = r.getDouble(i);
-                    if (r.wasNull())
+                    if (r.wasNull()) {
                         buffer.append("NULL");
-                    else
+                    } else {
                         buffer.append(dval);
+                    }
                     break;
                 case TIMESTAMP:
                     TimestampType tstamp = r.getTimestampAsTimestamp(i);
@@ -1596,6 +1764,31 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Get a JSON /api/2.0/ representation of this table.
+     *
+     * @param js {@link JSONStringer} instance to add this table to
+     * @return A JSONStringer containing representation of this table.
+     * @throws JSONException If there was an error generating the JSON
+     */
+    public JSONStringer toJSONStringerV2(JSONStringer js) throws JSONException {
+        // array of row data
+        VoltTableRow row = cloneRow();
+        row.resetRowPosition();
+        js.array();
+        while (row.advanceRow()) {
+            js.object();
+            for (int i = 0; i < getColumnCount(); i++) {
+
+                js.key(getColumnName(i));
+                row.putJSONRep(i, js);
+            }
+            js.endObject();
+        }
+        js.endArray();
+        return js;
+    }
+
+    /**
      * Construct a table from a JSON string. Only parses VoltDB VoltTable JSON format.
      *
      * @param json String containing JSON-formatted table data.
@@ -1640,8 +1833,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             Object[] row = new Object[jsonRow.length()];
             for (int j = 0; j < jsonRow.length(); j++) {
                 row[j] = jsonRow.get(j);
-                if (row[j] == JSONObject.NULL)
+                if (row[j] == JSONObject.NULL) {
                     row[j] = null;
+                }
                 VoltType type = columns[j].type;
 
                 // convert strings to numbers
@@ -1659,14 +1853,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         break;
                     case DECIMAL:
                         String decVal;
-                        if (row[j] instanceof String)
+                        if (row[j] instanceof String) {
                             decVal = (String) row[j];
-                        else
+                        } else {
                             decVal = row[j].toString();
-                        if (decVal.compareToIgnoreCase("NULL") == 0)
+                        }
+                        if (decVal.compareToIgnoreCase("NULL") == 0) {
                             row[j] = null;
-                        else
+                        } else {
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
+                        }
                         break;
                     case FLOAT:
                         if (row[j] instanceof String) {
@@ -1741,6 +1937,37 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         // TODO(evanj): When overriding equals, we should also override hashCode. I don't want to
         // implement this right now, since VoltTables should never be used as hash keys anyway.
         throw new UnsupportedOperationException("unimplemented");
+    }
+
+    /**
+     * Non-public method to duplicate a table.
+     * It's possible this might be useful to end-users of VoltDB, but we should
+     * talk about naming and semantics first, don't just make this public.
+     */
+    VoltTable semiDeepCopy() {
+        assert(verifyTableInvariants());
+        // share the immutable metadata if it's present for tests
+        final VoltTable cloned = new VoltTable(m_extraMetadata);
+        cloned.m_colCount = m_colCount;
+        cloned.m_rowCount = m_rowCount;
+        cloned.m_rowStart = m_rowStart;
+
+        cloned.m_buffer = m_buffer.duplicate();
+        cloned.m_activeRowIndex = m_activeRowIndex;
+        cloned.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
+        cloned.m_memoizedBufferOffset = m_memoizedBufferOffset;
+        cloned.m_memoizedRowOffset = m_memoizedRowOffset;
+        cloned.m_offsets = m_offsets == null ? null : m_offsets.clone();
+        cloned.m_position = m_position;
+        cloned.m_schemaString = m_schemaString == null ? null : m_schemaString.clone();
+        cloned.m_wasNull = m_wasNull;
+
+        // make the new table read only
+        cloned.m_readOnly = true;
+
+        assert(verifyTableInvariants());
+        assert(cloned.verifyTableInvariants());
+        return cloned;
     }
 
     /**
@@ -1834,7 +2061,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         assert(m_colCount > 0);
         assert(m_rowStart > 0);
         // minimum reasonable table size
-        final int minsize = 4 + 1 + 2 + 1 + 4 + 4;
+        final int minsize = POS_COL_TYPES + 1 + 4 + 4;
         assert(m_buffer.capacity() >= minsize);
         assert(m_buffer.limit() >= minsize);
         if (m_buffer.position() < minsize) {
@@ -1843,7 +2070,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         }
 
         int rowStart = m_buffer.getInt(0) + 4;
-        if (rowStart < (4 + 1 + 2 + 1 + 4)) {
+        if (rowStart < (POS_COL_TYPES + 1 + 4)) {
             System.err.printf("rowStart with value %d is smaller than it should be.\n", rowStart);
             return false;
         }

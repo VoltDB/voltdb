@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -908,6 +908,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              */
             jsObj.remove("requestId");
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
             final long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -931,6 +932,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                          * failure/success to the client.
                          */
                         if (isSnapshotInProgressResponse(clientResponse)) {
+                            loggingLog.info("Deferring user snapshot with nonce " + nonce + " until after in-progress snapshot completes");
                             scheduleSnapshotForLater(jsObj.toString(4), requestId, true);
                         } else {
                             ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
@@ -947,6 +949,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
+            loggingLog.info("Initiating user snapshot with nonce " + nonce);
             initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
             return;
         }
@@ -1311,7 +1314,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (m_state == State.STARTUP) {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
-            RateLimitedLogger.tryLogForMessage(System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO, "Blocked in scanning");
+            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO, "Blocked in scanning");
             return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);

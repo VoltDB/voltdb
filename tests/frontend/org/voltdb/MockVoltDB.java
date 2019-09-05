@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -58,6 +59,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
@@ -66,6 +68,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -90,12 +93,14 @@ public class MockVoltDB implements VoltDBInterface
     long m_clusterCreateTime = 0;
     VoltDB.Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
+    private ScheduledThreadPoolExecutor m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);;
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
             new HashMap<>();
     private boolean m_replicationActive = false;
     private CommandLog m_cl = null;
+    private int m_kfactor;
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -120,6 +125,8 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
             obj.put("drInterface", "127.0.0.1");
+            obj.put(VoltZK.drPublicHostProp, "");
+            obj.put(VoltZK.drPublicPortProp, Integer.toString(VoltDB.DISABLED_PORT));
 
             m_localMetadata = obj.toString(4);
 
@@ -493,7 +500,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext catalogUpdate(String diffCommands,
             int expectedCatalogVersion, long genId,
             boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration)
+            boolean hasSchemaChange, boolean requiresNewExportGeneration,  boolean hasSecurityUserChange)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -642,7 +649,11 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {
-        return null;
+        if (delay > 0) {
+            return m_periodicWorkThread.scheduleWithFixedDelay(work, initialDelay, delay, unit);
+        } else {
+            return m_periodicWorkThread.schedule(work, initialDelay, unit);
+        }
     }
 
     @Override
@@ -780,6 +791,58 @@ public class MockVoltDB implements VoltDBInterface
             public boolean secondaryInitialization() {
                 return true;
             }
+
+            @Override
+            public String getSignature() {
+                return null;
+            }
+
+            @Override
+            public String getLicenseType() {
+                return null;
+            }
+
+            @Override
+            public boolean isUnrestricted()
+            {
+                return false;
+            }
+
+            @Override
+            public String getIssuerCompany()
+            {
+                return null;
+            }
+
+            @Override
+            public String getIssuerUrl()
+            {
+                return null;
+            }
+
+            @Override
+            public String getIssuerEmail()
+            {
+                return null;
+            }
+
+            @Override
+            public String getIssuerPhone()
+            {
+                return null;
+            }
+
+            @Override
+            public int getVersion()
+            {
+                return 0;
+            }
+
+            @Override
+            public int getScheme()
+            {
+                return 0;
+            }
         };
     }
 
@@ -797,7 +860,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
-        return null;
+        return m_periodicWorkThread.scheduleWithFixedDelay(work, initialDelay, delay, unit);
     }
 
     @Override
@@ -843,7 +906,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Cartographer getCartograhper() {
+    public Cartographer getCartographer() {
         return null;
     }
 
@@ -856,7 +919,45 @@ public class MockVoltDB implements VoltDBInterface
     public void swapTables(String oneTable, String otherTable) {
     }
 
+    @Override
     public HTTPAdminListener getHttpAdminListener() {
+        return null;
+    }
+
+    @Override
+    public long getLowestSiteId() {
+        return 0;
+    }
+
+    @Override
+    public int getLowestPartitionId() {
+        return 0;
+    }
+
+    @Override
+    public int getKFactor() {
+        return m_kfactor;
+    }
+
+    public void setKFactor(int kfactor) {
+        m_kfactor = kfactor;
+    }
+
+    @Override
+    public boolean isJoining() {return false;}
+
+    @Override
+    public ElasticService getElasticService() {
+        return null;
+    }
+
+    @Override
+    public boolean isClusterComplete() {
+        return true;
+    }
+
+    @Override
+    public TaskManager getTaskManager() {
         return null;
     }
 }

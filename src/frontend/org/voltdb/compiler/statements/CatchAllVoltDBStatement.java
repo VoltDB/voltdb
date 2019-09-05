@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -87,6 +87,26 @@ public class CatchAllVoltDBStatement extends StatementProcessor {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid DR TABLE statement: \"%s\", " +
                     "expected syntax: DR TABLE <table> [DISABLE]",
+                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
+        }
+
+        if (TASK.equals(m_firstProcessor.getCommandPrefix())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE TASK statement: \"%s\", expected syntax: \n\""
+                            + "CREATE TASK <name> "
+                            + "ON SCHEDULE (CRON <exp> | DELAY <interval> <unit> | EVERY <interval> <unit>) "
+                            + "PROCEDURE <procedure> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]"
+                            + "\"\nor\n\""
+                            + "CREATE TASK <name> FROM CLASS <class> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]\"",
+                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
+        }
+
+        if (AGGREGATE.equals(m_firstProcessor.getCommandPrefix())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE AGGREGATE FUNCTION statement: \"%s\", " +
+                    "expected syntax: \"CREATE AGGREGATE FUNCTION <name> FROM CLASS <class-name>\"",
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 

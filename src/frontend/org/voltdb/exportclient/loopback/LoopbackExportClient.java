@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,6 +57,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import org.voltdb.exportclient.ExportRow;
 
 public class LoopbackExportClient extends ExportClientBase {
 
@@ -65,6 +66,7 @@ public class LoopbackExportClient extends ExportClientBase {
     private String m_procedure;
     private String m_failureLog;
     private File m_rejectedDH;
+    private boolean m_skipInternals = true;
 
     public LoopbackExportClient() {
     }
@@ -72,9 +74,13 @@ public class LoopbackExportClient extends ExportClientBase {
     public interface Config extends Accessible {
         final static String PROCEDURE = "procedure";
         final static String FAILURE_LOG_FILE = "failurelogfile";
+        final static String SKIP_INTERNALS = "skipinternals";
 
         @Key(PROCEDURE)
         public String getProcedureName();
+
+        @Key(SKIP_INTERNALS)
+        public String getSkipInternals();
 
         @Key(FAILURE_LOG_FILE)
         public String getFailureLogFile();
@@ -93,6 +99,12 @@ public class LoopbackExportClient extends ExportClientBase {
         Config config = Config.create(props);
         checkArgument(isNotBlank(config.getProcedureName()), "procedure name is not defined");
         m_procedure = config.getProcedureName();
+
+        String skipVal = config.getSkipInternals();
+        if (skipVal != null && !skipVal.isEmpty()) {
+            m_skipInternals = Boolean.parseBoolean(skipVal);
+        }
+
         m_failureLog = config.getFailureLogFile();
         if (m_failureLog != null && m_failureLog.trim().length() > 0) {
             File rejectedDH = new File(m_failureLog);
@@ -147,9 +159,8 @@ public class LoopbackExportClient extends ExportClientBase {
                 m_rejs = Suppliers.memoize(new Supplier<CSVWriter>() {
                     @Override
                     public CSVWriter get() {
-                        String gen = Long.toString(source.m_generation, Character.MAX_RADIX);
                         String fileFN = String.format(
-                                "rejected-%s-%d-%s.tsv", source.tableName, source.partitionId, gen
+                                "rejected-%s-%d.tsv", source.tableName, source.partitionId
                                 );
                         File rejectedFH = new File(m_rejectedDH, fileFN);
                         LOG.warn("writing failed invocations parameters to " + rejectedFH);
@@ -172,22 +183,18 @@ public class LoopbackExportClient extends ExportClientBase {
             CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
             builder
                 .dateFormatter(tmpl)
-                .columnNames(source.columnNames)
-                .columnTypes(source.columnTypes)
-                .skipInternalFields(true)
+                .skipInternalFields(m_skipInternals)
             ;
             m_csvWriterDecoder = builder.build();
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Loopback Export decoder for partition " + source.partitionId
-                    + " table " + source.tableName
-                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Loopback Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
             m_user = getVoltDB().getCatalogContext().authSystem.getImporterUser();
             m_invoker = getVoltDB().getClientInterface().getInternalConnectionHandler();
             m_shouldContinue = (x) -> !m_es.isShutdown();
         }
 
         @Override
-        public void onBlockCompletion() throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             if (m_ctx.invokes > 0) {
                 try {
                     m_ctx.m_done.acquire(m_ctx.invokes);
@@ -217,39 +224,32 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart() throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_ctx = new BlockContext();
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData)
+        public boolean processRow(ExportRow rd)
                 throws RestartBlockException {
             final int bix = m_ctx.recs++;
             if (m_restarted && !m_failed.get(bix)) {
                 return true;
             }
-            ExportRowData rd;
-            try {
-                rd = decodeRow(rowData);
-            } catch (IOException e) {
-                // non restartable structural failure
-                LOG.error("Unable to decode notification", e);
-                return false;
-            }
             if (m_restarted && !m_resubmit.get(bix) && m_rejs != null) {
                 try {
-                    m_csvWriterDecoder.decode(m_rejs.get(),rd.values);
+                    m_csvWriterDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, m_rejs.get(), rd.values);
                 } catch (IOException e) {
                     LOG.error("failed to write failed invocation to rejected file", e);
                     return false;
                 }
                 return true;
             }
+            int firstFieldOffset = m_skipInternals ? INTERNAL_FIELD_COUNT : 0;
             LoopbackCallback cb = m_ctx.createCallback(bix);
             if (m_invoker.callProcedure(m_user, false,
                     BatchTimeoutOverrideType.NO_TIMEOUT,
                     cb, false, m_shouldContinue, m_procedure,
-                    Arrays.copyOfRange(rd.values, 6, rd.values.length))) {
+                    Arrays.copyOfRange(rd.values, firstFieldOffset, rd.values.length))) {
                 ++m_ctx.invokes;
             } else {
                 LOG.error("failed to Invoke procedure: " + m_procedure);

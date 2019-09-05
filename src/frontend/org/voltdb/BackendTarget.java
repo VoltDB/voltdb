@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,15 +33,42 @@ package org.voltdb;
  * tests, where VoltDB results are compared with PostgreSQL results.
  */
 public enum BackendTarget {
-    NATIVE_EE_JNI("jni", false),
-    NATIVE_EE_SPY_JNI("jni_spy", false),
-    NATIVE_EE_IPC("ipc", true),
-    NATIVE_EE_VALGRIND_IPC("valgrind_ipc", true),
-    HSQLDB_BACKEND("hsqldb", false),
-    POSTGRESQL_BACKEND("postgresql", false),
-    POSTGIS_BACKEND("postgis", false),
-    NONE("none", false);
-    private BackendTarget(String display, boolean isIPC) { this.display = display; this.isIPC = isIPC; }
+                   /*      display,        isIPC, isVGABLE, isVG,  isLTT, isDefJNI */
+    NATIVE_EE_JNI(         "jni",          false, true,     false, false, true),
+    NATIVE_EE_LARGE_JNI(   "jni_large",    false, true,     false, true,  true),
+    NATIVE_EE_SPY_JNI(     "jni_spy",      false, false,    false, false, false),
+    NATIVE_EE_IPC(         "ipc",          true,  false,    false, false, false),
+    NATIVE_EE_VALGRIND_IPC("valgrind_ipc", true,  false,    true,  false, false),
+    HSQLDB_BACKEND(        "hsqldb",       false, false,    false, false, false),
+    POSTGRESQL_BACKEND(     "postgresql",  false, false,    false, false, false),
+    POSTGIS_BACKEND(        "postgis",     false, false,    false, false, false),
+    NONE(                   "none",        false, false,    false, false, false);
+
+    private BackendTarget(String display,
+                          boolean isIPC,
+                          boolean isValgrindable,
+                          boolean isValgrindTarget,
+                          boolean isLargeTempTableTarget,
+                          boolean isDefaulJNITarget) {
+        this.display = display;
+        this.isIPC = isIPC;
+        this.isValgrindable = isValgrindable;
+        this.isValgrindTarget = isValgrindTarget;
+        this.isLargeTempTableTarget = isLargeTempTableTarget;
+        this.isDefaultJNITarget = isDefaulJNITarget;
+    }
     public final String display;
     public final boolean isIPC;
+    // True iff this target can be used with Valgrind.
+    // The target need not be a valgrind target, but it's
+    // sensible to convert it to be a valgrind target.
+    public final boolean isValgrindable;
+    // True if this target is actually a valgrind
+    // target.  That is to say, we are going to use
+    // valgrind with this target.
+    public final boolean isValgrindTarget;
+    // True if this target is a large temp table target.
+    public final boolean isLargeTempTableTarget;
+    // True if this is a JNI target with no special engine properties.
+    public final boolean isDefaultJNITarget;
 }

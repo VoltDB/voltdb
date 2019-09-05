@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <export>
-        <configuration enabled="true" stream="abc" type="jdbc">
+        <configuration enabled="true" target="jdbc_target" type="jdbc">
             <property name="jdbcurl">jdbc:vertica://volt15d:5433/Test1</property>
             <property name="jdbcuser">dbadmin</property>
             <property name="skipinternals">true</property>

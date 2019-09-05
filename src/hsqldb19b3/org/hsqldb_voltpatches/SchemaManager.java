@@ -529,6 +529,13 @@ public class SchemaManager {
             return null;
         }
 
+        if (session != null) {
+            Table table = session.getLocalTable(name);
+            if (table != null) {
+                return table;
+            }
+        }
+
         int i = schema.tableList.getIndex(name);
 
         if (i == -1) {

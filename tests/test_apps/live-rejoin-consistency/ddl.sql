@@ -46,13 +46,14 @@ LOAD CLASSES liverejoinconsistency-procs.jar;
 file -inlinebatch END_OF_2ND_BATCH
 
 CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCountFromPtn;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCountFromRep;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getRowFromPtn;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getRowFromRep;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCRCFromPtn;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCRCFromRep;
-CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getNextFromPtn;
+PARAMETER 0
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getCountFromPtn;
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getCountFromRep;
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getRowFromPtn;
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getRowFromRep;
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getCRCFromPtn;
+CREATE PROCEDURE PARTITION ON TABLE JOINER COLUMN ID FROM CLASS liverejoinconsistency.procedures.getCRCFromRep;
+CREATE PROCEDURE PARTITION ON TABLE COUNTERS_PTN COLUMN ID FROM CLASS liverejoinconsistency.procedures.getNextFromPtn;
 CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.MPUpdatePtn;
 CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.MPUpdateRep;
 

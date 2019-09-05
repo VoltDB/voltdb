@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -93,11 +93,13 @@ public class JDBCBenchmark
                     procedureCS.setLong(2, this.wait);
                     try
                     {
-                        procedureCS.executeUpdate();
+                        //procedureCS.executeUpdate();
+                        procedureCS.execute();
                         TrackingResults.incrementAndGet(0);
                     }
                     catch(Exception x)
                     {
+                        x.printStackTrace();
                         TrackingResults.incrementAndGet(1);
                     }
                 }
@@ -126,8 +128,10 @@ public class JDBCBenchmark
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms, ", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
+        System.out.printf("Success/Failures %d/%d\n", TrackingResults.get(0),
+                TrackingResults.get(1));
     }
 
     // Application entry point
@@ -264,9 +268,14 @@ public class JDBCBenchmark
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             try {
-                System.out.print(fullStatsContext.getStatsForProcedure(procedure).toString());
+                //System.out.print(fullStatsContext.getStatsForProcedure(procedure).toString());
+                System.out.print(fullStatsContext.getStats().toString());
             } catch  (Exception e) {
                 e.printStackTrace();
+            }
+            if (TrackingResults.get(0) == 0 ) {
+                System.err.println("ERROR No transactions succeeded");
+                System.exit(1);
             }
             // Dump statistics to a CSV file
             Con.unwrap(IVoltDBConnection.class).saveStatistics(fullStatsContext.getStats(), csv);
@@ -278,8 +287,9 @@ public class JDBCBenchmark
         }
         catch(Exception x)
         {
-            System.out.println("Exception: " + x);
+            System.out.println("ERROR Exception: " + x);
             x.printStackTrace();
+            System.exit(1);
         }
     }
 }

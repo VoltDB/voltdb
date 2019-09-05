@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 VOLTDB_BIN="$(pwd)/../../../bin"
 VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
 VOLTDB_LIB="$VOLTDB_BASE/lib"

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,8 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -33,6 +35,7 @@ import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
+import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -44,11 +47,11 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator extends BaseInitiator implements Promotable
+public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -56,7 +59,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 new MpScheduler(
                     MP_INIT_PID,
                     buddyHSIds,
-                    new SiteTaskerQueue(MP_INIT_PID)),
+                    new SiteTaskerQueue(MP_INIT_PID),
+                    leaderId),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);
@@ -72,18 +76,18 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
-        if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
+        if (backend.isValgrindTarget) {
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
         // Hacky
-        MpScheduler sched = (MpScheduler)m_scheduler;
+        MpScheduler sched = m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
@@ -110,25 +114,36 @@ public class MpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
+            // Look for the previous MPI (if any)
+            int deadMPIHost = Integer.MAX_VALUE;
+            Cartographer cartographer = VoltDB.instance().getCartographer();
+            if (cartographer != null) {
+                Long deadMPIHSId = cartographer.getHSIdForMultiPartitionInitiator();
+                if (deadMPIHSId != null) {
+                    deadMPIHost = CoreUtils.getHostIdFromHSId(deadMPIHSId);
+                }
+            }
             m_term = createTerm(m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
             while (!success) {
-                final RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
+                final RepairAlgo repair = m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(),
+                                deadMPIHost, m_whoami, false);
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                long repairTruncationHandle = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
+                    repairTruncationHandle = res.m_repairTruncationHandle;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid);
+                    ((MpInitiatorMailbox)m_initiatorMailbox).setLeaderState(txnid, repairTruncationHandle);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn
@@ -146,18 +161,23 @@ public class MpInitiator extends BaseInitiator implements Promotable
                                     new DumpMessage());
                             throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
                         }
-                        tmLog.debug(m_whoami + " restarting MP transaction: " + restartTxns.get(0));
-                        m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug(m_whoami + " restarting MP transaction: " + restartTxns.get(0));
+                        }
+                        Iv2InitiateTaskMessage firstMsg = restartTxns.get(0);
+                        assert(firstMsg.getTruncationHandle() == TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+                        m_initiatorMailbox.repairReplicasWith(null, firstMsg);
                     }
                     tmLog.info(m_whoami
-                             + "finished leader promotion. Took "
-                             + (System.currentTimeMillis() - startTime) + " ms.");
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms. Leader ID: "
+                            + m_scheduler.getLeaderId());
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
-                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
-                            m_zkMailboxNode);
+                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(), "MpInitiator", m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+                    TTLManager.instance().scheduleTTLTasks();
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -204,19 +224,22 @@ public class MpInitiator extends BaseInitiator implements Promotable
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE,
                 isReplay, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-        MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateCatalog(diffCmds, context);
+        m_scheduler.updateCatalog(diffCmds, context);
     }
 
     public void updateSettings(CatalogContext context)
     {
         m_executionSite.updateSettings(context);
-        MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateSettings(context);
+        m_scheduler.updateSettings(context);
     }
 
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new MpInitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
     }
 }

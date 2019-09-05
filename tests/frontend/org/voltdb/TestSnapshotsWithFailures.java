@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -61,7 +61,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
     protected static final String TESTNONCE = "testnonce";
     private static final int fillerSize = 515 * 512;
     private static final byte[] fillerBytes = new byte[fillerSize];
-    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
 
     LocalCluster cluster = null;
     Client c = null;
@@ -392,7 +391,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             if (nonce != null) {
                 snapshotNames.add(nonce);
             }
-            SnapshotVerifier.verifySnapshots(directories, snapshotNames, m_expectHashinator);
+            SnapshotVerifier.verifySnapshots(directories, snapshotNames);
             ps.flush();
             String reportString = baos.toString("UTF-8");
             // If headers are bad in the table files, SnapshotVerifier will not report the file as corrupt

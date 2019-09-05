@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,25 +17,23 @@
 
 package org.voltdb.iv2;
 
-import java.lang.InterruptedException;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.SortedSet;
 import java.util.concurrent.ExecutionException;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class MpTerm implements Term
 {
@@ -64,7 +62,7 @@ public class MpTerm implements Term
             HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
             boolean migratePartitionLeaderRequested = false;
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
-                long hsid = e.getValue().m_HSID;
+                long hsid = e.getValue().m_HSId;
                 builder.add(hsid);
                 cacheCopy.put(e.getKey(), hsid);
 
@@ -80,7 +78,8 @@ public class MpTerm implements Term
             }
             m_knownLeaders = updatedLeaders;
 
-            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, migratePartitionLeaderRequested);
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy,
+                    migratePartitionLeaderRequested);
         }
     };
 
@@ -103,7 +102,7 @@ public class MpTerm implements Term
     public void start()
     {
         try {
-            m_leaderCache = new LeaderCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
+            m_leaderCache = new LeaderCache(m_zk, "MpTerm-iv2masters", VoltZK.iv2masters, m_leadersChangeHandler);
             m_leaderCache.start(true);
         }
         catch (ExecutionException ee) {

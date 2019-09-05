@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,10 +24,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -40,13 +39,11 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class MpInitiatorMailbox extends InitiatorMailbox
 {
-    VoltLogger hostLog = new VoltLogger("HOST");
-    VoltLogger tmLog = new VoltLogger("TM");
-
     private final LinkedBlockingQueue<Runnable> m_taskQueue = new LinkedBlockingQueue<Runnable>();
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
     private long m_taskThreadId = 0;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
     private final Thread m_taskThread = new Thread(null,
                     new Runnable() {
                         @Override
@@ -84,17 +81,14 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     "MpInitiator send", 1024 * 128);
 
     @Override
-    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami) {
-        return constructRepairAlgo(survivors, whoami , false);
-    }
-
-    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami, boolean balanceSPI) {
+    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean balanceSPI) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami, balanceSPI);
+                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), deadHost, MpInitiatorMailbox.this,
+                            m_restartSeqGenerator, whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -106,14 +100,13 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo( survivors.get(), this, whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
     }
 
-    @Override
-    public void setLeaderState(final long maxSeenTxnId)
+    public void setLeaderState(final long maxSeenTxnId, final long repairTruncationHandle)
     {
         final CountDownLatch cdl = new CountDownLatch(1);
         m_taskQueue.offer(new Runnable() {
@@ -121,6 +114,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             public void run() {
                 try {
                     setLeaderStateInternal(maxSeenTxnId);
+                    ((MpScheduler)m_scheduler).m_repairLogTruncationHandle = repairTruncationHandle;
+                    ((MpScheduler)m_scheduler).m_repairLogAwaitingTruncate = repairTruncationHandle;
                 } finally {
                     cdl.countDown();
                 }
@@ -196,55 +191,58 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     public MpInitiatorMailbox(int partitionId,
-            Scheduler scheduler,
+            MpScheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
             JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(scheduler.getLeaderId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }
 
-      @Override
-      public void shutdown() throws InterruptedException {
-          m_taskQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  try {
-                      shutdownInternal();
-                  } catch (InterruptedException e) {
-                      tmLog.info("Interrupted during shutdown", e);
-                  }
-              }
-          });
-          m_taskQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  throw new TerminateThreadException();
-              }
-          });
-          m_sendQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  throw new TerminateThreadException();
-              }
-          });
-          m_taskThread.join();
-          m_sendThread.join();
-      }
-
-
     @Override
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
+    public void shutdown() throws InterruptedException {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas, partitionMasters);
+                try {
+                    shutdownInternal();
+                } catch (InterruptedException e) {
+                    tmLog.info("Interrupted during shutdown", e);
+                }
             }
         });
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                throw new TerminateThreadException();
+            }
+        });
+        m_sendQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                throw new TerminateThreadException();
+            }
+        });
+        m_taskThread.join();
+        m_sendThread.join();
     }
 
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
+    @Override
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState) {
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                updateReplicasInternal(replicas, partitionMasters, snapshotTransactionState);
+            }
+        });
+        return new long[0];
+    }
+
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            boolean balanceSPI) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {

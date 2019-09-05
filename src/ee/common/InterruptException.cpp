@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,15 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/InterruptException.h"
-#include "common/SerializableEEException.h"
 #include "common/serializeio.h"
-#include <iostream>
-#include <cassert>
 
 using namespace voltdb;
 
 InterruptException::InterruptException(std::string message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
+    SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
 }
 
 void InterruptException::p_serialize(ReferenceSerializeOutput *output) const {

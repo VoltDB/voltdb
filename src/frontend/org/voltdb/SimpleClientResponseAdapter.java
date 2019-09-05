@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -85,7 +85,6 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final String m_name;
-    public static volatile AtomicLong m_testConnectionIdGenerator;
     private final boolean m_leaveCallback;
     private final SettableFuture<ClientResponseImpl> m_retFuture;
 
@@ -106,11 +105,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
      * @param leaveCallback   Don't remove callbacks when invoking them, they are reused
      */
     public SimpleClientResponseAdapter(long connectionId, String name, boolean leaveCallback) {
-        if (m_testConnectionIdGenerator != null) {
-            m_connectionId = m_testConnectionIdGenerator.incrementAndGet();
-        } else {
-            m_connectionId = connectionId;
-        }
+        m_connectionId = connectionId;
         m_name = name;
         m_leaveCallback = leaveCallback;
         m_retFuture = null;
@@ -176,7 +171,12 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             // in NIOWriteStream.enqueue().
             ByteBuffer buf = null;
             synchronized(this) {
-                buf = ByteBuffer.allocate(ds.getSerializedSize());
+                final int serializedSize = ds.getSerializedSize();
+                if (serializedSize <= 0) {
+                    return;
+                }
+
+                buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
             }
             if (buf == null) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,7 +16,6 @@
  */
 
 package org.voltdb.parser;
-
 
 /**
  * Inherit from this class in order to use the static methods without the class name
@@ -216,6 +215,10 @@ public class SQLPatternFactory
         public static SQLPatternPart integer()
         {
             return new SQLPatternPartElement("\\d+");
+        }
+
+        public static SQLPatternPart ifExisits() {
+            return SPF.optional(SPF.capture("ifExists", SPF.clause(SPF.token("if"), SPF.token("exists"))));
         }
 
         /**

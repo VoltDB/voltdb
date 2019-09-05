@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,25 +45,26 @@
 
 #include "swaptablesexecutor.h"
 
-#include "execution/ExecutorVector.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "plannodes/swaptablesnode.h"
-#include "storage/persistenttable.h"
 
 using namespace std;
 using namespace voltdb;
+int64_t SwapTablesExecutor::s_modifiedTuples;
 
 bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
                                 const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init SwapTable Executor");
-#ifndef NDEBUG
     SwapTablesPlanNode* node = dynamic_cast<SwapTablesPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getTargetTable());
-    assert(node->getOtherTargetTable());
-    assert(node->getInputTableCount() == 0);
+#ifndef NDEBUG
+    vassert(node);
+    vassert(node->getTargetTable());
+    vassert(node->getOtherTargetTable());
+    vassert(node->getInputTableCount() == 0);
 #endif
 
+    m_replicatedTableOperation = static_cast<PersistentTable*>(node->getTargetTable())->isReplicatedTable();
     setDMLCountOutputTable(executorVector.limits());
     return true;
 }
@@ -72,38 +73,60 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     // target tables should be persistent tables
     // update target table references from table delegates
     SwapTablesPlanNode* node = static_cast<SwapTablesPlanNode*>(m_abstractNode);
-    assert(dynamic_cast<SwapTablesPlanNode*>(m_abstractNode));
+    vassert(dynamic_cast<SwapTablesPlanNode*>(m_abstractNode));
     PersistentTable* theTargetTable = static_cast<PersistentTable*>(node->getTargetTable());
-    assert(theTargetTable);
-    assert(theTargetTable == dynamic_cast<PersistentTable*>(node->getTargetTable()));
+    vassert(theTargetTable);
+    vassert(theTargetTable == dynamic_cast<PersistentTable*>(node->getTargetTable()));
     PersistentTable* otherTargetTable = node->getOtherTargetTable();
-    assert(otherTargetTable);
+    vassert(otherTargetTable);
 
     int64_t modified_tuples = 0;
 
     VOLT_TRACE("swap tables %s and %s",
                theTargetTable->name().c_str(),
                otherTargetTable->name().c_str());
-    // count the active tuples in both tables as modified
-    modified_tuples = theTargetTable->visibleTupleCount() +
-            otherTargetTable->visibleTupleCount();
+    {
+        vassert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                m_replicatedTableOperation, m_engine->isLowestSite(),
+                []() { s_modifiedTuples = -1l; });
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // count the active tuples in both tables as modified
+            modified_tuples = theTargetTable->visibleTupleCount() +
+                    otherTargetTable->visibleTupleCount();
 
-    VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
-               " and %s with %d active, %d visible, %d allocated",
-               theTargetTable->name().c_str(),
-               (int)theTargetTable->activeTupleCount(),
-               (int)theTargetTable->visibleTupleCount(),
-               (int)theTargetTable->allocatedTupleCount(),
-               otherTargetTable->name().c_str(),
-               (int)otherTargetTable->activeTupleCount(),
-               (int)otherTargetTable->visibleTupleCount(),
-               (int)otherTargetTable->allocatedTupleCount());
+            VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
+                       " and %s with %d active, %d visible, %d allocated",
+                       theTargetTable->name().c_str(),
+                       (int)theTargetTable->activeTupleCount(),
+                       (int)theTargetTable->visibleTupleCount(),
+                       (int)theTargetTable->allocatedTupleCount(),
+                       otherTargetTable->name().c_str(),
+                       (int)otherTargetTable->activeTupleCount(),
+                       (int)otherTargetTable->visibleTupleCount(),
+                       (int)otherTargetTable->allocatedTupleCount());
 
-    // Swap the table catalog delegates and corresponding indexes and views.
-    theTargetTable->swapTable(otherTargetTable,
-                              node->theIndexes(),
-                              node->otherIndexes());
-
+            // Swap the table catalog delegates and corresponding indexes and views.
+            theTargetTable->swapTable(otherTargetTable,
+                                      node->theIndexes(),
+                                      node->otherIndexes());
+            s_modifiedTuples = modified_tuples;
+        }
+        else {
+            if (s_modifiedTuples == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+                        "Replicated table swap threw an unknown exception on other thread for table %s",
+                        theTargetTable->name().c_str());
+            }
+        }
+    }
+    if (m_replicatedTableOperation) {
+        // Use the static value assigned above to propagate the result to the other engines
+        // that skipped the replicated table work
+        modified_tuples = s_modifiedTuples;
+    }
     TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
     // try to put the tuple into the output table

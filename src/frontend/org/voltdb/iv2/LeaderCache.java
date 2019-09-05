@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -51,20 +50,75 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
 
+    // HSID for test only
+    public static long TEST_LAST_HSID = Long.MAX_VALUE -1;
+    protected final ZooKeeper m_zk;
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    protected final Callback m_cb; // the callback when the cache changes
+    private final String m_whoami; // identify the owner of the leader cache
+
+    // the children of this node are observed.
+    protected final String m_rootNode;
+
+    // All watch processing is run serially in this thread.
+    private final ListeningExecutorService m_es;
+
+    // previous children snapshot for internal use.
+    protected Set<String> m_lastChildren = new HashSet<String>();
+
+    // the cache exposed to the public. Start empty. Love it.
+    protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
+
+
+    public static final String migrate_partition_leader_suffix = "_migrated";
+
     public static class LeaderCallBackInfo {
-        Long m_HSID;
+        Long m_lastHSId;
+        Long m_HSId;
         boolean m_isMigratePartitionLeaderRequested;
 
-        public LeaderCallBackInfo(Long hsid, boolean isRequested) {
-            m_HSID = hsid;
+        public LeaderCallBackInfo(Long lastHSId, Long HSId, boolean isRequested) {
+            m_lastHSId = lastHSId;
+            m_HSId = HSId;
             m_isMigratePartitionLeaderRequested = isRequested;
         }
 
         @Override
         public String toString() {
-            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) +
+            return "leader hsid: " + CoreUtils.hsIdToString(m_HSId) +
+                    ( m_lastHSId != Long.MAX_VALUE ? " (previously " + CoreUtils.hsIdToString(m_lastHSId) + ")" : "" ) +
                     ( m_isMigratePartitionLeaderRequested ? ", MigratePartitionLeader requested" : "");
         }
+    }
+
+    /**
+     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
+     * When this string is updated, we can tell the reason why HSID is changed.
+     */
+    public static String suffixHSIdsWithMigratePartitionLeaderRequest(Long HSId) {
+        return Long.toString(Long.MAX_VALUE) + "/" + Long.toString(HSId) + migrate_partition_leader_suffix;
+    }
+
+    /**
+     * Is the data string hsid written because of MigratePartitionLeader request?
+     */
+    public static boolean isHSIdFromMigratePartitionLeaderRequest(String HSIdInfo) {
+        return HSIdInfo.endsWith(migrate_partition_leader_suffix);
+    }
+
+    public static LeaderCallBackInfo buildLeaderCallbackFromString(String HSIdInfo) {
+        int nextHSIdOffset = HSIdInfo.indexOf("/");
+        assert(nextHSIdOffset >= 0);
+        long lastHSId = Long.parseLong(HSIdInfo.substring(0, nextHSIdOffset));
+        boolean migratePartitionLeader = isHSIdFromMigratePartitionLeaderRequest(HSIdInfo);
+        long nextHSId;
+        if (migratePartitionLeader) {
+            nextHSId = Long.parseLong(HSIdInfo.substring(nextHSIdOffset+1, HSIdInfo.length() - migrate_partition_leader_suffix.length()));
+        }
+        else {
+            nextHSId = Long.parseLong(HSIdInfo.substring(nextHSIdOffset+1));
+        }
+        return new LeaderCallBackInfo(lastHSId, nextHSId, migratePartitionLeader);
     }
 
     /**
@@ -77,16 +131,18 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     /** Instantiate a LeaderCache of parent rootNode. The rootNode must exist. */
-    public LeaderCache(ZooKeeper zk, String rootNode)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode)
     {
-        this(zk, rootNode, null);
+        this(zk, from, rootNode, null);
     }
 
-    public LeaderCache(ZooKeeper zk, String rootNode, Callback cb)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode, Callback cb)
     {
         m_zk = zk;
+        m_whoami = from;
         m_rootNode = rootNode;
         m_cb = cb;
+        m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache-" + m_whoami, 15000);
     }
 
     /** Initialize and start watching the cache. */
@@ -96,6 +152,16 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (block) {
             task.get();
         }
+    }
+
+    /**
+     * Initialized and start watching partition level cache, this function is blocking.
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void startPartitionWatch() throws InterruptedException, ExecutionException {
+        Future<?> task = m_es.submit(new PartitionWatchEvent());
+        task.get();
     }
 
     /** Stop caring */
@@ -117,7 +183,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
         HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
         for (Entry<Integer, LeaderCallBackInfo> e : m_publicCache.entrySet()) {
-            cacheCopy.put(e.getKey(), e.getValue().m_HSID);
+            cacheCopy.put(e.getKey(), e.getValue().m_HSId);
         }
         return ImmutableMap.copyOf(cacheCopy);
     }
@@ -127,7 +193,20 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     @Override
     public Long get(int partitionId) {
-        return m_publicCache.get(partitionId).m_HSID;
+        LeaderCallBackInfo info = m_publicCache.get(partitionId);
+        if (info == null) {
+            return null;
+        }
+
+        return info.m_HSId;
+    }
+
+    public boolean isMigratePartitionLeaderRequested(int partitionId) {
+        LeaderCallBackInfo info = m_publicCache.get(partitionId);
+        if (info != null) {
+            return info.m_isMigratePartitionLeaderRequested;
+        }
+        return false;
     }
 
     /**
@@ -135,7 +214,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     @Override
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException {
-        put(partitionId, Long.toString(HSId));
+        put(partitionId, Long.toString(Long.MAX_VALUE) + "/" + Long.toString(HSId));
     }
 
     /**
@@ -159,27 +238,9 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         return m_publicCache.containsKey(partitionId);
     }
 
-    private final ZooKeeper m_zk;
-    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    private final Callback m_cb; // the callback when the cache changes
-
-    // the children of this node are observed.
-    private final String m_rootNode;
-
-    // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
-
-    // previous children snapshot for internal use.
-    private Set<String> m_lastChildren = new HashSet<String>();
-
-    // the cache exposed to the public. Start empty. Love it.
-    private volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
-
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
-        private final WatchedEvent m_event;
         public ParentEvent(WatchedEvent event) {
-            m_event = event;
         }
 
         @Override
@@ -192,6 +253,70 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
                 }
             }
+        }
+    }
+
+    // Boilerplate to forward zookeeper watches to the executor service
+    protected final Watcher m_parentWatch = new Watcher() {
+        @Override
+        public void process(final WatchedEvent event) {
+            try {
+                if (!m_shutdown.get()) {
+                    m_es.submit(new ParentEvent(event));
+                }
+            } catch (RejectedExecutionException e) {
+                if (!m_es.isShutdown()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
+                }
+            }
+        }
+    };
+
+    /**
+     * Rebuild the point-in-time snapshot of the children objects
+     * and set watches on new children.
+     */
+    protected void processParentEvent() throws Exception {
+        // get current children snapshot and reset this watch.
+        Set<String> children = new TreeSet<String>(m_zk.getChildren(m_rootNode, m_parentWatch));
+        // intersect to get newChildren and update m_lastChildren to the current set.
+        Set<String> newChildren = new HashSet<String>(children);
+        newChildren.removeAll(m_lastChildren);
+        m_lastChildren = children;
+
+        List<ByteArrayCallback> callbacks = new ArrayList<ByteArrayCallback>();
+        for (String child : children) {
+            ByteArrayCallback cb = new ByteArrayCallback();
+            // set watches on new children.
+            if(newChildren.contains(child)) {
+                m_zk.getData(ZKUtil.joinZKPath(m_rootNode, child), m_childWatch, cb, null);
+            } else {
+                m_zk.getData(ZKUtil.joinZKPath(m_rootNode, child), false, cb, null);
+            }
+
+            callbacks.add(cb);
+        }
+
+        HashMap<Integer, LeaderCallBackInfo> cache = new HashMap<Integer, LeaderCallBackInfo>();
+        for (ByteArrayCallback callback : callbacks) {
+            try {
+                byte payload[] = callback.get();
+                // During initialization children node may contain no data.
+                if (payload == null) {
+                    continue;
+                }
+                String data = new String(payload, "UTF-8");
+                LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
+                Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
+                cache.put(partitionId, info);
+            } catch (KeeperException.NoNodeException e) {
+                // child may have been deleted between the parent trigger and getData.
+            }
+        }
+
+        m_publicCache = ImmutableMap.copyOf(cache);
+        if (m_cb != null) {
+            m_cb.run(m_publicCache);
         }
     }
 
@@ -216,25 +341,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     // Boilerplate to forward zookeeper watches to the executor service
-    private final Watcher m_parentWatch = new Watcher() {
-        @Override
-        public void process(final WatchedEvent event) {
-            try {
-                if (!m_shutdown.get()) {
-                    m_es.submit(new ParentEvent(event));
-                }
-            } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
-                }
-            }
-        }
-    };
-
-    // Boilerplate to forward zookeeper watches to the executor service
-    private final Watcher m_childWatch = new Watcher() {
+    protected final Watcher m_childWatch = new Watcher() {
         @Override
         public void process(final WatchedEvent event) {
             try {
@@ -242,66 +349,12 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                     m_es.submit(new ChildEvent(event));
                 }
             } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
+                if (!m_es.isShutdown()) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
                 }
             }
         }
     };
-
-    // example zkPath string: /db/iv2masters/1
-    private static int getPartitionIdFromZKPath(String zkPath)
-    {
-        String array[] = zkPath.split("/");
-        return Integer.valueOf(array[array.length - 1]);
-    }
-
-    /**
-     * Rebuild the point-in-time snapshot of the children objects
-     * and set watches on new children.
-     */
-    private void processParentEvent() throws Exception {
-        // get current children snapshot and reset this watch.
-        Set<String> children = new TreeSet<String>(m_zk.getChildren(m_rootNode, m_parentWatch));
-        // intersect to get newChildren and update m_lastChildren to the current set.
-        Set<String> newChildren = new HashSet<String>(children);
-        newChildren.removeAll(m_lastChildren);
-        m_lastChildren = children;
-
-        List<ByteArrayCallback> callbacks = new ArrayList<ByteArrayCallback>();
-        for (String child : children) {
-            ByteArrayCallback cb = new ByteArrayCallback();
-            // set watches on new children.
-            if(newChildren.contains(child)) {
-                m_zk.getData(ZKUtil.joinZKPath(m_rootNode, child), m_childWatch, cb, null);
-            } else {
-                m_zk.getData(ZKUtil.joinZKPath(m_rootNode, child), false, cb, null);
-            }
-
-            callbacks.add(cb);
-        }
-
-        HashMap<Integer, LeaderCallBackInfo> cache = new HashMap<Integer, LeaderCallBackInfo>();
-        for (ByteArrayCallback callback : callbacks) {
-            try {
-                byte payload[] = callback.getData();
-                String data = new String(payload, "UTF-8");
-                long HSId = VoltZK.getHSId(data);
-                boolean isMigratePartitionLeader = VoltZK.isHSIdFromMigratePartitionLeaderRequest(data);
-                Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
-                cache.put(partitionId, new LeaderCallBackInfo(HSId, isMigratePartitionLeader));
-            } catch (KeeperException.NoNodeException e) {
-                // child may have been deleted between the parent trigger and getData.
-            }
-        }
-
-        m_publicCache = ImmutableMap.copyOf(cache);
-        if (m_cb != null) {
-            m_cb.run(m_publicCache);
-        }
-    }
 
     /**
      * Update a modified child and republish a new snapshot. This may indicate
@@ -313,13 +366,11 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
             // cb.getData() and cb.getPath() throw KeeperException
-            byte payload[] = cb.getData();
+            byte payload[] = cb.get();
             String data = new String(payload, "UTF-8");
-            long HSId = VoltZK.getHSId(data);
-            boolean isMigratePartitionLeader = VoltZK.isHSIdFromMigratePartitionLeaderRequest(data);
-
+            LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
             Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
-            cacheCopy.put(partitionId, new LeaderCallBackInfo(HSId, isMigratePartitionLeader));
+            cacheCopy.put(partitionId, info);
         } catch (KeeperException.NoNodeException e) {
             // rtb: I think result's path is the same as cb.getPath()?
             Integer partitionId = getPartitionIdFromZKPath(event.getPath());
@@ -329,6 +380,40 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_cb != null) {
             m_cb.run(m_publicCache);
         }
+    }
+
+    // parent (root node) sees new or deleted child
+    private class PartitionWatchEvent implements Runnable {
+        public PartitionWatchEvent() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                processPartitionWatchEvent();
+            } catch (Exception e) {
+                // ignore post-shutdown session termination exceptions.
+                if (!m_shutdown.get()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
+                }
+            }
+        }
+    }
+
+    // Race to create partition-specific zk node and put a watch on it.
+    private void processPartitionWatchEvent() throws KeeperException, InterruptedException {
+        try {
+            m_zk.create(m_rootNode, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        } catch (KeeperException.NodeExistsException e) {
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        }
+    }
+
+    // example zkPath string: /db/iv2masters/1
+    protected static int getPartitionIdFromZKPath(String zkPath)
+    {
+        return Integer.parseInt(zkPath.substring(zkPath.lastIndexOf('/') + 1));
     }
 
     @Override

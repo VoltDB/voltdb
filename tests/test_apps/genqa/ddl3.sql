@@ -250,14 +250,15 @@ CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPO
 );
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
+CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
+CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
+CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
+

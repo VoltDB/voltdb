@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,23 @@ public class MessagingChannel {
         this.m_socketChannel = socketChannel;
     }
 
+    public SocketChannel getSocketChannel() {
+        return m_socketChannel;
+    }
+
+    public ByteBuffer readBytes(int numBytes) throws IOException {
+        ByteBuffer message = ByteBuffer.allocate(numBytes);
+        while (message.hasRemaining()) {
+            int read = m_socketChannel.read(message);
+            if (read == -1) {
+                throw new IOException("Failed to read message");
+            }
+        }
+        assert message.position() == numBytes : "Bytes read is at an unexpected position. " + numBytes + "!=" + message.position();
+        message.flip();
+        return message;
+    }
+
     public ByteBuffer readMessage() throws IOException {
         int read;
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -63,15 +80,7 @@ public class MessagingChannel {
         if (len > VoltPort.MAX_MESSAGE_LENGTH) {
             throw new IOException("Packet exceeds maximum allowed size");
         }
-        ByteBuffer message = ByteBuffer.allocate(len);
-        while (message.hasRemaining()) {
-            read = m_socketChannel.read(message);
-            if (read == -1) {
-                throw new IOException("Failed to read message");
-            }
-        }
-        message.flip();
-        return message;
+        return readBytes(len);
     }
 
     public int writeMessage(ByteBuffer message) throws IOException {

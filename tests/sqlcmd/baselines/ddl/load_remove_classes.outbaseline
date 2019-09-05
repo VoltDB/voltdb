@@ -93,13 +93,17 @@ primary key (ID));
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -136,13 +140,17 @@ create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -247,13 +255,17 @@ drop procedure InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -304,13 +316,17 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -347,13 +363,17 @@ create procedure from class sqlcmdtest.BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
@@ -464,13 +484,17 @@ drop procedure BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
+@Ping                     
 @Promote                  
+@QueryStats               	varchar
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   

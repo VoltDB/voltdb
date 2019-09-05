@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -34,7 +32,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -44,22 +42,18 @@ import org.voltdb.types.ConstraintType;
  * intermediate failure, for example a constraint violation, will leave partial
  * and inconsistent data in the persistent store.
  */
-@ProcInfo(singlePartition = false)
 public class LoadMultipartitionTable extends VoltSystemProcedure
 {
-
-    static final int DEP_distribute = (int) SysProcFragmentId.PF_distribute |
-                                      DtxnConstants.MULTIPARTITION_DEPENDENCY;
-
-    static final int DEP_aggregate = (int) SysProcFragmentId.PF_aggregate;
-
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
     }
 
+    @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{SysProcFragmentId.PF_distribute};
+    }
 
-    @SuppressWarnings("deprecation")
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -83,12 +77,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             result.addRow(currentPartition);
             try {
                 // voltLoadTable is void. Assume success or exception.
-                DeprecatedProcedureAPIAccess.voltLoadTable(
-                                    this,
-                                    context.getCluster().getTypeName(),
-                                    context.getDatabase().getTypeName(),
-                                    tableName,
-                                    toInsert, false, false);
+                context.getSiteProcedureConnection().loadTable(m_runner.getTxnState(), tableName, toInsert,
+                        LoadTableCaller.CLIENT);
                 // return the number of rows inserted
                 result.addRow(toInsert.getRowCount());
             }
@@ -96,13 +86,14 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 // must continue and reply with dependency.
                 e.printStackTrace();
                 // report -1 rows inserted, though this might be false
-                result.addRow(-1);
+                // result.addRow(-1);
+                throw e;
             }
-            return new DependencyPair.TableDependencyPair(DEP_distribute, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_distribute, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_aggregate) {
             long[] modifiedTuples = new long[context.getNumberOfPartitions()];
-            List<VoltTable> deps = dependencies.get(DEP_distribute);
+            List<VoltTable> deps = dependencies.get(SysProcFragmentId.PF_distribute);
             assert(deps.size() > 0);
 
             // go through all the deps and find one mod tuple count per partition
@@ -116,19 +107,18 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                     modifiedTuples[partitionId] = rowsModified;
                 }
                 else {
-                    if (modifiedTuples[partitionId] != rowsModified)
+                    if (modifiedTuples[partitionId] != rowsModified) {
                         throw new RuntimeException(
                                 "@LoadMultipartitionTable received different tuple mod counts from two replicas.");
+                    }
                 }
             }
 
-            // sum up all the modified rows from all partitions
-            long rowsModified = 0;
-            for (long l : modifiedTuples)
-                rowsModified += l;
+            // using modified rows from lowest partitions
+            long rowsModified =  modifiedTuples[0];
 
             result.addRow(rowsModified);
-            return new DependencyPair.TableDependencyPair(DEP_aggregate, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_aggregate, result);
         }
 
         // must handle every dependency id.
@@ -165,7 +155,21 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             throw new VoltAbortException("Table not present in catalog.");
         }
 
+        if (!catTable.getIsreplicated()) {
+            throw new VoltAbortException("LoadMultipartitionTable no longer supports loading partitioned tables" +
+                    " use CRUD procs instead");
+        }
+
         boolean isUpsert = (upsertMode != 0);
+
+        // TODO verify table has right schema as catTable
+
+        // use loadTable path for bulk insert
+        if (!isUpsert && table.getRowCount() > 1) {
+            VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_distribute,
+                    SysProcFragmentId.PF_aggregate, tableName, table);
+            return results[0].asScalarLong();
+        }
 
         if (isUpsert) {
             boolean hasPkey = false;
@@ -214,41 +218,36 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
         m_runner.initSQLStmt(stmt, catStmt);
 
-        if (catTable.getIsreplicated()) {
-            long queued = 0;
-            long executed = 0;
 
-            // make sure at the start of the table
-            table.resetRowPosition();
-            for (int i = 0; table.advanceRow(); ++i) {
-                Object[] params = new Object[columnCount];
+        long queued = 0;
+        long executed = 0;
 
-                // get the parameters from the volt table
-                for (int col = 0; col < columnCount; ++col) {
-                    params[col] = table.get(col, table.getColumnType(col));
-                }
+        // make sure at the start of the table
+        table.resetRowPosition();
+        for (int i = 1; table.advanceRow(); ++i) {
+            Object[] params = new Object[columnCount];
 
-                // queue an insert and count it
-                voltQueueSQL(stmt, params);
-                ++queued;
-
-                // every 100 statements, exec the batch
-                // 100 is an arbitrary number
-                if ((i % 100) == 0) {
-                    executed += executeSQL();
-                }
-            }
-            // execute any leftover batched statements
-            if (queued > executed) {
-                executed += executeSQL();
+            // get the parameters from the volt table
+            for (int col = 0; col < columnCount; ++col) {
+                params[col] = table.get(col, table.getColumnType(col));
             }
 
-            return executed;
+            // queue an insert and count it
+            voltQueueSQL(stmt, params);
+            ++queued;
+
+            // every 100 statements, exec the batch
+            // 100 is an arbitrary number
+            if ((i % 100) == 0) {
+                executed += executeSQL(false);
+            }
         }
-        else {
-            throw new VoltAbortException("LoadMultipartitionTable no longer supports loading partitioned tables" +
-                                         " use CRUD procs instead");
+        // execute any leftover batched statements
+        if (queued > executed) {
+            executed += executeSQL(true);
         }
+
+        return executed;
     }
 
     /**
@@ -258,9 +257,9 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
      * @return Count of rows inserted.
      * @throws VoltAbortException if any failure at all.
      */
-    long executeSQL() throws VoltAbortException {
+    long executeSQL(boolean isFinal) throws VoltAbortException {
         long count = 0;
-        VoltTable[] results = voltExecuteSQL();
+        VoltTable[] results = voltExecuteSQL(isFinal);
         for (VoltTable result : results) {
             long dmlUpdated = result.asScalarLong();
             if (dmlUpdated == 0) {

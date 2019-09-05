@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import java.util.Map;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -33,10 +32,6 @@ import org.voltdb.VoltTable;
  * Return VoltTable results that correspond to JDBC result sets for selected
  * methods on DatabaseMetaData
  */
-@ProcInfo(
-    singlePartition = true
-)
-
 public class SystemCatalog extends VoltSystemProcedure
 {
     @SuppressWarnings("unused")

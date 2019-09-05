@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,6 @@ public interface DRProtocol {
     public static final int MIXED_SIZE_PROTOCOL_VERSION = 4;
     public static final int MULTICLUSTER_PROTOCOL_VERSION = 7;
     public static final int ELASTICADD_PROTOCOL_VERSION = 8;
-    public static final int NO_REPLICATED_STREAM_PROTOCOL_VERSION = 9;
 
     // all partial MP txns go into SP streams
     public static final int DR_NO_MP_START_PROTOCOL_VERSION = 3;

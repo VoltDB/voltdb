@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -39,7 +39,8 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.regressionsuites;
+ */
+package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
@@ -56,7 +57,6 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     public TestWindowFunctionSuite(String name) {
         super(name);
-        // TODO Auto-generated constructor stub
     }
 
     static private void setupSchema(VoltProjectBuilder project) throws IOException {
@@ -216,6 +216,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
         if (IS_ENABLED) {
             truncateAllTables(client);
+            subtestRowNumber();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
             subtestRankMultPartitionBys();
         }
         if (IS_ENABLED) {
@@ -315,31 +319,31 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     // rank1 is the rank for partition by A, order by B
     // rank2 is the rank for partition by A, AA, order by B
     private Long expected[][] = new Long[][] {
-        // A     AA   B     C    rank1   rank2   rank3
+        // A     AA   B     C    rank1   rank2   rank3   row_number1  row_number2
         //--------------------------------------
-        {  1L,  301L, 1L,  101L, 1L,      1L,      1L},
-        {  1L,  301L, 1L,  102L, 1L,      1L,      1L},
+        {  1L,  301L, 1L,  101L, 1L,      1L,      1L,   1L,          1L},
+        {  1L,  301L, 1L,  102L, 1L,      1L,      1L,   2L,          2L},
         //======================================
-        {  1L,  302L, 2L,  201L, 3L,      1L,      2L},
-        {  1L,  302L, 2L,  202L, 3L,      1L,      2L},
+        {  1L,  302L, 2L,  201L, 3L,      1L,      2L,   3L,          3L},
+        {  1L,  302L, 2L,  202L, 3L,      1L,      2L,   4L,          4L},
         //======================================
-        {  1L,  302L, 3L,  203L, 5L,      3L,      3L},
+        {  1L,  302L, 3L,  203L, 5L,      3L,      3L,   5L,          5L},
         //--------------------------------------
-        {  2L,  303L, 1L, 1101L, 1L,      1L,      1L},
-        {  2L,  303L, 1L, 1102L, 1L,      1L,      1L},
+        {  2L,  303L, 1L, 1101L, 1L,      1L,      1L,   1L,          6L},
+        {  2L,  303L, 1L, 1102L, 1L,      1L,      1L,   2L,          7L},
         //======================================
-        {  2L,  303L, 2L, 1201L, 3L,      3L,      2L},
-        {  2L,  304L, 2L, 1202L, 3L,      1L,      2L},
+        {  2L,  303L, 2L, 1201L, 3L,      3L,      2L,   3L,          8L},
+        {  2L,  304L, 2L, 1202L, 3L,      1L,      2L,   4L,          9L},
         //======================================
-        {  2L,  304L, 3L, 1203L, 5L,      2L,      3L},
+        {  2L,  304L, 3L, 1203L, 5L,      2L,      3L,   5L,          10L},
         //--------------------------------------
-        { 20L,  305L, 1L, 2101L, 1L,      1L,      1L},
-        { 20L,  305L, 1L, 2102L, 1L,      1L,      1L},
+        { 20L,  305L, 1L, 2101L, 1L,      1L,      1L,   1L,          11L},
+        { 20L,  305L, 1L, 2102L, 1L,      1L,      1L,   2L,          12L},
         //======================================
-        { 20L,  305L, 2L, 2201L, 3L,      3L,      2L},
-        { 20L,  306L, 2L, 2202L, 3L,      1L,      2L},
+        { 20L,  305L, 2L, 2201L, 3L,      3L,      2L,   3L,          13L},
+        { 20L,  306L, 2L, 2202L, 3L,      1L,      2L,   4L,          14L},
         //======================================
-        { 20L,  306L, 3L, 2203L, 5L,      2L,      3L},
+        { 20L,  306L, 3L, 2203L, 5L,      2L,      3L,   5L,          15L},
         //--------------------------------------
     };
 
@@ -351,6 +355,8 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     final int colR_A        = 4;
     final int colR_AA       = 5;
     final int colR_dense    = 6;
+    final int colR_row1     = 7;
+    final int colR_row2     = 8;
 
     private void subtestRankWithString() throws Exception {
         Client client = getClient();
@@ -534,6 +540,16 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         validateRankFunction("select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
                               colR_A);
     }
+
+    private void subtestRowNumber() throws Exception {
+        // partition by
+        validateRankFunction("select A, B, C, row_number() over (partition by A order by B, C) as R from T order by A;",
+                colR_row1);
+        // no partition by
+        validateRankFunction("select A, B, C, row_number() over (ORDER BY A, B, C) as R from T;",
+                colR_row2);
+    }
+
     private void subtestRankMultPartitionBys() throws Exception {
         Client client = getClient();
 

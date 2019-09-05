@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,53 +26,67 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 public class Explain extends AdHocNTBase {
+    private final AdHocNTBaseContext m_context = new AdHocNTBaseContext();
 
+    @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-
-        // dispatch common
-
-        Object[] paramArray = params.toArray();
-        String sql = (String) paramArray[0];
-        Object[] userParams = null;
-        if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
-        }
-
-        List<String> sqlStatements = new ArrayList<>();
-        AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
-
-        if (mix == AdHocSQLMix.EMPTY) {
-            // we saw neither DDL or DQL/DML.  Make sure that we get a
-            // response back to the client
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Failed to plan, no SQL statement provided.");
-        }
-
-        else if (mix == AdHocSQLMix.MIXED) {
-            // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "DDL mixed with DML and queries is unsupported.");
-        }
-
-        else if (mix == AdHocSQLMix.ALL_DDL) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Explain doesn't support DDL.");
-        }
-
-        // assume all DML/DQL at this point
-        return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
-                              sqlStatements,
-                              true, // infer partitioning
-                              null, // no partition key
-                              ExplainMode.EXPLAIN_ADHOC,
-                              false, // not a large query
-                              false, // not swap tables
-                              userParams);
+        return runInternal(params);
     }
 
+    /**
+     * Run an AdHoc explain batch through Calcite parser and planner. If there is
+     * anything that Calcite cannot handle, we will let it fall back to the
+     * legacy parser and planner.
+     *
+     * @param params the user parameters. The first parameter is always the query
+     *               text. The rest parameters are the ones used in the queries.
+     *               </br>
+     * @return the client response.
+     * @author Chao Zhou
+     * @since 9.1
+     */
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        try {
+            // We do not need to worry about the ParameterSet,
+            // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
+            return SqlBatch.from(params, m_context, ExplainMode.EXPLAIN_ADHOC).execute();
+        } catch (PlannerFallbackException e) {
+            return runUsingLegacy(params);
+        } catch (Exception ex) { // For now, let's just fail the batch if any error happens.
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
+        }
+    }
+
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
+        // dispatch common
+        final Object[] paramArray = params.toArray();
+        final String sql = (String) paramArray[0];
+        final Object[] userParams;
+        if (params.size() > 1) {
+            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
+        } else {
+            userParams = null;
+        }
+        final List<String> sqlStatements = new ArrayList<>();
+        switch (processAdHocSQLStmtTypes(sql, sqlStatements)) {
+            case EMPTY: // we saw neither DDL or DQL/DML.  Make sure that we get a response back to the client
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Failed to plan, no SQL statement provided.");
+            case MIXED: // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "DDL mixed with DML and queries is unsupported.");
+            case ALL_DDL:
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Explain doesn't support DDL.");
+            case ALL_DML_OR_DQL:
+                return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(), sqlStatements,
+                        true, null, ExplainMode.EXPLAIN_ADHOC, false, false,
+                        userParams);
+            default:
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Unsupported/unknown SQL statement type.");
+        }
+    }
 }

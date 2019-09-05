@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.MpRestartSequenceGenerator;
 import org.voltdb.iv2.TxnEgo;
 
 /**
@@ -69,7 +70,13 @@ public class FragmentResponseMessage extends VoltMessage {
     // indicate that the fragment is handled via original partition leader
     // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_isForOldLeader = false;
+    boolean m_executedOnPreviousLeader = false;
+
+    // Used by MPI to differentiate responses due to the transaction restart
+    long m_restartTimestamp = -1L;
+
+    // Used by MPI for rollback empty or overBufferLimit DR txn
+    int m_drBufferSize = 0;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -82,6 +89,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_spHandle = task.getSpHandle();
         m_destinationHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
+        m_restartTimestamp = task.getTimestamp();
     }
 
     // IV2 hacky constructor
@@ -101,6 +109,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_respBufferable = resp.m_respBufferable;
         m_exception = resp.m_exception;
         m_subject = Subject.DEFAULT.getId();
+        m_restartTimestamp = resp.m_restartTimestamp;
     }
 
     /**
@@ -177,6 +186,14 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_dependencies.get(index).getBufferDependency();
     }
 
+    public void setDrBufferSize(int drBufferSize) {
+        this.m_drBufferSize = drBufferSize;
+    }
+
+    public int getDRBufferSize() {
+        return m_drBufferSize;
+    }
+
     public SerializableException getException() {
         return m_exception;
     }
@@ -194,8 +211,10 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // dirty flag
             + 1 // node recovering flag
             + 2 // dependency count
-            + 4// partition id
-            + 1; //m_forLeader
+            + 4 // partition id
+            + 1 // m_forLeader
+            + 8 // restart timestamp
+            + 4;// drBuffer size
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -231,7 +250,9 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
-        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_executedOnPreviousLeader ? (byte) 1 : (byte) 0);
+        buf.putLong(m_restartTimestamp);
+        buf.putInt(m_drBufferSize);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -265,11 +286,14 @@ public class FragmentResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
-        m_isForOldLeader = buf.get() == 1;
+        m_executedOnPreviousLeader = buf.get() == 1;
+        m_restartTimestamp = buf.getLong();
+        m_drBufferSize = buf.getInt();
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
             boolean isNull = depLen == 0 ? true : false;
+
             if (isNull) {
                 m_dependencies.add(new DependencyPair.TableDependencyPair(depId, null));
             } else {
@@ -301,6 +325,9 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(", TIMESTAMP: ");
+        sb.append(MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp));
+        sb.append(", DR Buffer Size: " + m_drBufferSize);
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");
@@ -334,12 +361,16 @@ public class FragmentResponseMessage extends VoltMessage {
         return sb.toString();
     }
 
-    public void setForOldLeader(boolean forOldLeader) {
-        m_isForOldLeader = forOldLeader;
+    public void setExecutedOnPreviousLeader(boolean forOldLeader) {
+        m_executedOnPreviousLeader = forOldLeader;
     }
 
-    public boolean isForOldLeader() {
-        return m_isForOldLeader;
+    public boolean isExecutedOnPreviousLeader() {
+        return m_executedOnPreviousLeader;
+    }
+
+    public long getRestartTimestamp() {
+        return m_restartTimestamp;
     }
 
     @Override

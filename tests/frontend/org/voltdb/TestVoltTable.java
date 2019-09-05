@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,8 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
-import junit.framework.TestCase;
-
+import org.apache.commons.lang3.RandomStringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -40,6 +39,10 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltTableUtil;
+
+import com.google_voltpatches.common.collect.ImmutableList;
+
+import junit.framework.TestCase;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
@@ -116,8 +119,9 @@ public class TestVoltTable extends TestCase {
 
     private static boolean contains(Class<?>[] types, Class<?> type) {
         for (Class<?> c : types) {
-            if (type == c)
+            if (type == c) {
                 return true;
+            }
         }
         return false;
     }
@@ -145,30 +149,39 @@ public class TestVoltTable extends TestCase {
             Double d2 = (Double) rhs;
             return (d1.compareTo(d2) == 0);
         case STRING:
-            if (lhs == null && rhs == null)
+            if (lhs == null && rhs == null) {
                 return true;
-            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null)
+            }
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) {
                 return true;
+            }
             return ((String) lhs).equals(rhs);
         case VARBINARY:
-            if (lhs == null && rhs == null)
+            if (lhs == null && rhs == null) {
                 return true;
-            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null)
+            }
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) {
                 return true;
+            }
             return Arrays.equals((byte[]) lhs, (byte[]) rhs);
         case TIMESTAMP:
-            if (lhs == null && rhs == null)
+            if (lhs == null && rhs == null) {
                 return true;
-            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null)
+            }
+            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) {
                 return true;
+            }
             return ((TimestampType) lhs).equals(rhs);
         case DECIMAL:
-            if (lhs == null && rhs == null)
+            if (lhs == null && rhs == null) {
                 return true;
-            if (lhs == VoltType.NULL_DECIMAL && rhs == null)
+            }
+            if (lhs == VoltType.NULL_DECIMAL && rhs == null) {
                 return true;
-            if (lhs == null || rhs == null)
+            }
+            if (lhs == null || rhs == null) {
                 return false;
+            }
             return ((BigDecimal) lhs).equals(rhs);
         }
 
@@ -809,8 +822,9 @@ public class TestVoltTable extends TestCase {
         while (t.advanceRow()) {
             assertEquals(rowcount, t.getLong(0));
             assertTrue(String.valueOf(rowcount).equals(t.getString(1)));
-            if (rowcount == 4)
+            if (rowcount == 4) {
                 copy = t.cloneRow();
+            }
             rowcount++;
         }
         assertEquals(10, rowcount);
@@ -935,10 +949,11 @@ public class TestVoltTable extends TestCase {
             Object[] vals = new Object[content.length];
             ;
             for (int k = 0; k < content.length; k++) {
-                if (i == k)
+                if (i == k) {
                     vals[k] = nulls[k];
-                else
+                } else {
                     vals[k] = content[k];
+                }
             }
             System.out.println("Adding row: " + i);
             tt.addRow(vals);
@@ -1453,6 +1468,99 @@ public class TestVoltTable extends TestCase {
                 .map(x -> String.valueOf(x))
                 .map(s -> "Hello:" + s)
                 .forEach(s -> System.out.println(s));
+        }
+    }
+
+    public void testAddTable() {
+        t = new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C3", VoltType.INTEGER) });
+
+        // Test different type for one column
+        try {
+            t.addTable(new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                    new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C3", VoltType.FLOAT) }));
+            fail("Should have thrown IllegalArgumentException");
+        } catch (IllegalArgumentException e) {}
+
+        // Test different column name for one column
+        try {
+            t.addTable(new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                    new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C4", VoltType.INTEGER) }));
+            fail("Should have thrown IllegalArgumentException");
+        } catch (IllegalArgumentException e) {}
+
+        t2 = new VoltTable(t.getTableSchema());
+
+        t.addTable(t2);
+        assertEquals(0, t.getRowCount());
+
+        for (int i = 0; i < 1000; ++i) {
+            t2.addRow(i, RandomStringUtils.random(847), i);
+        }
+
+        for (int i = 0; i < 5; ++i) {
+            t.addTable(t2);
+            assertEquals(t2.getRowCount() * (i + 1), t.getRowCount());
+
+            t.resetRowPosition();
+            for (int j = 0; j < i; ++j) {
+                t2.resetRowPosition();
+                while (t2.advanceRow()) {
+                    assertTrue(t.advanceRow());
+                    for (int k = 0; k < t2.getColumnCount(); ++k) {
+                        VoltType type = t2.getColumnType(k);
+                        assertEquals(t2.get(k, type), t.get(k, type));
+                    }
+                }
+            }
+        }
+    }
+
+    public void testAddTables() {
+        t = new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C3", VoltType.INTEGER) });
+
+        t2 = new VoltTable(t.getTableSchema());
+
+        // Test different type for one column
+        try {
+            t.addTables(
+                    ImmutableList.of(t2,
+                            new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                                    new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C3", VoltType.FLOAT) }),
+                    t2, t2));
+            fail("Should have thrown IllegalArgumentException");
+        } catch (IllegalArgumentException e) {}
+
+        // Test different column name for one column
+        try {
+            t.addTables(
+                    ImmutableList.of(t2, t2,
+                            new VoltTable(new ColumnInfo[] { new ColumnInfo("C1", VoltType.BIGINT),
+                                    new ColumnInfo("C2", VoltType.STRING), new ColumnInfo("C4", VoltType.INTEGER) }),
+                    t2));
+            fail("Should have thrown IllegalArgumentException");
+        } catch (IllegalArgumentException e) {}
+
+        t.addTables(ImmutableList.of(t2, t2, t2, t2));
+        assertEquals(0, t.getRowCount());
+
+        for (int i = 0; i < 1000; ++i) {
+            t2.addRow(i, RandomStringUtils.random(847), i);
+        }
+
+        t.addTables(ImmutableList.of(t2, t2, t2, t2, t2));
+        assertEquals(t2.getRowCount() * 5, t.getRowCount());
+        t.resetRowPosition();
+        for (int i = 0; i < 5; ++i) {
+            t2.resetRowPosition();
+            while (t2.advanceRow()) {
+                assertTrue(t.advanceRow());
+                for (int j = 0; j < t2.getColumnCount(); ++j) {
+                    VoltType type = t2.getColumnType(j);
+                    assertEquals(t2.get(j, type), t.get(j, type));
+                }
+            }
         }
     }
 }

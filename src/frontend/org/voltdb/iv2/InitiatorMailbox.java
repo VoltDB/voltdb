@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,21 +22,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.Consistency;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -46,8 +48,10 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+
 import com.google_voltpatches.common.base.Supplier;
 
 /**
@@ -66,15 +70,22 @@ public class InitiatorMailbox implements Mailbox
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
 
-    public static enum MigratePartitionLeaderStatus {
-        STARTED,            //@MigratePartitionLeader on old master has been started
-        TXN_RESTART,    //new master needs txn restart before old master drains txns
-        TXN_DRAINED,    //new master is notified that old master has drained
-        NONE                //no or complete MigratePartitionLeader
+    public static enum LeaderMigrationState {
+        STARTED(1),            //@MigratePartitionLeader on old master has been started
+        TXN_RESTART(2),        //new master needs txn restart before old master drains txns
+        TXN_DRAINED(3),        //new master is notified that old master has drained
+        NONE(4);                //no or complete MigratePartitionLeader
+        final int state;
+        LeaderMigrationState(int s) {
+            this.state = s;
+        }
+        public int get() {
+            return state;
+        }
     }
 
-    VoltLogger hostLog = new VoltLogger("HOST");
-    VoltLogger tmLog = new VoltLogger("TM");
+    final VoltLogger hostLog = new VoltLogger("HOST");
+    final VoltLogger tmLog = new VoltLogger("TM");
 
     protected final int m_partitionId;
     protected final Scheduler m_scheduler;
@@ -84,12 +95,14 @@ public class InitiatorMailbox implements Mailbox
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
     protected RepairAlgo m_algo;
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     //Queue all the transactions on the new master after MigratePartitionLeader till it receives a message
     //from its older master which has drained all the transactions.
-    private long m_newLeaderHSID = Long.MIN_VALUE;
-    private MigratePartitionLeaderStatus m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
+    private AtomicLong m_newLeaderHSID = new AtomicLong(Long.MIN_VALUE);
+    private AtomicReference<LeaderMigrationState> m_leaderMigrationState =
+            new AtomicReference<LeaderMigrationState>();
+
+    private final Object m_leaderMigrationStateLock = new Object();
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -116,10 +129,9 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isMigratePartitionLeader) {
-        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isMigratePartitionLeader);
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, int deadHost, String whoami, boolean isMigratePartitionLeader) {
+        RepairAlgo ra = new SpPromoteAlgo(survivors.get(), deadHost, this, whoami, m_partitionId, isMigratePartitionLeader);
         if (hostLog.isDebugEnabled()) {
-
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
                     m_partitionId + ", survivors: " + CoreUtils.hsIdCollectionToString(survivors.get()));
         }
@@ -127,9 +139,6 @@ public class InitiatorMailbox implements Mailbox
         return ra;
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
-        return constructRepairAlgo(survivors, whoami, false);
-    }
     protected void setRepairAlgoInternal(RepairAlgo algo)
     {
         assert(lockingVows());
@@ -181,7 +190,8 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog = repairLog;
         m_joinProducer = joinProducer;
 
-        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(),
+                "InitiatorMailbox-masterLeaderCache-" + m_partitionId, VoltZK.iv2masters);
         try {
             m_masterLeaderCache.start(false);
         } catch (InterruptedException ignored) {
@@ -196,8 +206,7 @@ public class InitiatorMailbox implements Mailbox
          * Only used for an assertion on locking.
          */
         m_allInitiatorMailboxes.add(this);
-
-        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
+        m_leaderMigrationState.set(LeaderMigrationState.NONE);
     }
 
     public JoinProducerBase getJoinProducer()
@@ -252,12 +261,18 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // Change the replica set configuration (during or after promotion)
-    public synchronized void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
-    {
-        updateReplicasInternal(replicas, partitionMasters);
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters) {
+        return updateReplicasInternal(replicas, partitionMasters, null);
     }
 
-    protected void updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters) {
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState)
+    {
+        return updateReplicasInternal(replicas, partitionMasters, snapshotTransactionState);
+    }
+
+    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -265,7 +280,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        m_scheduler.updateReplicas(replicas, partitionMasters);
+        return m_scheduler.updateReplicas(replicas, partitionMasters, snapshotTransactionState);
     }
 
     public long getMasterHsId(int partitionId)
@@ -317,7 +332,18 @@ public class InitiatorMailbox implements Mailbox
         assert(lockingVows());
         logRxMessage(message);
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
-        if (message instanceof DumpMessage) {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof FragmentTaskMessage) {
+            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
+                return;
+            }
+        }
+        else if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
             try {
                 m_scheduler.dump();
@@ -325,7 +351,7 @@ public class InitiatorMailbox implements Mailbox
                 hostLog.warn("Failed to dump the content of the scheduler", ignore);
             }
         }
-        if (message instanceof Iv2RepairLogRequestMessage) {
+        else if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;
         }
@@ -341,19 +367,11 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        else if (message instanceof Iv2InitiateTaskMessage) {
-            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
-                return;
-            }
-            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
-        } else if (message instanceof FragmentTaskMessage) {
-            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
-                return;
-            }
-        }  else if (message instanceof MigratePartitionLeaderMessage) {
-            setMigratePartitionLeaderStatus((MigratePartitionLeaderMessage)message);
+        else if (message instanceof MigratePartitionLeaderMessage) {
+            setLeaderMigrationState((MigratePartitionLeaderMessage)message);
             return;
         }
+
         if (canDeliver) {
             //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
             //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
@@ -381,27 +399,23 @@ public class InitiatorMailbox implements Mailbox
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         int hostId = Integer.parseInt(params[2].toString());
-        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
+        Long newLeaderHSId = db.getCartographer().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
             tmLog.warn(String.format("@MigratePartitionLeader the partition leader is already on the host %d or the host id is invalid.", hostId));
-            return;
-        }
-
-        //one more check to make sure all the hosts are up before any changes are made
-        if (!db.isClusterCompelte()) {
             return;
         }
 
         SpScheduler scheduler = (SpScheduler)m_scheduler;
         scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;
-        m_newLeaderHSID = newLeaderHSId;
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.STARTED;
+        m_newLeaderHSID.set(newLeaderHSId);
+        m_leaderMigrationState.set(LeaderMigrationState.STARTED);
 
-        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(),
+                "initiateSPIMigrationIfRequested-" + m_partitionId, VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
-            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
+            leaderAppointee.put(pid, LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
         } catch (InterruptedException | ExecutionException | KeeperException e) {
             VoltDB.crashLocalVoltDB("fail to start MigratePartitionLeader",true, e);
         } finally {
@@ -424,12 +438,7 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST
-                && m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
-            return false;
-        }
-
-        if (m_scheduler.isLeader() && m_migratePartitionLeaderStatus != MigratePartitionLeaderStatus.TXN_RESTART) {
+        if (m_scheduler.isLeader() && m_leaderMigrationState.get() != LeaderMigrationState.TXN_RESTART) {
             //At this point, the message is sent to partition leader
             return false;
         }
@@ -444,7 +453,7 @@ public class InitiatorMailbox implements Mailbox
         deliver(response);
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
-                    " status:" + m_migratePartitionLeaderStatus + "\n" + message);
+                    " status:" + m_leaderMigrationState + "\n" + message);
         }
         //notify the new partition leader that the old leader has completed the Txns if needed.
         notifyNewLeaderOfTxnDoneIfNeeded();
@@ -457,10 +466,10 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()) != null);
+        TransactionState txnState = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()));
 
         // If a fragment is part of a transaction which have not been seen on this site, restart it.
-        if (!seenTheTxn) {
+        if (txnState == null) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
                     "Transaction being restarted due to MigratePartitionLeader.", message.getTxnId());
@@ -477,15 +486,12 @@ public class InitiatorMailbox implements Mailbox
 
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
-        if (!m_scheduler.isLeader() && !message.isForReplica() && seenTheTxn) {
-            message.setForOldLeader(true);
+        if (!m_scheduler.isLeader() && !message.isForReplica()) {
+            message.setExecutedOnPreviousLeader(true);
+            txnState.setLeaderMigrationInvolved();
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
-        }
-        if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
-            tmLog.debug("The batch index of the fragment: " + message.getCurrentBatchIndex() + ". It is the 1st time on:"
-                    + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
         }
         return false;
     }
@@ -548,9 +554,42 @@ public class InitiatorMailbox implements Mailbox
     private void handleLogRequest(VoltMessage message)
     {
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
+        // It is possible for a dead host to queue messages after a repair request is processed
+        // so make sure this can't happen by re-queuing this message after we know the dead host is gone
+        // Since we are not checking validateForeignHostId on the PicoNetwork thread, it is possible for
+        // the PicoNetwork thread to validateForeignHostId and queue a message behind this repair message.
+        // Further, we loose visibility to the ForeignHost as soon as HostMessenger marks the host invalid
+        // even though the PicoNetwork thread could still be alive so we will skeptically
+        int deadHostId = req.getDeadHostId();
+        if (deadHostId != Integer.MAX_VALUE) {
+            if (m_messenger.canCompleteRepair(deadHostId)) {
+                // Make sure we are the last in the task queue when we know the ForeignHost is gone
+                req.disableDeadHostCheck();
+                deliver(message);
+            }
+            else {
+                if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
+                    hostLog.warn("Repair Request for dead host " + deadHostId +
+                            " has not been processed yet because connection has not closed");
+                }
+                Runnable retryRepair = new Runnable() {
+                    @Override
+                    public void run() {
+                        InitiatorMailbox.this.deliver(message);
+                    }
+                };
+                VoltDB.instance().scheduleWork(retryRepair, 10, -1, TimeUnit.MILLISECONDS);
+                // the repair message will be resubmitted shortly when the ForeignHosts to the dead host have been removed
+            }
+            return;
+        }
+
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
+        if (req.isMPIRequest()) {
+            m_scheduler.cleanupTransactionBacklogOnRepair();
+        }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
         }
@@ -581,6 +620,7 @@ public class InitiatorMailbox implements Mailbox
         else if (repairWork instanceof FragmentTaskMessage) {
             // We need to get this into the repair log in case we've never seen it before.  Adding fragment
             // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
+            ((FragmentTaskMessage)repairWork).setExecutedOnPreviousLeader(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
@@ -588,6 +628,7 @@ public class InitiatorMailbox implements Mailbox
             // CompleteTransactionMessages should always be safe to handle.  Either the work was done, and we'll
             // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
             // get into the repair log and then let them run their course.
+            ((CompleteTransactionMessage)repairWork).setRequireAck(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
@@ -610,59 +651,75 @@ public class InitiatorMailbox implements Mailbox
     }
 
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        if (m_joinProducer == null) return;
+        if (m_joinProducer == null) {
+            return;
+        }
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 
-    //The new partition leader is notified by previous partition leader
-    //that previous partition leader has drained its txns
-    private void setMigratePartitionLeaderStatus(MigratePartitionLeaderMessage message) {
+    // The new partition leader is notified by previous partition leader
+    // that previous partition leader has drained its txns
+    private void setLeaderMigrationState(MigratePartitionLeaderMessage message) {
 
-        //The host with old partition leader is down.
-        if (message.isStatusReset()) {
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
-            return;
+        // Synchronize the leader migration state since the state updates are async
+        synchronized(m_leaderMigrationStateLock) {
+            // The host with old partition leader is down.
+            if (message.isStatusReset()) {
+                if ( m_leaderMigrationState.get() == LeaderMigrationState.TXN_RESTART) {
+                    m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_RESTART ,LeaderMigrationState.NONE);
+                } else if (!m_scheduler.isLeader()){
+
+                    // Update the status only if the site has not been promoted.
+                    m_leaderMigrationState.set(LeaderMigrationState.TXN_DRAINED);
+                }
+                m_newLeaderHSID.set(Long.MIN_VALUE);
+                tmLog.info("MigratePartitionLeader " +
+                        CoreUtils.hsIdToString(m_hsId) + " is reset to state:" + m_leaderMigrationState);
+                return;
+            }
+
+            if (m_leaderMigrationState.get() == LeaderMigrationState.NONE) {
+                //txn draining notification from the old leader arrives before this site is promoted
+                m_leaderMigrationState.compareAndSet(LeaderMigrationState.NONE ,LeaderMigrationState.TXN_DRAINED);
+            } else if (m_leaderMigrationState.get() == LeaderMigrationState.TXN_RESTART) {
+                //if the new leader has been promoted, stop restarting txns.
+                m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_RESTART ,LeaderMigrationState.NONE);
+            }
+
+            tmLog.info("MigratePartitionLeader new leader " +
+                    CoreUtils.hsIdToString(m_hsId) + " is notified by previous leader " +
+                    CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". state:" + m_leaderMigrationState);
         }
-
-        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
-            //txn draining notification from the old leader arrives before this site is promoted
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_DRAINED;
-        } else if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.TXN_RESTART) {
-            //if the new leader has been promoted, stop restarting txns.
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
-        }
-
-        tmLog.info("MigratePartitionLeader new leader " +
-                CoreUtils.hsIdToString(m_hsId) + " is notified by previous leader " +
-                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_migratePartitionLeaderStatus);
     }
 
-    //the site for new partition leader
-    public void setMigratePartitionLeaderStatus(boolean migratePartitionLeader) {
-        if (!migratePartitionLeader) {
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
-            m_newLeaderHSID = Long.MIN_VALUE;
-            return;
-        }
+    // The site for new partition leader
+    public void setLeaderMigrationState(boolean migratePartitionLeader) {
+        synchronized(m_leaderMigrationStateLock) {
+            if (!migratePartitionLeader) {
+                m_leaderMigrationState.set(LeaderMigrationState.NONE);
+                m_newLeaderHSID.set(Long.MIN_VALUE);
+                return;
+            }
 
-        //The previous leader has already drained all txns
-        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.TXN_DRAINED) {
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
-            tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
-                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
-            return;
-        }
+            // The previous leader has already drained all txns
+            if (m_leaderMigrationState.get() == LeaderMigrationState.TXN_DRAINED) {
+                m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_DRAINED ,LeaderMigrationState.NONE);
+                tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
+                        CoreUtils.hsIdToString(m_hsId) + " state:" + m_leaderMigrationState);
+                return;
+            }
 
-        //Wait for the notification from old partition leader
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_RESTART;
-        tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
+            // Wait for the notification from old partition leader
+            m_leaderMigrationState.set(LeaderMigrationState.TXN_RESTART);
+            tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " state:" + m_leaderMigrationState);
+        }
     }
 
-    //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
-    //Then new master can proceed to process transactions.
+    // Old master notifies new master that the transactions before the checkpoint on old master have been drained.
+    // Then new master can proceed to process transactions.
     public void notifyNewLeaderOfTxnDoneIfNeeded() {
-        //return quickly to avoid performance hit
-        if (m_newLeaderHSID == Long.MIN_VALUE ) {
+        // return quickly to avoid performance hit
+        if (m_newLeaderHSID.get() == Long.MIN_VALUE ) {
             return;
         }
 
@@ -671,22 +728,18 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_hsId, m_newLeaderHSID);
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_hsId, m_newLeaderHSID.get());
         send(message.getNewLeaderHSID(), message);
 
-        //reset status on the old partition leader
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
+        // reset status on the old partition leader
+        m_leaderMigrationState.set(LeaderMigrationState.NONE);
         m_repairLog.setLeaderState(false);
         tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
-                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_migratePartitionLeaderStatus);
-        m_newLeaderHSID = Long.MIN_VALUE;
+                CoreUtils.hsIdToString(m_newLeaderHSID.get()) + " transactions are drained." + " state:" + m_leaderMigrationState);
+        m_newLeaderHSID.set(Long.MIN_VALUE);
     }
 
-    //Reinstall the site as leader.
-    public void resetMigratePartitionLeaderStatus() {
-        m_scheduler.m_isLeader = true;
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
-        m_repairLog.setLeaderState(true);
-        m_newLeaderHSID = Long.MIN_VALUE;
+    public ZooKeeper getZK() {
+        return m_messenger.getZK();
     }
 }

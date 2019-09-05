@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,7 +53,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -71,7 +71,7 @@ public:
     }
 
     voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert(m_paramValue != NULL);
+        vassert(m_paramValue != NULL);
         return *m_paramValue;
     }
 

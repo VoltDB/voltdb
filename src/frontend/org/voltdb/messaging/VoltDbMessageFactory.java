@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,6 +53,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte DUMMY_TRANSACTION_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 27;
     final public static byte DUMP_PLAN_ID = VOLTCORE_MESSAGE_ID_MAX + 28;
     final public static byte Migrate_Partition_Leader_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 29;
+    final public static byte FLUSH_RO_TXN_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 30;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -108,9 +109,6 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case REJOIN_DATA_ACK_ID:
             message = new RejoinDataAckMessage();
             break;
-        case FRAGMENT_TASK_LOG_ID:
-            message = new FragmentTaskLogMessage();
-            break;
         case IV2_LOG_FAULT_ID:
             message = new Iv2LogFaultMessage();
             break;
@@ -152,6 +150,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case DUMP_PLAN_ID:
             message = new DumpPlanThenExitMessage();
+            break;
+        case FLUSH_RO_TXN_MESSAGE_ID:
+            message = new MPBacklogFlushMessage();
             break;
         default:
             message = null;

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -14,8 +14,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+from glob import glob
+
 # Main Java Class
 VoltDB = 'org.voltdb.VoltDB'
+
+def _listOfGlobsToFiles(pathGlobs):
+    result = set()
+    for pathGlob in pathGlobs:
+        globRes = glob(pathGlob.strip())
+        if globRes:
+            result.update(globRes)
+        else:
+            result.add(pathGlob)
+    return ",".join(result)
 
 @VOLT.Command(
     options = (
@@ -27,10 +39,10 @@ VoltDB = 'org.voltdb.VoltDB'
                           default = None),
         VOLT.BooleanOption('-f', '--force', 'force',
                            'Initialize a new, empty database. Any previous session will be overwritten.'),
-        VOLT.StringOption('-s', '--schema', 'schema',
-                           'Specifies a file containing the data definition (as SQL statements) to be loaded when starting the database.'),
-        VOLT.StringOption('-j', '--classes', 'classes_jarfile',
-                          'Specifies a .jar file containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.')
+        VOLT.StringListOption('-s', '--schema', 'schemas',
+                           'Specifies a list of schema files or paths with wildcards, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
+        VOLT.StringListOption('-j', '--classes', 'classes_jarfiles',
+                          'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.')
     ),
     description = 'Initializes a new, empty database.'
 )
@@ -43,10 +55,12 @@ def init(runner):
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.extend(['force'])
-    if runner.opts.schema:
-        runner.args.extend(['schema', runner.opts.schema])
-    if runner.opts.classes_jarfile:
-        runner.args.extend(['classes', runner.opts.classes_jarfile])
+    if runner.opts.schemas:
+        runner.args.append('schema')
+        runner.args.append(_listOfGlobsToFiles(runner.opts.schemas))
+    if runner.opts.classes_jarfiles:
+        runner.args.append('classes')
+        runner.args.append(_listOfGlobsToFiles(runner.opts.classes_jarfiles))
 
     args = runner.args
     runner.java_execute(VoltDB, None, *args)

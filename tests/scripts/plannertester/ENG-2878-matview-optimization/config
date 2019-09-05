@@ -1,0 +1,33 @@
+DDL:
+./ENG-2878-matview-optimization/ddl.sql
+
+SQL:
+select * from (select distinct a1 distinct_a, count(*) count_of from t1 where b > 2 group by a1) foo inner join (select a1 distinct_a, count(*) count_of from t1 where b >= 2 or b1 in (3, 300, 30) group by a1) bar on foo.distinct_a = bar.distinct_a left join (select a1 distinct_a, count(*) count_of from t1 where b < 200 group by a1) baz on bar.distinct_a = baz.distinct_a;
+(select distinct a1 distinct_a, count(*) count_of from t1 where b > 2 group by a1) union (select a1 distinct_a, count(*) count_of from t1 where b >= 2 or b1 in (3, 300, 30) group by a1);
+select count(a1) CA, sum(a) SA from t1 where a + b1 > a1 or power(a, a1) + b1 <= mod(a1, b) + abs(b) group by a1;
+(SELECT SUM(a) sum_a, COUNT(b) count_b FROM t1 as FOO GROUP BY a1) INTERSECT ((SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 WHERE abs(b) > abs(a) GROUP BY a1) UNION (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 WHERE abs(b) > abs(a) GROUP BY a1));
+select distinct a1 distinct_a, count(*) count_of from t1 where b > 2 group by a1;
+select distinct a1 distinct_a1, sum(a) sum_a, count(b) count_b, count(*) count_of from t1 group by a1;
+select a1 distinct_a1, count(b) count_b, sum(a) sum_a, count(*) from t1 group by a1;
+select distinct a1 distinct_a1, count(b) count_b, sum(a) sum_a, count(*) from t1 group by a1 having sum(a) <= 500;
+select distinct a1 distinct_a1, count(b) count_b, sum(a) sum_a, count(*) from t1 group by a1;
+select a1 distinct_a1, sum(a) sumof_a, count(b1) countof_b1, count(*) from t1 where b >= 2 or b1 in (3,300,30) group by a1;
+select a1 distinct_a1, sum(a) sumof_a, count(b1) countof_b1, count(*) from t1 where b1 in (30, 3, 300,30) or 2 <= b group by a1;
+select sum(a) sumof_a, a1 distinct_a1, count(b1) countof_b1, count(*) from t1 where b1 in (30, 3, 300,30) or 2 <= b group by a1;
+select a1 distinct_a1, sum(b) sumof_b, count(b1) countof_b1, count(*) from t1 where b1 in (3,300,30) group by a1;
+select a a, b b, min(b1) min_b1, count(*) counts, sum(a1) sum_a1 from t1 group by a, b;
+select a * 2 + a1 a2_plus_a1, b - a b_minus_a, sum(a1) sum_a1, min(b1) min_b1, count(*) counts from t1 group by a * 2 + a1, b-a;
+select 2 * a + a1 a2_plus_a1, b - a b_minus_a, sum(a1) sum_a1, min(b1) min_b1, count(*) counts from t1 group by 2 * a + a1, b-a;
+select a2_plus_a1 + min_b1 - sum_a1 subquery_expr from (select b - a b_minus_a, a * 2 + a1 a2_plus_a1, sum(a1) sum_a1, min(b1) min_b1, count(*) counts from t1 group by a * 2 + a1, b-a) as foo;
+select distinct a1 distinct_a1, a1 all_a1, sum(a) sum_a, count(*) from t1 where b1 >= 2 group by a1;
+select b1, count(*) counts from t1 where c in ('foo', 'bar', 'pattern') group by b1;
+select b - a b_minus_a, a * 2 + a1 a2_plus_a1, sum(a1) sum_a1, min(b1) min_b1 from t1 group by a * 2 + a1, b-a limit 20;
+select distinct c0 distinct_c, sum(b0) sum_b, count(*) counts from t2 group by c0;
+select b0 b, sum(c0) sum_c, count(*) counts from t2 group by b0;
+select sum(c0) from t2 group by b0 limit 5;
+(select a1, sum(a) from t1 as foo where b >= 2 or b1 in (3, 300, 30) group by a1) intersect (select a1, sum(a) from t11 group by a1) union all (select a1, sum(a) from t11 group by a1) except (select a1, sum(a) from t1 as foo where b >= 2 or b1 in (3, 300, 30) group by a1) intersect ((select a1, sum(a) from t11 group by a1) union all (select a1, sum(a) from t11 group by a1));
+((select a1, sum(a) from t1 as foo where b >= 2 or b1 in (3, 300, 30) group by a1) union all (select a1, sum(a) from t11 group by a1)) intersect (select a1, sum(a) from t11 group by a1);
+
+Partition Columns:
+
+

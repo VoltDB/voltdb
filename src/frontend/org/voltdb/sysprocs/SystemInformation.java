@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,13 +41,13 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
@@ -56,7 +57,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
-import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
@@ -67,22 +68,11 @@ import org.voltdb.utils.VoltTableUtil;
  * Access key/value tables of cluster info that correspond to the REST
  * API members/properties
  */
-@ProcInfo(
-    singlePartition = false
-)
-
 public class SystemInformation extends VoltSystemProcedure
 {
+    public static final String DR_PUBLIC_INTF_COL = "DRPUBLICINTERFACE";
+    public static final String DR_PUBLIC_PORT_COL = "DRPUBLICPORT";
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    static final int DEP_DISTRIBUTE = (int)
-        SysProcFragmentId.PF_systemInformationOverview | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_AGGREGATE = (int) SysProcFragmentId.PF_systemInformationOverviewAggregate;
-
-    static final int DEP_systemInformationDeployment = (int)
-        SysProcFragmentId.PF_systemInformationDeployment | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_systemInformationAggregate = (int)
-        SysProcFragmentId.PF_systemInformationAggregate;
 
     public static final ColumnInfo clusterInfoSchema[] = new ColumnInfo[]
     {
@@ -97,7 +87,8 @@ public class SystemInformation extends VoltSystemProcedure
             SysProcFragmentId.PF_systemInformationOverview,
             SysProcFragmentId.PF_systemInformationOverviewAggregate,
             SysProcFragmentId.PF_systemInformationDeployment,
-            SysProcFragmentId.PF_systemInformationAggregate
+            SysProcFragmentId.PF_systemInformationAggregate,
+            SysProcFragmentId.PF_systemInformationLicense
         };
     }
 
@@ -123,12 +114,12 @@ public class SystemInformation extends VoltSystemProcedure
                                        new ColumnInfo("KEY", VoltType.STRING),
                                        new ColumnInfo("VALUE", VoltType.STRING));
             }
-            return new DependencyPair.TableDependencyPair(DEP_DISTRIBUTE, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationOverview, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
-            return new DependencyPair.TableDependencyPair(DEP_AGGREGATE, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_systemInformationOverview));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationOverviewAggregate, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
         {
@@ -144,14 +135,14 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 result = new VoltTable(clusterInfoSchema);
             }
-            return new DependencyPair.TableDependencyPair(DEP_systemInformationDeployment, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationDeployment, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationAggregate)
         {
             VoltTable result = null;
             // Check for KEY/VALUE consistency
             List<VoltTable> answers =
-                dependencies.get(DEP_systemInformationDeployment);
+                dependencies.get(SysProcFragmentId.PF_systemInformationDeployment);
             for (VoltTable answer : answers)
             {
                 // if we got an empty table from a non-lowest execution site ID,
@@ -183,7 +174,22 @@ public class SystemInformation extends VoltSystemProcedure
                     }
                 }
             }
-            return new DependencyPair.TableDependencyPair(DEP_systemInformationAggregate, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationAggregate, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_systemInformationLicense)
+        {
+            VoltTable result = null;
+            // Choose the lowest site ID on this host to do the info gathering
+            // All other sites should just return empty results tables.
+            if (context.isLowestSiteId())
+            {
+                result = populateLicenseProperties();
+            }
+            else
+            {
+                result = new VoltTable(clusterInfoSchema);
+            }
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationLicense, result);
         }
         assert(false);
         return null;
@@ -256,13 +262,17 @@ public class SystemInformation extends VoltSystemProcedure
         VoltTable[] results;
 
         // This selector provides the old @SystemInformation behavior
-        if (selector.toUpperCase().equals("OVERVIEW"))
+        if ("OVERVIEW".equalsIgnoreCase(selector.toString()))
         {
             results = getOverviewInfo();
         }
-        else if (selector.toUpperCase().equals("DEPLOYMENT"))
+        else if ("DEPLOYMENT".equalsIgnoreCase(selector.toString()))
         {
             results = getDeploymentInfo();
+        }
+        else if ("LICENSE".equalsIgnoreCase(selector.toString()))
+        {
+            results = getLicenseInfo();
         }
         else
         {
@@ -282,48 +292,18 @@ public class SystemInformation extends VoltSystemProcedure
      */
     private VoltTable[] getOverviewInfo()
     {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].outputDepId = DEP_DISTRIBUTE;
-        spf[0].inputDepIds = new int[] {};
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].outputDepId = DEP_AGGREGATE;
-        spf[1].inputDepIds = new int[] { DEP_DISTRIBUTE };
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(spf, DEP_AGGREGATE);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationOverview,
+                SysProcFragmentId.PF_systemInformationOverviewAggregate);
     }
 
     private VoltTable[] getDeploymentInfo() {
-        VoltTable[] results;
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         // create a work fragment to gather deployment data from each of the sites.
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].outputDepId = DEP_systemInformationDeployment;
-        pfs[1].inputDepIds = new int[]{};
-        pfs[1].multipartition = true;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        // create a work fragment to aggregate the results.
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].outputDepId = DEP_systemInformationAggregate;
-        pfs[0].inputDepIds = new int[]{DEP_systemInformationDeployment};
-        pfs[0].multipartition = false;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        // distribute and execute these fragments providing pfs and id of the
-        // aggregator's output dependency table.
-        results = executeSysProcPlanFragments(pfs, DEP_systemInformationAggregate);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationDeployment,
+                SysProcFragmentId.PF_systemInformationAggregate);
+    }
+    private VoltTable[] getLicenseInfo() {
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationLicense,
+                SysProcFragmentId.PF_systemInformationAggregate);
     }
 
     public static VoltTable constructOverviewTable() {
@@ -359,6 +339,8 @@ public class SystemInformation extends VoltSystemProcedure
         String drInterface = null;
         int drPort = VoltDB.DEFAULT_DR_PORT;
         String publicInterface = null;
+        String drPublicInterface = null;
+        int drPublicPort = 0;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
@@ -378,6 +360,8 @@ public class SystemInformation extends VoltSystemProcedure
             drPort = jsObj.getInt("drPort");
             drInterface = jsObj.getString("drInterface");
             publicInterface = jsObj.getString("publicInterface");
+            drPublicInterface = jsObj.getString(VoltZK.drPublicHostProp);
+            drPublicPort = jsObj.getInt(VoltZK.drPublicPortProp);
         } catch (JSONException e) {
             hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
@@ -403,6 +387,8 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "DRINTERFACE", drInterface);
         vt.addRow(hostId, "DRPORT", Integer.toString(drPort));
         vt.addRow(hostId, "PUBLICINTERFACE", publicInterface);
+        vt.addRow(hostId, DR_PUBLIC_INTF_COL, drPublicInterface);
+        vt.addRow(hostId, DR_PUBLIC_PORT_COL, Integer.toString(drPublicPort));
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());
@@ -411,14 +397,16 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "VERSION", VoltDB.instance().getVersionString());
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
-        if (path != null && !path.startsWith("http"))
+        if (path != null && !path.startsWith("http")) {
             path = (new File(path)).getAbsolutePath();
+        }
         vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
-        if (path != null && !path.startsWith("http"))
+        if (path != null && !path.startsWith("http")) {
             path = (new File(path)).getAbsolutePath();
+        }
         vt.addRow(hostId, "DEPLOYMENT", path);
 
         String cluster_state = VoltDB.instance().getMode().toString();
@@ -447,8 +435,9 @@ public class SystemInformation extends VoltSystemProcedure
         SocketHubAppender hubAppender =
             (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
         int port = 0;
-        if (hubAppender != null)
+        if (hubAppender != null) {
             port = hubAppender.getPort();
+        }
         vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
         //Add license information
         if (MiscUtils.isPro()) {
@@ -472,7 +461,7 @@ public class SystemInformation extends VoltSystemProcedure
         } catch (KeeperException | InterruptedException | JSONException e) {
             vt.addRow(hostId, "PLACEMENTGROUP","NULL");
         }
-        Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
+        Set<Integer> buddies = VoltDB.instance().getCartographer().getHostIdsWithinPartitionGroup(hostId);
         String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
         vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
     }
@@ -608,5 +597,65 @@ public class SystemInformation extends VoltSystemProcedure
         }
 
         return sb.toString();
+    }
+
+    static public VoltTable populateLicenseProperties()
+    {
+        VoltTable results = new VoltTable(clusterInfoSchema);
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+        LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
+
+
+        results.addRow("PERMIT_VERSION", Integer.toString(licenseApi.getVersion()));
+        results.addRow("PERMIT_SCHEME", Integer.toString(licenseApi.getScheme()));
+
+        if(licenseApi.getLicenseType() != null)
+        {
+            results.addRow("TYPE", licenseApi.getLicenseType());
+        }
+        if(licenseApi.getIssuerCompany() != null)
+        {
+            results.addRow("ISSUER_COMPANY", licenseApi.getIssuerCompany());
+        }
+        if(licenseApi.getIssuerEmail() != null)
+        {
+            results.addRow("ISSUER_EMAIL", licenseApi.getIssuerEmail());
+        }
+        if(licenseApi.getIssuerUrl() != null)
+        {
+            results.addRow("ISSUER_URL", licenseApi.getIssuerUrl());
+        }
+        if(licenseApi.getIssuerPhone() != null)
+        {
+            results.addRow("ISSUER_PHONE", licenseApi.getIssuerPhone());
+        }
+        if(licenseApi.issued() != null)
+        {
+            results.addRow("ISSUE_DATE", sdf.format(licenseApi.issued().getTime()));
+        }
+        if(licenseApi.licensee() != null)
+        {
+            results.addRow("LICENSEE", licenseApi.licensee());
+        }
+        if(licenseApi.expires() != null)
+        {
+            results.addRow("EXPIRATION", sdf.format(licenseApi.expires().getTime()));
+        }
+
+        results.addRow("HOSTCOUNT_MAX", Integer.toString(licenseApi.maxHostcount()));
+        results.addRow("FEATURES_TRIAL", Boolean.toString(licenseApi.isAnyKindOfTrial()));
+        results.addRow("FEATURES_UNRESTRICTED", Boolean.toString(licenseApi.isUnrestricted()));
+        results.addRow("FEATURES_COMMANDLOGGING", Boolean.toString(licenseApi.isCommandLoggingAllowed()));
+        results.addRow("FEATURES_DRACTIVEACTIVE", Boolean.toString(licenseApi.isDrActiveActiveAllowed()));
+
+        if(licenseApi.note() != null)
+        {
+            results.addRow("NOTE", licenseApi.note());
+        }
+        if(licenseApi.getSignature() != null)
+        {
+            results.addRow("SIGNATURE", licenseApi.getSignature());
+        }
+        return results;
     }
 }

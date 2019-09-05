@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationListener;
@@ -51,12 +53,11 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.ClientResponseToJsonApiV2;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
 
 public class HTTPClientInterface {
 
@@ -74,7 +75,7 @@ public class HTTPClientInterface {
     public static final String PARAM_ADMIN = "admin";
     public static final String AUTH_USER_SESSION_KEY = "authuser";
     //Hidden property for session inactive timeout.
-    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 10);
+    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 30);
     //Hidden property for disable session management and use always auth mode.
     public static final boolean HTTP_DONT_USE_SESSION = Boolean.getBoolean("HTTP_DONT_USE_SESSION");
 
@@ -113,13 +114,15 @@ public class HTTPClientInterface {
         final AtomicBoolean m_complete = new AtomicBoolean(false);
         final Continuation m_continuation;
         final String m_jsonp;
+        private int m_api_version;
 
-        public JSONProcCallback(Continuation continuation, String jsonp) {
+        public JSONProcCallback(Continuation continuation, String jsonp, int api_version) {
             assert continuation != null : "given continuation is null";
 
             m_continuation = continuation;
             m_continuation.addContinuationListener(this);
             m_jsonp = jsonp;
+            m_api_version = api_version;
         }
 
         @Override
@@ -130,12 +133,16 @@ public class HTTPClientInterface {
                     m_rate_limited_log.log(
                             EstTime.currentTimeMillis(), Level.WARN, null,
                             "Procedure response arrived for a request that was timed out by jetty"
-                            );
+                    );
                 }
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
-            String msg = rimpl.toJSONString();
+            String msg = null;
+            if (m_api_version == 1)
+                msg = rimpl.toJSONString();
+            else if (m_api_version == 2)
+                msg = ClientResponseToJsonApiV2.toJSONStringV2(rimpl);
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
@@ -320,8 +327,12 @@ public class HTTPClientInterface {
 
             continuation.suspend(response);
             suspended = true;
+            JSONProcCallback cb;
+            if (request.getServletPath().equals("/api/2.0"))
+                cb = new JSONProcCallback(continuation, jsonp, 2);
+            else
+                cb = new JSONProcCallback(continuation, jsonp, 1);
 
-            JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
             boolean success;
             String hostname = request.getRemoteHost();
             if (params != null) {
@@ -370,7 +381,8 @@ public class HTTPClientInterface {
     }
 
     public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
+        InternalConnectionHandler internal=m_invocationHandler.get();
+        return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
     }
 
     public boolean callProcedure(String hostname, final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {

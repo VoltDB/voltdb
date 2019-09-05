@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,8 +16,6 @@
  */
 
 #include <common/UndoLog.h>
-#include <stdint.h>
-#include <iostream>
 
 namespace voltdb {
 
@@ -28,12 +26,10 @@ UndoLog::UndoLog()
 
 void UndoLog::clear()
 {
-    if (m_undoQuantums.size() > 0) {
+    if (! m_undoQuantums.empty()) {
         release(m_lastUndoToken);
     }
-    for (std::vector<Pool*>::iterator i = m_undoDataPools.begin();
-         i != m_undoDataPools.end();
-         i++) {
+    for (auto i = m_undoDataPools.begin(); i != m_undoDataPools.end(); i++) {
         delete *i;
     }
     m_undoDataPools.clear();

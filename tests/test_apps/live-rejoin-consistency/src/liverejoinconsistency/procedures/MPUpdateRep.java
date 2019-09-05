@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,16 +27,12 @@
 
 package liverejoinconsistency.procedures;
 
-import org.voltdb.ProcInfo;
+import java.util.Random;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-import java.util.Random;
-
-@ProcInfo (
-        singlePartition = false
-        )
 public class MPUpdateRep extends VoltProcedure
 {
 

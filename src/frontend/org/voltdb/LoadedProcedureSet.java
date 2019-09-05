@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,20 +17,27 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
 
 public class LoadedProcedureSet {
 
@@ -177,6 +184,8 @@ public class LoadedProcedureSet {
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
+        List<Long> durableFragments = Lists.newArrayList();
+        List<String> replayableProcs = Lists.newArrayList();
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -236,8 +245,18 @@ public class LoadedProcedureSet {
                 }
 
                 builder.put(entry.getKey().intern(), runner);
+                if (!sysProc.singlePartition  && sysProc.isDurable()) {
+                    long[] fragIds =  procedure.getAllowableSysprocFragIdsInTaskLog();
+                    if (fragIds != null && fragIds.length > 0) {
+                        durableFragments.addAll(Arrays.stream(fragIds).boxed().collect(Collectors.toList()));
+                    }
+                    if (procedure.allowableSysprocForTaskLog()) {
+                        replayableProcs.add("@" + runner.m_procedureName);
+                    }
+                }
             }
         }
+        SystemProcedureCatalog.setupAllowableSysprocFragsInTaskLog(durableFragments, replayableProcs);
         return builder.build();
     }
 
@@ -256,10 +275,16 @@ public class LoadedProcedureSet {
 
         // if not in the cache, compile the full default proc and put it in the cache
         if (pr == null) {
+            // nibble delete and migrate have special statements
+            if (procName.endsWith(DefaultProcedureManager.NIBBLE_MIGRATE_PROC) ||
+                    procName.endsWith(DefaultProcedureManager.NIBBLE_DELETE_PROC)) {
+                return pr;
+            }
             Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
             if (catProc != null) {
                 String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
-                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
+                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(
+                        m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
                 pr = new ProcedureRunner(voltProc, m_site, newCatProc);
                 // this will ensure any created fragment tasks know to load the plans
@@ -271,5 +296,47 @@ public class LoadedProcedureSet {
 
         // return what we got, hopefully not null
         return pr;
+    }
+
+    /**
+     * (TableName).nibbleDelete is cached in default procedure cache.
+     * @param tableName
+     * @return
+     */
+    public ProcedureRunner getNibbleDeleteProc(String procName,
+                                               Table catTable,
+                                               Column column,
+                                               ComparisonOperation op)
+    {
+        ProcedureRunner pr = m_defaultProcCache.get(procName);
+        if (pr == null) {
+            Procedure newCatProc =
+                    StatementCompiler.compileNibbleDeleteProcedure(
+                            catTable, procName, column, op);
+            VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+            pr = new ProcedureRunner(voltProc, m_site, newCatProc);
+            // this will ensure any created fragment tasks know to load the plans
+            // for this plan-on-the-fly procedure
+            pr.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
+            m_defaultProcCache.put(procName, pr);
+            // also list nibble delete into default procedures
+            m_defaultProcManager.m_defaultProcMap.put(procName.toLowerCase(), pr.getCatalogProcedure());
+        }
+        return pr;
+    }
+
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        ProcedureRunner runner = m_defaultProcCache.get(procName);
+        if (runner == null) {
+            Procedure newCatProc = StatementCompiler.compileMigrateProcedure(
+                            catTable, procName, column, op);
+            VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+            runner = new ProcedureRunner(voltProc, m_site, newCatProc);
+            runner.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
+            m_defaultProcCache.put(procName, runner);
+            m_defaultProcManager.m_defaultProcMap.put(procName.toLowerCase(), runner.getCatalogProcedure());
+        }
+        return runner;
     }
 }

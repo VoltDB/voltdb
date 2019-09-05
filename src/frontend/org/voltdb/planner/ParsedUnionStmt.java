@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -53,9 +55,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    private final List<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<>();
+    public List<AbstractParsedStmt> m_children = new ArrayList<>();
     public UnionType m_unionType = UnionType.NOUNION;
 
     /**
@@ -63,8 +65,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedUnionStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedUnionStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -123,15 +125,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         AbstractParsedStmt childStmt = null;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equals(SELECT_NODE_NAME)) {
-                childStmt = new ParsedSelectStmt(m_paramValues, m_db);
+                childStmt = new ParsedSelectStmt(null, m_paramValues, m_db);
                 // Assign every child a unique ID
-                childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
+                childStmt.setStmtId(AbstractParsedStmt.NEXT_STMT_ID++);
                 childStmt.m_parentStmt = m_parentStmt;
                 childStmt.setParentAsUnionClause();
 
             }
             else if (childSQL.name.equals(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
+                childStmt = new ParsedUnionStmt(null, m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
             }
@@ -149,7 +151,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
             // m_tableAliasListAsJoinOrder is not interesting for UNION
             // m_tableAliasMap may have same alias table from different children
-            addStmtTablesFromChildren(childStmt.m_tableAliasMap);
+            addStmtTablesFromChildren(childStmt.getScanEntrySet());
         }
     }
 
@@ -280,12 +282,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
-    private void addStmtTablesFromChildren(HashMap<String, StmtTableScan> tableAliasMap) {
-        for (String alias: tableAliasMap.keySet()) {
-            StmtTableScan tableScan = tableAliasMap.get(alias);
+    private void addStmtTablesFromChildren(Set<Entry<String, StmtTableScan>> entries) {
+        for (Entry<String, StmtTableScan> entry : entries) {
+            String alias = entry.getKey();
+            StmtTableScan tableScan = entry.getValue();
 
-            if (m_tableAliasMap.get(alias) == null) {
-                m_tableAliasMap.put(alias, tableScan);
+            if (getStmtTableScanByAlias(alias) == null) {
+                defineTableScanByAlias(alias, tableScan);
             } else {
                 // if there is a duplicate table alias in the map,
                 // find a new unique name for the key
@@ -294,7 +297,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 HashMap<String, StmtTableScan> duplicates = new HashMap<>();
                 duplicates.put(alias, tableScan);
 
-                addStmtTablesFromChildren(duplicates);
+                addStmtTablesFromChildren(duplicates.entrySet());
             }
         }
     }
@@ -316,10 +319,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         };
         // Get the display columns from the first child
-        List<ParsedColInfo> displayColumns = leftmostSelectChild.orderByColumns();
+        List<ParsedColInfo> displayColumns = leftmostSelectChild.displayColumns();
         ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(leftmostSelectChild, orderByNode, adjuster);
 
-        AbstractExpression order_exp = order_col.expression;
+        AbstractExpression order_exp = order_col.m_expression;
         assert(order_exp != null);
 
         // Mark the order by column if it is in displayColumns
@@ -327,13 +330,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // tagging the actual display column as being also an order by column
         // helps later when trying to determine ORDER BY coverage (for determinism).
         for (ParsedColInfo col : displayColumns) {
-            if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
-                col.orderBy = true;
-                col.ascending = order_col.ascending;
+            if (col.m_alias.equals(order_col.m_alias) || col.m_expression.equals(order_exp)) {
+                col.m_orderBy = true;
+                col.m_ascending = order_col.m_ascending;
 
-                order_col.alias = col.alias;
-                order_col.columnName = col.columnName;
-                order_col.tableName = col.tableName;
+                order_col.m_alias = col.m_alias;
+                order_col.m_columnName = col.m_columnName;
+                order_col.m_tableName = col.m_tableName;
                 break;
             }
         }
@@ -454,16 +457,16 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         int orderByIndex = 0;
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
         for (ParsedColInfo col : leftmostSelectChild.m_displayColumns) {
-            displayIndexMap.put(col.expression, orderByIndex);
-            assert(col.alias != null);
+            displayIndexMap.put(col.m_expression, orderByIndex);
+            assert(col.m_alias != null);
             displayIndexToColumnMap.put(orderByIndex, col);
             orderByIndex++;
         }
 
         // place the TVEs from Display columns in the ORDER BY expression
         for (ParsedColInfo orderCol : m_orderColumns) {
-            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
-            orderCol.expression = expr;
+            AbstractExpression expr = orderCol.m_expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+            orderCol.m_expression = expr;
         }
     }
 
@@ -496,6 +499,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return answer;
+    }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
     }
 
 }

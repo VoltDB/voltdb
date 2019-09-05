@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.iv2.MpTransactionState;
@@ -118,22 +117,73 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      */
     abstract public long[] getPlanFragmentIds();
 
+    /**
+     * return all SysProc plan fragments that needs to be registered
+     * These fragments will be replayed in rejoining process.
+     */
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[]{};
+    }
+
+    /**
+     * @return true if the procedure should not be skipped from TaskLog replay
+     */
+    public boolean allowableSysprocForTaskLog() {
+        return false;
+    }
+
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public long siteId = -1;
-        public long fragmentId = -1;
-        public int outputDepId = -1;
-        public int inputDepIds[] = null;
-        public ParameterSet parameters = null;
-        public boolean multipartition = false;
+        public final long fragmentId;
+        public final int outputDepId;
+        public final ParameterSet parameters;
         /** true if distributes to all executable partitions */
+        public final boolean multipartition;
+
+        public SynthesizedPlanFragment(int fragmentId, boolean multipartition) {
+            this(fragmentId, multipartition, ParameterSet.emptyParameterSet());
+        }
+
+        public SynthesizedPlanFragment(int fragmentId, boolean multipartition, ParameterSet parameters) {
+            this(fragmentId, fragmentId, multipartition, parameters);
+        }
+
+        public SynthesizedPlanFragment(int fragmentId, int outputDepId, boolean multipartition,
+                ParameterSet parameters) {
+            this(-1, fragmentId, outputDepId, multipartition, parameters);
+        }
+
+        public SynthesizedPlanFragment(long siteId, int fragmentId, int outputDepId, boolean multipartition,
+                ParameterSet parameters) {
+            this.siteId = siteId;
+            this.fragmentId = fragmentId;
+            this.outputDepId = outputDepId;
+            this.parameters = parameters;
+            this.multipartition = multipartition;
+        }
+
         /**
-         * Used to tell the DTXN to suppress duplicate results from sites that
-         * replicate a partition. Most system procedures don't want this, but,
-         * for example, adhoc queries actually do want duplicate suppression
-         * like user sysprocs.
+         * Most MP sysprocs use this pattern of MP fragment and a non-MP aggregator fragment. Utility method to create
+         * that.
+         *
+         * @param fragmentId    Id of the MP fragment distributed to sites. This will be the fragment id of the first
+         *                      SynthesizedPlanFragment, its output dependency id and input dependency id of the
+         *                      aggregator fragment.
+         * @param aggFragmentId Id of the aggregator fragment. This will be the fragment id of the second
+         *                      SynthesizedPlanFragment and its output dependency id.
+         * @param params        {@link ParameterSet} for the first fragment.
+         * @return Array of fragments in the correct order
          */
-        public boolean suppressDuplicates = false;
+        static SynthesizedPlanFragment[] createFragmentAndAggregator(int fragmentId, int aggFragmentId,
+                ParameterSet params) {
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+
+            pfs[0] = new SynthesizedPlanFragment(fragmentId, true, params);
+            pfs[1] = new SynthesizedPlanFragment(aggFragmentId, false, ParameterSet.emptyParameterSet());
+
+            return pfs;
+        }
     }
 
     abstract public DependencyPair executePlanFragment(
@@ -162,7 +212,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
         assert (txnState != null);
-        txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
+        txnState.setupProcedureResume(new int[] { aggregatorOutputDependencyId });
 
         final ArrayList<VoltTable> results = new ArrayList<>();
         executeSysProcPlanFragmentsAsync(pfs);
@@ -200,17 +250,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     public void executeSysProcPlanFragmentsAsync(
             SynthesizedPlanFragment pfs[]) {
 
-        TransactionState txnState = m_runner.getTxnState();
+        MpTransactionState txnState = (MpTransactionState)m_runner.getTxnState();
+        assert(txnState != null);
 
-        int fragmentIndex = 0;
         for (SynthesizedPlanFragment pf : pfs) {
             assert (pf.parameters != null);
-
-            // check the output dep id makes sense given the number of sites to
-            // run this on
-            if (pf.multipartition) {
-                assert ((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
-            }
 
             FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
                     txnState.initiatorHSId,
@@ -222,31 +266,24 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     pf.outputDepId,
                     pf.parameters,
                     false,
-                    txnState.isForReplay());
+                    txnState.isForReplay(),
+                    txnState.isNPartTxn(),
+                    txnState.getTimetamp());
 
-            //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
-            //to determine how the follow-up fragments are processed.
-            task.setBatch(fragmentIndex++);
-            if (pf.inputDepIds != null) {
-                for (int depId : pf.inputDepIds) {
-                    task.addInputDepId(0, depId);
-                }
-            }
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
-            if (pf.suppressDuplicates) {
-                task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
-            }
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
+                task.setBatch(txnState.getNextFragmentIndex());
                 txnState.createAllParticipatingFragmentWork(task);
             } else {
                 // create one workunit for the current site
-                if (pf.siteId == -1)
+                if (pf.siteId == -1) {
                     txnState.createLocalFragmentWork(task, false);
-                else
+                } else {
                     txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
+                }
             }
         }
     }
@@ -267,5 +304,42 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         } else {
             throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
         }
+    }
+
+    /**
+     * @param fragmentId    Of the multi partition fragment
+     * @param aggFragmentId Fragment ID of the aggeregator fragment
+     * @return Resulting {@link VoltTable[]} from executing the fragments
+     * @see #createAndExecuteSysProcPlan(int, int, ParameterSet)
+     */
+    protected VoltTable[] createAndExecuteSysProcPlan(int fragmentId, int aggFragmentId) {
+        return createAndExecuteSysProcPlan(fragmentId, aggFragmentId, ParameterSet.emptyParameterSet());
+    }
+
+    /**
+     * @param fragmentId    Of the multi partition fragment
+     * @param aggFragmentId Fragment ID of the aggeregator fragment
+     * @param params        Parameters which is to be passed to the multi partition fragment
+     * @return Resulting {@link VoltTable[]} from executing the fragments
+     * @see #createAndExecuteSysProcPlan(int, int, ParameterSet)
+     */
+    protected VoltTable[] createAndExecuteSysProcPlan(int fragmentId, int aggFragmentId, Object... params) {
+        return createAndExecuteSysProcPlan(fragmentId, aggFragmentId, ParameterSet.fromArrayNoCopy(params));
+    }
+
+    /**
+     * Create a two {@link SynthesizedPlanFragment} the first one is a multi partition fragment and the second is an
+     * aggregator fragment. Then execute the fragments and return the resulting {@link VoltTable[]} from the aggregator
+     * fragment.
+     *
+     * @param fragmentId    Of the multi partition fragment
+     * @param aggFragmentId Fragment ID of the aggeregator fragment
+     * @param params        {@link ParameterSet} which is to be passed to the multi partition fragment
+     * @return Resulting {@link VoltTable[]} from executing the fragments
+     */
+    protected VoltTable[] createAndExecuteSysProcPlan(int fragmentId, int aggFragmentId, ParameterSet params) {
+        return executeSysProcPlanFragments(
+                SynthesizedPlanFragment.createFragmentAndAggregator(fragmentId, aggFragmentId, params),
+                aggFragmentId);
     }
 }

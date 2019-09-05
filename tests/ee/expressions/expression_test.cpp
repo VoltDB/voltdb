@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -57,7 +57,7 @@
 #include <boost/scoped_array.hpp>
 
 #include "harness.h"
-#include "jsoncpp/jsoncpp.h"
+#include "json/json.h"
 
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
@@ -299,7 +299,7 @@ AbstractExpression * convertToExpression(queue<AE*> &e) {
 
     PlannerDomRoot domRoot(jsonText.c_str());
 
-    AbstractExpression * exp = AbstractExpression::buildExpressionTree(domRoot.rootObject());
+    AbstractExpression * exp = AbstractExpression::buildExpressionTree(domRoot());
     delete tree;
     return exp;
 }
@@ -428,7 +428,7 @@ TEST_F(ExpressionTest, HashRange) {
     Json::FastWriter writer;
     std::string jsonText = writer.write(json);
     PlannerDomRoot domRoot(jsonText.c_str());
-    boost::scoped_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot.rootObject()));
+    boost::scoped_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot()));
 
     vector<std::string> columnNames;
     columnNames.push_back("foo");

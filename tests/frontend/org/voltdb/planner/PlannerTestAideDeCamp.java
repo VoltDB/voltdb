@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,8 +29,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Assert;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -43,8 +46,11 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.types.PlannerType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
+
+import static org.junit.Assert.fail;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.
@@ -82,29 +88,32 @@ public class PlannerTestAideDeCamp {
         return db;
     }
 
+    public VoltXMLElement compileToXML(String sql) throws HSQLParseException {
+        return hsql.getXMLCompiledStatement(sql);
+    }
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
      * @param detMode
      */
-    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
-        compile(sql, 0, null, true, false, detMode);
+    CompiledPlan compileAdHocPlan(PlannerType plannerType, String sql, DeterminismMode detMode) {
+        compile(plannerType, sql, 0, null, true, false, detMode);
         return m_currentPlan;
     }
 
-    CompiledPlan compileAdHocPlan(String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
-        compile(sql, 0, null, inferPartitioning, singlePartition, detMode);
+    public CompiledPlan compileAdHocPlan(PlannerType plannerType, String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
+        compile(plannerType, sql, 0, null, inferPartitioning, singlePartition, detMode);
         return m_currentPlan;
     }
 
-    List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
-        return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
+    List<AbstractPlanNode> compile(PlannerType plannerType, String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
+        return compile(plannerType, sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(PlannerType plannerType, String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
         String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
 
@@ -150,9 +159,23 @@ public class PlannerTestAideDeCamp {
                 partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode, false)) {
 
-            planner.parse();
-            plan = planner.plan();
-            assert(plan != null);
+            switch (plannerType) {
+                case VOLTDB: {
+                    planner.parse();
+                    plan = planner.plan();
+                    break;
+                }
+                case CALCITE:
+                default: {
+                    // TODO: plan using the calcite planner
+                    fail("Temporarily a dead branch.");
+                    break;
+                }
+
+
+            }
+
+            Assert.assertNotNull(plan);
         }
 
         // Partitioning optionally inferred from the planning process.

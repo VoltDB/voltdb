@@ -31,6 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -163,14 +166,67 @@ public class QueryExpression {
         rightQueryExpression.setFullOrder();
     }
 
-    public void resolve(Session session) {
+    static class WithList {
+        private final List<WithExpression> m_withExpressions = new ArrayList<>();
+        private final boolean m_isRecursive;
+        public WithList(boolean recursive) {
+            m_isRecursive = recursive;
+        }
+        public final List<WithExpression> getWithExpressions() {
+            return m_withExpressions;
+        }
+        public final boolean isRecursive() {
+            return m_isRecursive;
+        }
+        public void add(WithExpression withExpression) {
+            m_withExpressions.add(withExpression);
+        }
+    }
 
+    public WithList withList;
+
+    public void addWithList(WithList newWithList) {
+        withList = newWithList;
+    }
+
+    public void resolveWithClause(Session session) {
+        if (withList != null) {
+            for (WithExpression withExp : withList.getWithExpressions()) {
+                if (withExp.baseQueryResolved()) {
+                    // Query expressions must be resolved exactly once before they
+                    // are converted to VoltXML---otherwise the list of expr columns
+                    // is not correct.
+                    withExp.getBaseQuery().resolve(session);
+                    withExp.setBaseQueryResolved();
+                }
+                if (withList.isRecursive()) {
+                    withExp.getRecursiveQuery().resolve(session);
+                }
+            }
+        }
+    }
+
+    public void resolveWithClause(Session session, RangeVariable[] outerRanges) {
+        if (withList != null) {
+            for (WithExpression withExp : withList.getWithExpressions()) {
+                withExp.getBaseQuery().resolve(session, outerRanges);
+                if (withList.isRecursive()) {
+                    withExp.getRecursiveQuery().resolve(session, outerRanges);
+                }
+            }
+        }
+    }
+
+    public void resolve(Session session) {
+        resolveWithClause(session);
         resolveReferences(session);
         ExpressionColumn.checkColumnsResolved(unresolvedExpressions);
         resolveTypes(session);
     }
 
     public void resolve(Session session, RangeVariable[] outerRanges) {
+
+        resolveWithClause(session, outerRanges);
 
         resolveReferences(session);
 
@@ -631,7 +687,7 @@ public class QueryExpression {
         if (sortAndSlice.hasOrder()) {
             orderIndex = resultTable.createAndAddIndexStructure(null,
                     sortAndSlice.sortOrder, sortAndSlice.sortDescending,
-                    sortAndSlice.sortNullsLast, false, false, false);
+                    sortAndSlice.sortNullsLast, false, false, false, false);
         }
 
         int[] fullCols = new int[columnCount];
@@ -639,7 +695,7 @@ public class QueryExpression {
         ArrayUtil.fillSequence(fullCols);
 
         fullIndex = resultTable.createAndAddIndexStructure(null, fullCols,
-                null, null, false, false, false);
+                null, null, false, false, false, false);
         resultTable.fullIndex = fullIndex;
     }
 
@@ -831,4 +887,9 @@ public class QueryExpression {
         return rightQueryExpression;
     }
     /**********************************************************************/
+
+    public WithList getWithList() {
+        return withList;
+    }
+
 }

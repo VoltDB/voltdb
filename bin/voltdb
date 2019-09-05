@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -36,15 +36,15 @@
 import sys
 import os
 try:
-    # ensure version 2.6+ of python
-    if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+    # ensure version 2.7+ of python
+    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
         for dir in os.environ['PATH'].split(':'):
-            for name in ('python2.7', 'python2.6'):
+            for name in ['python2.7']:
                 path = os.path.join(dir, name)
-                if os.path.exists(path):
+                if os.path.isfile(path):
                     print 'Re-running with %s...' % path
                     os.execv(path, [path] + sys.argv)
-        sys.stderr.write("This script requires Python 2.6 or newer. Please install " +
+        sys.stderr.write("This script requires Python 2.7 or newer. Please install " +
                          "a more recent Python release and retry.\n")
         sys.exit(-1)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -23,8 +23,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-# This file contains the "geo" tests, which are a subset of those run
-# by the "postgis" sqlcoverage Jenkins job.
+# This file (mostly) contains the "geo" tests, which are a subset of those
+# run by the "postgis" sqlcoverage Jenkins job.
 
 # These tests only work when run against PostgreSQL/PostGIS, not HSQL. Hence,
 # to run them on the command line, use something like the following:
@@ -56,4 +56,11 @@
                       "template": "geo-functions.sql",
                       "normalizer": "normalizer.py",
                       "precision": "4"},
+    # This test suite does not contain "geo" tests, but it was added here
+    # anyway, since this config file is the one that runs the fastest,
+    # among the current "postgis" config files.
+    "advanced-starts-with": {"schema": "strings-schema.py",
+                             "ddl": "strings-DDL-null.sql",
+                             "template": "advanced-starts-with.sql",
+                             "normalizer": "nulls-lowest-normalizer.py"},
 }

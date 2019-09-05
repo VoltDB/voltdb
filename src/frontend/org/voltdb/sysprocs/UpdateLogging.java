@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,13 +27,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo(singlePartition = false)
 
 /**
  * Execute the supplied XML string using org.apache.log4j.xml.DomConfigurator
@@ -52,6 +49,11 @@ public class UpdateLogging extends VoltSystemProcedure
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
+    }
+
+    @Override
+    public boolean allowableSysprocForTaskLog() {
+        return true;
     }
 
     @Override

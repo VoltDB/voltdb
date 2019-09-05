@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -487,6 +487,10 @@ const std::string jsonPlan =
 
 
 class ExecutorVectorTest : public Test {
+public:
+    ~ExecutorVectorTest() {
+        voltdb::globalDestroyOncePerProcess();
+    }
 };
 
 TEST_F(ExecutorVectorTest, Large) {
@@ -530,6 +534,8 @@ TEST_F(ExecutorVectorTest, Large) {
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
 
+    SynchronizedThreadLock::debugSimulateSingleThreadMode(true);
+    SynchronizedThreadLock::assumeMpMemoryContext();
     for (int i = 0; i < 750; ++i) {
         std::ostringstream ossShort, ossLong;
         ossShort << "short " << i;
@@ -538,14 +544,16 @@ TEST_F(ExecutorVectorTest, Large) {
         Tools::setTupleValues(&tuple, i, ossShort.str(), ossLong.str());
         persTbl->insertTuple(tuple);
     }
+    SynchronizedThreadLock::assumeLowestSiteContext();
+    SynchronizedThreadLock::debugSimulateSingleThreadMode(false);
 
     tbl = engine->executePlanFragment(ev.get(), NULL);
     // Again send node has no output table.
     ASSERT_EQ(NULL, tbl.get());
 
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
+    ASSERT_EQ(0, lttBlockCache.allocatedMemory());
 }
 
 int main() {

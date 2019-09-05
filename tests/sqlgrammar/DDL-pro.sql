@@ -1,0 +1,99 @@
+-- Define "extra" DDL (tables, streams, indexes, views), for use with the
+-- SQL grammar generator when running with the 'pro' version of VoltDB; this
+-- separate file is needed because the 'community' version of VoltDB only
+-- allows 2 streams, including in Migrating tables
+
+-- Drop all 'pro' items first, in case they already exist
+file -inlinebatch END_OF_BATCH_PRO_1
+
+DROP STREAM S100 IF EXISTS CASCADE;
+DROP TABLE  R141 IF EXISTS CASCADE;
+DROP TABLE  P141 IF EXISTS CASCADE;
+
+END_OF_BATCH_PRO_1
+
+
+file -inlinebatch END_OF_BATCH_PRO_2
+
+-- TODO: once ENG-16526 is fixed, change column names INT1 back to INT
+-- and TIME1 back to TIME
+
+-- A Stream (a.k.a. an Export table)
+CREATE STREAM S100 EXPORT TO TARGET grammartarget (
+  ID      INTEGER,
+  TINY    TINYINT,
+  SMALL   SMALLINT,
+  INT1     INTEGER,
+  BIG     BIGINT,
+  NUM     FLOAT,
+  DEC     DECIMAL,
+  VCHAR_INLINE      VARCHAR(14),
+  VCHAR_INLINE_MAX  VARCHAR(63 BYTES),
+  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES),
+  VCHAR             VARCHAR,
+  VCHAR_JSON        VARCHAR(1000),
+  TIME1    TIMESTAMP,
+  VARBIN  VARBINARY(100),
+  POINT   GEOGRAPHY_POINT,
+  POLYGON GEOGRAPHY,
+  -- Used to test internet address functions:
+  -- INET6_ATON, INET6_NTOA, INET_ATON, INET_NTOA
+  IPV4    VARCHAR(15),
+  IPV6    VARCHAR(60),
+  VBIPV4  VARBINARY(4),
+  VBIPV6  VARBINARY(16)
+);
+
+-- Tables with a MIGRATE target and a TTL columnn
+CREATE TABLE R141 MIGRATE TO TARGET grammartarget (
+  ID      INTEGER NOT NULL PRIMARY KEY,
+  TINY    TINYINT,
+  SMALL   SMALLINT,
+  INT1     INTEGER,
+  BIG     BIGINT,
+  NUM     FLOAT,
+  DEC     DECIMAL,
+  VCHAR_INLINE      VARCHAR(42 BYTES),
+  VCHAR_INLINE_MAX  VARCHAR(15),
+  VCHAR_OUTLINE_MIN VARCHAR(16),
+  VCHAR             VARCHAR,
+  VCHAR_JSON        VARCHAR(4000 BYTES),
+  TIME1    TIMESTAMP DEFAULT NOW NOT NULL,
+  VARBIN  VARBINARY(100),
+  POINT   GEOGRAPHY_POINT,
+  POLYGON GEOGRAPHY,
+  -- Used to test internet address functions:
+  -- INET6_ATON, INET6_NTOA, INET_ATON, INET_NTOA
+  IPV4    VARCHAR(15),
+  IPV6    VARCHAR(60),
+  VBIPV4  VARBINARY(4),
+  VBIPV6  VARBINARY(16)
+) USING TTL 60 ON COLUMN TIME1;
+
+CREATE TABLE P141 MIGRATE TO TARGET grammartarget (
+  ID      INTEGER NOT NULL PRIMARY KEY,
+  TINY    TINYINT,
+  SMALL   SMALLINT,
+  INT1     INTEGER,
+  BIG     BIGINT,
+  NUM     FLOAT,
+  DEC     DECIMAL,
+  VCHAR_INLINE      VARCHAR(42 BYTES),
+  VCHAR_INLINE_MAX  VARCHAR(15),
+  VCHAR_OUTLINE_MIN VARCHAR(16),
+  VCHAR             VARCHAR,
+  VCHAR_JSON        VARCHAR(4000 BYTES),
+  TIME1    TIMESTAMP DEFAULT NOW NOT NULL,
+  VARBIN  VARBINARY(100),
+  POINT   GEOGRAPHY_POINT,
+  POLYGON GEOGRAPHY,
+  -- Used to test internet address functions:
+  -- INET6_ATON, INET6_NTOA, INET_ATON, INET_NTOA
+  IPV4    VARCHAR(15),
+  IPV6    VARCHAR(60),
+  VBIPV4  VARBINARY(4),
+  VBIPV6  VARBINARY(16)
+) USING TTL 60 ON COLUMN TIME1;
+PARTITION TABLE P141 ON COLUMN ID;
+
+END_OF_BATCH_PRO_2

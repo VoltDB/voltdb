@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.common;
 
+import java.io.File;
 import java.nio.charset.Charset;
 
 public class Constants
@@ -37,6 +38,11 @@ public class Constants
     public static final byte AUTH_HANDSHAKE = 5;
 
     public static final String KERBEROS = "kerberos";
+
+    public static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+    public static final String DEFAULT_KEYSTORE_PASSWD = "password";
+    public static final String DEFAULT_TRUSTSTORE_RESOURCE = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
+    public static final String DEFAULT_TRUSTSTORE_PASSWD = "changeit";
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
@@ -69,8 +75,8 @@ public class Constants
     /** String that can be used to indicate NULL value in CSV files */
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
-    // default export group to use when no group name is provided
-    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__default__";
+    // export connector name for streams that don't specify a target (Connectorless streams)
+    public static final String CONNECTORLESS_STREAM_TARGET_NAME = "__UNSPECIFIED_TARGET__";
 
     // Special HTTP port values to disable or trigger auto-scan.
     public static final int UNDEFINED = -1;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.orderbyprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo(singlePartition = false)
 public class OrderByCountStarAlias extends VoltProcedure {
     public final SQLStmt select = new SQLStmt("select A_INT, count(*) as FOO from O1 group by A_INT order by FOO;");
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -172,13 +172,13 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         }
 
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
-
-        ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
-        builder.putAll(Maps.filterKeys(oldReference, notUriIn(assignment.getRemoved())));
+        Map<URI, AbstractImporter> importersMap = Maps.newHashMap();
+        importersMap.putAll(oldReference);
         List<AbstractImporter> toStop = new ArrayList<>();
         List<String> missingRemovedURLs = new ArrayList<>();
         List<String> missingAddedURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
+            importersMap.remove(removed);
             if (m_configs.containsKey(removed)) {
                AbstractImporter importer = oldReference.get(removed);
                if (importer != null) {
@@ -192,9 +192,13 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         List<AbstractImporter> newImporters = new ArrayList<>();
         for (final URI added: assignment.getAdded()) {
             if (m_configs.containsKey(added)) {
+                //sanity check to avoid duplicated assignments
+                if (importersMap.containsKey(added)) {
+                    continue;
+                }
                 AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
                 newImporters.add(importer);
-                builder.put(added, importer);
+                importersMap.put(added, importer);
             } else {
                 missingAddedURLs.add(added.toString());
             }
@@ -206,21 +210,12 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                     Joiner.on(", ").join(missingAddedURLs) + "). Pause and Resume the database to refresh the importer.");
         }
 
-        ImmutableMap<URI, AbstractImporter> newReference = builder.build();
+        ImmutableMap<URI, AbstractImporter> newReference = ImmutableMap.copyOf(importersMap);
         boolean success = m_importers.compareAndSet(oldReference, newReference);
         if (!m_stopping && success) { // Could fail if stop was called after we entered inside this method
             stopImporters(toStop);
             startImporters(newImporters);
         }
-    }
-
-    private final static Predicate<URI> notUriIn(final Set<URI> uris) {
-        return new Predicate<URI>() {
-            @Override
-            final public boolean apply(URI uri) {
-                return !uris.contains(uri);
-            }
-        };
     }
 
     private void submitAccept(final AbstractImporter importer)
@@ -272,14 +267,18 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             m_distributer.unregisterCallback(m_distributerDesignation);
         }
 
-        if (m_executorService != null) {
-            m_executorService.shutdown();
-            try {
-                m_executorService.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException ex) {
-                //Should never come here.
-                s_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
-            }
+        if (m_executorService == null) {
+            return;
+        }
+
+        //graceful shutdown to allow importers to properly process post shutdown tasks.
+        m_executorService.shutdown();
+        try {
+            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+            m_executorService = null;
+        } catch (InterruptedException ex) {
+            //Should never come here.
+            s_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
         }
     }
 

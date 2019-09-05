@@ -9,50 +9,55 @@ GEB tests of Web Studio, in the, now deleted, ../studioWeb/ directory.
 To run these tests of the VMC:
 
 1. Download and install OR build from source VoltDB, either the community
-or pro version (the 'genqa' test app requires pro, if you want to use that).
+or pro version.
 
 2. Launch a (backgrounded) VoltDB server. The easiest way to do that, for VMC
-testing purposes, is from the voltdb/tests/geb/vmc/server/ directory, via this
-command:
+testing purposes, is from the voltdb/tests/geb/vmc/ directory, via this command:
 <pre>
-    ./run_voltdb_server.sh -p
+    ./run.sh server
 </pre>
-The '-p' argument is used to start the pro version of VoltDB; the default is
-the community version, so if you are running that, leave out this arg.
-You may also specify '-g' to run against the 'genqa' test app (which used to
-be the preferred server to use), or '-v' to run against the 'voter' example
-app.
+You may use the server-pro option, if you want to run the pro version of VoltDB.
 Or, you may start up and run against some other VoltDB server, if you prefer.
 
 3. From the voltdb/tests/geb/vmc/ directory, launch the all-in-one install/run
 script for the automated tests:
 <pre>
-    ./run_vmc_tests.sh debug
+    ./run.sh tests --debug --basic
 </pre>
-The 'debug' argument is optional; if specified, you will get more information
-in the results summary (HTML) files. This script simply runs the following
-Gradle command (which you may run directly, if you prefer), after putting the
-arguments in the right order, and providing defaults (and expanding the 'debug'
-arg); since no browser was specified, the default value of 'firefox' is used:
+The '--debug' argument is optional; if specified, you will get more information
+in the results summary (HTML) files. Similarly, the '--basic' argument is
+optional; if specified, you will run the 'basic' tests that actually work. This
+script simply runs the following Gradle command (which you may run directly, if
+you prefer), after putting the arguments in the right order, and providing
+defaults (and expanding the '--debug' and '--basic' args); since no browser was
+specified, the default value of 'chrome' is used:
 <pre>
-    ./gradlew -PdebugPrint=true firefox --rerun-tasks
+    ./gradlew -PdebugPrint=true chrome --tests=*BasicTest* --rerun-tasks
 </pre>
-(Using 'firefox' or 'firefoxTest' here is equivalent.)
+(Using 'chrome' or 'chromeTest' here is equivalent.) Note that, to use Chrome,
+you will first need to download the Chrome Driver, as described in:  <br>
+    https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver  <br>
+(mainly, make sure it's in a directory included in the system PATH).
 
 4. Scan the console output for highlighted FAILED messages or failed test
 counts and/or browse the test result summary rooted in:  <br>
-    voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html  <br>
+    voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html  <br>
 or, if you used PhantomJS / Ghost Driver:  <br>
     voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html  <br>
-or, if you used Chrome:  <br>
-    voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html  <br>
+or, if you used Firefox:  <br>
+    voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html  <br>
 or, if you used Internet Explorer (IE):  <br>
     voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html  <br>
 or, if you used Safari:  <br>
     voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html  <br>
 
-5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" - or 
-"kill <whatever your actual background job number(s) may be>").
+5. Stop the backgrounded server:
+    ./run.sh shutdown
+(Or, use "voltadmin shutdown" or "kill %1" - or "kill <whatever your actual
+background job number(s) may be>").
+
+6. If you prefer, you may do all of the above (after download), using:
+    ./run.sh all --debug --basic
 
 To add to or modify the existing tests:
 
@@ -103,28 +108,29 @@ Notes:
 so no GUI is needed (which is particularly useful on a Linux system without
 X11), using PhantomJS / Ghost Driver:
 <pre>
-    ./run_vmc_tests.sh debug phantomjs
+    ./run.sh --debug --basic phantomjs
 </pre>
-(you may use 'phantomjs' or 'phantomjsTest', and 'debug' is optional), then
-you will first need to download PhantomJS, as described here:
+(you may use 'phantomjs' or 'phantomjsTest', and '--debug' and '--basic' are
+optional), then you will first need to download PhantomJS, as described here:
     http://phantomjs.org/download.html
 (and make sure its bin directory is included in the system PATH).
 
-2. If you want to run these tests on Chrome, using:
+2. If you want to run these tests on Firefox, using:
 <pre>
-    ./run_vmc_tests.sh debug chrome
+    ./run.sh --debug --basic firefox
 </pre>
-(you may use 'chrome' or 'chromeTest', and 'debug' is optional), then you will
-first need to download the Chrome Driver, as described in:  <br>
-    https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver  <br>
-(mainly, make sure it's in a directory included in the system PATH).
+(you may use 'firefox' or 'firefoxTest', and '--debug' and '--basic' are
+optional). This does not work as well as it used to, perhaps due to recent
+updates to Selenium and Firefox versions. It is possible that it could work
+by specifying an appropriate seleniumVersion (see below), but this has not
+been investigated yet.
 
 3. Similarly, if you want to run these tests on Safari, on a Mac, using:
 <pre>
-    ./run_vmc_tests.sh debug safari
+    ./run.sh --debug --basic safari
 </pre>
-(you may use 'safari' or 'safariTest', and 'debug' is optional), then you will
-first need to follow the instructions here:  <br>
+(you may use 'safari' or 'safariTest', and '--debug' and '--basic' are
+optional), then you will first need to follow the instructions here:  <br>
     https://github.com/SeleniumHQ/selenium/wiki/SafariDriver  <br>
 about opening the latest version of SafariDriver.safariextz, and clicking the
 "install" button.
@@ -132,14 +138,14 @@ about opening the latest version of SafariDriver.safariextz, and clicking the
 with PhantomJS / Ghost Driver.)
 
 4. Similarly, if you want to run these tests on Internet Explorer (IE), on a
-Windows system, using (note that the run_vmc_tests.sh script will not work on
-Windows; 'gradlew' here refers to gradlew.bat):
+Windows system, using (note that the run.sh script will not work on Windows;
+'gradlew' here refers to gradlew.bat):
 <pre>
-    gradlew -PdebugPrint=true ie --rerun-tasks
+    gradlew -PdebugPrint=true ie --tests=*BasicTest* --rerun-tasks
 </pre>
-(you may use 'ie' or 'ieTest', and '-PdebugPrint=true' is optional), then you
-will first need to download the IE driver, as described here (under 'The
-Internet Explorer Driver Server'):  <br>
+(you may use 'ie' or 'ieTest', and '-PdebugPrint=true' and --tests=*BasicTest*
+are optional), then you will first need to download the IE driver, as described
+here (under 'The Internet Explorer Driver Server'):  <br>
     http://docs.seleniumhq.org/download/  <br>
 but also be aware of this recent issue:  <br>
     https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw  <br>
@@ -149,13 +155,14 @@ with PhantomJS / Ghost Driver.)
 
 5. If you want to run just one test class or method, you may do so using
 the --tests argument. For example, to run all of the tests in the
-NavigatePagesTest class (on Firefox, with the optional 'debug' argument), run:
+NavigatePagesBasicTest class (on Firefox, with the optional '--debug'
+argument), run:
 <pre>
-    ./run_vmc_tests.sh debug --tests=*NavigatePages*
+    ./run.sh --debug --tests=*NavigatePages*
 </pre>
 Or, to run just the checkTables method (in the SqlQueriesTest class), run:
 <pre>
-    ./run_vmc_tests.sh debug --tests=*checkTables
+    ./run.sh --debug --tests=*checkTables
 </pre>
 
 6. Two test classes, SqlQueriesTest and FullDdlSqlTest, mostly run tests that
@@ -165,19 +172,19 @@ However, you may narrow down these further using the '-PsqlTests=...' argument.
 For instance, you can run only the first two tests defined in 
 voltdb/tests/geb/vmc/src/resources/sqlQueries.txt, as follows:
 <pre>
-    ./run_vmc_tests.sh debug --tests=*sqlQueries* -PsqlTests=InsertBigInt,InsertTinyInt
+    ./run.sh --debug --tests=*sqlQueries* -PsqlTests=SetVariables,InsertBigInt,InsertTinyInt
 </pre>
 Or, you can run only the (related) first tests in both
 voltdb/tests/frontend/org/voltdb/fullddlfeatures/fullDDL.sql and
 voltdb/tests/frontend/org/voltdb/fullddlfeatures/TestDDLFeatures.java, as follows:
 <pre>
-    ./run_vmc_tests.sh debug --tests=*FullDdlSql* -PsqlTests=CREATE_TABLE_T1,testCreateUniqueIndex
+    ./run.sh --debug --tests=*FullDdlSql* -PsqlTests=CREATE_TABLE_T1,testCreateUniqueIndex
 </pre>
 
 7. There are several other system properties that can be specified on the
 command-line using '-P' arguments, as follows:
 <pre>
-    ./run_vmc_tests.sh -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=30
+    ./run.sh -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=30
 </pre>
 Here is a description of all system properties currently available:
 <pre>

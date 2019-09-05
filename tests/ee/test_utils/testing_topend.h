@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -39,7 +39,8 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */#ifndef TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
+ */
+#ifndef TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
 #define TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
 #include <map>
 #include "common/Topend.h"

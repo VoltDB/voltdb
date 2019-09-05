@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -104,9 +104,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
@@ -123,9 +122,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
@@ -812,7 +810,7 @@ public class TestDRCatalogDiffs {
 
         String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
         Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
-        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
+        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog, (byte) 0);
     }
 
     private Catalog createCatalog(String schema) throws Exception {

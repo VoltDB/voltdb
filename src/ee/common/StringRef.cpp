@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,32 +24,42 @@
 
 using namespace voltdb;
 
-inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr)
-{ return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr); }
+char const* empty_string = "";
 
-char* StringRef::getObjectValue()
-{ return asSizedObject(m_stringPtr)->m_data; }
+inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
+   return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
+}
 
-const char* StringRef::getObjectValue() const
-{ return asSizedObject(m_stringPtr)->m_data; }
+char* StringRef::getObjectValue() {
+   return asSizedObject(m_stringPtr)->m_data;
+}
 
-int32_t StringRef::getObjectLength() const
-{ return asSizedObject(m_stringPtr)->m_size; }
+const char* StringRef::getObjectValue() const {
+   return asSizedObject(m_stringPtr)->m_data;
+}
 
-const char* StringRef::getObject(int32_t* lengthOut) const
-{
+int32_t StringRef::getObjectLength() const {
+   return asSizedObject(m_stringPtr)->m_size;
+}
+
+const char* StringRef::getObject(int32_t& lengthOut) const {
     /*/ enable to debug
     std::cout << this << " DEBUG: getting [" << asSizedObject(m_stringPtr)->m_size << "]"
               << std::string(asSizedObject(m_stringPtr)->m_data,
                              asSizedObject(m_stringPtr)->m_size)
               << std::endl;
     // */
-    *lengthOut = asSizedObject(m_stringPtr)->m_size;
-    return asSizedObject(m_stringPtr)->m_data;
+    auto const* sized = asSizedObject(m_stringPtr);
+    lengthOut = sized->m_size;
+    if (lengthOut > 0) {
+        return sized->m_data;
+    } else {
+        lengthOut = 0;
+        return empty_string;
+    }
 }
 
-int32_t StringRef::getAllocatedSizeInPersistentStorage() const
-{
+int32_t StringRef::getAllocatedSizeInPersistentStorage() const {
     // The CompactingPool allocated a chunk of this size for storage.
     int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
     //cout << "Pool allocation size: " << alloc_size << endl;
@@ -62,9 +72,7 @@ int32_t StringRef::getAllocatedSizeInPersistentStorage() const
 
 int32_t StringRef::getAllocatedSizeInTempStorage() const {
     int32_t size = asSizedObject(m_stringPtr)->m_size;
-    size += sizeof(StringRef) + sizeof(ThreadLocalPool::Sized);
-
-    return size;
+    return size + sizeof(StringRef) + sizeof(ThreadLocalPool::Sized);
 }
 
 // Persistent strings are initialized to point to relocatable storage.
@@ -83,25 +91,22 @@ int32_t StringRef::getAllocatedSizeInTempStorage() const {
 // The alternative would be to require the allocator to be aware of the
 // StringRef class so that it can call a proper accessor method.
 // An earlier implementation taking this approach proved hard to follow.
-inline StringRef::StringRef(int32_t sz)
-  : m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz)))
-{ }
+inline StringRef::StringRef(int32_t sz):
+    m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) { }
 
 // Temporary strings are allocated in one piece with their referring
 // StringRefs -- the string data starts just past the StringRef object,
 // which by the rules of object pointer math is just "this+1".
-inline StringRef::StringRef(Pool* unused, int32_t sz)
-  : m_stringPtr(reinterpret_cast<char*>(this+1))
-{ asSizedObject(m_stringPtr)->m_size = sz; }
+inline StringRef::StringRef(Pool* unused, int32_t sz) : m_stringPtr(reinterpret_cast<char*>(this+1)) {
+    asSizedObject(m_stringPtr)->m_size = sz;
+}
 
 // The destroy method keeps this from getting run on temporary strings.
-inline StringRef::~StringRef()
-{
+inline StringRef::~StringRef() {
     ThreadLocalPool::freeRelocatable(asSizedObject(m_stringPtr));
 }
 
-StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool)
-{
+StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     /*/ enable to debug
     if (source) {
         std::cout << "DEBUG: setting [" << sz << "]" << std::string(source, sz) << std::endl;
@@ -110,33 +115,31 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool)
         std::cout << "DEBUG: setting up [" << sz << "]" << std::endl;
     }
     // */
+    vassert(sz >= 0);
     StringRef* result;
     if (tempPool) {
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(tempPool, sz);
-    }
-    else {
+    } else {
 #ifdef MEMCHECK
         result = new StringRef(sz);
 #else
         result = new (ThreadLocalPool::allocateExactSizedObject(sizeof(StringRef))) StringRef(sz);
 #endif
     }
-    if (source) {
+    if (source && sz > 0) {
         ::memcpy(result->getObjectValue(), source, sz);
     }
     return result;
 }
 
-StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock)
-{
-    assert (lttBlock != NULL);
+StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock) {
+    vassert(lttBlock != nullptr);
     StringRef* result;
     result = new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(NULL, sz);
 
     if (source) {
         ::memcpy(result->getObjectValue(), source, sz);
     }
-
     return result;
 
 }
@@ -146,8 +149,7 @@ void StringRef::relocate(std::ptrdiff_t offset) {
 }
 
 // The destroy method keeps this from getting run on temporary strings.
-void StringRef::operator delete(void* sref)
-{
+void StringRef::operator delete(void* sref) {
 #ifdef MEMCHECK
     ::operator delete(sref);
 #else
@@ -155,9 +157,7 @@ void StringRef::operator delete(void* sref)
 #endif
 }
 
-void
-StringRef::destroy(StringRef* sref)
-{
+void StringRef::destroy(StringRef* sref) {
     // Temporary strings are allocated in one piece with their referring
     // StringRefs -- both get deallocated as raw storage when the temp pool
     // is purged or destroyed. They MUST NOT be deallocated here and now.

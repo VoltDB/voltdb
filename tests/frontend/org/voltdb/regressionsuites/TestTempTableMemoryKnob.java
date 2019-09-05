@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -35,13 +33,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
 
-public class TestTempTableMemoryKnob extends RegressionSuite {
+import junit.framework.Test;
 
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES =
-    {
-     InsertLotsOfData.class, FetchTooMuch.class
-    };
+public class TestTempTableMemoryKnob extends RegressionSuite {
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -103,7 +97,9 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(InsertLotsOfData.class);
+        project.addProcedure(FetchTooMuch.class);
+
         // Give ourselves a little leeway for slop over 300 MB
         project.setMaxTempTableMemory(320);
         // build the jarfile

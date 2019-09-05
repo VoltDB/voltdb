@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,12 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Map;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -29,7 +33,9 @@ import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -103,6 +109,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
      * handles the transition between locking vs. submitting to the MpInitiatorMailbox task queue.
      */
     protected Object m_lock;
+    // Lock shared by all schedulers to de-conflict the first dump message to log a stacktrace of all site threads
+    private static final Object s_threadDumpLock = new Object();
+    private static long s_txnIdForSiteThreadDump = 0;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
@@ -206,7 +215,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState);
 
     @Override
     abstract public void deliver(VoltMessage message);
@@ -214,4 +224,30 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
+
+    //flush out read only transactions upon host failure
+    public void cleanupTransactionBacklogOnRepair() {}
+
+    protected static void generateSiteThreadDump(StringBuilder threadDumps) {
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
+        for (ThreadInfo t : threadInfos) {
+            if (t.getThreadName().startsWith("SP") || t.getThreadName().startsWith("MP Site") || t.getThreadName().startsWith("RO MP Site")) {
+                threadDumps.append(t);
+            }
+        }
+    }
+
+    protected static void dumpStackTraceOnFirstSiteThread(DumpMessage message, StringBuilder threadDumps) {
+        synchronized(s_threadDumpLock) {
+            if (message.getTxnId() > s_txnIdForSiteThreadDump) {
+                s_txnIdForSiteThreadDump = message.getTxnId();
+            } else {
+                return;
+            }
+        }
+        threadDumps.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
+        generateSiteThreadDump(threadDumps);
+        threadDumps.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+    }
 }

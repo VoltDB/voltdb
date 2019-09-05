@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -68,6 +69,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -418,7 +420,7 @@ public class CoreUtils {
     };
 
     /**
-     * Get a single thread executor that caches it's thread meaning that the thread will terminate
+     * Get a single thread executor that caches its thread meaning that the thread will terminate
      * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
      * around for keepAlive milliseconds. On creation no thread is allocated, the first task creates a thread.
      *
@@ -848,6 +850,14 @@ public class CoreUtils {
         return (int) (HSId & 0xffffffff);
     }
 
+    public static Set<Integer> getHostIdsFromHSIDs(Collection<Long> hsids) {
+        Set<Integer> hosts = Sets.newHashSet();
+        for (Long id : hsids) {
+            hosts.add(getHostIdFromHSId(id));
+        }
+        return hosts;
+    }
+
     public static String hsIdToString(long hsId) {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }
@@ -1010,13 +1020,22 @@ public class CoreUtils {
             final TimeUnit startUnit,
             final long maxInterval,
             final TimeUnit maxUnit) {
+
+        SettableFuture<T> future = SettableFuture.create();
+        retryHelper(ses, es, callable, maxAttempts, startInterval, startUnit, maxInterval, maxUnit, future);
+        return future;
+    }
+
+    public static final <T> void retryHelper(final ScheduledExecutorService ses, final ExecutorService es,
+            final Callable<T> callable, final long maxAttempts, final long startInterval, final TimeUnit startUnit,
+            final long maxInterval, final TimeUnit maxUnit, final SettableFuture<T> future) {
         Preconditions.checkNotNull(maxUnit);
         Preconditions.checkNotNull(startUnit);
         Preconditions.checkArgument(startUnit.toMillis(startInterval) >= 1);
         Preconditions.checkArgument(maxUnit.toMillis(maxInterval) >= 1);
         Preconditions.checkNotNull(callable);
+        Preconditions.checkNotNull(future);
 
-        final SettableFuture<T> retval = SettableFuture.create();
         /*
          * Base case with no retry, attempt the task once
          */
@@ -1024,16 +1043,16 @@ public class CoreUtils {
             @Override
             public void run() {
                 try {
-                    retval.set(callable.call());
+                    future.set(callable.call());
                 } catch (RetryException e) {
                     //Now schedule a retry
-                    retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
+                    retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0,
+                            future);
                 } catch (Exception e) {
-                    retval.setException(e);
+                    future.setException(e);
                 }
             }
         });
-        return retval;
     }
 
     private static final <T> void retryHelper(

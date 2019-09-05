@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
+  <component name="CidrRootsConfiguration">
+    <sourceRoots>
+      <file path="$PROJECT_DIR$/src/catgen/in/cppsrc" />
+      <file path="$PROJECT_DIR$/src/catgen/out/cppsrc" />
+      <file path="$PROJECT_DIR$/src/ee" />
+      <file path="$PROJECT_DIR$/tests/ee" />
+      <file path="$PROJECT_DIR$/third_party/cpp" />
+    </sourceRoots>
+  </component>
+</project>

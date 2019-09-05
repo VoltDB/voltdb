@@ -65,7 +65,7 @@ public class StatementInsert extends StatementDML {
         this.insertExpression       = insertExpression;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -86,7 +86,7 @@ public class StatementInsert extends StatementDML {
         this.queryExpression        = queryExpression;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 

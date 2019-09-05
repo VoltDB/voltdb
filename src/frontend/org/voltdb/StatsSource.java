@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,7 +54,6 @@ public abstract class StatsSource {
      * Initialize this source of statistical information with the specified
      * name. Populate the column schema by calling populateColumnSchema on the
      * derived class and use it to populate the columnNameToIndex map.
-     * @param name
      * @param isEE If this source represents statistics from EE
      */
     public StatsSource(boolean isEE) {
@@ -184,6 +183,14 @@ public abstract class StatsSource {
         rowValues[0] = now;
         rowValues[1] = m_hostId;
         rowValues[2] = m_hostname;
+    }
+
+    public Integer getHostId() {
+        return m_hostId;
+    }
+
+    public String getHostname() {
+        return m_hostname;
     }
 
     /**

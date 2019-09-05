@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -69,6 +70,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
@@ -82,6 +84,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -151,6 +154,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -186,6 +190,9 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+    public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
+    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -193,6 +200,10 @@ public abstract class CatalogUtil {
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo MIGRATE_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -372,6 +383,89 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Tell if a table is a single table view without a COUNT(*) column.
+     * In that case, the table will have a hidden COUNT(*) column which we need to
+     * include in the snapshot.
+     * @param table The table to check.
+     * @return true if we need to snapshot a hidden COUNT(*) column.
+     */
+    public static boolean needsViewHiddenColumn(Table table) {
+        // The table must be a view, and it can only have one source table.
+        // We do not care if the source table is persistent or streamed.
+
+        // If the table is not a materialized view, skip.
+        if (table.getMaterializer() == null) {
+            return false;
+        }
+
+        // If the table is a materialized view, then search if there is a COUNT(*) column.
+        // We only allow the users to omit the COUNT(*) column if the view is built on
+        // one single table. So we do not check again here.
+        for (Column c : table.getColumns()) {
+            if (ExpressionType.get(c.getAggregatetype()) == ExpressionType.AGGREGATE_COUNT_STAR) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a persistent table view and should be included in the snapshot.
+     * @param db The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a persistent table view that should be snapshotted.
+     */
+    public static boolean isSnapshotablePersistentTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (CatalogUtil.isStream(db, materializer)) {
+            // The view source table should not be a streamed table.
+            return false;
+        }
+        if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
+            // If the view table is implicitly partitioned (maybe was not in snapshot),
+            // its maintenance is not turned off during the snapshot restore process.
+            // Let it take care of its own data by itself.
+            // Do not attempt to restore data for it.
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a streamed table view and should be included in the snapshot.
+     * @param db The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a streamed table view that should be snapshotted.
+     */
+    public static boolean isSnapshotableStreamedTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (! CatalogUtil.isStream(db, materializer)) {
+            // Test if the view source table is a streamed table.
+            return false;
+        }
+        // Non-partitioned export table are not allowed so it should not get here.
+        Column sourcePartitionColumn = materializer.getPartitioncolumn();
+        if (sourcePartitionColumn == null) {
+            return false;
+        }
+        // Make sure the partition column is present in the view.
+        // Export table views are special, we use column names to match..
+        Column pc = table.getColumns().get(sourcePartitionColumn.getName());
+        if (pc == null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Get a unique id for a plan fragment by munging the indices of it's parents
      * and grandparents in the catalog.
      *
@@ -400,7 +494,7 @@ public abstract class CatalogUtil {
 
         int i = 0;
         for (Column catCol : catalogColumns) {
-            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+            columns[i++] = catalogColumnToInfo(catCol);
         }
 
         return new VoltTable(columns);
@@ -419,7 +513,7 @@ public abstract class CatalogUtil {
 
         int i = 0;
         for (Column catCol : catalogColumns) {
-            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+            columns[i++] = catalogColumnToInfo(catCol);
         }
         for (VoltTable.ColumnInfo hiddenColumnInfo : hiddenColumns) {
             columns[i++] = hiddenColumnInfo;
@@ -440,28 +534,8 @@ public abstract class CatalogUtil {
      * @return A list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> List<T> getSortedCatalogItems(CatalogMap<T> items, String sortFieldName) {
-        assert(items != null);
-        assert(sortFieldName != null);
-
-        // build a treemap based on the field value
-        TreeMap<Object, T> map = new TreeMap<>();
-        boolean hasField = false;
-        for (T item : items) {
-            // check the first time through for the field
-            if (hasField == false) {
-                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
-            }
-            assert(hasField == true);
-
-            map.put(item.getField(sortFieldName), item);
-        }
-
-        // create a sorted list from the map
-        ArrayList<T> retval = new ArrayList<>();
-        for (T item : map.values()) {
-            retval.add(item);
-        }
-
+        List<T> retval = new ArrayList<>();
+        getSortedCatalogItems(items, sortFieldName, retval);
         return retval;
     }
 
@@ -473,7 +547,23 @@ public abstract class CatalogUtil {
      * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
-        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
+        assert (items != null);
+        assert (sortFieldName != null);
+
+        // build a treemap based on the field value
+        TreeMap<Object, T> map = new TreeMap<>();
+        boolean hasField = false;
+        for (T item : items) {
+            // check the first time through for the field
+            if (hasField == false) {
+                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
+            }
+            assert (hasField == true);
+
+            map.put(item.getField(sortFieldName), item);
+        }
+
+        result.addAll(map.values());
     }
 
     /**
@@ -533,6 +623,77 @@ public abstract class CatalogUtil {
         return exportTables.build();
     }
 
+    public static NavigableSet<Table> getExportTablesExcludeViewOnly(CatalogMap<Connector> connectors) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : connectors) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                Table t = tinfo.getTable();
+                if (t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
+                exportTables.add(t);
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static List<String> getDisabledConnectors() {
+        List<String> disabledConnectors = new LinkedList<>();
+        for (Connector conn : getConnectors(VoltDB.instance().getCatalogContext())) {
+            if (!conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                disabledConnectors.add(conn.getTypeName());
+            }
+        }
+        return disabledConnectors;
+    }
+
+    public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
+
+        if (!logger.isDebugEnabled()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        logger.debug(sb.toString());
+    }
+
     public static NavigableSet<String> getExportTableNames(Database db) {
         ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
         for (Connector connector : db.getConnectors()) {
@@ -544,26 +705,36 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a streamed / export table
-     * This function is duplicated in CatalogUtil.h
+     * Return true if a table was explicitly declared as a STREAM in the DDL
+     *
      * @param database
      * @param table
      * @return true if a table is export or false otherwise
      */
-    public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
-                                            org.voltdb.catalog.Table table)
-    {
-        for (Connector connector : database.getConnectors()) {
-            // iterate the connector tableinfo list looking for tableIndex
-            // tableInfo has a reference to a table - can compare the reference
-            // to the desired table by looking at the relative index. ick.
-            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                    return true;
+    public static boolean isStream(org.voltdb.catalog.Database database,
+                                            org.voltdb.catalog.Table table) {
+        int type = table.getTabletype();
+        // Starting from V9.2 we should not read pre-9.0 snapshots
+        // However, many JUnit tests mock the environment with invalid table types
+        // assert(!TableType.isInvalidType(type));
+        if (TableType.isInvalidType(type)) {
+            // This implementation uses connectors instead of just looking at the tableType
+            // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
+            for (Connector connector : database.getConnectors()) {
+                // iterate the connector tableinfo list looking for tableIndex
+                // tableInfo has a reference to a table - can compare the reference
+                // to the desired table by looking at the relative index. ick.
+                for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                    if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                        return true;
+                    }
                 }
             }
+            // Found no connectors
+            return false;
+        } else {
+            return TableType.isStream(type);
         }
-        return false;
     }
 
     public static boolean isExportEnabled() {
@@ -734,7 +905,7 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
@@ -1091,8 +1262,9 @@ public abstract class CatalogUtil {
 
             boolean foundAdminUser = false;
             for (UsersType.User user : deployment.getUsers().getUser()) {
-                if (user.getRoles() == null)
+                if (user.getRoles() == null) {
                     continue;
+                }
 
                 for (String role : extractUserRoles(user)) {
                     if (role.equalsIgnoreCase(ADMIN)) {
@@ -1294,8 +1466,6 @@ public abstract class CatalogUtil {
             throw new DeploymentCheckException("Unable to instantiate export processor", e);
         }
         try {
-            processor.addLogger(hostLog);
-
             processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
@@ -1520,9 +1690,7 @@ public abstract class CatalogUtil {
                 String version = importConfiguration.getVersion().trim();
                 if ("8".equals(version)) {
                     if (validation) {
-                        hostLog.warn("Kafka importer version 0.8 is being deprecated. "
-                                + "The default importer will change to Kafka 0.10 at the next major release. "
-                                + "Add version=\"10\" to the import configuration to use Kafka 0.10 in the current release.");
+                        hostLog.warn("Kafka importer version 0.8 has been deprecated.");
                     }
                     importBundleUrl = "kafkastream.jar";
                 } else if ("10".equals(version)) {
@@ -1622,19 +1790,9 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
-                        throw new RuntimeException("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "DR Conflicts cannot be handled.");
-                    } else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "Export target " + targetName + " will be disabled.");
-                    }
+                    hostLog.info("Export configuration enabled and provided for export target " + targetName
+                            + " in deployment file however no export tables are assigned to the this target. "
+                            + "Export target " + targetName + " will be disabled.");
                 }
                 continue;
             }
@@ -1706,7 +1864,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
                 kafkaConfigs.add(importConfiguration);
@@ -1791,7 +1951,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
@@ -2172,7 +2334,8 @@ public abstract class CatalogUtil {
                             saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
-
+            //use fixed seed for comparison
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
@@ -2201,12 +2364,16 @@ public abstract class CatalogUtil {
      */
     private static Set<String> extractUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<>();
-        if (user == null) return roles;
+        if (user == null) {
+            return roles;
+        }
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
-                if( role == null || role.trim().isEmpty()) continue;
+                if( role == null || role.trim().isEmpty()) {
+                    continue;
+                }
                 roles.add(role.trim().toLowerCase());
             }
         }
@@ -2226,7 +2393,7 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType, boolean isPlaceHolderCatalog) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -2248,13 +2415,11 @@ public abstract class CatalogUtil {
                 clusterId = clusterType.getId();
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
+            } else if (clusterType.getId().equals(dr.getId())) {
+                clusterId = clusterType.getId();
             } else {
-                if (clusterType.getId().equals(dr.getId())) {
-                    clusterId = clusterType.getId();
-                } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
-                            + "deprecated, please remove");
-                }
+                throw new RuntimeException("Detected two conflicting cluster ids in deployment file, "
+                        + "setting cluster id in DR tag is deprecated, please remove");
             }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
@@ -2278,11 +2443,18 @@ public abstract class CatalogUtil {
                     }
                 }
                 hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
-            } else {
-                if (dr.getRole() == DrRoleType.XDCR) {
-                    // consumer should be enabled even without connection source for XDCR
-                    cluster.setDrconsumerenabled(true);
-                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            } else if (dr.getRole() == DrRoleType.XDCR) {
+                // consumer should be enabled even without connection source for XDCR
+                cluster.setDrconsumerenabled(true);
+                cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            }
+            if (!isPlaceHolderCatalog && dr.getRole() == DrRoleType.XDCR) {
+                CatalogMap<Table> tables = db.getTables();
+                if (tables.get(DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) == null
+                        || tables.get(DR_CONFLICTS_REPLICATED_EXPORT_TABLE) == null) {
+                    throw new RuntimeException("The XDCR role cannot be changed on an existing database. "
+                            + "Save the contents, initialize a new instance with the desired role, "
+                            + "and restore the contents.");
                 }
             }
         } else {
@@ -2385,10 +2557,6 @@ public abstract class CatalogUtil {
         ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
-                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        // create the previous catalog bytes zk node
-        zk.create(VoltZK.catalogbytesPrevious,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
@@ -2520,23 +2688,73 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Get all normal table names from a in-memory catalog jar file.
-     * A normal table is one that's NOT a materialized view, nor an export table.
-     * @param InMemoryJarfile a in-memory catalog jar file
-     * @return A set of normal table names
+     * Get all snapshot-able table names from an in-memory catalog jar file.
+     * A snapshot-able table is one that's neither an export table nor an implicitly partitioned view.
+     * @param jarfile a in-memory catalog jar file
+     * @return A pair of two string sets.</br>
+     *         The first set contains a complete list of names of snapshot-able tables.</br>
+     *         The second set contains a list of names of optional
+     *         <strong>single persistent table views</strong> without which the snapshot
+     *         is still considered as complete (ENG-11578, ENG-14145).
      */
-    public static Set<String> getNormalTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
-        Set<String> tableNames = new HashSet<>();
+    public static Pair<Set<String>, Set<String>>
+    getSnapshotableTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
+        Set<String> fullTableNames = new HashSet<>();
+        Set<String> optionalTableNames = new HashSet<>();
         Catalog catalog = new Catalog();
         catalog.execute(getSerializedCatalogStringFromJar(jarfile));
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        for (Table table : getNormalTables(db, true)) {
-            tableNames.add(table.getTypeName());
+        Pair<List<Table>, Set<String>> ret;
+
+        ret = getSnapshotableTables(db, true);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        ret = getSnapshotableTables(db, false);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        return new Pair<Set<String>, Set<String>>(fullTableNames, optionalTableNames);
+    }
+
+    /**
+     * Get all snapshot-able tables from the catalog. A snapshot-able table is one
+     * that's neither an export table nor an implicitly partitioned view.
+     * @param catalog         Catalog database
+     * @param isReplicated    true to return only replicated tables,
+     *                        false to return all partitioned tables
+     * @return A pair that contains a complete list of snapshot-able tables and a list
+     *         of names of optional <strong>single persistent table views</strong> without
+     *         which the snapshot is still considered as complete (ENG-11578, ENG-14145).
+     */
+    public static Pair<List<Table>, Set<String>>
+    getSnapshotableTables(Database catalog, boolean isReplicated) {
+        List<Table> tables = new ArrayList<>();
+        Set<String> optionalTableNames = new HashSet<>();
+        for (Table table : catalog.getTables()) {
+            if (table.getIsreplicated() != isReplicated) {
+                // We handle replicated tables and partitioned tables separately.
+                continue;
+            }
+            if (isStream(catalog, table)) {
+                // Streamed tables are not considered as "normal" tables here.
+                continue;
+            }
+            if (table.getMaterializer() != null) {
+                if (isSnapshotablePersistentTableView(catalog, table)) {
+                    // Some persistent table views are added to the snapshot starting from
+                    // V8.2, they are since then considered as "normal" tables, too.
+                    // But their presence in the snapshot is not compulsory for backward
+                    // compatibility reasons.
+                    optionalTableNames.add(table.getTypeName());
+                }
+                else if (! isSnapshotableStreamedTableView(catalog, table)) {
+                    continue;
+                }
+            }
+            tables.add(table);
         }
-        for (Table table : getNormalTables(db, false)) {
-            tableNames.add(table.getTypeName());
-        }
-        return tableNames;
+        return new Pair<List<Table>, Set<String>>(tables, optionalTableNames);
     }
 
     /**
@@ -2551,15 +2769,15 @@ public abstract class CatalogUtil {
         List<Table> tables = new ArrayList<>();
         for (Table table : catalog.getTables()) {
             if ((table.getIsreplicated() == isReplicated) &&
-                table.getMaterializer() == null &&
-                !CatalogUtil.isTableExportOnly(catalog, table)) {
+                    table.getMaterializer() == null &&
+                    !CatalogUtil.isStream(catalog, table)) {
                 tables.add(table);
                 continue;
             }
             //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
             //column as part of view.
             if ((table.getMaterializer() != null) && !isReplicated
-                    && (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
+                    && (CatalogUtil.isStream(catalog, table.getMaterializer()))) {
                 //Non partitioned export table are not allowed so it should not get here.
                 Column bpc = table.getMaterializer().getPartitioncolumn();
                 if (bpc != null) {
@@ -2679,8 +2897,8 @@ public abstract class CatalogUtil {
      */
     public static Pair<Long, String> calculateDrTableSignatureAndCrc(Database catalog) {
         SortedSet<Table> tables = Sets.newTreeSet();
-        tables.addAll(getNormalTables(catalog, true));
-        tables.addAll(getNormalTables(catalog, false));
+        tables.addAll(getSnapshotableTables(catalog, true).getFirst());
+        tables.addAll(getSnapshotableTables(catalog, false).getFirst());
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         final StringBuilder sb = new StringBuilder();
@@ -2738,8 +2956,9 @@ public abstract class CatalogUtil {
      * by a LIMIT PARTITION ROWS constraint, or NULL if there isn't one. */
     public static String getLimitPartitionRowsDeleteStmt(Table table) {
         CatalogMap<Statement> map = table.getTuplelimitdeletestmt();
-        if (map.isEmpty())
+        if (map.isEmpty()) {
             return null;
+        }
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();
@@ -2858,7 +3077,6 @@ public abstract class CatalogUtil {
         clone.setSecurity(o.getSecurity());
         clone.setDr(o.getDr());
         clone.setImport(o.getImport());
-        clone.setConsistency(o.getConsistency());
 
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();
@@ -2867,7 +3085,6 @@ public abstract class CatalogUtil {
         cluster.setSitesperhost(other.getSitesperhost());
         cluster.setKfactor(other.getKfactor());
         cluster.setId(other.getId());
-        cluster.setElastic(other.getElastic());
         cluster.setSchema(other.getSchema());
 
         clone.setCluster(cluster);
@@ -3002,15 +3219,17 @@ public abstract class CatalogUtil {
         sb.append("Statement Hash: ").append(hash);
         sb.append(", Statement SQL: ").append(sqlText);
         ProcedureRunner runner = procSet.getProcByName(proc.getTypeName());
-        for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
-            for (PlanFragment frag : stmt.getFragments()) {
-                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
-                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
-                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
-                sb.append(", Plan Fragment Id:").append(planId);
-                sb.append(", Plan Stmt Text:").append(stmtText);
-                sb.append(", Json Plan:").append(new String(jsonPlan));
+        if (runner != null) {
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
             }
         }
         sb.append("\n");
@@ -3022,5 +3241,60 @@ public abstract class CatalogUtil {
      */
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
+    }
+
+    public static Map<String, Table> getTimeToLiveTables(Database db) {
+        Map<String, Table> ttls = Maps.newHashMap();
+        for (Table t : db.getTables()) {
+            if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
+                ttls.put(t.getTypeName().toLowerCase(),t);
+            }
+        }
+        return ttls;
+    }
+
+    public static boolean isColumnIndexed(Table table, Column column) {
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if(column.equals(colRef.getColumn())){
+                 return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean getIsreplicated(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return table.getIsreplicated();
+        }
+        return false;
+    }
+
+    public static boolean isPersistentMigrate(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return TableType.isPersistentMigrate(table.getTabletype());
+        }
+        return false;
+    }
+
+    public static boolean hasShadowStream(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return TableType.needsShadowStream(table.getTabletype());
+        }
+        return false;
+    }
+
+    /**
+     * Utility method for converting a {@link Column} to a {@link VoltTable.ColumnInfo}
+     *
+     * @param column Source {@link Column}
+     * @return {@code column} converted into a {@link VoltTable.ColumnInfo}
+     */
+    public static VoltTable.ColumnInfo catalogColumnToInfo(Column column) {
+        return new VoltTable.ColumnInfo(column.getTypeName(), VoltType.get((byte) column.getType()));
     }
 }

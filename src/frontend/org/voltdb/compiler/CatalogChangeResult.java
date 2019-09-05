@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,4 +44,6 @@ public class CatalogChangeResult {
     public int expectedCatalogVersion = -1;
     // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
+    // This is true if there are security user changes.
+    public boolean hasSecurityUserChange;
 }

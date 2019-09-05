@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,8 +39,6 @@ import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 public class RejoinTestBase extends JUnit4LocalClusterTest {
     protected static final ClientConfig m_cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
 
-    static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
-
     public VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
             "create table blah (" +
@@ -56,6 +54,16 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +
             "PRIMARY KEY(pkey));" +
+
+            "create view vblah_replicated (ival, cnt) as\n" +
+            "select ival, count(*) from blah_replicated group by ival;\n" +
+            "create view vpartitioned (pkey, cnt) as\n" +
+            "select pkey, count(*) from PARTITIONED group by pkey;\n" +
+            "create view vrpartitioned (value, cnt) as\n" +
+            "select value, count(*) from partitioned group by value;\n" +
+            "create view vjoin (pkey, cntt) as\n" +
+            "select a.pkey, count(*) from PARTITIONED a join blah_replicated b on a.value = b.ival group by a.pkey;\n" +
+
             "create table PARTITIONED_LARGE (" +
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +
@@ -97,7 +105,6 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
             ");"
             ;
 
-
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         String schemaPath = schemaFile.getPath();
         schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
@@ -117,19 +124,25 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
         UserInfo ui = new UserInfo( "ry@nlikesthe", "y@nkees", new String[] { "foo" } );
         builder.addUsers(new UserInfo[] { ui } );
 
+        ProcedurePartitionData data = new ProcedurePartitionData("TEST_INLINED_STRING", "pkey");
         ProcedureInfo[] pi = new ProcedureInfo[] {
-            new ProcedureInfo(new String[] { "foo" }, "InsertInlinedString", "insert into TEST_INLINED_STRING values (?, ?, ?);", "TEST_INLINED_STRING.pkey:0"),
+            new ProcedureInfo(new String[] { "foo" }, "InsertInlinedString", "insert into TEST_INLINED_STRING values (?, ?, ?);", data),
             new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into blah values (?);", null),
-            new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);", "blah.ival:0"),
+            new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);",
+                    new ProcedurePartitionData("blah", "ival")),
             new ProcedureInfo(new String[] { "foo" }, "InsertReplicated", "insert into blah_replicated values (?);", null),
-            new ProcedureInfo(new String[] { "foo" }, "SelectBlahSinglePartition", "select * from blah where ival = ?;", "blah.ival:0"),
+            new ProcedureInfo(new String[] { "foo" }, "SelectBlahSinglePartition", "select * from blah where ival = ?;",
+                    new ProcedurePartitionData("blah", "ival")),
             new ProcedureInfo(new String[] { "foo" }, "SelectBlah", "select * from blah where ival = ?;", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null),
-            new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);", "PARTITIONED.pkey:0"),
-            new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;", "PARTITIONED.pkey:1"),
+            new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);",
+                    new ProcedurePartitionData("PARTITIONED", "pkey")),
+            new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;",
+                    new ProcedurePartitionData("PARTITIONED", "pkey", "1")),
             new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED order by pkey;", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectCountPartitioned", "select count(*) from PARTITIONED;", null),
-            new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);", "PARTITIONED_LARGE.pkey:0"),
+            new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);",
+                    new ProcedurePartitionData("PARTITIONED_LARGE", "pkey", "0")),
             new ProcedureInfo(new String[] { "foo" }, "InsertMultiPartitionPolygon", "insert into GEO_POLY_MP values (?, ?);", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertMultiPartitionPoint", "insert into GEO_POINT_MP values (?, ?);", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectMultiPartitionPolygon", "select * from GEO_POLY_MP where id = ?;", null),
@@ -141,7 +154,7 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
         };
 
         builder.addProcedures(pi);
-        builder.addProcedures(PROCEDURES);
+        builder.addProcedure(NonOrgVoltDBProc.class);
 
         return builder;
     }

@@ -1,6 +1,6 @@
 //  tagged pointer, for aba prevention
 //
-//  Copyright (C) 2008 Tim Blechmann
+//  Copyright (C) 2008, 2016 Tim Blechmann
 //
 //  Distributed under the Boost Software License, Version 1.0. (See
 //  accompanying file LICENSE_1_0.txt or copy at
@@ -9,16 +9,27 @@
 #ifndef BOOST_LOCKFREE_TAGGED_PTR_DCAS_HPP_INCLUDED
 #define BOOST_LOCKFREE_TAGGED_PTR_DCAS_HPP_INCLUDED
 
-#include <boost/lockfree/detail/branch_hints.hpp>
-
 #include <cstddef>              /* for std::size_t */
+#include <limits>
 
-namespace boost {
+#include <boost/predef.h>
+
+namespace boost    {
 namespace lockfree {
-namespace detail {
+namespace detail   {
+
+
 
 template <class T>
-class BOOST_LOCKFREE_DCAS_ALIGNMENT tagged_ptr
+class
+#if BOOST_COMP_MSVC && BOOST_ARCH_X86_64
+BOOST_ALIGNMENT(16)
+#elif BOOST_COMP_MSVC && BOOST_ARCH_X86_32
+BOOST_ALIGNMENT(8)
+#else
+BOOST_ALIGNMENT(2 * sizeof(void*))
+#endif
+  tagged_ptr
 {
 public:
     typedef std::size_t tag_t;
@@ -73,12 +84,12 @@ public:
 
     /** pointer access */
     /* @{ */
-    T * get_ptr(void) const volatile
+    T * get_ptr(void) const
     {
         return ptr;
     }
 
-    void set_ptr(T * p) volatile
+    void set_ptr(T * p)
     {
         ptr = p;
     }
@@ -86,12 +97,18 @@ public:
 
     /** tag access */
     /* @{ */
-    tag_t get_tag() const volatile
+    tag_t get_tag() const
     {
         return tag;
     }
 
-    void set_tag(tag_t t) volatile
+    tag_t get_next_tag() const
+    {
+        tag_t next = (get_tag() + 1) & (std::numeric_limits<tag_t>::max)();
+        return next;
+    }
+
+    void set_tag(tag_t t)
     {
         tag = t;
     }

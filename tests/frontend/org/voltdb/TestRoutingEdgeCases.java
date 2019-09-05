@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,8 +26,6 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -35,6 +33,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestRoutingEdgeCases extends TestCase {
 
@@ -58,7 +58,7 @@ public class TestRoutingEdgeCases extends TestCase {
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(simpleSchema);
-            builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
+            builder.addStmtProcedure("Insert", "insert into blah values (?);");
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("edgecases.jar"), 7, 1, 0);
             assert(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("edgecases.xml"));

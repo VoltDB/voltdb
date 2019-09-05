@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
@@ -45,10 +46,12 @@ import org.voltdb.planner.TestPlansGroupBy;
  */
 
 public class TestGroupBySuite extends RegressionSuite {
+    private static final boolean TEST_NORMAL_TABLES = true;
+    private static final boolean TEST_LARGE_TABLES = false;
+    private static final boolean TEST_HSQL = true;
 
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
@@ -177,6 +180,21 @@ public class TestGroupBySuite extends RegressionSuite {
         assertEquals(0, found[0]);
         for (int i = 1; i < 12; i++) {
             assertEquals(1, found[i]);
+        }
+    }
+
+    /** select PK from T1 group by A1, invalid */
+    public void testSelectPKGroupbyA() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        loaderNxN(client, 0);
+
+        // execute the query, expected to fail
+        try {
+            client.callProcedure("@AdHoc", "SELECT PKEY from T1 group by A1");
+            fail("Select list should match group by list");
+        } catch (Exception e){
+            assertTrue(e.getMessage().contains("expression not in aggregate or GROUP BY columns"));
         }
     }
 
@@ -790,7 +808,9 @@ public class TestGroupBySuite extends RegressionSuite {
 
         project.addSchema(TestPlansGroupBy.class
                 .getResource("testplans-groupby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
+                new ProcedurePartitionData("F", "F_PKEY", "0"));
         project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
         project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
 
@@ -798,22 +818,33 @@ public class TestGroupBySuite extends RegressionSuite {
         // config.compile(project);
         // builder.addServerConfig(config);
 
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (TEST_NORMAL_TABLES) {
+            configureTests(builder, project, BackendTarget.NATIVE_EE_JNI, 1, 1, 0);
+            // Cluster.
+            configureTests(builder, project, BackendTarget.NATIVE_EE_JNI, 2, 3, 1);
+        }
+        if (TEST_LARGE_TABLES) {
+            configureTests(builder, project, BackendTarget.NATIVE_EE_LARGE_JNI, 1, 1, 0);
+            // Cluster
+            configureTests(builder, project, BackendTarget.NATIVE_EE_LARGE_JNI, 1, 1, 0);
+        }
+        if (TEST_HSQL) {
+            configureTests(builder, project, BackendTarget.HSQLDB_BACKEND, 1, 1, 0);
+        }
+        return builder;
+    }
+
+    private static void configureTests(MultiConfigSuiteBuilder builder,
+                                       VoltProjectBuilder project,
+                                       BackendTarget jniTarget,
+                                       int hostCount,
+                                       int siteCount,
+                                       int kfactor) {
+        VoltServerConfig config;
+        config = new LocalCluster("plansgroupby-onesite.jar", hostCount, siteCount, kfactor, jniTarget);
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-
-        return builder;
     }
 
     public class VRowComparator<T> implements Comparator<VoltTableRow>

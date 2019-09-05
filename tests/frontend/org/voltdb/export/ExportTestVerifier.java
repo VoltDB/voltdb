@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb.export;
 
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -33,13 +32,13 @@ import org.voltdb.exportclient.ExportDecoderBase;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltdb.exportclient.ExportRow;
 
 public class ExportTestVerifier extends ExportDecoderBase
 {
-    private final ArrayDeque<Object[]> m_data;
+    private final ArrayDeque<ExportRow> m_data;
     private final ArrayDeque<Object[]> m_expected_data;
     private boolean m_rowFailed = false;
-    private final String m_tableName;
     private final int m_partitionId;
     private long sequenceNumber = 0;
     private static final VoltLogger m_logger = new VoltLogger("CONSOLE");
@@ -51,14 +50,12 @@ public class ExportTestVerifier extends ExportDecoderBase
     ExportTestVerifier(AdvertisedDataSource source)
     {
         super(source);
-        m_tableName = source.tableName;
         m_partitionId = source.partitionId;
-        m_data = new ArrayDeque<Object[]>();
+        m_data = new ArrayDeque<ExportRow>();
         m_expected_data = new ArrayDeque<Object[]>();
         m_es = CoreUtils.getListeningSingleThreadExecutor(
-                "Test Export decoder for partition " + source.partitionId
-                + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
-        System.out.println("VERIFIER for: " + source.tableName + " " + source.partitionId);
+                "Test Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+        System.out.println("VERIFIER for: " + source.partitionId);
     }
 
     @Override
@@ -75,7 +72,7 @@ public class ExportTestVerifier extends ExportDecoderBase
     }
 
     @Override
-    public void onBlockStart() throws RestartBlockException {
+    public void onBlockStart(ExportRow r) throws RestartBlockException {
         //long flag = 0;
         if (m_closed) {
             return;
@@ -88,28 +85,14 @@ public class ExportTestVerifier extends ExportDecoderBase
     }
 
     @Override
-    public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+    public boolean processRow(ExportRow rd) throws RestartBlockException {
         if (m_paused) {
             throw new RestartBlockException(true);
         }
-        Object[] decoded = null;
-        try {
-            ExportRowData rd = decodeRow(rowData);
-            decoded = rd.values;
-        } catch (IOException e) {
-            m_logger.error("Unable to decode row for table: " + m_source.tableName);
-            return false;
-        }
+        Object[] decoded = rd.values;
 
-        // no data found - an ERROR.
-        if (decoded == null) {
-            System.out.println("No source data. Rows remaining: " + m_data.size()
-                    + " received: " + rowData.length + " bytes to verify.");
-            m_rowFailed = true;
-            return false;
-        }
         //System.out.println("Process Row Called found data.");
-        m_data.offer(decoded);
+        m_data.offer(rd);
         //m_logger.info("Adding Data: " + m_data.size());
         if (ExportTestVerifier.m_verifySequenceNumber) {
             if (!decoded[2].equals(sequenceNumber)) {
@@ -136,8 +119,7 @@ public class ExportTestVerifier extends ExportDecoderBase
                 + " Expected: " + m_expected_data.size() + " And Rows Failed: " + m_rowFailed);
         boolean result = (m_expected_data.size() == m_data.size() && (!m_rowFailed));
         if (!result) {
-            System.out.println("ExportVerifier error. Table ID: " + m_tableName +
-                               ", partition ID: " + m_partitionId);
+            System.out.println("ExportVerifier error. partition ID: " + m_partitionId);
             System.out.println("  Data size: " +
                                m_data.size() + " row failed state: " + m_rowFailed);
         } else {
@@ -155,6 +137,6 @@ public class ExportTestVerifier extends ExportDecoderBase
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        System.out.println("Source No Longer Present: " + m_tableName + ":" + m_partitionId);
+        System.out.println("Source No Longer Present: " + m_partitionId);
     }
 }

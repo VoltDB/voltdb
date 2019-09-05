@@ -32,6 +32,9 @@
 package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -162,7 +165,9 @@ public class ParserDDL extends ParserRoutine {
         }
 
         // A VoltDB extension to support the assume unique attribute
+        boolean unique = false;
         boolean assumeUnique = false;
+        boolean migratingIndex = false;
         // End of VoltDB extension
         switch (token.tokenType) {
 
@@ -199,16 +204,21 @@ public class ParserDDL extends ParserRoutine {
 
             // index
             // A VoltDB extension to support the assume unique attribute
+            case Tokens.MIGRATING:
+                migratingIndex = true;
+                // $FALL-THROUGH$
             case Tokens.ASSUMEUNIQUE :
-                assumeUnique = true;
+                assumeUnique = token.tokenType == Tokens.ASSUMEUNIQUE;
                 // $FALL-THROUGH$
             // End of VoltDB extension
             case Tokens.UNIQUE :
+                unique = token.tokenType == Tokens.UNIQUE;
                 read();
                 checkIsThis(Tokens.INDEX);
-
+                assert ! migratingIndex || ! (unique || assumeUnique) :
+                        "MIGRATING index cannot be UNIQUE or ASSUMEUNIQUE";
                 // A VoltDB extension to support the assume unique attribute
-                return compileCreateIndex(true, assumeUnique);
+                return compileCreateIndex(unique, assumeUnique, migratingIndex);
                 /* disable 1 line ...
                 return compileCreateIndex(true);
                 ... disabled 1 line */
@@ -216,7 +226,7 @@ public class ParserDDL extends ParserRoutine {
 
             case Tokens.INDEX :
                 // A VoltDB extension to support the assume unique attribute
-                return compileCreateIndex(false, false);
+                return compileCreateIndex(false, false, migratingIndex);
                 /* disable 1 line ...
                 return compileCreateIndex(false);
                 ... disabled 1 line */
@@ -225,7 +235,6 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
                 return compileCreateProcedureOrFunction();
-
             default : {
                 throw unexpectedToken();
             }
@@ -239,6 +248,7 @@ public class ParserDDL extends ParserRoutine {
 
         switch (token.tokenType) {
 
+            case Tokens.STREAM :
             case Tokens.TABLE : {
                 read();
                 processAlterTable();
@@ -308,6 +318,11 @@ public class ParserDDL extends ParserRoutine {
 
                 return compileAlterTable();
             }
+            case Tokens.STREAM : {
+                read();
+
+                return compileAlterTable();
+            }
             case Tokens.USER : {
                 read();
 
@@ -324,18 +339,6 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
-/*
-    CompiledStatementInterface compileAlter() {
-
-        CompiledStatementInterface cs = null;
-        read();
-        String sql = getStatement(getParsePosition(), endStatementTokensAlter);
-
-        cs = new CompiledStatementSchema(sql, StatementCodes.ALTER_TYPE, null);
-
-        return cs;
-    }
-*/
     Statement compileDrop() {
 
         int      objectTokenType;
@@ -480,7 +483,6 @@ public class ParserDDL extends ParserRoutine {
                 canCascade    = true;
                 useIfExists   = true;
                 break;
-
             default :
                 throw unexpectedToken();
         }
@@ -544,7 +546,7 @@ public class ParserDDL extends ParserRoutine {
                         database.schemaManager.findSchemaObject(name.name,
                                 schemaName, objectType);
                     if (object == null) {
-                    	writeName = null;
+                        writeName = null;
                     }
                     else  // AS IN else if (cascade) {
                     // End of VoltDB extension
@@ -905,6 +907,14 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableAddColumn(t);
 
+                    case Tokens.USING :
+                        if (t.getTTL() != null) {
+                            throw Error.error(ErrorCode.X_42504);
+                        }
+                        if (t.hasMigrationTarget()) {
+                            throw Error.error(ErrorCode.X_42581, "May not add TTL column");
+                        }
+                        return readTimeToLive(t, true);
                     default :
                         if (cname != null) {
                             throw unexpectedToken();
@@ -921,8 +931,6 @@ public class ParserDDL extends ParserRoutine {
                 switch (token.tokenType) {
 
                     case Tokens.PRIMARY : {
-                        boolean cascade = false;
-
                         read();
                         readThis(Tokens.KEY);
 
@@ -941,9 +949,11 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableDropConstraint(t);
                     }
+                    case Tokens.TTL :
+                        read();
+                        return compileAlterTableDropTTL(t);
                     case Tokens.COLUMN :
                         read();
-
                     // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
@@ -968,6 +978,14 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.ALTER : {
                 read();
 
+                if (token.tokenType == Tokens.EXPORT) {
+                    return readPersistentExport(t, true);
+                }
+
+                if (token.tokenType == Tokens.USING) {
+                    return readTimeToLive(t, true);
+                }
+
                 if (token.tokenType == Tokens.COLUMN) {
                     read();
                 }
@@ -984,6 +1002,266 @@ public class ParserDDL extends ParserRoutine {
             }
         }
     }
+
+    //VoltDB extension, drop TTL
+    private Statement compileAlterTableDropTTL(Table t) {
+        if (t.hasMigrationTarget()) {
+            throw Error.error(ErrorCode.X_42581, "May not drop TTL column");
+        }
+        if (t.getTTL() == null) {
+            throw Error.error(ErrorCode.X_42501);
+        }
+        Object[] args = new Object[] {
+            t.getName(),
+            Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+            Boolean.valueOf(false)
+        };
+        return new StatementSchema(null, StatementTypes.DROP_TTL, args,
+                                   null, t.getName());
+    }
+
+    private void setPeristentExportTriggers(Table table) {
+        // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
+        if (token.tokenType != Tokens.EXPORT) {
+            return;
+        }
+        String target = readMigrateTarget();
+        List<String> triggers = readExportTrigger(false);
+        target = target.toUpperCase();
+        PersistentExport export = new PersistentExport(target, triggers);
+        table.persistentExport = export;
+    }
+    private Statement readPersistentExport(Table table, boolean alter) {
+
+        // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
+        if (token.tokenType != Tokens.EXPORT) {
+            return null;
+        }
+        String target = readMigrateTarget();
+        // read triggers
+        List<String> triggers = readExportTrigger(true);
+        Object[] args = new Object[] {
+                table.getName(),
+                target.toUpperCase(),
+                triggers,
+                Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+                Boolean.valueOf(false)
+            };
+        return new StatementSchema(null, StatementTypes.ALTER_EXPORT, args,
+                                       null, table.getName());
+    }
+
+    private List<String> readExportTrigger(boolean alter) {
+        List<String> triggers = new ArrayList<>();
+        read();
+        if (token.tokenType == Tokens.ON) {
+            read();
+            int lastTokenType = token.tokenType;
+            int endToken = (alter ? Tokens.SEMICOLON : Tokens.OPENBRACKET);
+            while (token.tokenType != endToken) {
+                String theToken = null;;
+                switch(token.tokenType) {
+                case Tokens.DELETE:
+                    theToken = Tokens.T_DELETE;
+                    break;
+                case Tokens.INSERT:
+                    theToken = Tokens.T_INSERT;
+                    break;
+                case Tokens.UPDATE:
+                    theToken = Tokens.T_UPDATE;
+                    break;
+                case Tokens.UPDATEOLD:
+                    theToken = Tokens.T_UPDATEOLD;
+                    break;
+                case Tokens.UPDATENEW:
+                    theToken = Tokens.T_UPDATENEW;
+                    break;
+                default:
+                    if (token.tokenType != Tokens.COMMA){
+                        throw unexpectedToken();
+                    }
+                }
+                if (theToken != null) {
+                    if (triggers.contains(theToken)) {
+                        throw unexpectedToken();
+                    }
+                    triggers.add(theToken);
+                }
+                read();
+
+                // Cannot have two same tokens in a row
+                if (lastTokenType == token.tokenType) {
+                    throw unexpectedToken();
+                }
+                lastTokenType = token.tokenType;
+            }
+        }
+        if (triggers.contains(Tokens.T_UPDATE) && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
+            throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                    " or " + Tokens.T_UPDATENEW);
+        }
+        if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
+            throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                    " and " + Tokens.T_UPDATENEW);
+        }
+
+        if (triggers.isEmpty()) {
+            triggers= Arrays.asList("INSERT");
+        }
+
+        return triggers;
+    }
+    private Statement readTimeToLive(Table table, boolean alter) {
+        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TARGET NAME>
+        if (!alter && token.tokenType != Tokens.USING) {
+            return null;
+        }
+        int timeLiveValue = 0;
+        String ttlUnit = "SECONDS";
+        String ttlColumn = "";
+        int batchSize = 1000;
+        int maxFrequency = 1;
+        read();
+        if (token.tokenType != Tokens.TTL) {
+            throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType != Tokens.X_VALUE) {
+            throw unexpectedToken();
+        }
+        timeLiveValue = (Integer)(token.tokenValue);
+
+        read();
+        if (token.tokenType == Tokens.SECONDS || token.tokenType == Tokens.MINUTES ||
+             token.tokenType == Tokens.HOURS || token.tokenType == Tokens.DAYS) {
+            ttlUnit = token.tokenString;
+            read();
+        }
+
+        if (token.tokenType == Tokens.ON) {
+            read();
+            if (token.tokenType != Tokens.COLUMN) {
+                throw unexpectedToken();
+            }
+            read();
+            if (token.tokenType != Tokens.X_IDENTIFIER) {
+                throw unexpectedToken();
+            }
+            ttlColumn = token.tokenString;
+            int index = table.findColumn(ttlColumn);
+            if (index < 0) {
+                throw unexpectedToken();
+            }
+            ColumnSchema col = table.getColumn(index);
+            //TIMESTAMP, INTEGER, BIGINT
+            int colType = col.getDataType().typeCode;
+            if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
+                throw unexpectedToken();
+            }
+            // At this moment we don't allow alter TTL column of migrate table on the fly
+            if (alter && table.hasMigrationTarget() && !token.tokenString.equals(table.getTTL().ttlColumn.getNameString())) {
+                throw Error.error(ErrorCode.X_42581, "May not alter TTL column");
+            }
+        } else {
+            throw unexpectedToken();
+        }
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                read();
+                if (token.tokenType != Tokens.X_VALUE) {
+                    throw unexpectedToken();
+                }
+                batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
+            } else {
+                read();
+                if (token.tokenType != Tokens.X_VALUE) {
+                    throw unexpectedToken();
+                }
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
+            }
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
+            } else {
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
+            }
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+
+        read();
+
+      if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        } else {
+            throw unexpectedToken();
+        }
+    }
+
+    private String readMigrateTarget() {
+        read();
+        if (token.tokenType != Tokens.TO) {
+            throw unexpectedToken();
+        }
+        read();
+        if (token.tokenType != Tokens.TARGET) {
+            throw unexpectedToken();
+        }
+        read();
+        if (token.tokenType != Tokens.X_IDENTIFIER) {
+            throw unexpectedToken();
+        }
+        return token.tokenString;
+    }
+    private Statement createTimeToLive(Table table, int value, String unit, String column,
+            int batchSize, int maxFrequency) {
+        table.addTTL(value, unit, column, batchSize, maxFrequency);
+
+        Object[] args = new Object[] {
+                table.getName(),
+                value,
+                unit,
+                column,
+                batchSize,
+                maxFrequency,
+                Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+                Boolean.valueOf(false)
+            };
+        return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
+                                       null, table.getName());
+    }
+    //End of VoltDB extension
 
     private Statement compileAlterTableDropConstraint(Table t) {
 
@@ -1067,6 +1345,15 @@ public class ParserDDL extends ParserRoutine {
 
         int position = getPosition();
 
+        table.setHasMigrationTarget(token.tokenType == Tokens.MIGRATE);
+        if (token.tokenType == Tokens.EXPORT) {
+            // have to setup PersistentExport
+            setPeristentExportTriggers(table);
+        }
+        // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
+        // We can collect the ttl first in order to decide if its a ttl migration or general migration.
+        readUntilThis(Tokens.OPENBRACKET);
+
         readThis(Tokens.OPENBRACKET);
 
         {
@@ -1128,6 +1415,9 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CLOSEBRACKET :
                     read();
 
+                    // A VoltDB extension to support TTL
+                    readTimeToLive(table, false);
+                    // End of VoltDB extension
                     end = true;
                     break;
 
@@ -1162,6 +1452,11 @@ public class ParserDDL extends ParserRoutine {
                     start     = false;
                     startPart = false;
             }
+        }
+
+        // zero-column table is not allowed
+        if (table.getColumnCount() == 0) {
+            throw Error.error(ErrorCode.X_47002);
         }
 
         if (token.tokenType == Tokens.ON) {
@@ -1200,7 +1495,7 @@ public class ParserDDL extends ParserRoutine {
         name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
 
         Table table = TableUtil.newTable(database, type, name);
-
+        table.setStream(true);
         if (token.tokenType == Tokens.AS) {
             return readTableAsSubqueryDefinition(table);
         }
@@ -1421,7 +1716,6 @@ public class ParserDDL extends ParserRoutine {
 
     StatementSchema readTableAsSubqueryDefinition(Table table) {
 
-        HsqlName   readName    = null;
         boolean    withData    = true;
         HsqlName[] columnNames = null;
         Statement  statement   = null;
@@ -1558,10 +1852,13 @@ public class ParserDDL extends ParserRoutine {
                     Index index = null;
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
+                        index = table.createAndAddExprIndexStructure(
+                                indexName, c.core.mainCols, c.indexExprs, true, false, true)
+                                .setAssumeUnique(c.assumeUnique);
                     } else {
-                        index = table.createAndAddIndexStructure(indexName,
-                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
+                        index = table.createAndAddIndexStructure(
+                                indexName, c.core.mainCols, null, null, true, false, true, false)
+                                .setAssumeUnique(c.assumeUnique);
                     }
 
                     Constraint newconstraint = new Constraint(c.getName(), c.getIsAutogeneratedName(),
@@ -1575,6 +1872,18 @@ public class ParserDDL extends ParserRoutine {
                         newconstraint);
 
                     break;
+                }
+                case Constraint.MIGRATING : {
+                    // TODO
+                    Index index = table.createAndAddIndexStructure(indexName,
+                            c.core.mainCols, null, null, true, true, false, false);
+                    Constraint newconstraint = new Constraint(c.getName(), c.getIsAutogeneratedName(),
+                            table, index, Constraint.MIGRATING)
+                            .setMigrating(c.migrating);
+
+                    table.addConstraint(newconstraint);
+                    session.database.schemaManager.addSchemaObject(
+                            newconstraint);
                 }
                 case Constraint.FOREIGN_KEY : {
                     addForeignKey(session, table, c, constraintList);
@@ -1660,7 +1969,7 @@ public class ParserDDL extends ParserRoutine {
         HsqlName refIndexName = session.database.nameManager.newAutoName("IDX",
             table.getSchemaName(), table.getName(), SchemaObject.INDEX);
         Index index = table.createAndAddIndexStructure(refIndexName,
-            c.core.refCols, null, null, false, true, isForward);
+            c.core.refCols, null, null, false, false, true, isForward);
         HsqlName mainName = session.database.nameManager.newAutoName("REF",
             c.getName().name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
@@ -3286,7 +3595,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     // A VoltDB extension to support indexed expressions and the assume unique attribute
-    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique) {
+    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique, boolean migrating) {
     /* disable 1 line ...
     StatementSchema compileCreateIndex(boolean unique) {
     ... disabled 1 line */
@@ -3318,7 +3627,7 @@ public class ParserDDL extends ParserRoutine {
         // A VoltDB extension to support indexed expressions and the assume unique attribute
         java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
         // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
-        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
+        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc, migrating);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] indexColumns = null;
         if (set == null) {
@@ -3341,9 +3650,7 @@ public class ParserDDL extends ParserRoutine {
         indexColumns = getColumnList(set, table);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
-            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs,
-            Boolean.valueOf(assumeUnique),
-            predicate
+            table, indexColumns, indexHsqlName, unique, migrating, indexExprs, assumeUnique, predicate
         /* disable 4 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();
@@ -4012,6 +4319,11 @@ public class ParserDDL extends ParserRoutine {
         TableWorks tableWorks = new TableWorks(session, table);
 
         tableWorks.dropColumn(colindex, cascade);
+
+        //VoltDB extension to support Time to live
+        if (table.getTTL() != null && colName.equalsIgnoreCase(table.getTTL().ttlColumn.getName().name)) {
+            table.dropTTL();
+        }
     }
 
     Statement compileAlterTableDropColumn(Table table, String colName,
@@ -4024,6 +4336,12 @@ public class ParserDDL extends ParserRoutine {
             throw Error.error(ErrorCode.X_42591);
         }
 
+        if (table.timeToLive != null) {
+            final String ttlColumn = table.timeToLive.ttlColumn.getNameString();
+            if (colName.equalsIgnoreCase(ttlColumn)) {
+                throw Error.error("Columns used by TTL cannot be dropped.");
+            }
+        }
         Object[] args = new Object[] {
             table.getColumn(colindex).getName(),
             Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(cascade),
@@ -5298,17 +5616,28 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
+    // Default disallow empty parenthesis
+    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+        return XreadExpressions(ascDesc, false);
+    }
+
     /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
     /// adding support for indexed expressions.
-    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc, boolean allowEmpty) {
         readThis(Tokens.OPENBRACKET);
 
-        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+        java.util.List<Expression> indexExprs = new java.util.ArrayList<>();
 
         while (true) {
+            if (allowEmpty && readIfThis(Tokens.CLOSEBRACKET)) {    // empty bracket
+                return indexExprs;
+            }
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 
+            if (token.tokenType == Tokens.DESC) {
+                throw unexpectedToken();
+            }
             // A VoltDB extension to the "readColumnList(table, true)" support for descending-value indexes,
             // that similarly parses the asc/desc indicators but COLLECTS them so they can be ignored later,
             // rather than ignoring them on the spot.
@@ -5380,30 +5709,30 @@ public class ParserDDL extends ParserRoutine {
     }
 
     private boolean voltDBacceptNotNullConstraint(HsqlArrayList list) {
-		if (list.size() != 2) {
-			return false;
-		}
-		if (! (list.get(1) instanceof Constraint)) {
-			return false;
-		}
+        if (list.size() != 2) {
+            return false;
+        }
+        if (! (list.get(1) instanceof Constraint)) {
+            return false;
+        }
         // This replicates the logic that controls the setting of the Consraint.isNotNull member.
         // Unfortunately that member only gets set a little later.
-		Constraint constraint = (Constraint)list.get(1);
-		if ( constraint.getConstraintType() != Constraint.CHECK ) {
-			return false;
-		}
-		Expression check = constraint.getCheckExpression();
-		if (check.getType() != OpTypes.NOT) {
-			return false;
-		}
-		if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
-			return false;
-		}
-		if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
-			return false;
-		}
-		return true;
-	}
+        Constraint constraint = (Constraint)list.get(1);
+        if ( constraint.getConstraintType() != Constraint.CHECK ) {
+            return false;
+        }
+        Expression check = constraint.getCheckExpression();
+        if (check.getType() != OpTypes.NOT) {
+            return false;
+        }
+        if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
+            return false;
+        }
+        if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
+            return false;
+        }
+        return true;
+    }
 
     // A VoltDB extension to support LIMIT PARTITION ROWS syntax
     private Statement compileAlterTableAddLimitConstraint(Table table, HsqlName name)

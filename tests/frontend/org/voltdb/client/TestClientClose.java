@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
+
+import com.google_voltpatches.common.base.Joiner;
 
 import junit.framework.TestCase;
 
@@ -97,24 +99,7 @@ public class TestClientClose extends TestCase {
         client.createConnection("localhost");
         client.close();
         ClientFactory.decreaseClientNum();
-        Thread.sleep(2000);
-        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
-        int postNumClientReaper = 0;
-        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
-            // skip the current thread
-            Thread t = e.getKey();
-            if (t == Thread.currentThread()) {
-                continue;
-            }
-            // check thread name and whether the thread should be close.
-            String threadName = t.getName();
-            if (threadName.contains("VoltDB Client Reaper Thread")) {
-                postNumClientReaper++;
-            }
-            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
-                    || threadName.contains("Estimated Time Updater"));
-        }
-        assertEquals(preNumClientReaper, postNumClientReaper);
+        assertEquals(preNumClientReaper, assertThreadsAllDead(2000));
     }
 
     public void testThreadsKilledOneOfClientClose() throws Exception {
@@ -137,19 +122,7 @@ public class TestClientClose extends TestCase {
 
     public void testCreateCloseAllClientInParallel() throws Exception{
         clientCreateCloseAll(50, 3);
-        Thread.sleep(500);
-        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
-        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
-            // skip the current thread
-            Thread t = e.getKey();
-            if (t == Thread.currentThread()) {
-                continue;
-            }
-            // check thread name and whether the thread should be close.
-            String threadName = t.getName();
-            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
-                    || threadName.contains("Estimated Time Updater"));
-        }
+        assertThreadsAllDead(500);
     }
 
     public void testCreateCloseInParallelRemainOne() throws Exception {
@@ -173,7 +146,7 @@ public class TestClientClose extends TestCase {
     private void clientCreateCloseAll(int clientNum, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(loops);
         for (int i = 0; i < loops; i++) {
-            (new clientCreateCloseAllLauncher(clientNum, latch, i)).start();
+            new ClientCreateCloseAllLauncher(clientNum, latch).start();
         }
         latch.await();
     }
@@ -205,11 +178,39 @@ public class TestClientClose extends TestCase {
         return haveReverseDNSLookups && haveAsyncLogger && haveEstTimeUpdater && haveClientReaper;
     }
 
-    class clientCreateCloseAllLauncher extends Thread{
+    private int assertThreadsAllDead(int totalTimeout) throws InterruptedException {
+        long timeoutAt = System.currentTimeMillis() + totalTimeout;
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        int numClientReaper = 0;
+        for (Thread t : stMap.keySet()) {
+            // skip the current thread
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+            // check thread name and whether the thread should be close.
+            String threadName = t.getName();
+            if (threadName.contains("VoltDB Client Reaper Thread")) {
+                numClientReaper++;
+            }
+            if (threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
+                    || threadName.contains("Estimated Time Updater")) {
+                long timeout = timeoutAt - System.currentTimeMillis();
+                if (timeout > 0) {
+                    t.join(timeout);
+                }
+                if (t.isAlive()) {
+                    fail("Thread still alive: " + threadName + ":\n\t" + Joiner.on("\n\t").join(t.getStackTrace()));
+                }
+            }
+        }
+        return numClientReaper;
+    }
+
+    static class ClientCreateCloseAllLauncher extends Thread {
         private final int m_clientNum;
         private final CountDownLatch m_latch;
 
-        public clientCreateCloseAllLauncher (int clientNum, CountDownLatch latch, int loopNum) {
+        public ClientCreateCloseAllLauncher (int clientNum, CountDownLatch latch) {
             m_clientNum = clientNum;
             m_latch = latch;
         }

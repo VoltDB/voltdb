@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,8 +32,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -54,6 +52,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 
+import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicates;
@@ -92,15 +91,119 @@ public class ConnectionUtil {
         }
     }
 
+    /**
+     * Thread instance which delays running a runnable until a delay time is reached or it is canceled.
+     * <p>
+     * A very similar functionality can be achieved using a {@link java.util.concurrent.ScheduledExecutorService} but in
+     * this use case there is no obvious life span for the pool so it is easier to use a fire and forget thread
+     */
+    @VisibleForTesting
+    static final class DelayedExecutionThread extends Thread {
+        // nano time which needs to elapse before runnable is executed
+        private final long m_runAtNanos;
+        // runnable to execute after delay
+        private final Runnable m_runnable;
+        // current state of the thread
+        private volatile State m_state = State.NOT_STARTED;
+
+        public DelayedExecutionThread(long delay, TimeUnit unit, Runnable onTimeout) {
+            super(null, null, "Delayed Execution Thread " + unit.toMillis(delay) + "ms", CoreUtils.SMALL_STACK_SIZE);
+            m_runAtNanos = unit.toNanos(delay) + System.nanoTime();
+            m_runnable = onTimeout;
+            setDaemon(true);
+        }
+
+        @Override
+        public synchronized void run() {
+            if (m_state == State.CANCELED) {
+                // Already canceled before even being started
+                return;
+            }
+
+            if (m_state != State.NOT_STARTED) {
+                throw new IllegalStateException("Not in state " + State.NOT_STARTED + ": " + m_state);
+            }
+
+            setState(State.WAITING);
+
+            long now;
+            while (m_state == State.WAITING && (now = System.nanoTime()) <= m_runAtNanos) {
+                try {
+                    wait(Math.max(1, TimeUnit.NANOSECONDS.toMillis(now - m_runAtNanos)));
+                } catch (InterruptedException e) {
+                    // Ignore interruptions
+                }
+            }
+
+            if (!m_state.m_done) {
+                setState(State.RUNNING);
+                if (m_runnable != null) {
+                    m_runnable.run();
+                }
+                setState(State.COMPLETED);
+            }
+        }
+
+        /**
+         * Cancel the thread if it has not completed yet or is not running. This call will block if the {@code runnable}
+         * is being executed.
+         *
+         * @return {@code true} if the thread was canceled and {@code runnable} has not and will not run
+         */
+        public synchronized boolean cancel() {
+            if (!m_state.m_done) {
+                setState(State.CANCELED);
+            }
+            return m_state == State.CANCELED;
+        }
+
+        /**
+         * Block until a done state is reached. {@link State#COMPLETED} or {@link State#CANCELED}
+         *
+         * @return The done {@link State} of the thread
+         * @throws InterruptedException
+         */
+        public synchronized State waitUntilDone() throws InterruptedException {
+            while (!m_state.m_done) {
+                wait();
+            }
+            return m_state;
+        }
+
+        /**
+         * @return The current {@link State} of this thread
+         */
+        public State state() {
+            return m_state;
+        }
+
+        private void setState(State state) {
+            m_state = state;
+            if (state.m_done) {
+                notifyAll();
+            }
+        }
+
+        public enum State {
+            NOT_STARTED, WAITING, RUNNING, COMPLETED(true), CANCELED(true);
+
+            public final boolean m_done;
+
+            private State() {
+                this(false);
+            }
+
+            private State(boolean done) {
+                this.m_done = done;
+            }
+        }
+    }
+
     private static final HashMap<SocketChannel, ExecutorPair> m_executors =
         new HashMap<SocketChannel, ExecutorPair>();
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     private static final GSSManager m_gssManager = GSSManager.getInstance();
-
-    // Thread pool for checking authentication timeout
-    private static final ScheduledThreadPoolExecutor m_periodicWorkThread =
-        CoreUtils.getScheduledThreadPoolExecutor("Authentication Timer", 0, CoreUtils.SMALL_STACK_SIZE);
 
     /**
      * Get a hashed password using SHA-1 in a consistent way.
@@ -118,8 +221,9 @@ public class ConnectionUtil {
      * @return The bytes of the hashed password.
      */
     public static byte[] getHashedPassword(ClientAuthScheme scheme, String password) {
-        if (password == null)
+        if (password == null) {
             return null;
+        }
 
         MessageDigest md = null;
         try {
@@ -179,7 +283,9 @@ public class ConnectionUtil {
     };
 
     public final static Optional<DelegatePrincipal> getDelegate(Subject s) {
-        if (s == null) return Optional.absent();
+        if (s == null) {
+            return Optional.absent();
+        }
         return FluentIterable
                 .from(s.getPrincipals())
                 .filter(Predicates.instanceOf(DelegatePrincipal.class))
@@ -206,9 +312,9 @@ public class ConnectionUtil {
         }
 
         // Setup a timer that times out the authentication if it is stuck (server dies, connection drops, etc.)
-        final ScheduledFuture<?> timeoutFuture;
+        final DelayedExecutionThread timeoutThread;
         if (timeoutMillis > 0) {
-            timeoutFuture = m_periodicWorkThread.schedule(new Runnable() {
+            timeoutThread = new DelayedExecutionThread(timeoutMillis, TimeUnit.MILLISECONDS, new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -217,9 +323,10 @@ public class ConnectionUtil {
                         // Ignore
                     }
                 }
-            }, timeoutMillis, TimeUnit.MILLISECONDS);
+            });
+            timeoutThread.start();
         } else {
-            timeoutFuture = null;
+            timeoutThread = null;
         }
 
         MessagingChannel messagingChannel = null;
@@ -308,7 +415,7 @@ public class ConnectionUtil {
                     throw new IOException("Wire protocol format violation error");
                 }
                 String servicePrincipal = SerializationHelper.getString(loginResponse);
-                loginResponse = performAuthenticationHandShake(aChannel, subject, servicePrincipal);
+                loginResponse = performAuthenticationHandShake(messagingChannel, subject, servicePrincipal);
                 loginResponseCode = loginResponse.get();
             }
 
@@ -353,7 +460,7 @@ public class ConnectionUtil {
                 messagingChannel.cleanUp();
             }
 
-            if (timeoutFuture != null && !timeoutFuture.cancel(false)) {
+            if (timeoutThread != null && !timeoutThread.cancel()) {
                 // Failed to cancel, which means the timeout task must have run
                 throw new IOException("Authentication timed out");
             }
@@ -367,10 +474,11 @@ public class ConnectionUtil {
 
 
     private final static void establishSecurityContext(
-            final SocketChannel channel, GSSContext context, Optional<DelegatePrincipal> delegate)
+            final MessagingChannel channel, GSSContext context, Optional<DelegatePrincipal> delegate)
                     throws IOException, GSSException {
 
-        ByteBuffer bb = ByteBuffer.allocate(4096);
+        ByteBuffer writeBuffer = ByteBuffer.allocate(4096);
+        ByteBuffer readBuffer = writeBuffer;
         byte [] token;
         int msgSize = 0;
 
@@ -378,52 +486,37 @@ public class ConnectionUtil {
          * Establishing a kerberos secure context, requires a handshake conversation
          * where client, and server exchange and use tokens generated via calls to initSecContext
          */
-        bb.limit(msgSize);
+        writeBuffer.limit(msgSize);
         while (!context.isEstablished()) {
-            token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            token = context.initSecContext(readBuffer.array(), readBuffer.arrayOffset() + readBuffer.position(),
+                    readBuffer.remaining());
+
             if (token != null) {
                 msgSize = 4 + 1 + 1 + token.length;
-                bb.clear().limit(msgSize);
-                bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
-                bb.put(token).flip();
+                writeBuffer.clear().limit(msgSize);
+                writeBuffer.putInt(msgSize - 4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+                writeBuffer.put(token).flip();
 
-                while (bb.hasRemaining()) {
-                    channel.write(bb);
-                }
+                channel.writeMessage(writeBuffer);
             }
-            if (!context.isEstablished()) {
-                bb.clear().limit(4);
 
-                while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) throw new EOFException();
-                }
-                bb.flip();
+            if (context.isEstablished()) {
+                break;
+            }
 
-                msgSize = bb.getInt();
-                if (msgSize > bb.capacity()) {
-                    throw new IOException("Authentication packet exceeded alloted size");
-                }
-                if (msgSize <= 0) {
-                    throw new IOException("Wire Protocol Format error 0 or negative message length prefix");
-                }
-                bb.clear().limit(msgSize);
+            readBuffer = channel.readMessage();
 
-                while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) throw new EOFException();
-                }
-                bb.flip();
+            byte version = readBuffer.get();
+            if (version != Constants.AUTH_HANDSHAKE_VERSION) {
+                throw new IOException("Encountered unexpected authentication protocol version " + version);
+            }
 
-                byte version = bb.get();
-                if (version != Constants.AUTH_HANDSHAKE_VERSION) {
-                    throw new IOException("Encountered unexpected authentication protocol version " + version);
-                }
-
-                byte tag = bb.get();
-                if (tag != Constants.AUTH_HANDSHAKE) {
-                    throw new IOException("Encountered unexpected authentication protocol tag " + tag);
-                }
+            byte tag = readBuffer.get();
+            if (tag != Constants.AUTH_HANDSHAKE) {
+                throw new IOException("Encountered unexpected authentication protocol tag " + tag);
             }
         }
+
 
         if (!context.getMutualAuthState()) {
             throw new IOException("Authentication Handshake Failed");
@@ -437,25 +530,25 @@ public class ConnectionUtil {
         if (delegate.isPresent()) {
             MessageProp mprop = new MessageProp(0, true);
 
-            bb.clear().limit(delegate.get().wrappedSize());
-            delegate.get().wrap(bb);
-            bb.flip();
+            writeBuffer.clear().limit(delegate.get().wrappedSize());
+            delegate.get().wrap(writeBuffer);
+            writeBuffer.flip();
 
-            token = context.wrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop);
+            token = context.wrap(writeBuffer.array(), writeBuffer.arrayOffset() + writeBuffer.position(), writeBuffer.remaining(), mprop);
 
             msgSize = 4 + 1 + 1 + token.length;
-            bb.clear().limit(msgSize);
-            bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
-            bb.put(token).flip();
+            writeBuffer.clear().limit(msgSize);
+            writeBuffer.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+            writeBuffer.put(token).flip();
 
-            while (bb.hasRemaining()) {
-                channel.write(bb);
+            while (writeBuffer.hasRemaining()) {
+                channel.writeMessage(writeBuffer);
             }
         }
     }
 
     private final static ByteBuffer performAuthenticationHandShake(
-            final SocketChannel channel, final Subject subject,
+            final MessagingChannel channel, final Subject subject,
             final String serviceName) throws IOException {
 
         try {
@@ -494,14 +587,15 @@ public class ConnectionUtil {
                     } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     } finally {
-                        if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
+                        if (context != null) {
+                            try { context.dispose(); } catch (Exception ignoreIt) {}
+                        }
                     }
                     return null;
                 }
             });
         } catch (SecurityException ex) {
             // if we get here the authentication handshake failed.
-            try { channel.close(); } catch (Exception ignoreIt) {}
             // PriviledgedActionException is the first wrapper. The runtime from Throwables would be
             // the second wrapper
             Throwable cause = ex.getCause();
@@ -517,28 +611,10 @@ public class ConnectionUtil {
             }
         }
 
-        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-        while (lengthBuffer.hasRemaining()) {
-            if (channel.read(lengthBuffer) == -1) {
-                channel.close();
-                throw new EOFException();
-            }
-        }
-        lengthBuffer.flip();
-        int responseSize = lengthBuffer.getInt();
-
-        ByteBuffer loginResponse = ByteBuffer.allocate(responseSize);
-        while (loginResponse.hasRemaining()) {
-            if (channel.read(loginResponse) == -1) {
-                channel.close();
-                throw new EOFException();
-            }
-        }
-        loginResponse.flip();
+        ByteBuffer loginResponse = channel.readMessage();
 
         byte version = loginResponse.get();
         if (version != (byte)0) {
-            channel.close();
             throw new IOException("Encountered unexpected version for the login response message: " + version);
         }
         return loginResponse;

@@ -49,8 +49,8 @@
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
-      <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
+      <xs:element name="tasks" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
     </xs:all>
   </xs:complexType>
 
@@ -75,16 +75,8 @@
     <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="id" type="clusterIdType"/>
-    <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
-
-  <xs:simpleType name="readlevelType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="fast"/>
-      <xs:enumeration value="safe"/>
-    </xs:restriction>
-  </xs:simpleType>
 
   <!-- <snmp> -->
   <xs:complexType name="snmpType">
@@ -96,11 +88,6 @@
     <xs:attribute name="authkey" type="xs:string" default="voltdbauthkey" />
     <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
     <xs:attribute name="privacykey" type="xs:string" default="voltdbprivacykey" />
-  </xs:complexType>
-
-  <!-- <consistency> -->
-  <xs:complexType name="consistencyType">
-    <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -346,6 +333,7 @@
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
     <xs:attribute name="external" type="xs:boolean" default="false"/>
     <xs:attribute name="dr" type="xs:boolean" default="false"/>
+    <xs:attribute name="internal" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
@@ -389,7 +377,7 @@
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="format" type="xs:string" default="csv"/>
-    <xs:attribute name="version" type="xs:string" default="8"/>
+    <xs:attribute name="version" type="xs:string" default="10"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -498,6 +486,26 @@
     <xs:attribute name="preferred-source" type="clusterIdType"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
     <xs:attribute name="ssl" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- SchedulerManager -->
+  <xs:complexType name="taskSettingsType">
+    <xs:attribute name="min-delay-ms" type="xs:int" default="0"/>
+    <xs:attribute name="max-run-frequency" type="xs:double" default="0"/>
+    <xs:attribute name="host-thread-count" default="0">
+      <xs:simpleType>
+	<xs:restriction base="xs:int">
+          <xs:minInclusive value="0"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="partitioned-thread-count" default="0">
+      <xs:simpleType>
+        <xs:restriction base="xs:int">
+          <xs:minInclusive value="0"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
 
 </xs:schema>

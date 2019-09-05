@@ -38,7 +38,7 @@ echo  "CLASSPATH:" $CLASSPATH
 
 # Start the PostgreSQL server, in the new temp directory
 # Note: '--lc-collate=C' causes VARCHAR sorting to match VoltDB's
-$PG_PATH/initdb -D $PG_TMP_DIR/data --auth=trust --auth-host=trust --auth-local=trust --lc-collate=C
+$PG_PATH/initdb -D $PG_TMP_DIR/data --auth=trust --auth-host=trust --auth-local=trust --encoding='UTF-8' --lc-collate=C
 echo -e "unix_socket_directories='.'\nlisten_addresses='*'\nport=$PG_PORT" >> $PG_TMP_DIR/data/postgresql.conf
 $PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log
 

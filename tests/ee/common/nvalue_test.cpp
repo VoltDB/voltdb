@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,7 +59,7 @@ public:
     NValue lower;
     NValue upper;
 
-    static PlannerDomValue emptyDom() { return m_emptyRoot.rootObject(); }
+    static PlannerDomValue emptyDom() { return m_emptyRoot(); }
 
     void deserDecHelper()
     {
@@ -2523,12 +2523,10 @@ TEST_F(NValueTest, TestInList)
 
     AbstractExpression* in_expression = NULL;
     for (size_t kk = 0; kk < int_length1; ++kk) {
-        vector<AbstractExpression*>* int_constants_rhs1 =
-            new vector<AbstractExpression*>(int_length1);
-        vector<AbstractExpression*>* int_constants_rhs2 =
-            new vector<AbstractExpression*>(int_length2);
-        initConstantArray(*int_constants_rhs1, int_NV_set1);
-        initConstantArray(*int_constants_rhs2, int_NV_set2);
+        vector<AbstractExpression*> int_constants_rhs1(int_length1, NULL);
+        vector<AbstractExpression*> int_constants_rhs2(int_length2, NULL);
+        initConstantArray(int_constants_rhs1, int_NV_set1);
+        initConstantArray(int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
            ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
@@ -2550,12 +2548,10 @@ TEST_F(NValueTest, TestInList)
         delete in_expression;
     }
     for (size_t ll = 0; ll < int_length2; ++ll) {
-        vector<AbstractExpression*>* int_constants_rhs1 =
-            new vector<AbstractExpression*>(int_length1);
-        vector<AbstractExpression*>* int_constants_rhs2 =
-            new vector<AbstractExpression*>(int_length2);
-        initConstantArray(*int_constants_rhs1, int_NV_set1);
-        initConstantArray(*int_constants_rhs2, int_NV_set2);
+        vector<AbstractExpression*> int_constants_rhs1(int_length1, NULL);
+        vector<AbstractExpression*> int_constants_rhs2(int_length2, NULL);
+        initConstantArray(int_constants_rhs1, int_NV_set1);
+        initConstantArray(int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
            ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
@@ -2616,12 +2612,10 @@ TEST_F(NValueTest, TestInList)
     initConstantArray(string_constants_lhs2_2, string_set2);
 
     for (size_t kk = 0; kk < string_length1; ++kk) {
-        vector<AbstractExpression*>* string_constants_rhs1
-            = new vector<AbstractExpression*>(string_length1);
-        vector<AbstractExpression*>* string_constants_rhs2
-            = new vector<AbstractExpression*>(string_length2);
-        initConstantArray(*string_constants_rhs1, string_set1);
-        initConstantArray(*string_constants_rhs2, string_set2);
+        vector<AbstractExpression*> string_constants_rhs1(string_length1, NULL);
+        vector<AbstractExpression*> string_constants_rhs2(string_length2, NULL);
+        initConstantArray(string_constants_rhs1, string_set1);
+        initConstantArray(string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
            ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
@@ -2643,12 +2637,10 @@ TEST_F(NValueTest, TestInList)
         delete in_expression;
     }
     for (size_t ll = 0; ll < string_length2; ++ll) {
-        vector<AbstractExpression*>* string_constants_rhs1
-            = new vector<AbstractExpression*>(string_length1);
-        vector<AbstractExpression*>* string_constants_rhs2
-            = new vector<AbstractExpression*>(string_length2);
-        initConstantArray(*string_constants_rhs1, string_set1);
-        initConstantArray(*string_constants_rhs2, string_set2);
+        vector<AbstractExpression*> string_constants_rhs1(string_length1, NULL);
+        vector<AbstractExpression*> string_constants_rhs2(string_length2, NULL);
+        initConstantArray(string_constants_rhs1, string_set1);
+        initConstantArray(string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
            ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -65,6 +65,8 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
+import com.google_voltpatches.common.base.Strings;
+
 public class TestCSVLoader {
 
     protected static ServerThread localServer;
@@ -77,8 +79,9 @@ public class TestCSVLoader {
     protected static String dbName = String.format("mydb_%s", userName);
 
     public static void prepare() {
-        if (!reportDir.endsWith("/"))
+        if (!reportDir.endsWith("/")) {
             reportDir += "/";
+        }
         File dir = new File(reportDir);
         try {
             if (!dir.exists()) {
@@ -101,7 +104,7 @@ public class TestCSVLoader {
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         builder.addLiteralSchema(
-                "create table BLAH ("
+                "create table BLAH MIGRATE TO TARGET target1 ("
                 + "clm_integer integer not null, "
                 + "clm_tinyint tinyint default 0, "
                 + "clm_smallint smallint default 0, "
@@ -113,8 +116,12 @@ public class TestCSVLoader {
                 + "clm_point geography_point default null, "
                 + "clm_geography geography default null, "
                 + "PRIMARY KEY(clm_integer) "
-                + ");");
+                + ");"
+                + "DR TABLE BLAH;");
         builder.addPartitionInfo("BLAH", "clm_integer");
+        if (MiscUtils.isPro()) {
+            builder.setXDCR();
+        }
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -134,7 +141,9 @@ public class TestCSVLoader {
     @AfterClass
     public static void stopDatabase() throws InterruptedException
     {
-        if (client != null) client.close();
+        if (client != null) {
+            client.close();
+        }
         client = null;
 
         if (localServer != null) {
@@ -1415,8 +1424,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1444,7 +1454,9 @@ public class TestCSVLoader {
 
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1489,8 +1501,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1521,8 +1534,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists())
+            if(temp.exists()) {
                 temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1567,8 +1581,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1600,7 +1615,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1645,8 +1662,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1673,7 +1691,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1718,8 +1738,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (br != null)
+                if (br != null) {
                     br.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1758,7 +1779,9 @@ public class TestCSVLoader {
         }
         try {
             File temp = new File(FILENAME);
-            if(temp.exists()) temp.delete();
+            if(temp.exists()) {
+                temp.delete();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1784,6 +1807,34 @@ public class TestCSVLoader {
         String currentTime = new TimestampType().toString();
         String []myData = {
                 "1 ,1,1,11111111,first,2000000000000000000000000000000.000000000000,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+        };
+        int invalidLineCnt = 1;
+        int validLineCnt = 0;
+
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    @Test(timeout=2000)
+    public void testBadString() throws Exception {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String longString = Strings.repeat("a", (1024*1024)+1);
+        assertTrue(longString.length() > (1024*1024));
+        String []myData = {
+                "1 ,1,1,11111111,\""+longString+"\",2.0,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
         };
         int invalidLineCnt = 1;
         int validLineCnt = 0;
@@ -1840,8 +1891,9 @@ public class TestCSVLoader {
             e.printStackTrace();
         } finally {
             try {
-                if (bw != null)
+                if (bw != null) {
                     bw.close();
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -1892,7 +1944,7 @@ public class TestCSVLoader {
 
         // Call validate partitioning to check if we are good.
         VoltTable valTable;
-        valTable = client.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+        valTable = client.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
         System.out.println("Validate for BLAH:\n" + valTable);
         while (valTable.advanceRow()) {
             long miscnt = valTable.getLong("MISPARTITIONED_ROWS");

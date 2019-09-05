@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,40 +17,37 @@
 
 package org.voltdb.exportclient.decode;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltType;
 
-import com.google_voltpatches.common.collect.FluentIterable;
-import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class StringMapDecoder extends RowDecoder<Map<String,String>, RuntimeException>{
 
     protected final StringArrayDecoder m_stringArrayDecoder;
-    protected final String [] m_columnNames;
 
     protected StringMapDecoder(StringArrayDecoder stringArrayDecoder) {
         super(stringArrayDecoder);
         m_stringArrayDecoder = stringArrayDecoder;
-        m_columnNames = ImmutableList.copyOf(m_typeMap.keySet()).toArray(new String[0]);
     }
 
     @Override
-    public Map<String,String> decode(Map<String,String> to, Object[] fields) throws RuntimeException {
+    public Map<String,String> decode(long generation, String tableName, List<VoltType> types, List<String> names, Map<String,String> to, Object[] fields) throws RuntimeException {
         ImmutableMap.Builder<String,String> mb = null;
         if (to == null) {
             mb = ImmutableMap.builder();
         }
-        String [] strings = m_stringArrayDecoder.decode(null, fields);
-        for (int i = 0; i < strings.length && i < m_columnNames.length; ++i) {
+        String [] strings = m_stringArrayDecoder.decode(generation, tableName, types, names, null, fields);
+        int i = 0;
+        for (String name : names) {
             if (mb != null) {
-                mb.put(m_columnNames[i], strings[i]);
+                mb.put(name, strings[i]);
             } else {
-                to.put(m_columnNames[i], strings[i]);
+                to.put(name, strings[i]);
             }
+            i++;
         }
         return mb != null ? mb.build() : to;
     }
@@ -66,17 +63,6 @@ public class StringMapDecoder extends RowDecoder<Map<String,String>, RuntimeExce
             super(new StringArrayDecoder.Builder());
             m_delegateBuilder = getDelegateAs(StringArrayDecoder.Builder.class);
             m_delegateBuilder.nullRepresentation("");
-        }
-
-        @Override
-        public DelegateBuilder columnNames(List<String> columnNames) {
-            return super.columnNames(FluentIterable.from(columnNames).transform(camelCaseNameLowerFirst).toList());
-        }
-
-        @Override
-        public DelegateBuilder columnTypeMap(LinkedHashMap<String, VoltType> map) {
-            columnNames(ImmutableList.copyOf(map.keySet()));
-            return super.columnTypes(ImmutableList.copyOf(map.values()));
         }
 
         public StringMapDecoder build() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,21 +29,31 @@ import org.junit.Test;
 
 public class TestJsonStringDecoder extends BaseForDecoderTests {
 
-    final String expected =
+    final String expectedWithColumnNameXtion =
             "{\"tinyIntField\":10,\"smallIntField\":11,\"integerField\":12,"
           + "\"bigIntField\":13,\"floatField\":14.00014,\"timeStampField\":\"" + odbcDate
           + "\",\"stringField\":\"sixteen 十六\",\"varBinaryField\":\"" + base64Yolanda
           + "\",\"decimalField\":1818.0018,"
           + "\"geogPointField\":\"" + GEOG_POINT.toWKT()+ "\",\"geogField\":\"" + GEOG.toWKT() + "\"}";
 
+    final String expectedWithoutColumnNameXtion=
+            "{\"TINY_INT_FIELD\":10,\"SMALL_INT_FIELD\":11,\"INTEGER_FIELD\":12,"
+                    + "\"BIG_INT_FIELD\":13,\"FLOAT_FIELD\":14.00014,\"TIME_STAMP_FIELD\":\"" + odbcDate
+                    + "\",\"STRING_FIELD\":\"sixteen 十六\",\"VAR_BINARY_FIELD\":\"" + base64Yolanda
+                    + "\",\"DECIMAL_FIELD\":1818.0018,"
+                    + "\"GEOG_POINT_FIELD\":\"" + GEOG_POINT.toWKT()+ "\",\"GEOG_FIELD\":\"" + GEOG.toWKT() + "\"}";
     JsonStringDecoder.Builder builder = JsonStringDecoder.builder();
 
     @Test
     public void testDecodeRow() throws Exception {
-        builder.columnNames(NAMES).columnTypes(TYPES);
         JsonStringDecoder decoder = builder.build();
+        assertEquals(expectedWithColumnNameXtion, decoder.decode(0L, "mytable", TYPES, NAMES, null, row));
+    }
 
-        assertEquals(expected, decoder.decode(null, row));
+    @Test
+    public void testUmMangledRowNames() throws Exception {
+        JsonStringDecoder decoder = builder.camelCaseFieldNames(false).build();
+        assertEquals(expectedWithoutColumnNameXtion, decoder.decode(0L, "mytable", TYPES, NAMES, null, row));
     }
 
 }

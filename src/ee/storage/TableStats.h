@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLESTATS_H_
-#define TABLESTATS_H_
+#pragma once
 
 #include "stats/StatsSource.h"
 
@@ -28,7 +27,7 @@ class TempTable;
 /**
  * StatsSource extension for tables.
  */
-class TableStats : public voltdb::StatsSource {
+class TableStats : public StatsSource {
 public:
     /**
      * Static method to generate the column names for the tables which
@@ -40,10 +39,8 @@ public:
      * Static method to generate the remaining schema information for
      * the tables which contain persistent table stats.
      */
-    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types,
-                                         std::vector<int32_t>& columnLengths,
-                                         std::vector<bool>& allowNull,
-                                         std::vector<bool>& inBytes);
+    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types, std::vector<int32_t>& columnLengths,
+            std::vector<bool>& allowNull, std::vector<bool>& inBytes);
 
     /**
      * Return an empty TableStats table
@@ -60,7 +57,7 @@ public:
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
      */
-    void configure(std::string name);
+    void configure(std::string const& name);
 
 protected:
 
@@ -91,8 +88,6 @@ private:
      */
     voltdb::Table* m_table;
 
-    voltdb::NValue m_tableName;
-
     voltdb::NValue m_tableType;
 
     int64_t m_lastTupleCount;
@@ -103,4 +98,3 @@ private:
 
 }
 
-#endif /* TABLESTATS_H_ */

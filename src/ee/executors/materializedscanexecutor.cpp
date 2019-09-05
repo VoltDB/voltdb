@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,19 +18,8 @@
 #include <iostream>
 #include <set>
 #include "materializedscanexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/StlFriendlyNValue.h"
-#include "execution/ExecutorVector.h"
-#include "expressions/abstractexpression.h"
 #include "plannodes/materializedscanplannode.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
@@ -39,8 +28,8 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Materialized Scan Executor");
 
-    assert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
-    assert(abstract_node->getOutputSchema().size() == 1);
+    vassert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
+    vassert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -49,13 +38,13 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     MaterializedScanPlanNode* node = dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     // output table has one column
     Table* output_table = node->getOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
-    assert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert(output_table);
+    vassert((int)output_table->columnCount() == 1);
 
     // get the output type
     const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);
@@ -63,7 +52,7 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     bool outputCantBeNull = !columnInfo->allowNull;
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
-    assert(rowsExpression);
+    vassert(rowsExpression);
 
     // get array nvalue
     NValue arrayNValue = rowsExpression->eval();

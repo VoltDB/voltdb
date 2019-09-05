@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,7 +42,7 @@ public class CrashVoltDBTest extends JUnit4LocalClusterTest {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashVoltDBProc.class);
+        builder.addProcedure(CrashVoltDBProc.class);
         /*boolean success = builder.compile(Configuration.getPathToCatalogForTest("crash.jar"), 1, 1, 0, "localhost");
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("crash.xml"));*/

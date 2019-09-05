@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,20 +78,12 @@ class TempTable : public AbstractTempTable {
     TempTable operator=(TempTable const&);
 
   public:
-
     TableIterator iterator() {
-        m_iter.reset(m_data.begin());
-        return m_iter;
+        return TableIterator(this, m_data.begin(), false);
     }
 
     TableIterator iteratorDeletingAsWeGo() {
-        m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(true);
-        return m_iter;
-    }
-
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
+        return TableIterator(this, m_data.begin(), true);
     }
 
     virtual ~TempTable();
@@ -146,7 +138,7 @@ class TempTable : public AbstractTempTable {
      */
     virtual void swapContents(AbstractTempTable* otherTable) {
         TempTable* otherTempTable = dynamic_cast<TempTable*>(otherTable);
-        assert (otherTempTable);
+        vassert (otherTempTable);
         AbstractTempTable::swapContents(otherTable);
         m_data.swap(otherTempTable->m_data);
     }
@@ -174,9 +166,6 @@ class TempTable : public AbstractTempTable {
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
-
-    // default iterator
-    TableIterator m_iter;
 
     // ptr to global integer tracking temp table memory allocated per frag
     TempTableLimits* m_limits;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,9 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -47,7 +49,8 @@ public class OperatorExpression extends AbstractExpression {
 
     public OperatorExpression() {
         //
-        // This is needed for serialization
+        // This is needed for the "reflective" way to construct an abstract expression.
+        // See AbstractParsedStmt#parseOperationExpression()
         //
         super();
     }
@@ -171,30 +174,30 @@ public class OperatorExpression extends AbstractExpression {
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
 
-    @Override
+    @Override       // NOTE: this method does similar job of what Calcite.unparse does: to canonicalize a query, but the name is misleading. Refer to CatalogSchemaTools.toSchema().
     public String explain(String impliedTableName) {
-        ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL) {
-            return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+        final String explainLeftTableName = m_left.explain(impliedTableName);
+        switch(getExpressionType()) {
+            case OPERATOR_IS_NULL:
+                return String.format("(%s IS NULL)", explainLeftTableName);
+            case OPERATOR_NOT:
+                return String.format("(NOT %s)", explainLeftTableName);
+            case OPERATOR_CAST:
+                return String.format("(CAST (%s AS %s))", explainLeftTableName, m_valueType.toSQLString());
+            case OPERATOR_EXISTS:
+                return String.format("(EXISTS %s)", explainLeftTableName);
+            case OPERATOR_CASE_WHEN:
+                return String.format("(CASE WHEN %s THEN %s ELSE %s END)",
+                        explainLeftTableName, m_right.m_left.explain(impliedTableName),
+                        m_right.m_right.explain(impliedTableName));
+            case OPERATOR_UNARY_MINUS:
+                return String.format("(-%s)", explainLeftTableName);
+            default:
+                return String.format("(%s %s %s)",
+                        explainLeftTableName,
+                        getExpressionType().symbol(),
+                        m_right.explain(impliedTableName));
         }
-        if (type == ExpressionType.OPERATOR_NOT) {
-            return "(NOT " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CAST) {
-            return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
-        }
-
-        if (type == ExpressionType.OPERATOR_EXISTS) {
-            return "(EXISTS " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CASE_WHEN) {
-            return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
-                    m_right.m_left.explain(impliedTableName) + " ELSE " +
-                    m_right.m_right.explain(impliedTableName) + " END)";
-        }
-        return "(" + m_left.explain(impliedTableName) +
-            " " + type.symbol() + " " +
-            m_right.explain(impliedTableName) + ")";
     }
 
     @Override
@@ -210,5 +213,4 @@ public class OperatorExpression extends AbstractExpression {
             return true;
         }
     }
-
 }

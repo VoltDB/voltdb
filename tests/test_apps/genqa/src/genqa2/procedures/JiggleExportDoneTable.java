@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,14 +22,9 @@
  */
 package genqa2.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo(
-    partitionInfo = "export_done_table.txnid:0",
-    singlePartition = true
-)
 public class JiggleExportDoneTable extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
 

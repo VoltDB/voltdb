@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREDEBUGLOG_H
-#define HSTOREDEBUGLOG_H
+#pragma once
 
 /**
  * Debug logging functions for EE. Unlike the performance counters,
@@ -54,11 +53,14 @@
  * eliminate all instructions in the final binary.
 */
 
+#include "common/ThreadLocalPool.h"
+#include "common/StackTrace.h"
+
 #include <string>
 #include <ctime>
 #include <cstdio>
-#include <vector>
-namespace voltdb {
+#include <chrono>
+#include <sys/time.h>
 
 // Log levels.
 #define VOLT_LEVEL_OFF    1000
@@ -69,20 +71,15 @@ namespace voltdb {
 #define VOLT_LEVEL_TRACE  100
 #define VOLT_LEVEL_ALL    0
 
-#define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
+#define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %T"
 
 // Compile Option
 #ifndef VOLT_LOG_LEVEL
-    // TODO : any way to use pragma message in GCC?
-    //#pragma message("Warning: VOLT_LOG_LEVEL compile option was not explicitly given.")
-    #if defined(DEBUG) || defined(_DEBUG) || defined(_DEBUG_)
-        //#pragma message("VOLT_LEVEL_DEBUG is used instead as DEBUG option is on.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_DEBUG
-    #else
-        //#pragma message("VOLT_LEVEL_WARN is used instead as DEBUG option is off.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_WARN
+    #ifndef NDEBUG
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_ERROR
+    #else // release builds
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_OFF
     #endif
-    //#pragma message("Give VOLT_LOG_LEVEL compile option to overwrite the default level.")
 #endif
 
 
@@ -91,7 +88,23 @@ namespace voltdb {
     #define __FUNCTION__ ""
 #endif
 
-void outputLogHeader(const char *file, int line, const char *func, int level);
+#define _VOLT_LOG(lvl, msg, ...) do {                                           \
+        struct timeval __now__;                                                 \
+        ::gettimeofday(&__now__, NULL);                                         \
+        tm *__curTime__ = localtime(&__now__.tv_sec);                           \
+        char __time_str__[32];                                                  \
+        ::strftime(__time_str__, 32, VOLT_LOG_TIME_FORMAT, __curTime__);        \
+        ::printf("[%s] [T%d:E%d] [%s:%d:%s()] %s,%03jd - " msg, lvl,            \
+                voltdb::ThreadLocalPool::getThreadPartitionIdWithNullCheck(),   \
+                voltdb::ThreadLocalPool::getEnginePartitionIdWithNullCheck(),   \
+                __FILE__, __LINE__, __FUNCTION__,                               \
+                __time_str__, (intmax_t) __now__.tv_usec / 1000, ##__VA_ARGS__);\
+        ::fflush(stdout);                                                       \
+    } while (0)
+
+#define VOLT_LOG(lvl, msg, ...) _VOLT_LOG(lvl, msg  "\n", ##__VA_ARGS__)
+
+#define VOLT_LOG_STACK(lvl) _VOLT_LOG(lvl, "STACK TRACE\n%s", voltdb::StackTrace::stringStackTrace("    ").c_str())
 
 // Two convenient macros for debugging
 // 1. Logging macros.
@@ -102,10 +115,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_ERROR
     #define VOLT_ERROR_ENABLED
     //#pragma message("VOLT_ERROR was enabled.")
-    #define VOLT_ERROR(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_ERROR_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_ERROR(...) VOLT_LOG("ERROR", __VA_ARGS__)
+    #define VOLT_ERROR_STACK() VOLT_LOG_STACK("ERROR")
 #else
     #define VOLT_ERROR(...) ((void)0)
     #define VOLT_ERROR_STACK() ((void)0)
@@ -117,10 +128,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_WARN
     #define VOLT_WARN_ENABLED
     //#pragma message("VOLT_WARN was enabled.")
-    #define VOLT_WARN(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_WARN_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_WARN(...) VOLT_LOG("WARN", __VA_ARGS__)
+    #define VOLT_WARN_STACK() VOLT_LOG_STACK("WARN")
 #else
     #define VOLT_WARN(...) ((void)0)
     #define VOLT_WARN_STACK() ((void)0)
@@ -132,10 +141,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_INFO
     #define VOLT_INFO_ENABLED
     //#pragma message("VOLT_INFO was enabled.")
-    #define VOLT_INFO(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_INFO_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_INFO(...) VOLT_LOG("INFO", __VA_ARGS__)
+    #define VOLT_INFO_STACK() VOLT_LOG_STACK("INFO")
 #else
     #define VOLT_INFO(...) ((void)0)
     #define VOLT_INFO_STACK() ((void)0)
@@ -147,10 +154,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_DEBUG
     #define VOLT_DEBUG_ENABLED
     //#pragma message("VOLT_DEBUG was enabled.")
-    #define VOLT_DEBUG(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_DEBUG_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_DEBUG(...) VOLT_LOG("DEBUG", __VA_ARGS__)
+    #define VOLT_DEBUG_STACK() VOLT_LOG_STACK("DEBUG")
 #else
     #define VOLT_DEBUG(...) ((void)0)
     #define VOLT_DEBUG_STACK() ((void)0)
@@ -162,84 +167,82 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
     #define VOLT_TRACE_ENABLED
     //#pragma message("VOLT_TRACE was enabled.")
-    #define VOLT_TRACE(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_TRACE_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_TRACE(...) VOLT_LOG("TRACE", __VA_ARGS__)
+    #define VOLT_TRACE_STACK() VOLT_LOG_STACK("TRACE")
 #else
     #define VOLT_TRACE(...) ((void)0)
     #define VOLT_TRACE_STACK() ((void)0)
 #endif
 
-// Output log message header in this format: [type] [file:line:function] time -
-// ex: [ERROR] [somefile.cpp:123:doSome()] 2008/07/06 10:00:00 -
-inline void outputLogHeader(const char *file, int line, const char *func, int level) {
-    time_t t = ::time(NULL) ;
-    tm *curTime = localtime(&t);
-    char time_str[32]; // FIXME
-    ::strftime(time_str, 32, VOLT_LOG_TIME_FORMAT, curTime);
-    const char* type;
-    switch (level) {
-        case VOLT_LEVEL_ERROR:
-            type = "ERROR";
-            break;
-        case VOLT_LEVEL_WARN:
-            type = "WARN ";
-            break;
-        case VOLT_LEVEL_INFO:
-            type = "INFO ";
-            break;
-        case VOLT_LEVEL_DEBUG:
-            type = "DEBUG";
-            break;
-        case VOLT_LEVEL_TRACE:
-            type = "TRACE";
-            break;
-        default:
-            type = "UNKWN";
-    }
-    printf("[%s] [%s:%d:%s()] %s - ", type, file, line, func, time_str);
-}
-
-class StackTrace {
-public:
-    StackTrace();
-    ~StackTrace();
-
-    static void printMangledAndUnmangledToFile(FILE *targetFile) {
-        StackTrace st;
-        // write header for backtrace file
-        int numFrames = (int)st.m_traces.size();
-        // Ignore the stack frames specific to StackTrace object
-        fprintf(targetFile, "VoltDB Backtrace (%d stack frames)\n", numFrames-2);
-        for (int ii = 2; ii < numFrames; ii++) {
-            // write original symbol to file.
-            fprintf(targetFile, "raw[%d]: %s\n", ii, st.m_traceSymbols[ii]);
-        }
-        for (int ii=2; ii < numFrames; ii++) {
-            const char* str = st.m_traces[ii].c_str();
-            fprintf(targetFile, "demangled[%d]: %s\n", ii, str);
-        }
-    }
-
-
-    static void printStackTrace() {
-        StackTrace st;
-        for (int ii=1; ii < st.m_traces.size(); ii++) {
-            printf("   %s\n", st.m_traces[ii].c_str());
-        }
-    }
-
-    static std::string stringStackTrace();
-
-private:
-    char** m_traceSymbols;
-    std::vector<std::string> m_traces;
+#if VOLT_TIMER_ENABLED
+template<typename P>
+struct _TimerLevels {
+    std::chrono::duration<int64_t, P> error;
+    std::chrono::duration<int64_t, P> warn;
+    std::chrono::duration<int64_t, P> info;
+    std::chrono::duration<int64_t, P> debug;
 };
 
-#define PRINT_STACK_TRACE() outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ALL); \
-        ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+#define __TIMER_LVLS_NAME(name) __ ## name ## TimerLevels
 
-} // namespace voltdb
+// Define log levels based on timer duration. n: name of lvls struct, r: ratio for duration (milli, micro, ...),
+// e: error duration, w: warning duration, i: info duration, d: debug duration
+#define TIMER_LVLS(n, r, e, w, i, d) const static struct _TimerLevels<std::r> __TIMER_LVLS_NAME(n) = {    \
+        .error = std::chrono::r##seconds(e), .warn = std::chrono::r##seconds(w),                          \
+        .info = std::chrono::r##seconds(i), .debug = std::chrono::r##seconds(d) };
 
-#endif // HSTOREDEBUGLOG_H
+#define __TIMER_NAME(name) __ ## name ## StartTime
+
+// Start a timer with given name
+#define START_TIMER(name) auto __TIMER_NAME(name) = std::chrono::steady_clock::now()
+
+#define __TIMER_LOG(lvl, strfmt, duration, ...) do { VOLT_ ## lvl("Took %ld ns: " \
+        strfmt, duration.count(), ##__VA_ARGS__); } while (0)
+
+// Stop a timer with name and log at appropriate log level as defined by lvls.
+// strfmt: format string to log, and arguments for format string
+#define STOP_TIMER(name, lvls, strfmt, ...)  do {                                                                      \
+        auto __duration__ = std::chrono::steady_clock::now() - __TIMER_NAME(name);                                     \
+        if (__duration__ > __TIMER_LVLS_NAME(lvls).error) __TIMER_LOG(ERROR, strfmt, __duration__, ##__VA_ARGS__);     \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).warn) __TIMER_LOG(WARN, strfmt, __duration__, ##__VA_ARGS__);  \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).info) __TIMER_LOG(INFO, strfmt, __duration__, ##__VA_ARGS__);  \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).debug) __TIMER_LOG(DEBUG, strfmt, __duration__, ##__VA_ARGS__);\
+    } while (0)
+#else
+#define TIMER_LVLS(...)
+#define START_TIMER(...) ((void)0)
+#define STOP_TIMER(...) ((void)0)
+#endif
+
+#define PRINT_STACK_TRACE() VOLT_LOG_STACK("UNKWN")
+
+// A custom assert macro that adds stacktrace on message
+#ifdef NDEBUG
+// **NOTE**: We allow expr inside `vassert' to have side effect,
+// which GNU libc does not (by simply ommiting the expression)
+#define vassert(expr) (void)(expr)
+#else
+#ifdef MACOSX
+// MACOS does not have an equivalent of __assert_fail; so we do
+// what the header there does, see
+// https://gist.github.com/vrx/17c31cbfe0511645a41a#file-assert-h-L71
+#define vassert(expr)             \
+   if(! (expr)) {                 \
+       printf("%s%u: failed assertion\n(STACK TRACE:\n%s)\n", __FILE__, __LINE__,              \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());                            \
+       abort();                                                                                \
+   }
+#else
+extern char __assert_failure_msg__[4096];
+#define vassert(expr)             \
+   if(! (expr)) {                 \
+       snprintf(__assert_failure_msg__, sizeof __assert_failure_msg__,                         \
+               "%s\n(STACK TRACE:\n%s)\n", #expr,                                              \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());                            \
+       __assert_failure_msg__[sizeof __assert_failure_msg__ - 1] = '\0';                       \
+       __assert_fail(__assert_failure_msg__, __FILE__, __LINE__, __ASSERT_FUNCTION);           \
+   }
+#endif
+
+#endif
+

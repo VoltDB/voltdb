@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -137,6 +138,10 @@ public class CatalogContext {
 
     public long m_lastUpdateCoreDuration = -1; // in nano seconds
 
+    // This is the Calcite schema for a single database. This object is used to update
+    // the Calcite schema when the catalog is updated.
+    private SchemaPlus m_schemaPlus;
+
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
@@ -160,13 +165,11 @@ public class CatalogContext {
             DefaultProcedureManager defaultProcManager,
             PlannerTool plannerTool,
             HostMessenger messenger,
-            boolean hasSchemaChange)
-    {
+            boolean hasSchemaChange) {
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
-        }
-        if (settings == null) {
+        } else if (settings == null) {
             throw new IllegalArgumentException("Cant't create CatalogContext with null cluster settings");
         }
 
@@ -192,7 +195,7 @@ public class CatalogContext {
             m_ptool = new PlannerTool(database, m_catalogInfo.m_catalogHash);
         } else {
             m_defaultProcs = defaultProcManager;
-            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);
         }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_catalogInfo.m_jarfile);
@@ -231,8 +234,7 @@ public class CatalogContext {
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
-            HostMessenger messenger)
-    {
+            HostMessenger messenger) {
         this(catalog, settings, version, genId,
              new CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes),
              null, null, messenger, true);
@@ -256,6 +258,17 @@ public class CatalogContext {
         return newCatalog;
     }
 
+    public Database getDatabase() {
+        return database;
+    }
+
+    /**
+     * Get the Calcite schema associated with the default database
+     */
+    public SchemaPlus getSchemaPlus() {
+        return m_schemaPlus;
+    }
+
     public CatalogContext update(
             boolean isForReplay,
             String diffCommands,
@@ -264,8 +277,7 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
             HostMessenger messenger,
-            boolean hasSchemaChange)
-    {
+            boolean hasSchemaChange) {
         Catalog newCatalog = null;
         assert(catalogBytes != null);
 
@@ -337,8 +349,7 @@ public class CatalogContext {
      * @param name
      * @throws IOException
      */
-    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException
-    {
+    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException {
         File catalogFile = new VoltFile(path, name);
         File catalogTmpFile = new VoltFile(path, name + ".tmp");
 
@@ -400,8 +411,7 @@ public class CatalogContext {
     // Generate helpful status messages based on configuration present in the
     // catalog.  Used to generated these messages at startup and after an
     // @UpdateApplicationCatalog
-    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose)
-    {
+    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose) {
         SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology
@@ -577,5 +587,13 @@ public class CatalogContext {
      */
     public byte[] getFileInJar(String key) {
         return m_catalogInfo.m_jarfile.get(key);
+    }
+
+    /**
+     * Set the Calcite schema associated with the default database
+     * @param schemaPlus the updated schema
+     */
+    public void setSchemaPlus(SchemaPlus schemaPlus) {
+        m_schemaPlus = schemaPlus;
     }
 }

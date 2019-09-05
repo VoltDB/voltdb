@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -159,13 +159,13 @@ public:
         assert(m_kschema2);
         TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                                 m_columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, m_schema);
+                                false, false, false, m_schema);
         TableIndexScheme scheme1("test_index1", BALANCED_TREE_INDEX,
                                 m_columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, m_schema1);
+                                false, false, false, m_schema1);
         TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
                                 m_columnIndices2, TableIndex::simplyIndexColumns(),
-                                false, false, m_schema2);
+                                false, false, false, m_schema2);
         // build index
         // index has one column and pointer
         m_index = TableIndexFactory::getInstance(scheme);
@@ -225,7 +225,7 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
 
     TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
-                            false, false, schema);
+                            false, false, false, schema);
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);

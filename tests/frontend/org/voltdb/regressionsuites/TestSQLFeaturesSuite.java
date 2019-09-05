@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,9 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
@@ -46,20 +45,9 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
+import junit.framework.Test;
+
 public class TestSQLFeaturesSuite extends RegressionSuite {
-
-    /*
-     *  See also TestPlansGroupBySuite for tests of distinct, group by, basic aggregates
-     */
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        FeaturesSelectAll.class, UpdateTests.class,
-        SelfJoinTest.class, SelectOrderLineByDistInfo.class,
-        BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -431,6 +419,13 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{2, "updated"}}, vt[0]);
     }
 
+    // procedures used by these tests
+    static final Class<?>[] MP_PROCEDURES = {
+        FeaturesSelectAll.class, SelectOrderLineByDistInfo.class,
+        BatchedMultiPartitionTest.class, WorkWithBigString.class,
+        InsertLotsOfData.class, SelectWithJoinOrder.class
+    };
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -448,7 +443,12 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        ProcedurePartitionData data = new ProcedurePartitionData("ORDER_LINE", "OL_W_ID");
+        project.addProcedure(UpdateTests.class, data);
+        project.addProcedure(SelfJoinTest.class, data);
+        project.addProcedure(PassByteArrayArg.class, data);
+        project.addProcedure(PassAllArgTypes.class, data);
 
         boolean success;
 

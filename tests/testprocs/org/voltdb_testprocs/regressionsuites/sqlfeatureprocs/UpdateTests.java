@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "ORDER_LINE.OL_W_ID: 0",
-    singlePartition = true
-)
 public class UpdateTests extends VoltProcedure {
 
     public final SQLStmt updateNoIndexes = new SQLStmt("UPDATE ORDER_LINE SET OL_SUPPLY_W_ID = 5;");

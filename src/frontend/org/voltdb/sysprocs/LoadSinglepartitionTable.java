@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -42,15 +41,6 @@ import org.voltdb.types.ConstraintType;
  * with only one network round trip and one transactional context.
  * Also a bit more generic.
  */
-@ProcInfo(
-    partitionInfo = "DUMMY: 0", // partitioning is done special for this class and
-                                // "DUMMY" signifies to the compiler this doesn't have
-                                // to line up with an actual column.
-                                // In practice this is partitioned by the
-                                // InvocationDispatcher just like any other single-partition
-                                // procedure.
-    singlePartition = true
-)
 public class LoadSinglepartitionTable extends VoltSystemProcedure
 {
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb.rejoin;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -32,10 +31,6 @@ import org.voltdb.VoltTable;
  * Used to test pause-less rejoin under load.
  * If the data diverges, this should crash VoltDB.
  */
-@ProcInfo (
-        partitionInfo = "PARTITIONED.PKEY:0",
-        singlePartition = true
-)
 public class IncrementProcSP extends VoltProcedure {
     public final static byte USER_ABORT = 66;
 

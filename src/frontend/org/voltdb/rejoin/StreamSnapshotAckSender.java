@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,8 @@ public class StreamSnapshotAckSender implements Runnable {
      * @param blockIndex
      */
     public void ack(long hsId, boolean isEOS, long targetId, int blockIndex) {
+        rejoinLog.debug("Queue ack for hsId:" + hsId + " isEOS: " +
+                isEOS + " targetId:" + targetId + " blockIndex: " + blockIndex);
         m_blockIndices.offer(Pair.of(hsId, new RejoinDataAckMessage(isEOS, targetId, blockIndex)));
     }
 

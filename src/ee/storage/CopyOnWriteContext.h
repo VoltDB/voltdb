@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,8 +38,8 @@ class PersistentTableSurgeon;
 
 class CopyOnWriteContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
-                                              TableStreamType, const std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TableStreamType,
+            const  HiddenColumnFilter&, const std::vector<std::string>&);
 
 public:
 
@@ -59,6 +59,10 @@ public:
      */
     virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
+    /**
+     * Reactivation handler.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType);
     /**
      * Mandatory TableStreamContext override.
      */
@@ -95,6 +99,7 @@ private:
     CopyOnWriteContext(PersistentTable &table,
                        PersistentTableSurgeon &surgeon,
                        int32_t partitionId,
+                       const HiddenColumnFilter &hiddenColumnFilter,
                        const std::vector<std::string> &predicateStrings,
                        int64_t totalTuples);
 
@@ -112,7 +117,7 @@ private:
      * Iterator over the table via a CopyOnWriteIterator or an iterator over
      *  temp table used to stored backed up tuples
      */
-    boost::scoped_ptr<TupleIterator> m_iterator;
+    std::unique_ptr<TupleIterator> m_iterator;
 
     TableTuple m_tuple;
 
@@ -127,6 +132,8 @@ private:
     int64_t m_updates;
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
+    const bool m_replicated;
+    const HiddenColumnFilter m_hiddenColumnFilter;
 
     void checkRemainingTuples(const std::string &label);
 

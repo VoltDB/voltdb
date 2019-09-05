@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -207,7 +207,8 @@ public class StoredProcedureInvocation implements JSONString {
      * Also line 30 of AbstactDRTupleStream.h
      * Also line 38 of InvocationBuffer.java
      */
-    public int getSerializedSize()
+
+    public int getFixedHeaderSize()
     {
         // get extension sizes - if not present, size is 0 for each
         // 6 is one byte for ext type, one for size, and 4 for integer value
@@ -217,17 +218,25 @@ public class StoredProcedureInvocation implements JSONString {
 
         // compute the size
         int size =
-            1 + // type
-            4 + getProcNameBytes().length + // procname
-            8 + // client handle
-            1 + // extension count
-            batchExtensionSize + allPartitionExtensionSize + // extensions
+                1 + // type
+                4 + getProcNameBytes().length + // procname
+                8 + // client handle
+                1 + // extension count
+                batchExtensionSize + allPartitionExtensionSize;
+        return size;
+    }
+
+    public int getSerializedSize()
+    {
+        // compute the size
+        int size = getFixedHeaderSize() +
             getSerializedParamSize(); // parameters
         assert(size > 0); // sanity
 
         // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
         return size;
     }
+
 
     /**
      * Get the serialized size of this SPI in the original serialization version.
@@ -424,14 +433,7 @@ public class StoredProcedureInvocation implements JSONString {
         setProcName(procNameBytes);
         clientHandle = buf.getLong();
         // do not deserialize parameters in ClientInterface context
-        serializedParams = buf.slice();
-        final ByteBuffer duplicate = serializedParams.duplicate();
-        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() throws Exception {
-                return ParameterSet.fromByteBuffer(duplicate);
-            }
-        });
+        initParameters(buf);
     }
 
     private void initVersion1FromBuffer(ByteBuffer buf) throws IOException {
@@ -495,6 +497,10 @@ public class StoredProcedureInvocation implements JSONString {
         }
 
         // do not deserialize parameters in ClientInterface context
+        initParameters(buf);
+    }
+
+    private void initParameters(ByteBuffer buf) {
         serializedParams = buf.slice();
         final ByteBuffer duplicate = serializedParams.duplicate();
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -143,7 +143,7 @@ public class Benchmark {
         String statsfile = "";
 
         @Option(desc = "Allow experimental in-procedure adhoc statments.")
-        boolean allowinprocadhoc = true;
+        boolean allowinprocadhoc = false;
 
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
@@ -159,9 +159,17 @@ public class Benchmark {
 
         @Option(desc = "Allow disabling different threads for testing specific functionality. ")
         String disabledthreads = "none";
-        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses"
+        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt"
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> disabledThreads = null;
+
+        @Option(desc = "Allow enabling specific threads. ")
+        String enabledthreads = "all";
+        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt"
+        // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
+        ArrayList<String> enabledThreads = null;
+
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -196,7 +204,17 @@ public class Benchmark {
 
             // parse servers
             parsedServers = servers.split(",");
-            disabledThreads = new ArrayList<String>(Arrays.asList(disabledthreads.split(",")));
+            if (enabledthreads != "all") {
+                disabledThreads = allThreads;
+                enabledThreads = new ArrayList<String>(Arrays.asList(enabledthreads.split(",")));
+                for (String tn : enabledThreads) {
+                    disabledThreads.remove(tn);
+                }
+            }
+            else {
+                disabledThreads = new ArrayList<String>(Arrays.asList(disabledthreads.split(",")));
+            }
+            log.info("Disabled threads: " + disabledthreads.join(","));
         }
     }
 
@@ -541,7 +559,10 @@ public class Benchmark {
     DdlThread ddlt = null;
     List<ClientThread> clientThreads = null;
     UpdateClassesThread updcls = null;
-
+    TTLLoader partNDlt = null;
+    TTLLoader replNDlt = null;
+    TTLLoader partttlMigratelt = null;
+    TTLLoader replttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -619,6 +640,7 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
 
         // Big Partitioned Loader
+        partBiglt = null;
         if (!(config.disabledThreads.contains("partBiglt") || config.disabledThreads.contains("Biglt"))) {
             partBiglt = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
@@ -631,6 +653,7 @@ public class Benchmark {
             replBiglt.start();
         }
 
+
         // wait for the filler tables to load up
         //partBiglt.join();
         //replBiglt.join();
@@ -639,9 +662,36 @@ public class Benchmark {
         log.info("Starting Benchmark");
         log.info(HORIZONTAL_RULE);
 
+        // Nibble delete Loader
+        if (!(config.disabledThreads.contains("partNDlt") || config.disabledThreads.contains("NDlt"))) {
+            partNDlt = new TTLLoader(client, "nibdp",
+                    100000, 1024, 50, permits, partitionCount, "TTL");
+            partNDlt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
+            replNDlt = new TTLLoader(client, "nibdr",
+                    100000, 1024, 3, permits, partitionCount, "TTL");
+            replNDlt.start();
+        }
+
+        // TTL/Migrate to Export
+        if (!config.disabledThreads.contains("partttlMigratelt")) {
+            partttlMigratelt = new TTLLoader(client, "ttlmigratep",
+                    100000, 1024, 50, permits, partitionCount, "EXPORT");
+            partttlMigratelt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
+            replttlMigratelt = new TTLLoader(client, "ttlmigrater",
+                    100000, 1024, 3, permits, partitionCount, "EXPORT");
+            replttlMigratelt.start();
+        }
+
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         scheduleRunTimer();
+
         // reset progress tracker
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
@@ -710,17 +760,23 @@ public class Benchmark {
                 adHocMayhemThread.start();
             }
         }
+
         if (!config.disabledThreads.contains("idpt")) {
             idpt = new InvokeDroppedProcedureThread(client);
             idpt.start();
-        } if (!config.disabledThreads.contains("ddlt")) {
+        }
+
+        if (!config.disabledThreads.contains("ddlt")) {
             ddlt = new DdlThread(client);
             // XXX/PSR ddlt.start();
         }
+
         if (!config.disabledThreads.contains("updateclasses")) {
             updcls = new UpdateClassesThread(client, config.duration);
             updcls.start();
         }
+
+
         log.info("All threads started...");
 
         while (true) {

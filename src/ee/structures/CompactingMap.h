@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <utility>
 #include <limits>
-#include <cassert>
+#include <common/debuglog.h>
 
 typedef u_int32_t NodeCount;
 
@@ -121,7 +121,7 @@ protected:
         void* operator new(std::size_t unused_sz, ContiguousAllocator& ca)
         {
             void *memory = ca.alloc();
-            assert(memory);
+            vassert(memory);
             return memory;
         }
 
@@ -221,14 +221,15 @@ public:
 
     iterator lowerBound(const Key &key) const;
     iterator upperBound(const Key &key) const;
+    // do upperBound(key) but treat null values in key as maximum
+    iterator upperBoundNullAsMax(const Key &key) const;
 
     std::pair<iterator, iterator> equalRange(const Key &key) const;
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    // TODO(xin): later rename it to rankLower
     // Must pass a key that already in map, or else return -1
-    int64_t rankAsc(const Key& key) const;
+    int64_t rankLower(const Key& key) const;
     int64_t rankUpper(const Key& key) const;
 
     /**
@@ -306,7 +307,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(const Key &key)
 template<typename KeyValuePair, typename Compare, bool hasRank>
 bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(iterator &iter)
 {
-    assert(iter.m_node != &NIL);
+    vassert(iter.m_node != &NIL);
     erase(iter.m_node);
     return true;
 }
@@ -352,7 +353,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
             }
         }
 
-        assert(y != &NIL);
+        vassert(y != &NIL);
 
         // create a new node using the custom operator new
         TreeNode *z = new (m_allocator) TreeNode(&NIL, y);
@@ -377,7 +378,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
         m_root = z;
     }
     m_count++;
-    assert(m_allocator.count() == m_count);
+    vassert(m_allocator.count() == m_count);
     return NULL;
 }
 
@@ -420,6 +421,25 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBound(const Key &key) const
     }
     return iterator(this, y);
 
+}
+
+template<typename KeyValuePair, typename Compare, bool hasRank>
+typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator
+CompactingMap<KeyValuePair, Compare, hasRank>::upperBoundNullAsMax(const Key &key) const {
+    Key tmpKey(key);
+    setPointerValue(tmpKey, MAXPOINTER);
+    TreeNode *x = m_root;
+    TreeNode *y = const_cast<TreeNode *>(&NIL);
+    while (x != &NIL) {
+        int cmp = m_comper.getNullAsMaxComparator()(x->key(), tmpKey);
+        if (cmp <= 0) {
+            x = x->right;
+        } else {
+            y = x;
+            x = x->left;
+        }
+    }
+    return iterator(this, y);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -688,28 +708,28 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
     if (last == x) {
         delete last;
         m_allocator.trim();
-        assert(m_allocator.count() == m_count);
+        vassert(m_allocator.count() == m_count);
         return;
     }
 
     // last should be a real node
-    //assert(isReachableNode(m_root, last));
+    //vassert(isReachableNode(m_root, last));
 
     if (last->parent == &NIL) {
         // fix the root pointer if needed
-        assert(last == m_root);
+        vassert(last == m_root);
         m_root = x;
     }
     else {
-        assert(last != m_root);
+        vassert(last != m_root);
         // Last has a parent node.
         // Make its pointer to last now point to the hole.
-        //assert(isReachableNode(m_root, last->parent));
+        //vassert(isReachableNode(m_root, last->parent));
         if (last->parent->left == last) {
             last->parent->left = x;
         }
         else {
-            assert(last->parent->right == last);
+            vassert(last->parent->right == last);
             last->parent->right = x;
         }
     }
@@ -723,7 +743,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
     }
 
     // Copy the last node over the hole left by the deleted node.
-    assert(x != &NIL);
+    vassert(x != &NIL);
     x->parent = last->parent;
     x->left = last->left;
     x->right = last->right;
@@ -735,7 +755,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
 
     delete last;
     m_allocator.trim();
-    assert(m_allocator.count() == m_count);
+    vassert(m_allocator.count() == m_count);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -868,7 +888,7 @@ inline void CompactingMap<KeyValuePair, Compare, hasRank>::updateSubct(TreeNode*
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
-int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) const
+int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankLower(const Key& key) const
 {
     if (!hasRank) {
         return -1;
@@ -934,7 +954,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
         return -1;
     }
     if (m_unique) {
-        return rankAsc(key);
+        return rankLower(key);
     }
     TreeNode *n = lookup(key);
     // return -1 if the key passed in is not in the map
@@ -947,7 +967,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
     if (it.isEnd()) {
         return m_count;
     }
-    return rankAsc(it.key()) - 1;
+    return rankLower(it.key()) - 1;
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -1000,8 +1020,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
         }
 
         if (m_unique) {
-            if ((rkasc = rankAsc(it.key())) != i) {
-                printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+            if ((rkasc = rankLower(it.key())) != i) {
+                printf("false: unique_rankLower expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
         }
@@ -1029,8 +1049,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
                     }
                 }
             }
-            // test rankAsc
-            rkasc = rankAsc(k);
+            // test rankLower
+            rkasc = rankLower(k);
             int64_t nc = 0;
             it.movePrev();
             while (k == it.key()) {
@@ -1038,8 +1058,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
                 it.movePrev();
             }
             if (rkasc + nc != i) {
-                printf("false: multi_rankAsc %ld keys are the same", (long)nc);
-                printf("false: multi_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+                printf("false: multi_rankLower %ld keys are the same", (long)nc);
+                printf("false: multi_rankLower expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
         }
@@ -1189,11 +1209,7 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 inline int
 CompactingMap<KeyValuePair, Compare, hasRank>::compareKeyRegardlessOfPointer(const Key& key, TreeNode *node) const
 {
-    // assume key's pointer field is NULL, if there is a pointer field in key
-    const void *tmp = node->kv.setPointerValue(NULL);
-    int rv = m_comper(key, node->key());
-    node->kv.setPointerValue(tmp);
-    return rv;
+    return m_comper.compareWithoutPointer(key, node->key());
 }
 
 } // namespace voltdb

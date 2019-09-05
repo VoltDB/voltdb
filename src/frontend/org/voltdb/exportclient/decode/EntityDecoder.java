@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,13 +18,15 @@
 package org.voltdb.exportclient.decode;
 
 import java.net.URI;
+import java.util.List;
 
 import org.apache.http.entity.AbstractHttpEntity;
+import org.voltdb.VoltType;
 
 public abstract class EntityDecoder implements BatchDecoder<AbstractHttpEntity, RuntimeException>{
 
     static final protected URI UNCHANGED_URI =
             URI.create("http://unchanged.sentinel/__UNCHANGED_SENTINEL__");
 
-    abstract public AbstractHttpEntity getHeaderEntity();
+    abstract public AbstractHttpEntity getHeaderEntity(long generation, String tableName, List<VoltType> types, List<String> names);
 }

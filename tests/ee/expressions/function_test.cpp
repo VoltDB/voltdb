@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -128,10 +128,10 @@ struct FunctionTest : public Test {
          * SQLException with the given inputs.
          */
         template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
-        std::string testBinaryThrows(int operation,
-                                     LEFT_INPUT_TYPE left_input,
-                                     RIGHT_INPUT_TYPE right_input,
-                                     const std::string& expectedMessage);
+        std::string testBinaryThrows(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, const std::string& expectedMessage);
+        template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+        std::string testBinaryThrows(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, const std::string& expectedMessage1,
+              const std::string& expectedMessage2);
 
         /**
          * A template for calling ternary functions.  This follows the pattern
@@ -217,8 +217,8 @@ int FunctionTest::testNullary(int operation,
         std::cout << "Expected out:  " << output << std::endl;
     }
     // This is an empty vector, but functionFactory wants it.
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
-    AbstractExpression* const_exp = ExpressionUtil::functionFactory(operation, argument);
+    std::vector<AbstractExpression*> argument;
+    AbstractExpression* const_exp = functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
@@ -261,10 +261,10 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
 
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *> argument;
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
-    argument->push_back(const_val_exp);
-    AbstractExpression* unary_exp = ExpressionUtil::functionFactory(operation, argument);
+    argument.push_back(const_val_exp);
+    AbstractExpression* unary_exp = functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
@@ -334,14 +334,14 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
         std::cout << "Right:         " << rinput << std::endl;
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *>argument;
     ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
     ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
-    argument->push_back(lhsexp);
-    argument->push_back(rhsexp);
+    argument.push_back(lhsexp);
+    argument.push_back(rhsexp);
 
     NValue expected = getSomeValue(output);
-    AbstractExpression *bin_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression *bin_exp = functionFactory(operation, argument);
     int cmpout;
     NValue answer;
     try {
@@ -369,10 +369,9 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
 }
 
 template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
-std::string FunctionTest::testBinaryThrows(int operation,
-                                           LEFT_INPUT_TYPE left_input,
-                                           RIGHT_INPUT_TYPE right_input,
-                                           const std::string& expectedMessage) {
+std::string FunctionTest::testBinaryThrows(
+      int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input,
+      const std::string& expectedMessage) {
     std::string diagnostic = "success";
     try {
         testBinary(operation, left_input, right_input, -1);
@@ -393,9 +392,34 @@ std::string FunctionTest::testBinaryThrows(int operation,
     }
 
     return diagnostic;
-
 }
 
+template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+std::string FunctionTest::testBinaryThrows(
+      int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input,
+      const std::string& expectedMessage1, const std::string& expectedMessage2) {
+    std::string diagnostic = "success";
+    try {
+        testBinary(operation, left_input, right_input, -1);
+        diagnostic = "Failed to throw an exception";
+    }
+    catch (const SQLException& exc) {
+        if (exc.message().find(expectedMessage1) == std::string::npos &&
+              exc.message().find(expectedMessage2) == std::string::npos) {
+            diagnostic = "Expected message \"" + expectedMessage1 + "\" or \"" + expectedMessage2 +"\", but found \"" +
+                exc.message() + "\"";
+        }
+    }
+    catch (...) {
+        diagnostic = "Caught some unexpected kind of exception";
+    }
+
+    if (diagnostic.compare("success") != 0) {
+        std::cerr << "\n***  " << diagnostic << "  ***\n";
+    }
+
+    return diagnostic;
+}
 
 
 /**
@@ -414,16 +438,16 @@ int FunctionTest::testTernary(int operation, LEFT_INPUT_TYPE linput, MIDDLE_INPU
         std::cout << "Right:         " << rinput << std::endl;
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *> argument;
     ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
     ConstantValueExpression *mdlexp = new ConstantValueExpression(getSomeValue(minput));
     ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
-    argument->push_back(lhsexp);
-    argument->push_back(mdlexp);
-    argument->push_back(rhsexp);
+    argument.push_back(lhsexp);
+    argument.push_back(mdlexp);
+    argument.push_back(rhsexp);
 
     NValue expected = getSomeValue(output);
-    AbstractExpression *ternary_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression *ternary_exp = functionFactory(operation, argument);
     int cmpout;
     NValue answer;
     try {
@@ -980,7 +1004,7 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
 
         // DATEADD that would produce an out of range timestamp should throw
         ASSERT_EQ("success", testBinaryThrows(func, -1, minValidTimestamp, outputOutOfRangeMessage));
-        ASSERT_EQ("success", testBinaryThrows(func, 1, maxValidTimestamp, outputOutOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, maxValidTimestamp, outputOutOfRangeMessage, intervalTooLargeMsg));
 
         ++i;
     }

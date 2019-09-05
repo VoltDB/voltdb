@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dr2.DRProtocol;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
@@ -83,6 +84,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("ISSYNCED", VoltType.STRING),
             new ColumnInfo("MODE", VoltType.STRING),
             new ColumnInfo("QUEUE_GAP", VoltType.BIGINT),
+            new ColumnInfo("CONNECTION_STATUS", VoltType.STRING),
         };
     }
 
@@ -146,8 +148,6 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         List<Client> consumerClients = new ArrayList<>();
         List<LocalCluster> consumerClusters = new ArrayList<>();
 
-        VoltTable expectedTable1 = new VoltTable(expectedDRPartitionStatsSchema);
-
         ClientResponse cr = primaryClient.callProcedure("@AdHoc", "insert into employee values(1, 25);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -158,7 +158,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             int CONSUMER_CLUSTER_COUNT = 2;
             for (int n = 1; n <= CONSUMER_CLUSTER_COUNT; n++) {
                 LocalCluster consumerCluster = LocalCluster.createLocalCluster(drSchema, SITES, HOSTS, KFACTOR, n,
-                        REPLICATION_PORT + 100 * n, REPLICATION_PORT, secondaryRoot, jarName, true);
+                        REPLICATION_PORT + 100 * n, REPLICATION_PORT, secondaryRoot, jarName, DrRoleType.REPLICA, false);
                 ClientConfig clientConfig = new ClientConfig();
                 clientConfig.setProcedureCallTimeout(10 * 60 * 1000);
                 Client consumerClient = createClient(clientConfig, consumerCluster);
@@ -179,23 +179,14 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
                 assertTrue(hasSnapshotData);
             }
 
-            //
-            // DRPARTITION
-            //
-            VoltTable[] results = primaryClient.callProcedure("@Statistics", "DRPRODUCERPARTITION", 0).getResults();
-            // one aggregate tables returned
-            assertEquals(1, results.length);
-            System.out.println("Test DR table: " + results[0].toString());
-            validateSchema(results[0], expectedTable1);
-            // One row per site, including the MPI on each host if there is DR replicated stream
-            // don't have HSID for ease of check, just check a bunch of stuff
-            boolean hasReplicatedStream = DRProtocol.PROTOCOL_VERSION < DRProtocol.NO_REPLICATED_STREAM_PROTOCOL_VERSION;
-            assertEquals(CONSUMER_CLUSTER_COUNT * (HOSTS * (SITES + (hasReplicatedStream ? 1 : 0))), results[0].getRowCount());
-            results[0].advanceRow();
-            Map<String, String> columnTargets = new HashMap<>();
-            columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
-            validateRowSeenAtAllHosts(results[0], columnTargets, false);
-            validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+            verifyPartitionStatistics(primaryClient, CONSUMER_CLUSTER_COUNT, "UP");
+
+            // Kill consumers and verify that connection_status changes to DOWN
+            System.out.println("Killing consumers...");
+            for (LocalCluster consumer : consumerClusters) {
+                consumer.shutDown();
+            }
+            verifyPartitionStatistics(primaryClient, CONSUMER_CLUSTER_COUNT, "DOWN");
         }
         finally {
             primaryClient.close();
@@ -210,6 +201,22 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
                 }
             }
         }
+    }
+
+    private void verifyPartitionStatistics(Client client, int consumerClusterCount, String connStatus) throws Exception {
+        VoltTable[] results = client.callProcedure("@Statistics", "DRPRODUCERPARTITION", 0).getResults();
+        // one aggregate tables returned
+        assertEquals(1, results.length);
+        System.out.println("Test DR table: " + results[0].toString());
+        validateSchema(results[0], new VoltTable(expectedDRPartitionStatsSchema));
+        // One row per site, including the MPI on each host if there is DR replicated stream
+        // don't have HSID for ease of check, just check a bunch of stuff
+        results[0].advanceRow();
+        Map<String, String> columnTargets = new HashMap<>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
+        validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        validateRowSeenAtAllPartitions(results[0], "CONNECTION_STATUS", connStatus, false);
     }
 
     public void testDRStatistics() throws Exception {

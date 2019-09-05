@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP
-#define EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP
+#pragma once
 
 #include <limits>
 #include <sstream>
@@ -38,57 +37,36 @@ public:
 
     /** Constructor for a null point,
      * with both lng and lat initialized to the null coordinate */
-    GeographyPointValue()
-        : m_latitude(nullCoord())
-        , m_longitude(nullCoord())
-    {
+    GeographyPointValue() = default;
+
+    GeographyPointValue(Coord longitude, Coord latitude) :
+        m_latitude(latitude) , m_longitude(longitude) {
+        vassert(m_latitude >= -90.0 && m_latitude <= 90.0);
+        vassert(m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
-    GeographyPointValue(Coord longitude, Coord latitude)
-        : m_latitude(latitude)
-        , m_longitude(longitude)
-    {
-        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
-        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
-    }
-
-    GeographyPointValue(const S2Point &s2Point)
-        : m_latitude(nullCoord())
-        , m_longitude(nullCoord())
-    {
-        assert(!s2Point.IsNaN());
+    GeographyPointValue(const S2Point &s2Point) {
+        vassert(!s2Point.IsNaN());
         S2LatLng latLong(s2Point);
         m_latitude = latLong.lat().degrees();
         m_longitude = latLong.lng().degrees();
-        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
-        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
+        vassert(m_latitude >= -90.0 && m_latitude <= 90.0);
+        vassert(m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
     // Use the number 360.0 for the null coordinate.
-    static Coord nullCoord() {
-        // A static const member could be used for this, but clang
-        // wants the constexpr keyword to be used with floating-point
-        // constants, and constexpr isn't supported until gcc 4.6.
-        // Creating a static function seems nicer than suppressing the
-        // warning or using the conditional compilation.
-        return 360.0;
-    }
+    static constexpr Coord NULL_COORD = 360;
 
     // Due to conversion to and from (x,y,z) coordinates needed to
     // support our polygon representation, we consider points whose
     // coordinates vary by less than this epsilon to be equal.  This
     // function should return a value that is the same as in Java
     // code: GeographyPointValue.EPSILON.
-    static Coord epsilon() {
-        // Making this a static method rather than a static member
-        // variable for the same reason as nullCoord(), above.
-        return 1e-12;
-    }
+    static constexpr Coord EPSILON = 1e-12;
 
     // The null point has 360 for both lat and long.
     bool isNull() const {
-        return (m_latitude == nullCoord()) &&
-            (m_longitude == nullCoord());
+        return m_latitude == NULL_COORD && m_longitude == NULL_COORD;
     }
 
     Coord getLatitude() const {
@@ -106,29 +84,29 @@ public:
     int compareWith(const GeographyPointValue& rhs) const {
 
         // Caller guarantees that neither side is null
-        assert(! isNull());
-        assert(! rhs.isNull());
+        vassert(! isNull());
+        vassert(! rhs.isNull());
 
         const GeographyPointValue canonThis = canonicalize();
         const GeographyPointValue canonRhs = rhs.canonicalize();
         Coord lhsLong = canonThis.getLongitude();
         Coord rhsLong = canonRhs.getLongitude();
-        if (rhsLong - lhsLong > epsilon()) {
+        if (rhsLong - lhsLong > EPSILON) {
             return VALUE_COMPARE_LESSTHAN;
         }
 
-        if (lhsLong - rhsLong > epsilon()) {
+        if (lhsLong - rhsLong > EPSILON) {
             return VALUE_COMPARE_GREATERTHAN;
         }
 
         // latitude is equal; compare longitude
         Coord lhsLat = canonThis.getLatitude();
         Coord rhsLat = canonRhs.getLatitude();
-        if (rhsLat - lhsLat > epsilon()) {
+        if (rhsLat - lhsLat > EPSILON) {
             return VALUE_COMPARE_LESSTHAN;
         }
 
-        if (lhsLat - rhsLat > epsilon()) {
+        if (lhsLat - rhsLat > EPSILON) {
             return VALUE_COMPARE_GREATERTHAN;
         }
 
@@ -139,7 +117,7 @@ public:
     static GeographyPointValue deserializeFrom(Deserializer& input) {
         Coord lng = input.readDouble();
         Coord lat = input.readDouble();
-        if (lat == nullCoord() && lng == nullCoord()) {
+        if (lat == NULL_COORD && lng == NULL_COORD) {
             return GeographyPointValue();
         }
 
@@ -152,9 +130,10 @@ public:
         output.writeDouble(getLatitude());
     }
 
-    void hashCombine(std::size_t& seed) const {
+    size_t hashCombine(std::size_t seed) const {
         MiscUtil::hashCombineFloatingPoint(seed, m_longitude);
         MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
+        return seed;
     }
 
     std::string toString() const {
@@ -223,12 +202,12 @@ private:
     GeographyPointValue canonicalize() const {
         Coord newLng = m_longitude;
 
-        if (90.0 - fabs(m_latitude) < epsilon()) {
+        if (90.0 - fabs(m_latitude) < EPSILON) {
             // We are at one of the poles;
             // longitude doesn't matter, so choose 0.
             newLng = 0.0;
         }
-        else if (180.0 + m_longitude < epsilon()) {
+        else if (180.0 + m_longitude < EPSILON) {
             // If point is not at the poles, evaluate longitudes within epsilon
             // of the antimeridian (on the east side), canonicalize to 180.0.
             newLng = 180.0;
@@ -237,10 +216,9 @@ private:
         return GeographyPointValue(newLng, m_latitude);
     }
 
-    Coord m_latitude;
-    Coord m_longitude;
+    Coord m_latitude = NULL_COORD;
+    Coord m_longitude = NULL_COORD;
 };
 
 } // end namespace
 
-#endif // EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP

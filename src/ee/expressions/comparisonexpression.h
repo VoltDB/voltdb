@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,7 +56,7 @@
 #include "expressions/tuplevalueexpression.h"
 
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -81,8 +81,8 @@ public:
     inline static const char* op_name() { return "CmpEq"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_equals_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return false; }
@@ -105,8 +105,8 @@ public:
     inline static const char* op_name() { return "CmpNe"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_notEquals_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
@@ -121,8 +121,8 @@ public:
     inline static const char* op_name() { return "CmpLt"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_lessThan_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
@@ -138,8 +138,8 @@ public:
     inline static const char* op_name() { return "CmpGt"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_greaterThan_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
@@ -155,8 +155,8 @@ public:
     inline static const char* op_name() { return "CmpLte"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_lessThanOrEqual_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r)
@@ -172,8 +172,8 @@ public:
     inline static const char* op_name() { return "CmpGte"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.op_greaterThanOrEqual_withoutNull(r);
     }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r)
@@ -192,8 +192,8 @@ public:
     inline static const char* op_name() { return "CmpLike"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.like(r);
     }
     inline static bool isNullRejecting() { return true; }
@@ -204,9 +204,24 @@ public:
     inline static const char* op_name() { return "CmpIn"; }
     inline static NValue compare(const NValue& l, const NValue& r)
     {
-        assert(!l.isNull());
-        assert(!r.isNull());
+        vassert(!l.isNull());
+        vassert(!r.isNull());
         return l.inList(r) ? NValue::getTrue() : NValue::getFalse();
+    }
+    inline static bool isNullRejecting() { return true; }
+};
+
+/*
+ * The Comparison Expression operator for 'STARTS WITH'
+ */
+class CmpStartsWith {
+public:
+    inline static const char* op_name() { return "CmpStartsWith"; }
+    inline static NValue compare(const NValue& l, const NValue& r)
+    {
+        vassert(!l.isNull());
+        vassert(!r.isNull());
+        return l.startsWith(r);
     }
     inline static bool isNullRejecting() { return true; }
 };
@@ -227,12 +242,12 @@ public:
     {
         VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
                    OP::op_name(),
-                   typeid(*(m_left)).name(),
-                   typeid(*(m_right)).name(),
+                   typeid(m_left).name(),
+                   typeid(m_right).name(),
                    traceEval(tuple1, tuple2));
 
-        assert(m_left != NULL);
-        assert(m_right != NULL);
+        vassert(m_left != NULL);
+        vassert(m_right != NULL);
 
         NValue lnv = m_left->eval(tuple1, tuple2);
         if (lnv.isNull() && OP::isNullRejecting()) {

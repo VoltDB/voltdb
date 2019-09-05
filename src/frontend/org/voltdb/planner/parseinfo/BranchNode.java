@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import java.util.Set;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.JoinType;
 
 /**
@@ -394,13 +395,21 @@ public class BranchNode extends JoinNode {
      * @return List<AbstractParsedStmt> - list of sub-queries from this query
      */
     @Override
-    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
         if (m_leftNode != null) {
-            m_leftNode.extractSubQueries(subQueries);
+            m_leftNode.extractEphemeralTableQueries(scans);
         }
         if (m_rightNode != null) {
-            m_rightNode.extractSubQueries(subQueries);
+            m_rightNode.extractEphemeralTableQueries(scans);
         }
+    }
+
+    @Override
+    public boolean hasSubqueryScans() {
+        if ((m_leftNode != null) && m_leftNode.hasSubqueryScans()) {
+            return true;
+        }
+        return (m_rightNode != null && m_rightNode.hasSubqueryScans());
     }
 
     @Override
@@ -456,4 +465,5 @@ public class BranchNode extends JoinNode {
         m_leftNode.gatherJoinExpressions(checkExpressions);
         m_rightNode.gatherJoinExpressions(checkExpressions);
     }
+
 }

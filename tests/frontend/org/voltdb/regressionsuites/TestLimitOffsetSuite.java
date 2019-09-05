@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,9 +40,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         super(name);
     }
 
-    private static void load(Client client)
-    throws NoConnectionsException, IOException, InterruptedException
-    {
+    private static void load(Client client) throws IOException, InterruptedException {
         for (int i = 0; i < 10; i++) {
             SyncCallback cb = new SyncCallback();
             client.callProcedure(cb, "InsertA", i, i);
@@ -58,9 +56,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    private static void doLimitOffsetAndCheck(Client client, String proc)
-    throws IOException, InterruptedException, ProcCallException
-    {
+    private static void doLimitOffsetAndCheck(Client client, String proc) throws IOException, ProcCallException {
         ClientResponse resp = client.callProcedure(proc, 4, 0);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable[] results = resp.getResults();
@@ -88,9 +84,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
      * This is done by executing the query with and without the offset clause,
      * and then skipping past the offset rows in the expected table here
      * on the client side. */
-    private static void doOffsetAndCheck(Client client, String stmt)
-    throws IOException, InterruptedException, ProcCallException
-    {
+    private static void doOffsetAndCheck(Client client, String stmt) throws IOException, ProcCallException {
         String stmtNoOffset = stmt.substring(0, stmt.indexOf("OFFSET"));
         VoltTable expectedTable = client.callProcedure("@AdHoc", stmtNoOffset).getResults()[0];
         int rowCountBeforeOffset = expectedTable.getRowCount();
@@ -146,8 +140,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         doTestJoinAndLimitOffset(client);
     }
 
-    public static void doTestJoinAndLimitOffset(Client client) throws IOException, ProcCallException, InterruptedException
-    {
+    public static void doTestJoinAndLimitOffset(Client client) throws IOException, ProcCallException {
         int limits[] = new int[] { 1, 2, 5, 10, 12, 25, Integer.MAX_VALUE };
         int offsets[] = new int[] { 0, 1, 2, 5, 10, 12, 25 };
         String selecteds[] = new String[] { "*", "A.PKEY" };
@@ -188,8 +181,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException
-    {
+    public void testDistinctLimitOffset() throws IOException, ProcCallException {
         Client client = getClient();
         client.callProcedure("InsertA", 0, 1);
         client.callProcedure("InsertA", 1, 1);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREDELETEEXECUTOR_H
-#define HSTOREDELETEEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -61,34 +60,27 @@ class DeletePlanNode;
 class AbstractTempTable;
 class PersistentTable;
 
-class DeleteExecutor : public AbstractExecutor
-{
+class DeleteExecutor : public AbstractExecutor {
 public:
     DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTable = NULL;
-        m_engine = engine;
-    }
+        : AbstractExecutor(engine, abstract_node) {}
 
 protected:
     bool p_init(AbstractPlanNode*,
                 const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-    DeletePlanNode* m_node;
+private:
+    DeletePlanNode* m_node = nullptr;
 
     /** true if all tuples are deleted, truncate is the only case we
         don't need PK to delete tuples. */
-    bool m_truncate;
-    AbstractTempTable* m_inputTable;
-    TableTuple m_inputTuple;
+    bool m_truncate = false;
+    AbstractTempTable* m_inputTable = nullptr;
+    TableTuple m_inputTuple{};
 
-    /** reference to the engine/context to store the number of
-        modified tuples */
-    VoltDBEngine* m_engine;
+    static int64_t s_modifiedTuples;
 };
 
 }
 
-#endif

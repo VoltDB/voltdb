@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,5 +60,10 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     @Override
     public void reportQueued(String importerName, String procName) {
         m_statsCollector.reportQueued(importerName, procName);
+    }
+
+    @Override
+    public void reportInitialized(String importerName, String procName) {
+        m_statsCollector.reportInitialized(importerName, procName);
     }
 }

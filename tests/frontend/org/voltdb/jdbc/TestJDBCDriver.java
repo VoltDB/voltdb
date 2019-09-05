@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,7 +48,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -58,10 +62,6 @@ import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.MiscUtils;
-
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 public class TestJDBCDriver {
     static String testjar;
@@ -116,7 +116,7 @@ public class TestJDBCDriver {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         pb.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        pb.addProcedures(ArbitraryDurationProc.class);
+        pb.addProcedure(ArbitraryDurationProc.class);
         pb.addPartitionInfo("TT", "A1");
         pb.addPartitionInfo("ORDERS", "A1");
         pb.addPartitionInfo("LAST", "A1");
@@ -125,8 +125,10 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("CUSTOMER", "A1");
         pb.addPartitionInfo("NUMBER_NINE", "A1");
         pb.addPartitionInfo("ALL_TYPES", "A1");
-        pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?,?,?);", "TT.A1: 0");
-        pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
+                new ProcedurePartitionData("ALL_TYPES", "A1"));
+        pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);",
+                new ProcedurePartitionData("TT", "A1"));
         pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
         pb.addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
@@ -723,27 +725,15 @@ public class TestJDBCDriver {
     // Test to check Query without Timeout
     @Test
     public  void testQueryNotTimeout() throws SQLException {
-        //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
-        stmt.setLong(1, 180*1000);
-        boolean exceptionCalled = false;
-        try {
-            stmt.execute();
-        } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
-            exceptionCalled = true;
-        }
-        assertFalse(exceptionCalled);
 
-        stmt.setLong(1, 60000);
-        exceptionCalled = false;
+        // Make the proc wait 30 seconds before returning.
+        stmt.setLong(1, 30000);
         try {
             stmt.execute();
         } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
-            exceptionCalled = true;
+            fail("Query threw exception when not expected to: " + ex.getSQLState());
         }
-        assertFalse(exceptionCalled);
     }
 
     // execute a Query with a Timeout set
@@ -772,9 +762,9 @@ public class TestJDBCDriver {
         Properties props = new Properties();
         // Check default setting, timeout unit should be TimeUnit.SECONDS
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertFalse(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
+        assertFalse(runQueryWithTimeout(4000, 30));
+        assertTrue(runQueryWithTimeout(4000, -1));
         myconn.close();
 
         // Check set time unit to MILLISECONDS
@@ -782,27 +772,21 @@ public class TestJDBCDriver {
         myconn = JDBCTestCommons.getJdbcConnection(
                 "jdbc:voltdb://localhost:21212?jdbc.querytimeout.unit=milliseconds",
                 props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertTrue(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
 
         // Check set time unit to MILLISECONDS
         // through Java Propeties
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "milliseconds");
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertTrue(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
 
         // Check set time unit to other unsupported unit, should by default
         // still use TimeUnit.SECONDS
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "nanoseconds");
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertFalse(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
     }
 

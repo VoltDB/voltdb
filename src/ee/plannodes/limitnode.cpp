@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -44,10 +44,7 @@
  */
 #include "limitnode.h"
 
-#include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
-
-#include <sstream>
 
 namespace voltdb {
 
@@ -94,7 +91,7 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
         limitOut = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
-        assert(offsetOut == 0);
+        vassert(offsetOut == 0);
     }
 }
 

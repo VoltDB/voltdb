@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,8 +91,8 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         if (m_outputSchemaPreInlineAgg != m_outputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
             stringer.array();
-            for (int colNo = 0; colNo < m_outputSchemaPreInlineAgg.getColumns().size(); colNo += 1) {
-                SchemaColumn column = m_outputSchemaPreInlineAgg.getColumns().get(colNo);
+            for (int colNo = 0; colNo < m_outputSchemaPreInlineAgg.size(); colNo += 1) {
+                SchemaColumn column = m_outputSchemaPreInlineAgg.getColumn(colNo);
                 column.toJSONString(stringer, true, colNo);
             }
             stringer.endArray();

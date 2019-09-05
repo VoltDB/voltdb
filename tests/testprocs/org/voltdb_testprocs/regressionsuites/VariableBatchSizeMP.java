@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb_testprocs.regressionsuites;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -64,10 +63,9 @@ public class VariableBatchSizeMP extends VoltProcedure {
         }
     }
 
-    public long run(long partitionParam, int[] opsForBatch1, int[] opsForBatch2) {
-        ProcInfo pi = getClass().getAnnotation(ProcInfo.class);
-        boolean singlePartition = (pi != null) && pi.singlePartition();
+    protected boolean m_isSp = false;
 
+    public long run(long partitionParam, int[] opsForBatch1, int[] opsForBatch2) {
         // ensure the state is right
         voltQueueSQL(rRead, EXPECT_SCALAR_MATCH(1));
         voltQueueSQL(pRead, EXPECT_SCALAR_MATCH(1));
@@ -75,13 +73,13 @@ public class VariableBatchSizeMP extends VoltProcedure {
 
         // batch 1
         for (int op : opsForBatch1) {
-            queueOp(op, singlePartition);
+            queueOp(op, m_isSp);
         }
         voltExecuteSQL();
 
         // batch 2
         for (int op : opsForBatch2) {
-            queueOp(op, singlePartition);
+            queueOp(op, m_isSp);
         }
         voltExecuteSQL();
 

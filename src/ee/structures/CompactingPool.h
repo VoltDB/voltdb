@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,16 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _EE_STRUCTURES_COMPACTINGPOOL_H_
-#define _EE_STRUCTURES_COMPACTINGPOOL_H_
+#pragma once
 
 #include "ContiguousAllocator.h"
-
 #include <cassert>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 
-namespace voltdb
-{
+namespace voltdb {
 // Provide a compacting pool of objects of fixed size. Each object is assumed
 // to have a single char* pointer referencing it in the caller for the lifetime
 // of the allocation.
@@ -43,8 +42,7 @@ namespace voltdb
 // it reserves the right to relocate past allocations on the thread and reset
 // their forward pointers to copied versions of their allocations.
 // Currently, this only happens when (other) allocations are freed.
-    class CompactingPool
-    {
+    class CompactingPool {
     public:
         // Create a compacting pool.  As memory is required, it will
         // allocate buffers of size elementSize * elementsPerBuffer bytes.
@@ -52,8 +50,21 @@ namespace voltdb
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
     { }
 
-    void* malloc(char** referrer)
-    {
+#ifdef VOLT_POOL_CHECKING
+    ~CompactingPool();
+
+    private:
+    void setPtr(void* data);
+    void movePtr(void* oldData, void* newData);
+    bool clrPtr(void* data);
+#else
+#define setPtr(a) ((void)0)
+#define movePtr(a, b) ((void)0)
+#define clrPtr(a) (true)
+#endif
+
+    public:
+    void* malloc(char** referrer) {
         Relocatable* result =
             Relocatable::fromAllocation(m_allocator.alloc(), referrer);
         // Going forward, the compacting pool manages the value of
@@ -70,11 +81,13 @@ namespace voltdb
         // point to an address at the same relative offset from the
         // actual allocation address before and after the allocation is
         // relocated.
+        setPtr(result->m_data);
         return result->m_data;
     }
 
-    void free(void* element)
-    {
+    void free(void* element) {
+        if (!clrPtr(element))
+            return;
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
         if (last != vacated) {
@@ -86,22 +99,33 @@ namespace voltdb
             // structures between the start of the Relocatable's m_data and the
             // address that the top allocator returned to its caller to store
             // and use for its own data.
+            movePtr(last->m_data, element);
             *(last->m_referringPtr) += (vacated->m_data - last->m_data);
             // copy the last entry into the newly vacated spot
-            memcpy(vacated, last, m_allocator.allocationSize());
+            ::memcpy(vacated, last, m_allocator.allocationSize());
         }
         // retire the last entry.
         m_allocator.trim();
     }
 
-    std::size_t getBytesAllocated() const
-    { return m_allocator.bytesAllocated(); }
+    std::size_t getBytesAllocated() const {
+        return m_allocator.bytesAllocated();
+    }
 
-    static int32_t FIXED_OVERHEAD_PER_ENTRY()
-    { return static_cast<int32_t>(sizeof(Relocatable)); }
+    static int32_t FIXED_OVERHEAD_PER_ENTRY() {
+        return static_cast<int32_t>(sizeof(Relocatable));
+    }
 
     private:
         ContiguousAllocator m_allocator;
+#ifdef VOLT_POOL_CHECKING
+#ifdef VOLT_TRACE_ALLOCATIONS
+        using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
+#else
+        using AllocTraceMap_t = std::unordered_set<void*>;
+#endif
+        AllocTraceMap_t m_allocations;
+#endif
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.
@@ -118,15 +142,13 @@ namespace voltdb
         char** m_referringPtr;
         char m_data[0];
 
-        static Relocatable* fromAllocation(void* allocation, char** referrer)
-        {
+        static Relocatable* fromAllocation(void* allocation, char** referrer) {
             Relocatable* result = reinterpret_cast<Relocatable*>(allocation);
             result->m_referringPtr = referrer;
             return result;
         }
 
-        static Relocatable* backtrackFromCallerData(void* data)
-        {
+        static Relocatable* backtrackFromCallerData(void* data) {
             // "-1" for a Relocatable* subtracts sizeof(Relocatable) ==
             // sizeof(m_referringPtr) == 8 bytes.
             Relocatable* result = reinterpret_cast<Relocatable*>(data)-1;
@@ -139,4 +161,3 @@ namespace voltdb
 
 } // namespace voltdb
 
-#endif // _EE_STRUCTURES_COMPACTINGPOOL_H_

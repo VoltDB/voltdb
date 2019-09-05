@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import java.util.List;
+import org.voltdb.VoltType;
 
 public class CSVStringDecoder extends RowDecoder<String, RuntimeException> {
 
@@ -39,8 +41,8 @@ public class CSVStringDecoder extends RowDecoder<String, RuntimeException> {
     }
 
     @Override
-    public String decode(String ignoreIt, Object[] fields) throws RuntimeException {
-        m_writer.writeNext(m_stringArrayDecoder.decode(null,fields));
+    public String decode(long generation, String tableName, List<VoltType> types, List<String> names, String ignoreIt, Object[] fields) throws RuntimeException {
+        m_writer.writeNext(m_stringArrayDecoder.decode(generation, tableName, types, names, null,fields));
         String csvLine = m_writerDestination.toString();
         m_writerDestination.setLength(0);
         return csvLine;

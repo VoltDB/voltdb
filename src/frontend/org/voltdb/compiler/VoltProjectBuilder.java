@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,14 +40,12 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.Consistency;
-import org.voltdb.ProcInfoData;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
-import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -101,23 +99,32 @@ public class VoltProjectBuilder {
         private final Class<?> cls;
         private final String name;
         private final String sql;
-        private final String partitionInfo;
+        private final ProcedurePartitionData partitionData;
 
-        public ProcedureInfo(final String roles[], final Class<?> cls) {
-            this.roles = roles;
-            this.cls = cls;
-            this.name = cls.getSimpleName();
-            this.sql = null;
-            this.partitionInfo = null;
-            assert(this.name != null);
-        }
-
-        public ProcedureInfo(final Class<?> cls, final String partitionInfo) {
+        public ProcedureInfo(final Class<?> cls) {
             this.roles = new String[0];
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
-            this.partitionInfo = partitionInfo;
+            this.partitionData = null;
+        }
+
+        public ProcedureInfo(final Class<?> cls, final ProcedurePartitionData partitionInfo) {
+            this.roles = new String[0];
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionData = partitionInfo;
+            assert(this.name != null);
+        }
+
+        public ProcedureInfo(final Class<?> cls, final ProcedurePartitionData partitionInfo,
+                final String roles[]) {
+            this.roles = roles;
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionData = partitionInfo;
             assert(this.name != null);
         }
 
@@ -125,7 +132,7 @@ public class VoltProjectBuilder {
                 final String roles[],
                 final String name,
                 final String sql,
-                final String partitionInfo) {
+                final ProcedurePartitionData partitionInfo) {
             assert(name != null);
             this.roles = roles;
             this.cls = null;
@@ -136,7 +143,7 @@ public class VoltProjectBuilder {
             else {
                 this.sql = sql + ";";
             }
-            this.partitionInfo = partitionInfo;
+            this.partitionData = partitionInfo;
             assert(this.name != null);
         }
 
@@ -269,8 +276,6 @@ public class VoltProjectBuilder {
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();
 
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
-
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
     private String m_snapshotPrefix = null;
@@ -282,8 +287,6 @@ public class VoltProjectBuilder {
     private String m_ppdPrefix = "none";
 
     private Integer m_heartbeatTimeout = null;
-
-    private Consistency.ReadLevel m_consistencyReadLevel = null;
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -303,7 +306,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
-    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<>();
+    private List<ExportConfigurationType> m_exportConfigs = new ArrayList<>();
 
     private Integer m_deadHostTimeout = null;
 
@@ -525,22 +528,41 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null);
+        addStmtProcedure(name, sql, new ProcedurePartitionData());
     }
 
-    public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
+    // compatible with old deprecated syntax for test ONLY
+    public void addStmtProcedure(String name, String sql, String partitionInfoString) {
+        addProcedures(new ProcedureInfo(new String[0], name, sql,
+                ProcedurePartitionData.fromPartitionInfoString(partitionInfoString)));
     }
 
-    public void addProcedures(final Class<?>... procedures) {
+    public void addStmtProcedure(String name, String sql, ProcedurePartitionData partitionData) {
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionData));
+    }
+
+    public void addMultiPartitionProcedures(final Class<?>... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final Class<?> procedure : procedures)
-            procArray.add(new ProcedureInfo(new String[0], procedure));
+            procArray.add(new ProcedureInfo(procedure));
         addProcedures(procArray);
     }
 
+    public void addProcedure(final Class<?> cls) {
+        addProcedures(new ProcedureInfo(cls));
+    }
+
+    public void addProcedure(final Class<?> cls, String partitionString) {
+        addProcedures(new ProcedureInfo(cls,
+                ProcedurePartitionData.fromPartitionInfoString(partitionString)));
+    }
+
+    public void addProcedure(final Class<?> cls, final ProcedurePartitionData partitionInfo) {
+        addProcedures(new ProcedureInfo(cls, partitionInfo));
+    }
+
     /*
-     * List of roles permitted to invoke the procedure
+     * List of procedures permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
@@ -571,21 +593,31 @@ public class VoltProjectBuilder {
                 roleInfo.replace(length - 1, length, " ");
             }
 
-            if(procedure.cls != null) {
-                transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
-            }
-            else if(procedure.sql != null) {
-                transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
+            String partitionProcedureStatement = "";
+            if(procedure.partitionData != null && procedure.partitionData.m_tableName != null) {
+                String tableName = procedure.partitionData.m_tableName;
+                String columnName = procedure.partitionData.m_columnName;
+                String paramIndex = procedure.partitionData.m_paramIndex;
+
+                partitionProcedureStatement = " PARTITION ON TABLE "+ tableName + " COLUMN " + columnName +
+                        " PARAMETER " + paramIndex + " ";
+
+                if (procedure.partitionData.m_tableName2 != null) {
+                    String tableName2 = procedure.partitionData.m_tableName2;
+                    String columnName2 = procedure.partitionData.m_columnName2;
+                    String paramIndex2 = procedure.partitionData.m_paramIndex2;
+                    partitionProcedureStatement += " AND ON TABLE "+ tableName2 + " COLUMN " + columnName2 +
+                            " PARAMETER " + paramIndex2 + " ";
+                }
             }
 
-            if(procedure.partitionInfo != null) {
-                String[] parameter = procedure.partitionInfo.split(":");
-                String[] token = parameter[0].split("\\.");
-                String position = "";
-                if(parameter.length >= 2 && Integer.parseInt(parameter[1].trim()) > 0) {
-                    position = " PARAMETER " + parameter[1];
-                }
-                transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
+            if(procedure.cls != null) {
+                transformer.append("CREATE PROCEDURE " + partitionProcedureStatement + roleInfo.toString() +
+                        " FROM CLASS " + procedure.cls.getName() + ";");
+            }
+            else if(procedure.sql != null) {
+                transformer.append("CREATE PROCEDURE " + procedure.name + partitionProcedureStatement + roleInfo.toString() +
+                        " AS " + procedure.sql);
             }
         }
     }
@@ -681,10 +713,6 @@ public class VoltProjectBuilder {
         m_heartbeatTimeout = seconds;
     }
 
-    public void setDefaultConsistencyReadLevel(Consistency.ReadLevel level) {
-        m_consistencyReadLevel = level;
-    }
-
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
          addImport(enabled, importType, importFormat, importBundle, config, new Properties());
     }
@@ -698,7 +726,6 @@ public class VoltProjectBuilder {
         if (importFormat != null) {
             importConnector.put("ilFormatter", importFormat);
         }
-
         if (formatConfig != null) {
             importConnector.put("ilFormatterConfig", formatConfig);
         }
@@ -712,14 +739,30 @@ public class VoltProjectBuilder {
         m_ilImportConnectors.add(importConnector);
     }
 
-    public void addExport(boolean enabled, String exportTarget, Properties config) {
-        addExport(enabled, exportTarget, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    public void addExport(boolean enabled) {
+        addExport(enabled, null, null);
     }
 
-    public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
-        HashMap<String, Object> exportConnector = new HashMap<>();
-        exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
-        exportConnector.put("elEnabled", enabled);
+    public void addExport(boolean enabled, ServerExportEnum exportType, Properties config) {
+        addExport(enabled, exportType, config, Constants.CONNECTORLESS_STREAM_TARGET_NAME);
+    }
+
+    public void addExport(boolean enabled, ServerExportEnum exportType, Properties config, String target) {
+        addExport(enabled, exportType, null, config, target);
+    }
+    public void addExport(boolean enabled, ServerExportEnum exportType, String connectorClass, Properties config, String target) {
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory = new org.voltdb.compiler.deploymentfile.ObjectFactory();
+
+        ExportConfigurationType exportConfig = factory.createExportConfigurationType();
+        exportConfig.setEnabled(enabled);
+
+        exportConfig.setType(exportType);
+        if (exportType == ServerExportEnum.CUSTOM) {
+            exportConfig.setExportconnectorclass(
+                    connectorClass == null ? System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) : connectorClass);
+        }
+
+        exportConfig.setTarget(target);
 
         if (config == null) {
             config = new Properties();
@@ -729,20 +772,19 @@ public class VoltProjectBuilder {
                     "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
-        exportConnector.put("elConfig", config);
+        List<PropertyType> configProperties = exportConfig.getProperty();
 
-        if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
-            exportConnector.put("elExportTarget", exportTarget);
-        }
-        else {
-            exportConnector.put("elExportTarget", "file");
-        }
-        exportConnector.put("elGroup", target);
-        m_elExportConnectors.add(exportConnector);
-    }
+        for(Object nameObj: config.keySet()) {
+            String name = (String) nameObj;
 
-    public void addExport(boolean enabled) {
-        addExport(enabled, null, null);
+            PropertyType prop = factory.createPropertyType();
+            prop.setName(name);
+            prop.setValue(config.getProperty(name));
+
+            configProperties.add(prop);
+        }
+
+        m_exportConfigs.add(exportConfig);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -794,19 +836,6 @@ public class VoltProjectBuilder {
 
     public void setXDCR() {
         m_drRole = DrRoleType.XDCR;
-    }
-
-    /**
-     * Override the procedure annotation with the specified values for a
-     * specified procedure.
-     *
-     * @param procName The name of the procedure to override the annotation.
-     * @param info The values to use instead of the annotation.
-     */
-    public void overrideProcInfoForProcedure(final String procName, final ProcInfoData info) {
-        assert(procName != null);
-        assert(info != null);
-        m_procInfoOverrides.put(procName, info);
     }
 
     public boolean compile(final String jarPath) {
@@ -924,7 +953,6 @@ public class VoltProjectBuilder {
 
         String[] schemaPath = m_schemas.toArray(new String[0]);
 
-        compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
@@ -1155,14 +1183,6 @@ public class VoltProjectBuilder {
             hb.setTimeout((int) m_heartbeatTimeout);
         }
 
-        // <consistency>
-        // don't include this element if not explicitly set
-        if (m_consistencyReadLevel != null) {
-            ConsistencyType ct = factory.createConsistencyType();
-            deployment.setConsistency(ct);
-            ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
-        }
-
         deployment.setSystemsettings(createSystemSettingsType(factory));
 
         // <users>
@@ -1231,33 +1251,7 @@ public class VoltProjectBuilder {
         ExportType export = factory.createExportType();
         deployment.setExport(export);
 
-        for (HashMap<String,Object> exportConnector : m_elExportConnectors) {
-            ExportConfigurationType exportConfig = factory.createExportConfigurationType();
-            exportConfig.setEnabled((boolean)exportConnector.get("elEnabled") && exportConnector.get("elLoader") != null &&
-                    !((String)exportConnector.get("elLoader")).trim().isEmpty());
-
-            ServerExportEnum exportTarget = ServerExportEnum.fromValue(((String)exportConnector.get("elExportTarget")).toLowerCase());
-            exportConfig.setType(exportTarget);
-            if (exportTarget.equals(ServerExportEnum.CUSTOM)) {
-                exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
-            }
-
-            exportConfig.setTarget((String)exportConnector.get("elGroup"));
-
-            Properties config = (Properties)exportConnector.get("elConfig");
-            if((config != null) && (config.size() > 0)) {
-                List<PropertyType> configProperties = exportConfig.getProperty();
-
-                for( Object nameObj: config.keySet()) {
-                    String name = String.class.cast(nameObj);
-
-                    PropertyType prop = factory.createPropertyType();
-                    prop.setName(name);
-                    prop.setValue(config.getProperty(name));
-
-                    configProperties.add(prop);
-                }
-            }
+        for (ExportConfigurationType exportConfig : m_exportConfigs) {
             export.getConfiguration().add(exportConfig);
         }
 
@@ -1271,6 +1265,7 @@ public class VoltProjectBuilder {
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
             importConfig.setModule((String )importConnector.get("ilModule"));
+
             String formatter = (String) importConnector.get("ilFormatter");
             if (formatter != null) {
                 importConfig.setFormat(formatter);
@@ -1278,6 +1273,10 @@ public class VoltProjectBuilder {
 
             Properties config = (Properties)importConnector.get("ilConfig");
             if((config != null) && (config.size() > 0)) {
+                String version = (String)config.get("version");
+                if (version != null) {
+                    importConfig.setVersion(version);
+                }
                 List<PropertyType> configProperties = importConfig.getProperty();
 
                 for( Object nameObj: config.keySet()) {

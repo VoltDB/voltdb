@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,10 +26,12 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -41,19 +43,22 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class MpPromoteAlgo implements RepairAlgo
 {
-    static final VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
+    private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+    private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
+    private long m_repairTruncationHandle = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
     long getRequestId()
     {
         return m_requestId;
@@ -108,25 +113,24 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
+    public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
+            MpRestartSequenceGenerator seqGen, String whoami)
     {
-        m_survivors = new ArrayList<Long>(survivors);
-        m_mailbox = mailbox;
-        m_isMigratePartitionLeader = false;
-        m_whoami = whoami;
+        this(survivors, deadHost, mailbox,seqGen, whoami, false);
     }
 
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami, boolean migratePartitionLeader)
+    public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
+            MpRestartSequenceGenerator seqGen, String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
+        m_deadHost = deadHost;
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
+        m_restartSeqGenerator = seqGen;
     }
 
     @Override
@@ -135,7 +139,7 @@ public class MpPromoteAlgo implements RepairAlgo
         try {
             prepareForFaultRecovery();
         } catch (Exception e) {
-            tmLog.error(m_whoami + "failed leader promotion:", e);
+            repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
         }
         return m_promotionResult;
@@ -154,12 +158,12 @@ public class MpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
         m_replicaRepairStructs.put(m_mailbox.getHSId(), new ReplicaRepairStruct());
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(m_whoami + "found " + m_survivors.size()
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug(m_whoami + "found " + m_survivors.size()
             + " surviving leaders to repair. "
             + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors) + " requested id:" + m_requestId);
         }
-        VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
+        VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId, m_deadHost);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
         m_mailbox.send(m_mailbox.getHSId(), logRequest);
     }
@@ -171,8 +175,8 @@ public class MpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                if (tmLog.isTraceEnabled()) {
-                    tmLog.trace(m_whoami + "rejecting stale repair response."
+                if (repairLogger.isTraceEnabled()) {
+                    repairLogger.trace(m_whoami + "rejecting stale repair response."
                             + " Current request id is: " + m_requestId
                             + " Received response for request id: " + response.getRequestId());
                 }
@@ -183,6 +187,8 @@ public class MpPromoteAlgo implements RepairAlgo
             if (response.getTxnId() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
+
+            m_repairTruncationHandle = Math.max(m_repairTruncationHandle, response.getRepairTruncationHandle());
 
             // Step 2: track hashinator versions
 
@@ -195,37 +201,37 @@ public class MpPromoteAlgo implements RepairAlgo
 
             // Step 3: offer to the union
             addToRepairLog(response);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
                         ", message: " + response.getPayload());
             }
 
             // Step 4: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                if (repairLogger.isDebugEnabled()) {
+                    repairLogger.debug(m_whoami + "collecting " + response.getOfTotal()
                     + " repair log entries from "
                     + CoreUtils.hsIdToString(response.m_sourceHSId));
                 }
             }
 
             if (rrs.update(response)) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+                if (repairLogger.isDebugEnabled()) {
+                    repairLogger.debug(m_whoami + "collected " + rrs.m_receivedResponses
                             + " responses for " + rrs.m_expectedResponses
                             + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 }
 
                 if (areRepairLogsComplete()) {
 
-                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
+                    TheHashinator.updateHashinator(ElasticHashinator.class,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
                     //no real transaction repair when triggered with MigratePartitionLeader. Theoretically it should not be here.
                     //MigratePartitionLeader should not trigger MP promotion.
                     if (m_isMigratePartitionLeader) {
-                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_repairTruncationHandle));
                     } else {
                         repairSurvivors();
                     }
@@ -258,11 +264,13 @@ public class MpPromoteAlgo implements RepairAlgo
         // currently). If cancelled and the last repair message arrives, don't send
         // out corrections!
         if (this.m_promotionResult.isCancelled()) {
-            tmLog.debug(m_whoami + "skipping repair message creation for cancelled Term.");
+            repairLogger.debug(m_whoami + "skipping repair message creation for cancelled Term.");
             return;
         }
 
-        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             // send the repair log union to all the survivors. SPIs will ignore
             // CompleteTransactionMessages for transactions which have already
@@ -270,14 +278,16 @@ public class MpPromoteAlgo implements RepairAlgo
             // in the repair log are filled without explicitly having to
             // discover and track them.
             VoltMessage repairMsg = createRepairMessage(li);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(m_survivors) + " with: " + TxnEgo.txnIdToString(li.getTxnId()) +
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(m_survivors) + " with: " + TxnEgo.txnIdToString(li.getTxnId()) +
                         " " + repairMsg);
             }
-            m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            if (repairMsg != null) {
+                m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            }
         }
 
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_repairTruncationHandle));
     }
 
     //
@@ -285,11 +295,9 @@ public class MpPromoteAlgo implements RepairAlgo
     //  Specialization
     //
     //
-
-
-    VoltMessage makeRepairLogRequestMessage(long requestId)
+    VoltMessage makeRepairLogRequestMessage(long requestId, int deadHost)
     {
-        return new Iv2RepairLogRequestMessage(requestId, Iv2RepairLogRequestMessage.MPIREQUEST);
+        return new Iv2RepairLogRequestMessage(requestId, deadHost, Iv2RepairLogRequestMessage.MPIREQUEST);
     }
 
     // Always add the first message for a transaction id and always
@@ -300,27 +308,43 @@ public class MpPromoteAlgo implements RepairAlgo
         if (msg.getPayload() == null) {
             return;
         }
+        // MP repair log has at most two messages, complete message for prior transaction
+        // and fragment message for current transaction, don't add message before prior completion
+        if (msg.getTxnId() <= m_maxSeenCompleteTxnId) {
+            return;
+        }
         Iv2RepairLogResponseMessage prev = m_repairLogUnion.floor(msg);
         if (prev != null && (prev.getTxnId() != msg.getTxnId())) {
             prev = null;
         }
 
-        if (prev == null) {
-           m_repairLogUnion.add(msg);
-        }
-        else if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            // prefer complete messages to fragment tasks.
-            m_repairLogUnion.remove(prev);
+        if (msg.getPayload() instanceof CompleteTransactionMessage) {
+            // prefer complete messages to fragment tasks. Completion message also erases prior staled messages
+            m_repairLogUnion.removeIf((p) -> p.getTxnId() <= msg.getTxnId());
             m_repairLogUnion.add(msg);
+            m_maxSeenCompleteTxnId = msg.getTxnId();
+        }
+        else if (prev == null) {
+           m_repairLogUnion.add(msg);
         }
     }
 
     VoltMessage createRepairMessage(Iv2RepairLogResponseMessage msg)
     {
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg.getPayload();
+            // Repair log messages that originated from this host may still be in the scoreboard,
+            // so build a new message to avoid corrupting the scoreboard's reference.
+            CompleteTransactionMessage message = new CompleteTransactionMessage(ctm.getInitiatorHSId(),
+                    ctm.getCoordinatorHSId(), ctm);
             message.setForReplica(false);
             message.setRequireAck(false);
+            message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+            message.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + "sending completion for txn " + TxnEgo.txnIdToString(message.getTxnId()) +
+                        ", ts " + MpRestartSequenceGenerator.restartSeqIdToString(message.getTimestamp()));
+            }
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
@@ -333,20 +357,37 @@ public class MpPromoteAlgo implements RepairAlgo
             // anyway, so not restarting the read is currently harmless.
             boolean restart = !ftm.isReadOnly();
             if (restart) {
-                assert(ftm.getInitiateTask() != null);
+                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
+                assert(initTaskMsg != null);
+                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
-            CompleteTransactionMessage rollback =
-                new CompleteTransactionMessage(
-                        ftm.getInitiatorHSId(),
-                        ftm.getCoordinatorHSId(),
-                        ftm.getTxnId(),
-                        ftm.isReadOnly(),
-                        0,
-                        true,   // Force rollback as our repair operation.
-                        false,  // no acks in iv2.
-                        restart,   // Indicate rollback for repair as appropriate
-                        ftm.isForReplay());
+            CompleteTransactionMessage rollback = null;
+            //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
+            //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
+            //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
+            String procName = ftm.getProcedureName();
+            if (procName != null) {
+                final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
+                if (proc != null && !proc.isRestartable()) {
+                    rollback = new CompleteTransactionMessage(
+                            ftm.getInitiatorHSId(),
+                            ftm.getCoordinatorHSId(),
+                            ftm.getTxnId(),
+                            ftm.isReadOnly(),
+                            0,
+                            true,       // Force rollback as our repair operation.
+                            false,      // no acks in iv2.
+                            false,      // Indicate because this will not be restarted, the txn should be cleaned up
+                            ftm.isForReplay(),
+                            ftm.isNPartTxn(),
+                            true,
+                            false);
+                    rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+                    rollback.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+                }
+            }
+
             return rollback;
         }
     }

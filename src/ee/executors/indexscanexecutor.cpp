@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,19 +45,9 @@
 
 #include "indexscanexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
-#include "indexes/tableindex.h"
 
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
@@ -65,9 +55,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
 
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
@@ -80,8 +68,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_projectionNode = NULL;
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
+    vassert(m_node);
+    vassert(m_node->getTargetTable());
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
@@ -112,7 +100,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
-    assert(m_aggExec == NULL || m_insertExec == NULL);
+    vassert(m_aggExec == NULL || m_insertExec == NULL);
 
     //
     // Make sure that we have search keys and that they're not null
@@ -140,7 +128,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     // The target table should be a persistent table.
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
@@ -154,19 +142,20 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    m_hasOffsetRankOptimization = m_node->hasOffsetRankOptimization();
+
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
     return true;
 }
 
-bool IndexScanExecutor::p_execute(const NValueArray &params)
-{
-    assert(m_node);
-    assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
+bool IndexScanExecutor::p_execute(const NValueArray &params) {
+    vassert(m_node);
+    vassert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
     // update local target table with its most recent reference
     // The target table should be a persistent table.
-    assert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
+    vassert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
     PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
@@ -175,7 +164,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+    // TODO: we may need to comment out this assertion for merge join.
+    vassert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
@@ -201,8 +191,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     // Initialize the postfilter
-    CountingPostfilter postfilter(m_outputTable, post_expression, limit, offset);
+    int postfilterOffset = offset;
+    if (m_hasOffsetRankOptimization) {
+        postfilterOffset = CountingPostfilter::NO_OFFSET;
+    }
+    CountingPostfilter postfilter(m_outputTable, post_expression, limit, postfilterOffset);
 
+    // Progress monitor
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
@@ -237,7 +232,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         } else {
             // We may actually find out during initialization
             // that we are done.  The p_execute_init function
-            // returns true if this is so.  See the definition
+            // returns false if this is so.  See the definition
             // of InsertExecutor::p_execute_init.
             //
             // We know we're in an insert from select statement.
@@ -253,13 +248,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // happy with.  The p_execute_init knows
             // how to do this.  Note that temp_tuple will
             // not be initialized if this returns false.
-            if (m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
+            if (!m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
                 return true;
             }
             // We should have as many expressions in the
             // projection node as there are columns in the
             // input schema if there is an inline projection.
-            assert(m_projectionNode != NULL
+            vassert(m_projectionNode != NULL
                        ? (temp_tuple.getSchema()->columnCount() == m_projectionNode->getOutputColumnExpressions().size())
                        : true);
         }
@@ -375,7 +370,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             localLookupType = INDEX_LOOKUP_TYPE_GT;
                             break;
                         default:
-                            assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                            vassert(!"IndexScanExecutor::p_execute - can't index on not equals");
                             return false;
                     }
                 }
@@ -415,7 +410,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         return true;
     }
 
-    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
+    vassert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
 
     //
@@ -472,26 +467,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             tableIndex->moveToLessThanKey(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-            // find the entry whose key is greater than search key,
-            // do a forward scan using initialExpr to find the correct
-            // start point to do reverse scan
-            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
-            if (isEnd) {
-                tableIndex->moveToEnd(false, indexCursor);
-            }
-            else {
-                while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
-                    pmp.countdownProgress();
-                    if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
-                        // just passed the first failed entry, so move 2 backward
-                        tableIndex->moveToBeforePriorEntry(indexCursor);
-                        break;
-                    }
-                }
-                if (tuple.isNullTuple()) {
-                    tableIndex->moveToEnd(false, indexCursor);
-                }
-            }
+            // find the entry whose key is less than or equal to search key
+            // as the start point to do a reverse scan
+            tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
             tableIndex->moveToCoveringCell(&searchKey, indexCursor);
@@ -499,10 +477,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    }
-    else {
-        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor);
+    } else {
+        bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+        if (m_hasOffsetRankOptimization) {
+            int rankOffset = offset + 1;
+            if (!forward) {
+                rankOffset = static_cast<int>(tableIndex->getSize() - offset);
+            }
+            // when rankOffset is not greater than 0, it means there are no matching tuples
+            // then we do not need to update the IndexCursor which points to NULL tuple by default
+            if (rankOffset > 0) {
+                tableIndex->moveToRankTuple(rankOffset, forward, indexCursor);
+            }
+        } else {
+            tableIndex->moveToEnd(forward, indexCursor);
+        }
     }
 
     //
@@ -578,7 +567,7 @@ void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& 
     //
     // Insert the tuple into our output table
     //
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
     m_tmpOutputTable->insertTempTuple(tuple);
 }
 

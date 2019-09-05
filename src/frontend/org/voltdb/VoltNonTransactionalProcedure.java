@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientResponseWithPartitionKey;
 
 /**
  * Base class for any user provided non-transactional procedures.
@@ -45,6 +46,18 @@ public class VoltNonTransactionalProcedure {
      */
     public CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         return m_runner.callProcedure(procName, params);
+    }
+
+    /**
+     * A version of the similar API from VoltDB clients, but for for non-transactional procedures.
+     * Runs a single-partition procedure on every partition that exists at the time it is called.
+     *
+     * @param procedureName A single-partition procedure.
+     * @param params Paramrters for the single-partition procedures (minus the partition parameter).
+     * @return A CF of responses for every call made (partial failure and varied failure status's are possible).
+     */
+    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(String procedureName, Object... params) {
+        return m_runner.callAllPartitionProcedure(procedureName, params);
     }
 
     /**

@@ -16,7 +16,7 @@ CREATE TABLE partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -62,7 +62,7 @@ CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGE
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -89,7 +89,7 @@ CREATE TABLE export_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -123,7 +123,7 @@ CREATE TABLE replicated_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -168,7 +168,7 @@ CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
@@ -216,7 +216,7 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -250,7 +250,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -275,7 +275,7 @@ CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET a
 
 
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;

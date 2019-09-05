@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -546,7 +547,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // The problem was a mismatch between the output schema
         // of the coordinator's send node and its feeding receive node
         // that had incorrectly rearranged its columns.
-        SchemaColumn middleCol = os.getColumns().get(1);
+        SchemaColumn middleCol = os.getColumn(1);
         System.out.println(middleCol.toString());
         assertTrue(middleCol.getColumnAlias().equals("C"));
 
@@ -712,11 +713,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof ReceivePlanNode);
+        assertTrue(p.getChild(0) instanceof MergeReceivePlanNode);
+        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.ORDERBY));
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
         // Useless order by clause.
         pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
@@ -991,10 +993,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments(sql2);
         explainStr2 = buildExplainPlan(pns);
         if (! exact) {
-            explainStr1 = explainStr1.replaceAll("TEMP_TABLE\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
-            explainStr2 = explainStr2.replaceAll("TEMP_TABLE\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
+            explainStr1 = explainStr1.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
+                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
+            explainStr2 = explainStr2.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
+                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
             assertEquals(explainStr1, explainStr2);
         }
         assertEquals(explainStr1, explainStr2);
@@ -1066,7 +1068,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: SP"));
+                    "object not found: SP"));
         }
 
         // Having
@@ -1077,7 +1079,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: CT"));
+                    "object not found: CT"));
         }
 
         // Group by column.alias
@@ -1088,7 +1090,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: P1.SP"));
+                    "object not found: P1.SP"));
         }
 
         //

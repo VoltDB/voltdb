@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.HashSet;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 
 /**
  * Subclass of AbstractParsedStmt for a SWAP TABLES statement.
@@ -38,8 +39,8 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedSwapStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedSwapStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     /**
@@ -89,5 +90,10 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
      */
     public Collection<String> calculateUDFDependees() {
         return new HashSet<>();
+    }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
     }
 }

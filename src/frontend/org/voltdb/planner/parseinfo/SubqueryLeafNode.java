@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,19 +17,16 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.planner.StmtEphemeralTableScan;
 
 /**
  * An object of class SubqueryLeafNode is a leaf in a join expression tree
  * which corresponds to a subquery.
  */
-public class SubqueryLeafNode extends JoinNode{
+public class SubqueryLeafNode extends JoinNode {
 
     private final StmtSubqueryScan m_subqueryScan;
 
@@ -69,8 +66,8 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
-        subQueries.add(m_subqueryScan);
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
+        scans.add(m_subqueryScan);
     }
 
     public StmtSubqueryScan getSubqueryScan() { return m_subqueryScan; }
@@ -82,26 +79,9 @@ public class SubqueryLeafNode extends JoinNode{
     public String getTableAlias() { return m_subqueryScan.getTableAlias(); }
 
     @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
-        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
-        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+    public boolean hasSubqueryScans() {
+        //  This is a subquery scan.
+        return true;
     }
 
-    @Override
-    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
-            Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes) {
-        if ( ! m_whereInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
-                                                      equivalenceSet);
-        }
-        // HSQL sometimes tags single-table filters in inner joins as join clauses
-        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-        // conditions that determine partitioning, so process them as where clauses.
-        if ( ! m_joinInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
-                                                      equivalenceSet);
-        }
-    }
 }

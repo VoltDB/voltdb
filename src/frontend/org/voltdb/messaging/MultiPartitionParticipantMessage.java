@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -100,6 +100,11 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_ciHandle = buf.getLong();
         m_connectionId = buf.getLong();
+    }
+
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("UNEXPECTED REPLAY SENTINAL");
     }
 
     @Override

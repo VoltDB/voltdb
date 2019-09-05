@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,39 +15,31 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDOINSERTACTION_H_
-#define PERSISTENTTABLEUNDOINSERTACTION_H_
+#pragma once
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-
-class PersistentTableUndoInsertAction: public voltdb::UndoAction {
+class PersistentTableUndoInsertAction: public UndoOnlyAction {
 public:
-    inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *tableSurgeon)
-        : m_tuple(insertedTuple)
-        , m_tableSurgeon(tableSurgeon)
-    { }
+    PersistentTableUndoInsertAction(
+          char* insertedTuple, voltdb::PersistentTableSurgeon *tableSurgeon) :
+       m_tuple(insertedTuple), m_tableSurgeon(tableSurgeon) { }
 
     virtual ~PersistentTableUndoInsertAction() { }
 
     /*
      * Undo whatever this undo action was created to undo
      */
-    virtual void undo() {
-        m_tableSurgeon->deleteTupleForUndo(m_tuple);
+    void undo() override {
+       m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
-
-    /*
-     * Release any resources held by the undo action. It will not need
-     * to be undone in the future.
-     */
-    virtual void release() { }
-
+    char const* getTupleForTest() const {
+       return m_tuple;
+    }
 private:
     char* m_tuple;
     PersistentTableSurgeon *m_tableSurgeon;
@@ -55,4 +47,3 @@ private:
 
 }
 
-#endif /* PERSISTENTTABLEUNDOINSERTACTION_H_ */

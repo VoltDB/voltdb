@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,336 +15,235 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef POOL_HPP_
-#define POOL_HPP_
+#pragma once
+#include <typeinfo>
+#include <cstdio>
+#include <cstring>
+#include <cstdint>
+#include <list>
 #include <vector>
-#include <iostream>
-#include <stdint.h>
-#include <sys/mman.h>
-#include <errno.h>
-#include <climits>
-#include <string.h>
-#include "common/FatalException.hpp"
+#include <memory>
+#include <signal.h>     // for sig_atomic_t typedef
+#include <mutex>
+
+#if defined __GNUC__ && __GNUC__ >= 5
+#define MODERN_CXX
+#else
+#undef MODERN_CXX
+#endif
 
 namespace voltdb {
-static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
 
+   // The default chunk size for the Pool is 256 KB.
+   static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
+
+   /**
+    * Here are two implementations of the Pool, depending on
+    * whether we are running memcheck test via valgrind:
+    *
+    * When we are building for memcheck test, then there is no
+    * fuzz of careful allocating/resusing after purge(). We
+    * allocate the exact amount from the system by demand;
+    *
+    * For normal build, we do all the careful book keeping to
+    * minimize the cost of malloc() system calls.
+    */
 #ifndef MEMCHECK
-/**
- * Description of a chunk of memory allocated on the heap
- */
-class Chunk {
-public:
-    Chunk()
-        : m_offset(0), m_size(0), m_chunkData(NULL)
-    {
-    }
-
-    inline Chunk(uint64_t size, void *chunkData)
-        : m_offset(0), m_size(size), m_chunkData(static_cast<char*>(chunkData))
-    {
-    }
-
-    int64_t getSize() const
-    {
-        return static_cast<int64_t>(m_size);
-    }
-
-    uint64_t m_offset;
-    uint64_t m_size;
-    char *m_chunkData;
-};
-
-/*
- * Find next higher power of two
- * From http://en.wikipedia.org/wiki/Power_of_two
- */
-template <class T>
-inline T nexthigher(T k) {
-        if (k == 0)
-                return 1;
-        k--;
-        for (int i=1; i<sizeof(T)*CHAR_BIT; i<<=1)
-                k = k | k >> i;
-        return k+1;
-}
-
-/**
- * A memory pool that provides fast allocation and deallocation. The
- * only way to release memory is to free all memory in the pool by
- * calling purge.
- */
-class Pool {
-public:
-
-    Pool() :
-        m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0)
-    {
-        init();
-    }
-
-    Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
-#ifdef USE_MMAP
-        m_allocationSize(nexthigher(allocationSize)),
-#else
-        m_allocationSize(allocationSize),
+   /**
+    * A memory pool that provides fast allocation and deallocation. The
+    * only way to release memory is to free all memory in the pool by
+    * calling purge; or destructing the Pool instance.
+    *
+    * The Pool works in this way:
+    *
+    * User specify the size (number of bytes) for normal-sized
+    * chunks, and the number of reserved chunks. In Pool creation
+    * time, it allocates a single chunk of memory.
+    * Whenever user asks for some memory, the Pool checks whether
+    * current chunk is big enough for the memory asked:
+    * - If the current chunk is big enough, then update the
+    *   chunk's offset book-keeping, and hand memory back to
+    *   user;
+    * - If the current chunk is not big enough, then the rest of
+    *   the memory in current chunk is wasted. Go check if the
+    *   asked memory size exceeds the size of a normal chunk
+    *   (set in the Pool's constructor):
+    *   - If a normal chunk size is not big enough to hold what
+    *   user asked, then we allocate an oversized chunk of
+    *   exactly that much memory, and hand it to user;
+    *   - Otherwise, allocate another normal-size chunk.
+    * When user explicitly called purge() method, that means that
+    * all memory in the pool is safe to reclaim. We don't release
+    * all memory to the system; instead, we only release all the
+    * over-sized chunks, and normal-size chunks above the number
+    * speicified in the constructor (i.e. the reserved).
+    *
+    * In summary, a Pool can be either used to ask arbitrary
+    * amount of memory, or you can tell the Pool to reclaim ALL
+    * memory allocated from it (when non of the memory previously
+    * allocated is useable any more). There is no intermediate
+    * state. The way the Pool is created, and largely, the sequence
+    * it is asked for memory, determines memory usage efficiency
+    * (i.e. how many bytes are wasted).
+    *
+    * A pool is **NOT** thread-safe, meaning that multiple
+    * threads should not call allocate() method from the same
+    * Pool instance.
+    */
+   class Pool {
+      /**
+       * A chunk of memory allocated on the heap
+       */
+      class Chunk {
+         uint64_t m_offset;
+         uint64_t m_size;
+         std::unique_ptr<char[]> m_chunkData;
+         Chunk& operator=(const Chunk&);
+         Chunk(const Chunk&);
+      public:
+         Chunk(uint64_t size, uint64_t offset)
+            : m_offset(offset), m_size(size), m_chunkData(std::unique_ptr<char[]>(new char[size])) { }
+         Chunk(Chunk&& rhs): m_offset(rhs.m_offset), m_size(rhs.m_size), m_chunkData(std::move(rhs.m_chunkData)) {
+            rhs.m_chunkData.release();
+         }
+         Chunk& operator=(Chunk&& rhs) {
+            m_offset = rhs.m_offset;
+            m_size = rhs.m_size;
+#ifdef MODERN_CXX     // error: deleted function ‘void std::unique_ptr<_Tp [], _Tp_Deleter>::reset(_Up) [with _Up = long int, _Tp = char, _Tp_Deleter = std::default_delete<char []>]’
+            m_chunkData.reset(NULL);
 #endif
-        m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
-        m_currentChunkIndex(0)
-    {
-        init();
-    }
-
-    void init() {
-#ifdef USE_MMAP
-        char *storage =
-                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-        if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-        }
-#else
-        char *storage = new char[m_allocationSize];
-#endif
-        m_chunks.push_back(Chunk(m_allocationSize, storage));
-    }
-
-    ~Pool() {
-        for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
-#ifdef USE_MMAP
-            if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-                std::cout << strerror( errno ) << std::endl;
-                throwFatalException("Failed munmap");
-            }
-#else
-            delete [] m_chunks[ii].m_chunkData;
-#endif
-        }
-        for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
-#ifdef USE_MMAP
-            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-                std::cout << strerror( errno ) << std::endl;
-                throwFatalException("Failed munmap");
-            }
-#else
-            delete [] m_oversizeChunks[ii].m_chunkData;
-#endif
-        }
-    }
-
-    /*
-     * Allocate a continous block of memory of the specified size.
-     */
-    inline void* allocate(std::size_t size) {
-        /*
-         * See if there is space in the current chunk
-         */
-        Chunk *currentChunk = &m_chunks[m_currentChunkIndex];
-        if (size > currentChunk->m_size - currentChunk->m_offset) {
-            /*
-             * Not enough space. Check if it is greater then our allocation size.
-             */
-            if (size > m_allocationSize) {
-                /*
-                 * Allocate an oversize chunk that will not be reused.
-                 */
-#ifdef USE_MMAP
-                char *storage =
-                        static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-                if (storage == MAP_FAILED) {
-                    std::cout << strerror( errno ) << std::endl;
-                    throwFatalException("Failed mmap");
-                }
-#else
-                char *storage = new char[size];
-#endif
-                m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
-                Chunk &newChunk = m_oversizeChunks.back();
-                newChunk.m_offset = size;
-                return newChunk.m_chunkData;
-            }
-
-            /*
-             * Check if there is an already allocated chunk we can use.
-             */
-            m_currentChunkIndex++;
-            if (m_currentChunkIndex < m_chunks.size()) {
-                currentChunk = &m_chunks[m_currentChunkIndex];
-                currentChunk->m_offset = size;
-                return currentChunk->m_chunkData;
-            } else {
-                /*
-                 * Need to allocate a new chunk
-                 */
-//                std::cout << "Pool had to allocate a new chunk. Not a good thing "
-//                  "from a performance perspective. If you see this we need to look "
-//                  "into structuring our pool sizes and allocations so the this doesn't "
-//                  "happen frequently" << std::endl;
-#ifdef USE_MMAP
-                char *storage =
-                        static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-                if (storage == MAP_FAILED) {
-                    std::cout << strerror( errno ) << std::endl;
-                    throwFatalException("Failed mmap");
-                }
-#else
-                char *storage = new char[m_allocationSize];
-#endif
-                m_chunks.push_back(Chunk(m_allocationSize, storage));
-                Chunk &newChunk = m_chunks.back();
-                newChunk.m_offset = size;
-                return newChunk.m_chunkData;
-            }
-        }
-
-        /*
-         * Get the offset into the current chunk. Then increment the
-         * offset counter by the amount being allocated.
-         */
-        void *retval = currentChunk->m_chunkData + currentChunk->m_offset;
-        currentChunk->m_offset += size;
-
-        //Ensure 8 byte alignment of future allocations
-        currentChunk->m_offset += (8 - (currentChunk->m_offset % 8));
-        if (currentChunk->m_offset > currentChunk->m_size) {
-            currentChunk->m_offset = currentChunk->m_size;
-        }
-
-        return retval;
-    }
-
-    /*
-     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
-     */
-    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
-
-    inline void purge() {
-        /*
-         * Erase any oversize chunks that were allocated
-         */
-        const std::size_t numOversizeChunks = m_oversizeChunks.size();
-        for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
-#ifdef USE_MMAP
-            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-                std::cout << strerror( errno ) << std::endl;
-                throwFatalException("Failed munmap");
-            }
-#else
-            delete [] m_oversizeChunks[ii].m_chunkData;
-#endif
-        }
-        m_oversizeChunks.clear();
-
-        /*
-         * Set the current chunk to the first in the list
-         */
-        m_currentChunkIndex = 0;
-        std::size_t numChunks = m_chunks.size();
-
-        /*
-         * If more then maxChunkCount chunks are allocated erase all extra chunks
-         */
-        if (numChunks > m_maxChunkCount) {
-            for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
-#ifdef USE_MMAP
-                if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-                    std::cout << strerror( errno ) << std::endl;
-                    throwFatalException("Failed munmap");
-                }
-#else
-                delete []m_chunks[ii].m_chunkData;
-#endif
-            }
-            m_chunks.resize(m_maxChunkCount);
-        }
-
-        numChunks = m_chunks.size();
-        for (std::size_t ii = 0; ii < numChunks; ii++) {
-            m_chunks[ii].m_offset = 0;
-        }
-    }
-
-    int64_t getAllocatedMemory()
-    {
-        int64_t total = 0;
-        total += m_chunks.size() * m_allocationSize;
-        for (int i = 0; i < m_oversizeChunks.size(); i++)
-        {
-            total += m_oversizeChunks[i].getSize();
-        }
-        return total;
-    }
-
-private:
-    const uint64_t m_allocationSize;
-    std::size_t m_maxChunkCount;
-    std::size_t m_currentChunkIndex;
-    std::vector<Chunk> m_chunks;
-    /*
-     * Oversize chunks that will be freed and not reused.
-     */
-    std::vector<Chunk> m_oversizeChunks;
-    // No implicit copies
-    Pool(const Pool&);
-    Pool& operator=(const Pool&);
-};
+            m_chunkData.swap(rhs.m_chunkData);
+            return *this;
+         }
+         int64_t size() const throw() {
+            return m_size;
+         }
+         uint64_t offset() const throw () {
+            return m_offset;
+         }
+         uint64_t& offset() throw() {
+            return m_offset;
+         }
+         const char* data() const throw() {
+            return m_chunkData.get();
+         }
+         char* data() throw() {
+            return m_chunkData.get();
+         }
+         size_t padding() const throw() {   // number of bytes needed to advance offset to make next object
+            return (8 - (offset() % 8)) % 8;    // align in 8-byte memory location.
+         }
+      };
+      const uint64_t m_chunkSize;
+      std::size_t m_maxChunkCount;
+      std::size_t m_currentChunkIndex;
+      std::size_t m_oversizeChunkSize;
+      std::vector<Chunk> m_chunks;
+      /*
+       * Oversize chunks that will be freed and not reused.
+       */
+      std::list<std::unique_ptr<char[]>> m_oversizeChunks;
+      // No implicit copies
+      Pool(const Pool&);
+      Pool& operator=(const Pool&);
+   public:
+      Pool();
+      Pool(uint64_t allocationSize, uint64_t maxChunkCount);
+      void init();
+      ~Pool();
+      /*
+       * Allocate a continous block of memory of the specified size.
+       */
+      void* allocate(std::size_t size);
+      /*
+       * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+       */
+      void* allocateZeroes(std::size_t size);
+      void purge() throw();
+      int64_t getAllocatedMemory() const throw() {
+         return m_chunks.size() * m_chunkSize + m_oversizeChunkSize;
+      }
+   };
 #else // for MEMCHECK builds
-/**
- * A debug version of the memory pool that does each allocation on the heap keeps a list for when purge is called
- */
-class Pool {
-public:
-    Pool()
-        : m_allocations()
-        , m_memTotal(0)
-    {
-    }
-
-    Pool(uint64_t allocationSize, uint64_t maxChunkCount)
-        : m_allocations()
-        , m_memTotal(0)
-    {
-    }
-
-    ~Pool() {
-        purge();
-    }
-
-    /*
-     * Allocate a continous block of memory of the specified size.
-     */
-    inline void* allocate(std::size_t size) {
-        char *retval = new char[size];
-        m_allocations.push_back(retval);
-        m_memTotal += size;
-        return retval;
-    }
-
-    /*
-     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
-     */
-    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
-
-    inline void purge() {
-        for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {
-            delete [] m_allocations[ii];
-        }
-        m_allocations.clear();
-        m_memTotal = 0;
-    }
-
-    int64_t getAllocatedMemory()
-    {
-        return m_memTotal;
-    }
-
-private:
-    std::vector<char*> m_allocations;
-    int64_t m_memTotal;
-    // No implicit copies
-    Pool(const Pool&);
-    Pool& operator=(const Pool&);
-};
+   /**
+    * A debug version of the memory pool that does each allocation on the heap keeps a list for when purge is called
+    */
+   class Pool {
+      std::vector<std::unique_ptr<char[]>> m_allocations;
+      int64_t m_memTotal;
+      // No implicit copies
+      Pool(const Pool&);
+      Pool& operator=(const Pool&);
+   public:
+      Pool() : m_memTotal(0) {}
+      Pool(uint64_t chunkSize, uint64_t maxChunkCount) {}
+      ~Pool() {purge();}
+      /*
+       * Allocate a continous block of memory of the specified size.
+       */
+      void* allocate(std::size_t size);
+      /*
+       * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+       */
+      void* allocateZeroes(std::size_t size);
+      void purge() throw();
+      int64_t getAllocatedMemory() const throw() {
+         return m_memTotal;
+      }
+   };
 #endif
+
+   /**
+    * Pattern for static factory of creating arbitrary C++ class
+    * on the thread-local memory pool.
+    * Usage:
+    * struct Foo {
+    *    Foo(T1 t1, T2 t2, ...);
+    * };
+    * Pool spool;
+    * Foo* instanceFromSpool = createInstanceFromPool<Foo>(t1, t2, ...);
+    */
+#ifdef MODERN_CXX
+   template<typename T, typename... Args> inline T* createInstanceFromPool(Pool& pool, Args... args) {
+      return ::new (pool.allocate(sizeof(T))) T(std::forward<Args>(args)...);
+   }
+#else       // no variadic template argument support...
+   template<typename T>
+   inline T* createInstanceFromPool(Pool& pool) {
+      return ::new (pool.allocate(sizeof(T))) T();
+   }
+   template<typename T, typename Arg1>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1);
+   }
+   template<typename T, typename Arg1, typename Arg2>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7, typename Arg8>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7, Arg8 arg8) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+   }
+#endif
+
 }
-#endif /* POOL_HPP_ */

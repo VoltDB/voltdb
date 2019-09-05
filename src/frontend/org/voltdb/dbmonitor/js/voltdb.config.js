@@ -1,5 +1,4 @@
-﻿
-(function (window) {
+﻿(function (window) {
 
     var iVoltDBConfig = (function () {
 
@@ -12,11 +11,10 @@
         };
 
         this.GetPortId = function () {
-            return window.location.port || 8080;
+            return window.location.port;
         };
     });
 
     window.VoltDBConfig = VoltDBConfig = new iVoltDBConfig();
 
 })(window);
-    

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,7 +37,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private int m_ofTotal = 0;
     private long m_handle = Long.MIN_VALUE;
     private long m_txnId;
-
+    private long m_repairTruncationHandle = Long.MIN_VALUE;
     // Only set when sequence is 0
     private long m_hashinatorVersion = Long.MIN_VALUE;
 
@@ -71,7 +71,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
-            Pair<Long, byte[]> versionedHashinatorConfig)
+            Pair<Long, byte[]> versionedHashinatorConfig, long repaieTruncationHandle)
     {
         super();
         m_requestId = requestId;
@@ -81,6 +81,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_txnId = txnId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
         m_hashinatorConfig = versionedHashinatorConfig.getSecond();
+        m_repairTruncationHandle = repaieTruncationHandle;
     }
 
     public long getRequestId()
@@ -105,6 +106,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public long getRepairTruncationHandle() {
+        return m_repairTruncationHandle;
     }
 
     public VoltMessage getPayload()
@@ -135,6 +140,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
+        msgsize += 8; // repair truncation handle
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }
@@ -155,7 +161,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
         buf.putLong(m_txnId);
-
+        buf.putLong(m_repairTruncationHandle);
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
             m_payload.flattenToBuffer(paybuf);
@@ -181,7 +187,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
         m_txnId = buf.getLong();
-
+        m_repairTruncationHandle = buf.getLong();
         // going inception.
         // The first message in the repair log response stream is always a null
         // ack, so don't try to deserialize a message that won't exist.

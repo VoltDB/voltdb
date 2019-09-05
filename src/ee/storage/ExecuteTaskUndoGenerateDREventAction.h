@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,28 +18,25 @@
 #ifndef EXECUTETASK_H
 #define EXECUTETASK_H
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 
 namespace voltdb {
 
-class ExecuteTaskUndoGenerateDREventAction : public voltdb::UndoAction {
+class ExecuteTaskUndoGenerateDREventAction : public voltdb::ReleaseOnlyAction {
 public:
     ExecuteTaskUndoGenerateDREventAction(
             AbstractDRTupleStream* drStream, AbstractDRTupleStream* drReplicatedStream,
             CatalogId partitionId,
-            DREventType type, int64_t lastCommittedSpHandle,
+            DREventType type,
             int64_t spHandle, int64_t uniqueId, ByteArray payloads)
         : m_drStream(drStream)
         , m_drReplicatedStream(drReplicatedStream)
         , m_partitionId(partitionId)
         , m_type(type)
-        , m_lastCommittedSpHandle(lastCommittedSpHandle)
         , m_spHandle(spHandle)
         , m_uniqueId(uniqueId)
         , m_payloads(payloads)
     { }
-
-    void undo() { }
 
     void release() {
         // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
@@ -49,7 +46,7 @@ public:
         // the partition stream in the last IF block.
         if (m_drReplicatedStream && (m_type != DR_ELASTIC_REBALANCE) &&
             ((m_type == DR_STREAM_START) != m_drReplicatedStream->drStreamStarted())) {
-            m_drReplicatedStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
+            m_drReplicatedStream->generateDREvent(m_type, m_spHandle, m_uniqueId, m_payloads);
         }
 
         if (m_type == DR_ELASTIC_CHANGE) {
@@ -57,13 +54,13 @@ public:
             int oldPartitionCnt = input.readInt();
             if (m_partitionId >= oldPartitionCnt && m_partitionId != 16383) {
                 // skip the drStreamStarted() check as this DR_ELASTIC_CHANGE will be transformed into DR_STREAM_START
-                m_drStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
+                m_drStream->generateDREvent(m_type, m_spHandle, m_uniqueId, m_payloads);
                 return;
             }
         }
 
         if ((m_type == DR_STREAM_START) != m_drStream->drStreamStarted()) {
-            m_drStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
+            m_drStream->generateDREvent(m_type, m_spHandle, m_uniqueId, m_payloads);
         }
     }
 
@@ -72,7 +69,6 @@ private:
     AbstractDRTupleStream* m_drReplicatedStream;
     CatalogId m_partitionId;
     DREventType m_type;
-    int64_t m_lastCommittedSpHandle;
     int64_t m_spHandle;
     int64_t m_uniqueId;
     ByteArray m_payloads;

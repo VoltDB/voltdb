@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,10 +34,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
-import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
@@ -160,7 +158,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @param catalogContext new catalog context
      * @return new importer configuration
      */
-    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
+    private Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
         Map<String, ImportConfiguration> newProcessorConfig;
 
         ImportType importElement = catalogContext.getDeployment().getImport();

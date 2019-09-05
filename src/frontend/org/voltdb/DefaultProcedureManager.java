@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,9 +20,9 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Catalog;
@@ -49,12 +49,16 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class DefaultProcedureManager {
 
-    Map<String, Procedure> m_defaultProcMap = new HashMap<>();
+    // ENG-14639, made concurrent to support LoadedProcedureSet.getNibbleDeleteProc
+    Map<String, Procedure> m_defaultProcMap = new ConcurrentHashMap<>();
 
     private final Database m_db;
     // fake db makes it easy to create procedures that aren't
     // part of the main catalog
     private final Database m_fakeDb;
+
+    public static final String NIBBLE_DELETE_PROC = "nibbledelete";
+    public static final String NIBBLE_MIGRATE_PROC = "nibblemigrate";
 
     public DefaultProcedureManager(Database db) {
         m_db = db;
@@ -70,7 +74,7 @@ public class DefaultProcedureManager {
         for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
-            if (CatalogUtil.isTableExportOnly(m_db, table)) {
+            if (CatalogUtil.isStream(m_db, table)) {
                 Column partitioncolumn = table.getPartitioncolumn();
                 if (partitioncolumn != null) {
                     int partitionIndex = partitioncolumn.getIndex();
@@ -163,7 +167,6 @@ public class DefaultProcedureManager {
         String name = defaultProc.getClassname();
         String[] parts = name.split("\\.");
         String action = parts[1];
-
         Table table = defaultProc.getPartitiontable();
         Column partitionColumn = defaultProc.getPartitioncolumn();
 
@@ -185,33 +188,33 @@ public class DefaultProcedureManager {
         case "insert":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudInsert(table, partitionColumn);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedInsert(table);
             }
         case "update":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudUpdate(table, partitionColumn, pkey);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedUpdate(table, pkey);
             }
         case "delete":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudDelete(table, partitionColumn, pkey);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedDelete(table, pkey);
             }
+        case DefaultProcedureManager.NIBBLE_MIGRATE_PROC:
+            return generateNibbleDelete(defaultProc);
         case "upsert":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudUpsert(table, partitionColumn);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedUpsert(table, pkey);
             }
+        case DefaultProcedureManager.NIBBLE_DELETE_PROC:
+            return generateNibbleDelete(defaultProc);
         default:
-            throw new RuntimeException("Invalid input to default proc SQL generator.");
+            throw new RuntimeException("Invalid input to default proc SQL generator (" + action + ")");
         }
     }
 
@@ -315,6 +318,20 @@ public class DefaultProcedureManager {
             sb.append("?");
         }
         sb.append(")");
+    }
+
+    /**
+     * Create a statement like:
+     * "MIGRATE FROM <table> where {...}"
+     * @param table target table
+     * @param partitioncolumn partition column of a partitioned table, or null if table is replicated
+     * @param pkey primary key
+     * @return statement string
+     */
+    private static String generateCrudMigrate(Table table, Column partitioncolumn, Constraint pkey) {
+        final StringBuilder sb = new StringBuilder("MIGRATE FROM ").append(table.getTypeName());
+        generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
+        return sb.append(';').toString();
     }
 
     /**
@@ -446,6 +463,14 @@ public class DefaultProcedureManager {
         generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
         sb.append(';');
 
+        return sb.toString();
+    }
+
+    private static String generateNibbleDelete(Procedure proc) {
+        StringBuilder sb = new StringBuilder();
+        for (org.voltdb.catalog.Statement stmt : proc.getStatements()) {
+            sb.append(stmt.getSqltext());
+        }
         return sb.toString();
     }
 

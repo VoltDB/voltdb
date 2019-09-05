@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -78,6 +78,17 @@ public class TestAdhocExportTable extends AdhocDDLTestBase {
                 fail("Should be able to drop a stream table");
             }
             assertFalse(findTableInSystemCatalogResults("FOO"));
+            // ENG-14155: add stream after drop stream causes SIGSEGV in ee
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create stream FOO (ID int default 0, VAL varchar(64 bytes));");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to add a stream table after the drop");
+            }
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+
         }
         finally {
             teardownSystem();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -86,6 +87,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_contentDeterminismMessage == null) {
             m_contentDeterminismMessage = value;
         }
+    }
+
+    /**
+     * Reset table/column name/alias. Useful when matching in complex
+     * gby/oby expressions in query rewrite.
+     */
+    public AbstractExpression anonymize() {
+       if (getLeft() != null) {
+          getLeft().anonymize();
+       }
+       if (getRight() != null) {
+          getRight().anonymize();
+       }
+       if (getArgs() != null) {
+          getArgs().forEach(AbstractExpression::anonymize);
+       }
+       return this;
     }
 
     /**
@@ -301,7 +319,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public void setValueSize(int size) {
         assert (size >= 0);
-        assert (size <= 10000000);
+        assert (size <= 10_000_000);
         m_valueSize = size;
     }
 
@@ -332,14 +350,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String header = getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ";
+        sb.append(linePrefix);
+        sb.append(getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ");
         if (m_valueType != null) {
-            header += m_valueType.toSQLString();
+            sb.append(m_valueType.toSQLString());
+            if (m_valueType.isVariableLength()) {
+                sb.append("(" + m_valueSize);
+                if (m_valueType == VoltType.STRING) {
+                    sb.append(m_inBytes ? " bytes" : " chars");
+                }
+                sb.append(")");
+            }
         }
         else {
-            header += "[null type]";
+            sb.append("[null type]");
         }
-        sb.append(linePrefix + header + "\n");
+        sb.append("\n");
 
         if (m_left != null) {
             sb.append(linePrefix + "Left:\n");
@@ -827,8 +853,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (ii != null) {
             ParsedColInfo col = indexToColumnMap.get(ii);
             TupleValueExpression tve = new TupleValueExpression(
-                    col.tableName, col.tableAlias,
-                    col.columnName, col.alias,
+                    col.m_tableName, col.m_tableAlias,
+                    col.m_columnName, col.m_alias,
                     this, ii);
             if (this instanceof TupleValueExpression) {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
@@ -1206,16 +1232,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     *  Associate underlying TupleValueExpressions with columns in the table
-     *  and propagate the type implications to parent expressions.
+     * Traverse this expression tree for a table.  Each TVE in the
+     * leaves of this expression gets resolved, which means
+     * the metadata in the TVE is set from the metadata in
+     * the table.  FunctionExpressions do something more,
+     * in that they do some type inference for parameters.
+     * See the FunctionExpression override for more details.
      */
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
     }
 
     /**
-     *  Do the recursive part of resolveForTable
-     *  as required for tree-structured expression types.
+     * Walk the expression tree, resolving TVEs and function
+     * expressions as we go.
      */
     protected final void resolveChildrenForTable(Table table) {
         if (m_left != null) {
@@ -1273,12 +1303,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
-        }
-        if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        } else if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
             msg.append("cannot contain aggregate expressions.");
             return false;
-        }
-        if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
+        } else if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
@@ -1288,12 +1316,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 msg.append("cannot contain subqueries.");
             }
             return false;
-        }
-        if (hasUserDefinedFunctionExpression()) {
+        } else if (hasUserDefinedFunctionExpression()) {
             msg.append("cannot contain calls to user defined functions.");
             return false;
+        } else {
+            return true;
         }
-        return true;
     }
 
     public List<AbstractExpression> findAllUserDefinedFunctionCalls() {
@@ -1373,7 +1401,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * This function will recursively find any function expression with ID functionId.
      * If found, return true. Otherwise, return false.
      *
-     * @param expr
      * @param functionId
      * @return
      */

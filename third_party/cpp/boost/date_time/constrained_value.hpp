@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland 
- * $Date: 2008-11-12 11:37:53 -0800 (Wed, 12 Nov 2008) $
+ * $Date$
  */
 
 #include <exception>
@@ -39,7 +39,7 @@ namespace CV {
    *
    */
   template<class value_policies>
-  class constrained_value {
+  class BOOST_SYMBOL_VISIBLE constrained_value {
   public:
     typedef typename value_policies::value_type value_type;
     //    typedef except_type exception_type;
@@ -80,9 +80,9 @@ namespace CV {
   //! Template to shortcut the constrained_value policy creation process
   template<typename rep_type, rep_type min_value, 
            rep_type max_value, class exception_type>
-  class simple_exception_policy
+  class BOOST_SYMBOL_VISIBLE simple_exception_policy
   {
-    struct exception_wrapper : public exception_type
+    struct BOOST_SYMBOL_VISIBLE exception_wrapper : public exception_type
     {
       // In order to support throw_exception mechanism in the BOOST_NO_EXCEPTIONS mode,
       // we'll have to provide a way to acquire std::exception from the exception being thrown.

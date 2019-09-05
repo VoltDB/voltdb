@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,11 +28,13 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -72,6 +74,8 @@ public interface VoltDBInterface
     public String getLargeQuerySwapPath();
 
     public boolean isBare();
+    public boolean isClusterComplete();
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.
@@ -130,7 +134,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
-    public Cartographer getCartograhper();
+    public Cartographer getCartographer();
     public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
@@ -159,7 +163,8 @@ public interface VoltDBInterface
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange);
 
     /**
      * Given the information, write the new catalog jar file only
@@ -331,4 +336,21 @@ public interface VoltDBInterface
     public void swapTables(String oneTable, String otherTable);
 
     public HTTPAdminListener getHttpAdminListener();
+
+    long getLowestSiteId();
+    int getLowestPartitionId();
+
+    public int getKFactor();
+
+    /**
+     * @return true if current node is joining and haven't finished the snapshot
+     */
+    public boolean isJoining();
+
+    public ElasticService getElasticService();
+
+    /**
+     * @return The instance of {@link TaskManager} which is running in this instance
+     */
+    public TaskManager getTaskManager();
 }

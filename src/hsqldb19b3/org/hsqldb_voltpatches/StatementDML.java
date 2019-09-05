@@ -86,7 +86,25 @@ public class StatementDML extends StatementDMQL {
         this.restartIdentity        = restartIdentity;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
+        checkAccessRights(session);
+    }
+
+    /**
+     * Instantiate this as a MIGRATE statement
+     */
+    StatementDML(Session session, Table targetTable,
+                 RangeVariable[] rangeVars, CompileContext compileContext) {
+
+        super(StatementTypes.MIGRATE_WHERE, StatementTypes.X_SQL_DATA_CHANGE,
+                session.currentSchema);
+
+        this.targetTable            = targetTable;
+        this.baseTable              = targetTable.getBaseTable();
+        this.targetRangeVariables   = rangeVars;
+        this.isTransactionStatement = true;
+
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -109,7 +127,7 @@ public class StatementDML extends StatementDMQL {
         this.targetRangeVariables   = rangeVars;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -137,7 +155,7 @@ public class StatementDML extends StatementDMQL {
         this.condition            = mergeCondition;
         isTransactionStatement    = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -160,7 +178,7 @@ public class StatementDML extends StatementDMQL {
         this.targetRangeVariables = rangeVars;
         isTransactionStatement    = false;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -189,6 +207,10 @@ public class StatementDML extends StatementDMQL {
 
             case StatementTypes.DELETE_WHERE :
                 result = executeDeleteStatement(session);
+                break;
+
+            case StatementTypes.MIGRATE_WHERE :
+                result = executeMigrateStatement(session);
                 break;
 
             case StatementTypes.ASSIGNMENT :
@@ -281,6 +303,7 @@ public class StatementDML extends StatementDMQL {
 
                     continue;
                 case StatementTypes.DELETE_WHERE :
+                case StatementTypes.MIGRATE_WHERE : // NOTE: using same GrantConstants as DELETE statement
                     if (td.getPrivilegeType() == GrantConstants.DELETE) {
                         break;
                     }
@@ -700,6 +723,10 @@ public class StatementDML extends StatementDMQL {
         }
 
         return Result.getUpdateCountResult(count);
+    }
+
+    Result executeMigrateStatement(Session session) {
+        return Result.getUpdateCountResult(0);  // TODO
     }
 
     /**
@@ -1405,6 +1432,12 @@ public class StatementDML extends StatementDMQL {
             voltAppendChildScans(session, xml);
             voltAppendCondition(session, xml);
             voltAppendSortAndSlice(session, xml);
+            break;
+
+        case StatementTypes.MIGRATE_WHERE :
+            xml = new VoltXMLElement("migrate");
+            voltAppendChildScans(session, xml);
+            voltAppendCondition(session, xml);
             break;
 
         default:

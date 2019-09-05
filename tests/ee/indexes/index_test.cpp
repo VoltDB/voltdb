@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -58,6 +58,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/SerializableEEException.h"
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -70,8 +71,6 @@
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
-#include "common/FixUnusedAssertHack.h"
-
 
 using namespace std;
 using namespace voltdb;
@@ -87,12 +86,14 @@ using namespace voltdb;
 
 class IndexTest : public Test {
 public:
-    IndexTest() : table(NULL) {}
+    IndexTest() : table(NULL)
+    {}
     ~IndexTest()
     {
         delete table;
         delete[] m_exceptionBuffer;
         delete m_engine;
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initWideTable(string name)
@@ -169,7 +170,7 @@ public:
         TableIndexScheme pkeyScheme(name,
                                     BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, schema);
+                                    true, true, false, schema);
         vector<TableIndexScheme> indexes;
         indexes.push_back(pkeyScheme);
 
@@ -177,8 +178,9 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         int partitionCount = 1;
-        m_engine->initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        m_engine->initialize(0, 0, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
+        m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
         table = dynamic_cast<PersistentTable*>(
             TableFactory::getPersistentTable(database_id, "test_wide_table",
                                              schema, columnNames, signature));
@@ -274,7 +276,7 @@ public:
         TupleSchema *initiallyNullTupleSchema = NULL;
         TableIndexScheme index(name, type,
                                ix_columnIndices, TableIndex::simplyIndexColumns(),
-                               unique, countable, initiallyNullTupleSchema);
+                               unique, countable, false, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
@@ -305,17 +307,19 @@ public:
 
         TableIndexScheme pkeyScheme("idx_pkey", BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, schema);
+                                    true, true, false, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
-        int partitionCount = htonl(1);
-        m_engine->initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames, signature));
+        int partitionCount = 1;
+        m_engine->initialize(0, 0, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
+        m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id,
+                    "test_table", schema, columnNames, signature));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -337,7 +341,7 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i + 20));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i * 11));
-            assert(true == table->insertTuple(tuple));
+            vassert(table->insertTuple(tuple));
         }
     }
 
@@ -388,7 +392,6 @@ protected:
     PersistentTable* table;
     char* m_exceptionBuffer;
     VoltDBEngine* m_engine;
-    ThreadLocalPool m_pool;
     char signature[20];
 };
 
@@ -579,11 +582,9 @@ TEST_F(IndexTest, IntsUnique) {
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     bool exceptionThrown = false;
-    try
-    {
+    try {
         EXPECT_EQ(false, table->insertTuple(tmptuple));
-    }
-    catch (SerializableEEException &e)
+    } catch (SerializableEEException &e)
     {
         exceptionThrown = true;
     }

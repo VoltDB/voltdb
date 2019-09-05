@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -115,7 +116,7 @@ public class StatementPartitioning implements Cloneable{
     /*
      * Any constant/parameter-based expressions found to be equality-filtering partitioning columns.
      */
-    private final Set<AbstractExpression> m_inferredExpression = new HashSet<AbstractExpression>();
+    private final Set<AbstractExpression> m_inferredExpression = new HashSet<>();
     /*
      * The actual number of partitioned table scans in the query (when supported, self-joins should count as multiple).
      */
@@ -390,7 +391,7 @@ public class StatementPartitioning implements Cloneable{
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
         //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess w/ scans:" + scans.size() + " filters:" + valueEquivalence.size());
         TupleValueExpression tokenPartitionKey = null;
-        Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
+        Set< Set<AbstractExpression> > eqSets = new HashSet< >();
         int unfilteredPartitionKeyCount = 0;
 
         // reset this flag to forget the last result of the multiple partition access path.
@@ -498,6 +499,16 @@ public class StatementPartitioning implements Cloneable{
                     // Only need one constant value.
                     break;
                 }
+            }
+        } else if (scans.size() == 1) {
+            // ENG-15117
+            // For query like "select * from (select DL_REGISTER_IP_CITY  from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;"
+            // There is no filter on the outer query,
+            // the inferredParameterIndex should be inferred from the subquery instead of uninitialized (-1).
+            StmtTableScan tableScan = scans.iterator().next();
+            if (tableScan instanceof StmtSubqueryScan) {
+                StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
+                m_inferredParameterIndex = subScan.getScanPartitioning().getInferredParameterIndex();
             }
         }
     }

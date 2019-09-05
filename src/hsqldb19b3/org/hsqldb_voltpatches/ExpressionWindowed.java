@@ -71,6 +71,7 @@ public class ExpressionWindowed extends Expression {
         switch (opType) {
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_ROW_NUMBER:
             if (nodes.length != 0) {
                 throw Error.error("Windowed Aggregate " + OpTypes.aggregateName(opType) + " expects no arguments.", "", 0);
             }
@@ -97,6 +98,7 @@ public class ExpressionWindowed extends Expression {
         switch (opType) {
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_ROW_NUMBER:
         case OpTypes.WINDOWED_COUNT:
             return Type.SQL_BIGINT;
         case OpTypes.WINDOWED_MAX:

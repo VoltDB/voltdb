@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,15 +32,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
@@ -48,16 +52,18 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertAllowNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertFromTableSelectSP;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertNoNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.InsertAddedStream;
+import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertLoopback;
+import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertNoNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportRollbackInsertNoNulls;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Loopback;
 
 public class TestExportBaseSocketExport extends RegressionSuite {
 
@@ -68,9 +74,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static ExportTestExpectedData m_verifier;
     protected static int m_portCount = 5001;
     protected static VoltProjectBuilder project;
-    protected boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
+    protected static List<String> m_streamNames = new ArrayList<>();
 
-    static class ServerListener extends Thread {
+    public static class ServerListener extends Thread {
 
         private ServerSocket ssocket;
         private int m_port;
@@ -101,6 +107,11 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         public void close() throws IOException {
             ssocket.close();
             m_close = true;
+            try {
+                this.join();
+            }
+            catch (InterruptedException e) {
+            }
         }
 
         @Override
@@ -139,8 +150,14 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return null;
         }
 
-        public int getSize() {
+        public int getReceivedRowCount() {
             return m_queue.size();
+        }
+
+        public void ignoreRow(long rowId) {
+            m_seenIds.remove(rowId);
+            m_data.remove(rowId);
+            m_queue.remove(rowId);
         }
 
         private class ClientConnectionHandler extends Thread {
@@ -154,7 +171,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             @Override
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
-                System.out.println("Starting Client handler");
                 try {
                     while (true) {
                         BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
@@ -167,6 +183,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
+
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");
@@ -193,10 +210,19 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
             public void stopClient() {
                 m_closed = true;
+                try {
+                    m_clientSocket.close();
+                    this.join();
+                }
+                catch (InterruptedException e) {
+                }
+                catch (IOException e) {
+                }
             }
         }
 
     }
+
 
     /** Shove a table name and pkey in front of row data */
     protected Object[] convertValsToParams(String tableName, final int i, final Object[] rowdata) {
@@ -245,7 +271,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         return client;
     }
 
-    protected void quiesce(final Client client) throws Exception {
+    protected static void quiesce(final Client client) throws Exception {
         client.drain();
         client.callProcedure("@Quiesce");
     }
@@ -263,19 +289,34 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-    public static final ProcedureInfo[] PROCEDURES = { new ProcedureInfo(new String[] { "proc" }, Insert.class),
-            new ProcedureInfo(new String[] { "proc" }, InsertBase.class),
-            new ProcedureInfo(new String[] { "proc" }, RollbackInsert.class),
-            new ProcedureInfo(new String[] { "proc" }, Update_Export.class)
-    };
-    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = { new ProcedureInfo(new String[] { "proc" }, Loopback.class) };
-
-    public static final ProcedureInfo[] PROCEDURES2 = {
-            new ProcedureInfo(new String[] { "proc" }, Update_Export.class)
+    public static final ProcedureInfo[] NONULLS_PROCEDURES = {
+            new ProcedureInfo(ExportInsertNoNulls.class, new ProcedurePartitionData ("S_NO_NULLS", "PKEY", "1"),
+                    new String[]{"proc"}),
+            new ProcedureInfo(ExportRollbackInsertNoNulls.class,
+                    new ProcedurePartitionData ("S_NO_NULLS", "PKEY", "1"), new String[]{"proc"}),
     };
 
-    public static final ProcedureInfo[] PROCEDURES3 = { new ProcedureInfo(new String[] { "proc" },
-            InsertAddedTable.class) };
+    public static final ProcedureInfo[] ALLOWNULLS_PROCEDURES = {
+            new ProcedureInfo(ExportInsertAllowNulls.class,
+                    new ProcedurePartitionData ("S_ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"}),
+    };
+
+    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
+            new ProcedureInfo(TableInsertLoopback.class,
+                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY", "0"), new String[] { "proc" })
+    };
+
+    public static final ProcedureInfo[] INSERTSELECT_PROCEDURES = {
+            new ProcedureInfo(ExportInsertFromTableSelectSP.class,
+                    new ProcedurePartitionData("NO_NULLS", "PKEY", "1"), new String[] { "proc" }),
+            new ProcedureInfo(TableInsertNoNulls.class,
+                    new ProcedurePartitionData("NO_NULLS", "PKEY", "1"), new String[] { "proc" })
+    };
+
+    public static final ProcedureInfo[] ADDSTREAM_PROCEDURES = {
+            new ProcedureInfo(InsertAddedStream.class,
+                    new ProcedurePartitionData ("S_ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
+    };
 
     /**
      * Wait for export processor to catch up and have nothing to be exported.
@@ -283,10 +324,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @param client
      * @throws Exception
      */
-    public void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
         boolean passed = false;
+        assertFalse(streamNames.isEmpty());
+        Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
 
-        // Quiesc to see all data flushed.
+        // Quiesce to see all data flushed.
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
@@ -297,7 +340,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -310,19 +352,31 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 st = System.currentTimeMillis();
             }
             long ts = 0;
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (stats.advanceRow()) {
-                String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
                 // Get highest timestamp and watch is change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                long m = stats.getLong("TUPLE_PENDING");
+                String source = stats.getString("SOURCE");
+                if (0 != m) {
+                    String target = stats.getString("TARGET");
+                    Long host = stats.getLong("HOST_ID");
+                    Long pid = stats.getLong("PARTITION_ID");
+                    if (target.isEmpty()) {
+                        // Stream w/o target keeps pending data forever, log and skip counting this stream
+                        System.out.println("Pending export data is not zero but target is disabled: " +
+                                source + " pend:" + m  + " host:" + host + " partid:" + pid);
+                    } else {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        System.out.println("Partition Not Zero: " + source + " pend:" + m  + " host:" + host + " partid:" + pid);
                         break;
                     }
+                }
+                else {
+                    matchStreams.remove(source);
                 }
             }
             if (passedThisTime) {
@@ -341,17 +395,75 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
         System.out.println("Passed is: " + passed);
         // System.out.println(stats);
+        assertTrue(passed && matchStreams.isEmpty());
+    }
+
+    /**
+     * Wait for all Export Streams to be removed (after all the streams are dropped)
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedTargetDeallocated(Client client) throws Exception {
+        boolean passed = false;
+
+        // Quiesce to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long st = System.currentTimeMillis();
+        // Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            while (stats.advanceRow()) {
+                passedThisTime = false;
+                String target = stats.getString("TARGET");
+                String ttable = stats.getString("SOURCE");
+                Long host = stats.getLong("HOST_ID");
+                Long pid = stats.getLong("PARTITION_ID");
+                if (target.isEmpty()) {
+                    // Stream w/o target keeps pending data forever, log and skip counting this stream
+                    System.out.println("Stream Not Dropped but target is disabled: " +
+                            ttable + " host:" + host + " partid:" + pid);
+                } else {
+                    System.out.println("Stream Not Dropped: " + ttable + " to " + target + " host:" + host + " partid:" + pid);
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        // System.out.println(stats);
         assertTrue(passed);
     }
 
-    public void quiesceAndVerify(final Client client, ExportTestExpectedData tester) throws Exception {
+
+    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
+            ExportTestExpectedData tester) throws Exception {
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, streamNames);
         tester.verifyRows();
         System.out.println("Passed!");
     }
 
-public static void wireupExportTableToCustomExport(String tableName, String procedure) {
+    public static void wireupExportTableToCustomExport(String tableName, String procedure) {
         String streamName = tableName;
 
         if (!m_portForTable.containsKey(streamName)) {
@@ -360,21 +472,23 @@ public static void wireupExportTableToCustomExport(String tableName, String proc
         Properties props = new Properties();
         props.put("procedure", procedure);
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, streamName);
     }
 
-    public static void wireupExportTableToSocketExport(String tableName) {
-        String streamName = tableName;
+    public static void wireupExportTableToSocketExport(String streamName) {
+        wireupExportTableToSocketExport(streamName, true, false);
+    }
+
+    public static void wireupExportTableToSocketExport(String streamName, boolean enabled, boolean exportReplicated) {
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
         }
         Properties props = new Properties();
-        m_isExportReplicated = false;
-        props.put("replicated", String.valueOf(m_isExportReplicated));
+        props.put("replicated", String.valueOf(exportReplicated));
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(enabled, ServerExportEnum.CUSTOM, props, streamName);
     }
 
     private static Integer getNextPort() {
@@ -389,7 +503,7 @@ public static void wireupExportTableToCustomExport(String tableName, String proc
         }
     }
 
-    public void closeClientAndServer() throws IOException {
+    public static void closeSocketExporterClientAndServer() throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
             ServerListener m_serverSocket = m_serverSockets.remove(target.getKey());
             if (m_serverSocket != null) {
@@ -403,4 +517,8 @@ public static void wireupExportTableToCustomExport(String tableName, String proc
         super(s);
     }
 
+    public void setUp() throws Exception {
+        super.setUp();
+        m_streamNames = new ArrayList<>();
+    }
 }

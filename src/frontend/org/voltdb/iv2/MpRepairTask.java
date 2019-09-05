@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google_voltpatches.common.base.Suppliers;
@@ -46,7 +47,7 @@ import com.google_voltpatches.common.base.Suppliers;
  */
 public class MpRepairTask extends SiteTasker
 {
-    static VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     private InitiatorMailbox m_mailbox;
     private List<Long> m_spMasters;
@@ -55,38 +56,46 @@ public class MpRepairTask extends SiteTasker
     private final String whoami;
     private final RepairAlgo algo;
 
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean balanceSPI)
+    // Indicate if this repair is triggered via partition leader migration
+    private final boolean m_leaderMigration;
+
+    // Indicate if the round of leader promotion has been completed
+    private final boolean m_partitionLeaderPromotionComplete;
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration, boolean partitionLeaderPromotionComplete)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, balanceSPI);
+        m_leaderMigration = leaderMigration;
+        m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, leaderMigration);
     }
 
     @Override
     public void run(SiteProcedureConnection connection) {
+
+        // When MP is processing reads, the task will be queued to all MpRoSite but the task is processed only on one of MpRoSite.
         synchronized (m_lock) {
             if (!m_repairRan) {
                 try {
-                    boolean success = false;
                     try {
                         algo.start().get();
-                        success = true;
-                    } catch (CancellationException e) {}
-                    if (success) {
-                        tmLog.info(whoami + "finished repair.");
+                        repairLogger.info(whoami + "finished repair.");
+                    } catch (CancellationException e) {
+                        repairLogger.info(whoami + "interrupted during repair.  Retrying.");
                     }
-                    else {
-                        tmLog.info(whoami + "interrupted during repair.  Retrying.");
-                    }
-                }
-                catch (InterruptedException ie) {}
-                catch (Exception e) {
+                } catch (InterruptedException ie) {
+                } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
-                }
-                finally {
+                } finally {
                     m_repairRan = true;
+
+                    // At this point, all the repairs are completed. This should be the final repair task
+                    // in the repair process. Remove the mp repair blocker
+                    if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
+                        VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                    }
                 }
             }
         }

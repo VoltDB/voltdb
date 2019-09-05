@@ -9,9 +9,10 @@
 # it's convenient and useful for debugging to put it here, so that the
 # tests can easily be generated manually.
 
-BUILD=debug
+BUILD_TYPE=release
 VERBOSE=
 ECHO=+x
+
 while [ -n "$1" ]; do
     case "$1" in
         --debug)
@@ -22,54 +23,34 @@ while [ -n "$1" ]; do
             VERBOSE=-v
             shift
             ;;
-        --names-only)
-            NAMES_ONLY=--names-only
+        --test-class=*)
+            TEST_CLASSES="$TEST_CLASSES $(echo $1 | sed 's/--test-class=//')"
             shift
             ;;
-        --test-class)
+        --build-type=*)
+            BUILD_TYPE="$(echo $1 | sed 's/--build-type=//')"
             shift
-            TEST_CLASSES="$TEST_CLASSES $1"
-            shift
-            ;;
-        --build)
-            shift
-            BUILD="$1"
-            shift
-            case "$BUILD" in
+            case "$BUILD_TYPE" in
                 debug|release|memcheck)
                     ;;
                 *)
-                    echo "$0: Unknown argument to --build: \"$BUILD\""
+                    echo "$0: Unknown argument to --build: \"$BUILD_TYPE\""
                     exit 100
                     ;;
             esac
             ;;
-        --voltdbroot)
+        --voltdbroot=*)
+            VOLTDB_ROOT="$(echo $1 | sed 's/--voltdbroot=//')"
             shift
-            VOLTDBROOT="$1"
-            shift
-            if [ ! -d "$VOLTDBROOT" ] ; then
-                echo "$0: Source directory \"$VOLTDBROOT\" does not exist."
+            if [ ! -d "$VOLTDB_ROOT" ] ; then
+                echo "$0: Source directory \"$VOLTDB_ROOT\" does not exist."
                 exit 100
             fi
-            if [ ! -d "$VOLTDBROOT/lib" ] \
-                || [ ! -d "$VOLTDBROOT/third_party/java/jars" ] \
-                || [ ! -f "$VOLTDBROOT/tests/log4j-allconsole.xml" ] ; then
-                  echo "$0: Source directory \"$VOLTDBROOT\" is implausible.  Is it right?"
+            if [ ! -d "$VOLTDB_ROOT/lib" ] \
+                || [ ! -d "$VOLTDB_ROOT/third_party/java/jars" ] \
+                || [ ! -f "$VOLTDB_ROOT/tests/log4j-allconsole.xml" ] ; then
+                  echo "$0: Source directory \"$VOLTDB_ROOT\" is implausible.  Is it right?"
                   exit 100
-            fi
-            ;;
-        --objdir)
-            shift
-            OBJDIR="$1"
-            shift
-            if [ ! -d "$OBJDIR" ] ; then
-                echo "$0: Object directory \"$OBJDIR\" does not exist."
-                exit 100
-            fi
-            if [ ! -d "$OBJDIR/prod" ] ; then
-                 echo "$0: Object directory \"$OBJDIR\" is not plausible.  Is it right?"
-                 exit 100
             fi
             ;;
         --help)
@@ -77,14 +58,6 @@ while [ -n "$1" ]; do
             echo 'Options:'
             echo ' --verbose                Run java -v'
             echo ' --voltdbroot DIR         The root of the voltdb tree is DIR.'
-            echo ' --objdir DIR             The object directory, where all the'
-            echo '                          builds occur, is DIR.  This will typically be'
-            echo '                          /home/user/.../voltdb/obj/debug for a release'
-            echo '                          build.  This is required.'
-            echo ' --build buildType        Set the build type.  The'
-            echo '                          possibilities are debug,'
-            echo '                          release and memcheck.'
-            echo ' --names-only             Only echo the test names'
             echo ' --test-class class-name  Run the given class name'
             echo '                          as a Java main program.  It'
             echo '                          will know which tests it'
@@ -95,7 +68,7 @@ while [ -n "$1" ]; do
             exit 100
             ;;
         *)
-            echo "$0: Unknown command line parameter $1"
+            echo "$0: Unknown command line parameter \"$1\""
             exit 100
             ;;
     esac
@@ -104,16 +77,25 @@ if [ -z "$TEST_CLASSES" ] ; then
     echo "$0: No test classes specified."
     exit 100
 fi
-if [ -z "$OBJDIR" ] ; then
-    echo "$0: --objdir is required."
-    exit 100
-fi
-GENERATED_DIR="$OBJDIR/generated"
-if [ -z "$VOLTDBROOT" ] ; then
-    echo "$0: --voltdbroot is required."
-    exit 100
-fi
 
+SRC_DIR="$VOLTDB_ROOT/tests/ee"
+GENERATED_DIR_NAME='ee_auto_generated_unit_tests'
+GENERATED_DIR_PATH="${SRC_DIR}/${GENERATED_DIR_NAME}"
+OBJDIR="$VOLTDB_ROOT/obj/${BUILD_TYPE}"
+TEST_NAMES_FILE="${GENERATED_DIR_PATH}/generated_tests.txt"
+# echo "SRC_DIR=${SRC_DIR}"
+# echo "GENERATED_DIR_PATH=${GENERATED_DIR_PATH}"
+# echo "TEST_NAMES_FILE=${TEST_NAMES_FILE}"
+# echo "OBJDIR=${OBJDIR}"
+#
+# Empty out the test names file.
+#
+rm -f "$TEST_NAMES_FILE"
 for CLASS in $TEST_CLASSES; do
-    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDBROOT}/lib/\*:${VOLTDBROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDBROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --generated-dir "$GENERATED_DIR/src")
+    (set $ECHO; java $VERBOSE \
+                     -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* \
+                     -Dlog4j.configuration=file:${VOLTDB_ROOT}/tests/log4j-allconsole.xml $CLASS \
+                     --generated-source-dir="$GENERATED_DIR_PATH" \
+                     --test-names-file="$TEST_NAMES_FILE"
+    )
 done

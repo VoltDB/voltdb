@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,7 +54,7 @@ bool ElasticScanner::continueScan() {
                 m_tuplePtr = m_blockIterator.key();
                 m_currentBlockPtr = m_blockIterator.data();
                 m_scannedBlocks.insert(m_currentBlockPtr);
-                assert(m_currentBlockPtr->address() == m_tuplePtr);
+                vassert(m_currentBlockPtr->address() == m_tuplePtr);
                 m_blockIterator.data() = TBPtr();
                 m_tupleIndex = 0;
                 m_blockIterator++;
@@ -71,11 +71,11 @@ bool ElasticScanner::next(TableTuple &out)
 {
     bool found = false;
     while (!found && continueScan()) {
-        assert(m_currentBlockPtr != NULL);
+        vassert(m_currentBlockPtr != NULL);
         // Sanity checks.
-        assert(m_tuplePtr < m_currentBlockPtr.get()->address() + m_table.getTableAllocationSize());
-        assert(m_tuplePtr < m_currentBlockPtr.get()->address() + (m_tupleSize * m_table.getTuplesPerBlock()));
-        assert (out.columnCount() == m_table.columnCount());
+        vassert(m_tuplePtr < m_currentBlockPtr.get()->address() + m_table.getTableAllocationSize());
+        vassert(m_tuplePtr < m_currentBlockPtr.get()->address() + (m_tupleSize * m_table.getTuplesPerBlock()));
+        vassert(out.columnCount() == m_table.columnCount());
         // Grab the tuple pointer.
         out.move(m_tuplePtr);
         // Shift to the next tuple in block.
@@ -103,7 +103,7 @@ void ElasticScanner::notifyBlockWasCompactedAway(TBPtr block) {
                 m_blockMap.erase(block->address());
                 m_blockIterator = m_blockMap.find(newNextBlock->address());
                 m_blockEnd = m_blockMap.end();
-                assert(m_blockIterator != m_blockMap.end());
+                vassert(m_blockIterator != m_blockMap.end());
             }
             else {
                 // There isn't a block to skip to, so we're done.
@@ -117,7 +117,7 @@ void ElasticScanner::notifyBlockWasCompactedAway(TBPtr block) {
             m_blockMap.erase(block->address());
             m_blockIterator = m_blockMap.find(nextBlock->address());
             m_blockEnd = m_blockMap.end();
-            assert(m_blockIterator != m_blockMap.end());
+            vassert(m_blockIterator != m_blockMap.end());
         }
     }
 }

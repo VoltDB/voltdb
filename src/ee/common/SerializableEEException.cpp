@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,41 +20,64 @@
 #include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
 
-#include <stdint.h>
-
 namespace voltdb {
 
 #ifdef VOLT_DEBUG_ENABLED
-static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exceptionType)
-{
+static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exceptionType) {
     switch(exceptionType) {
-    case VOLT_EE_EXCEPTION_TYPE_NONE: return "VOLT_EE_EXCEPTION_TYPE_NONE";
-    case VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION: return "VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION";
-    case VOLT_EE_EXCEPTION_TYPE_SQL: return "VOLT_EE_EXCEPTION_TYPE_SQL";
-    case VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION: return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
-    case VOLT_EE_EXCEPTION_TYPE_INTERRUPT: return "VOLT_EE_EXCEPTION_TYPE_INTERRUPT";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_RESTART: return "VOLT_EE_EXCEPTION_TYPE_TXN_RESTART";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION: return "VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION";
-    case VOLT_EE_EXCEPTION_TYPE_SPECIFIED: return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
-    case VOLT_EE_EXCEPTION_TYPE_GENERIC: return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED: return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";
-    default: return "UNKNOWN";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE:
+            return "VOLT_EE_EXCEPTION_TYPE_NONE";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION:
+            return "VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_SQL:
+            return "VOLT_EE_EXCEPTION_TYPE_SQL";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION:
+            return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INTERRUPT:
+            return "VOLT_EE_EXCEPTION_TYPE_INTERRUPT";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_TXN_RESTART:
+            return "VOLT_EE_EXCEPTION_TYPE_TXN_RESTART";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION:
+            return "VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_SPECIFIED:
+            return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_GENERIC:
+            return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED:
+            return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE:
+            return "VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND:
+            return "VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND";
+        default:
+            return "UNKNOWN";
     }
 }
 #endif
 
-SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
-    m_exceptionType(exceptionType), m_message(message)
-{
+#ifdef NDEBUG
+static inline std::string const enrich(std::string const& a) noexcept {
+    return a;
+}
+#else   // On DEBUG build, enrich our exception message with stack trace of the place it is thrown.
+static inline std::string enrich(std::string src) {
+    return src.append("\nSTACK TRACE:")
+        .append(voltdb::StackTrace::stringStackTrace("\t"))
+        .substr(0, 2048);
+}
+#endif
+
+SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string const& message) :
+    std::runtime_error(enrich(message)), m_exceptionType(exceptionType), m_message(what()) {
     VOLT_DEBUG("Created SerializableEEException: type: %s message: %s",
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
 
-SerializableEEException::SerializableEEException(std::string message) :
-    m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message)
-{
-    VOLT_DEBUG("Created SerializableEEException: default type, %s",
-               message.c_str());
+SerializableEEException::SerializableEEException(std::string const& message) :
+    std::runtime_error(enrich(message)),
+    m_exceptionType(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION),
+    m_message(what()) {
+    VOLT_DEBUG("Created SerializableEEException: default type, %s", message.c_str());
 }
 
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
@@ -62,17 +85,12 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeInt(static_cast<int32_t>(messageLength));
+    output->writeInt(messageLength);
     output->writeBytes(messageBytes, messageLength);
     p_serialize(output);
-    if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
+    if (m_exceptionType == VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
         output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
-}
-
-SerializableEEException::~SerializableEEException() {
-    // TODO Auto-generated destructor stub
+    output->writeIntAt(lengthPosition, output->position() - (lengthPosition + sizeof(int32_t)));
 }
 
 }

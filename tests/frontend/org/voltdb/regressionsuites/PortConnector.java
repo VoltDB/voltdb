@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.voltcore.network.CipherExecutor;
@@ -40,6 +39,10 @@ import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.Inits;
 import org.voltdb.client.TLSHandshaker;
+
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 
 public class PortConnector {
 
@@ -90,10 +93,10 @@ public class PortConnector {
             } catch (IOException ioe) {
                 throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
             }
-            SSLContext sslContext;
-            sslContext = SSLConfiguration.createSslContext(sslConfig);
+            SslContext sslContext;
+            sslContext = SSLConfiguration.createClientSslContext(sslConfig);
 
-            SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
+            SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT, m_host, m_port);
             sslEngine.setUseClientMode(true);
             TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
             boolean shookHands = false;
@@ -105,9 +108,8 @@ public class PortConnector {
             if (! shookHands) {
                 throw new IOException("SSL handshake failed");
             }
-            int appBufferSize = sslEngine.getSession().getApplicationBufferSize();
             m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
-            m_enc = new SSLBufferEncrypter(sslEngine, appBufferSize, m_packetBufferSize);
+            m_enc = new SSLBufferEncrypter(sslEngine);
             m_dec = new SSLBufferDecrypter(sslEngine);
             m_tlsFrame = null;
         }
@@ -115,9 +117,7 @@ public class PortConnector {
 
     public long write(ByteBuffer buf) throws IOException {
         if (m_enc != null) {
-            ByteBuffer frame = (ByteBuffer)ByteBuffer.allocate(m_packetBufferSize).clear();
-            m_enc.tlswrap(buf, frame);
-            buf = frame;
+            buf = m_enc.tlswrap(buf, UnpooledByteBufAllocator.DEFAULT).nioBuffer();
         }
         long wrote = 0;
         while (buf.hasRemaining()) {
@@ -132,13 +132,13 @@ public class PortConnector {
         if (m_tlsFrame != null && m_tlsFrame.hasRemaining()) {
             return m_tlsFrame;
         }
-        ByteBuffer header = (ByteBuffer)ByteBuffer.allocate(5).clear();
+        ByteBuffer header = ByteBuffer.allocate(5);
         while (header.hasRemaining()) {
             if (m_socket.read(header) < 0) {
                 throw new IOException("Closed");
             };
         }
-        ByteBuffer frame = (ByteBuffer)ByteBuffer.allocate(header.getShort(3) + header.capacity()).clear();
+        ByteBuffer frame = ByteBuffer.allocate(header.getShort(3) + header.capacity());
         frame.put((ByteBuffer)header.flip());
         while (frame.hasRemaining()) {
             if (m_socket.read(frame) < 0) {
@@ -146,7 +146,7 @@ public class PortConnector {
             };
         }
         int allocsz = Math.min(CipherExecutor.FRAME_SIZE, Integer.highestOneBit((frame.capacity()<<1) + 128));
-        m_tlsFrame = (ByteBuffer)ByteBuffer.allocate(allocsz).clear();
+        m_tlsFrame = ByteBuffer.allocate(allocsz);
         m_dec.tlsunwrap((ByteBuffer)frame.flip(), m_tlsFrame);
         return m_tlsFrame;
     }

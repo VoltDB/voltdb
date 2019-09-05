@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,9 @@
 
 #include "common/MiscUtil.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
-std::vector<std::string> MiscUtil::splitString(const std::string &str, char delimiter)
-{
+std::vector<std::string> MiscUtil::splitString(const std::string &str, char delimiter) {
     std::vector<std::string> vec;
     size_t begin = 0;
     while (true) {
@@ -38,8 +36,7 @@ std::vector<std::string> MiscUtil::splitString(const std::string &str, char deli
     return vec;
 }
 
-std::vector<std::string> MiscUtil::splitToTwoString(const std::string &str, char delimiter)
-{
+std::vector<std::string> MiscUtil::splitToTwoString(const std::string &str, char delimiter) {
     std::vector<std::string> vec;
     size_t end = str.find(delimiter);
     if (end == std::string::npos) {

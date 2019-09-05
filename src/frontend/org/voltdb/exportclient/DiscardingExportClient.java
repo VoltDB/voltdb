@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,28 +17,103 @@
 
 package org.voltdb.exportclient;
 
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
+
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * An export client that pulls data and acks it back, but
- * never does anythign with it.
+ * never does anything with it.
+ *
+ * An optional config option allows sleeping before acknowledging
+ * rows, turning this export client into a "slow" export target for
+ * testing pusposes.
  *
  */
 public class DiscardingExportClient extends ExportClientBase {
 
-    static class DiscardDecoder extends ExportDecoderBase {
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+
+    // Using common executor service to avoid using {@code ExportDataSource} executor
+    private static volatile ListeningExecutorService s_es;
+
+    private int m_ackDelaySeconds = 0;
+
+    class DiscardDecoder extends ExportDecoderBase {
+
+        @Override
+        public ListeningExecutorService getExecutor() {
+            m_atomicWorkLock.lock();
+            try {
+                return s_es != null ? s_es : super.getExecutor();
+            } finally {
+                m_atomicWorkLock.unlock();
+            }
+        }
 
         public DiscardDecoder(AdvertisedDataSource source) {
             super(source);
+            m_atomicWorkLock.lock();
+            try {
+                if (s_es == null) {
+                    s_es = CoreUtils.getListeningSingleThreadExecutor(
+                            "Common Discarding Export decoder thread", CoreUtils.MEDIUM_STACK_SIZE);
+                }
+            } catch (Exception e) {
+                m_logger.error("Failed to create executor: " + e);
+            } finally {
+                m_atomicWorkLock.unlock();
+            }
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) {
+        public boolean processRow(ExportRow row) {
+            if (m_ackDelaySeconds > 0) {
+                m_logger.info("Sleep " + m_ackDelaySeconds + " before processing row ...");
+                try {
+                    Thread.sleep(m_ackDelaySeconds * 1000);
+                } catch (InterruptedException e) {
+                }
+            }
             return true;
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            m_atomicWorkLock.lock();
+            try {
+                if (s_es != null) {
+                    s_es.shutdown();
+                    try {
+                        s_es.awaitTermination(365, TimeUnit.DAYS);
+                    } catch (InterruptedException e) {
+                    }
+                    s_es = null;
+                }
+            } finally {
+                m_atomicWorkLock.unlock();
+            }
+        }
+    }
+
+    @Override
+    public void configure(Properties config) throws Exception {
+        m_logger.info("Configuring DiscardingExportClient: " + config);
+
+        String sleepValue = config.getProperty("ackdelay");
+        if (sleepValue != null) {
+            int ackDelaySeconds = 0;
+            try {
+                ackDelaySeconds = Integer.parseInt(sleepValue);
+                m_ackDelaySeconds = ackDelaySeconds;
+            } catch (Exception e) {
+                m_logger.error("Failed to decode ackdelay value \'" + sleepValue + "\': " + e);
+            }
         }
     }
 

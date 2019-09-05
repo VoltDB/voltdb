@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
@@ -58,6 +59,8 @@ public interface SystemProcedureExecutionContext {
     public long getCatalogCRC();
 
     public int getCatalogVersion();
+
+    public long getGenerationId();
 
     public byte[] getCatalogHash();
 
@@ -93,7 +96,8 @@ public interface SystemProcedureExecutionContext {
      */
     public void updateHashinator(TheHashinator hashinator);
 
-    boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
+    boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter, boolean undo,
+            byte[] predicates);
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
@@ -111,7 +115,7 @@ public interface SystemProcedureExecutionContext {
 
     public boolean hasRealDrAppliedTracker(byte clusterId);
 
-    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream);
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 
     public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 

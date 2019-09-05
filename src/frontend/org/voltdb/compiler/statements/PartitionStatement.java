@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -116,12 +117,10 @@ public class PartitionStatement extends StatementProcessor {
             parameterNo = "0";
         }
 
-        String partitionInfo = String.format("%s.%s: %s", tableName, columnName, parameterNo);
-
+        ProcedurePartitionData partitionData = new ProcedurePartitionData(tableName, columnName, parameterNo);
         // procedureName -> group(1), partitionInfo -> group(2)
         m_tracker.addProcedurePartitionInfoTo(
-                checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement),
-                partitionInfo
+                checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement), partitionData
                 );
 
         // this command is now deprecated as of VoltDB 7.0

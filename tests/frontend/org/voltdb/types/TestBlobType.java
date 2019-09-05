@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,13 +56,13 @@ public class TestBlobType extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?, ?);", null);
-        builder.addStmtProcedure("Select", "select * from blah;", null);
-        builder.addStmtProcedure("Update", "update blah set b = ? where ival = ?", null);
-        builder.addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?", null);
-        builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5", null);
-        builder.addStmtProcedure("LiteralInsert", "insert into blah values (13, 'aabbcc', 'hi', 'aabb');", null);
-        builder.addProcedures(VarbinaryStringLookup.class);
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?, ?);");
+        builder.addStmtProcedure("Select", "select * from blah;");
+        builder.addStmtProcedure("Update", "update blah set b = ? where ival = ?");
+        builder.addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?");
+        builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5");
+        builder.addStmtProcedure("LiteralInsert", "insert into blah values (13, 'aabbcc', 'hi', 'aabb');");
+        builder.addProcedure(VarbinaryStringLookup.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest.xml"));
@@ -195,7 +195,7 @@ public class TestBlobType extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);");
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
         assertTrue(success);
     }
@@ -215,7 +215,7 @@ public class TestBlobType extends TestCase {
         builder.addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2");
         builder.addStmtProcedure("Fake1", "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_LAST = ? AND C_D_ID = ? AND C_W_ID = ? ORDER BY C_FIRST;");
 
-        builder.addProcedures(FakeCustomerLookup.class);
+        builder.addProcedure(FakeCustomerLookup.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest2.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest2.xml"));
@@ -310,7 +310,7 @@ public class TestBlobType extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(BigFatBlobAndStringMD5.class);
+        builder.addProcedure(BigFatBlobAndStringMD5.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("bigfatblobs.jar"), 1, 1, 0);
         assertTrue("Failed to compile catalog", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("bigfatblobs.xml"));

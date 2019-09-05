@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,6 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 public class TestExportV2SuitePro extends TestExportBaseSocketExport {
     private static final int k_factor = 1;
@@ -47,23 +46,22 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
+        m_streamNames.add("S_ALLOW_NULLS");
     }
 
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
-    // Test Export of an ADDED table.
+    // Test Export of an ADDED stream.
     //
     public void testExportAndAddedTable() throws Exception {
         System.out.println("testExportAndAddedTable");
@@ -79,51 +77,18 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        m_streamNames.add("S_ADDED_STREAM");
 
         // verify that it exports
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
+            m_verifier.addRow(client, "S_ADDED_STREAM", i, convertValsToRow(i, 'I', rowdata));
             // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            m_verifier.addRow(client, "ADDED_TABLE_GRP", i, convertValsToRow(i, 'I', rowdata));
-            final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
-            final Object[]  paramsGrp = convertValsToParams("ADDED_TABLE_GRP", i, rowdata);
-            client.callProcedure("InsertAddedTable", params);
-            client.callProcedure("InsertAddedTable", paramsGrp);
+            final Object[]  params = convertValsToParams("S_ADDED_STREAM", i, rowdata);
+            client.callProcedure("InsertAddedStream", params);
         }
 
-        quiesceAndVerify(client, m_verifier);
-    }
-
-    //  Test Export of a DROPPED table.  Queues some data to a table.
-    //  Then drops the table and verifies that Export can successfully
-    //  drain the dropped table. IE, drop table doesn't lose Export data.
-    //
-    public void testExportAndDroppedTable() throws Exception {
-        System.out.println("testExportAndDroppedTable");
-        Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            // Grp tables added to verifier because they are needed by ExportToFileVerifier
-            m_verifier.addRow(client, "NO_NULLS_GRP", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            final Object[] paramsGrp = convertValsToParams("NO_NULLS_GRP", i, rowdata);
-            client.callProcedure("Insert", params);
-            client.callProcedure("Insert", paramsGrp);
-        }
-
-        // now drop the no-nulls table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                                                                             new File(deploymentURL));
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        client = getClient();
-
-        // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
     }
 
     public TestExportV2SuitePro(final String name) {
@@ -145,14 +110,10 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         project.setSecurityEnabled(true, true);
         project.addRoles(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
+        project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("NO_NULLS");
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        wireupExportTableToSocketExport("NO_NULLS_GRP");
-        project.addProcedures(PROCEDURES);
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
 
 
         // JNI, single server
@@ -169,56 +130,31 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config, false);
 
-
         /*
-         * compile a catalog without the NO_NULLS table for add/drop tests
-         */
-        config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        project = new VoltProjectBuilder();
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        project.addProcedures(PROCEDURES2);
-        compile = config.compile(project);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml"));
-        assertTrue(compile);
-
-        /*
-         * compile a catalog with an added table for add/drop tests
+         * compile a catalog with an added table for add tests
          */
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true,false,additionalEnv);
+                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true,additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();
         project.addRoles(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-export-ddl-with-target.sql"));
+        project.addSchema(TestExportBase.class.getResource("export-allownulls-ddl-with-target.sql"));
+        project.addSchema(TestExportBase.class.getResource("export-addedstream-ddl-with-target.sql"));
 
-        wireupExportTableToSocketExport("ALLOW_NULLS");
-        wireupExportTableToSocketExport("ADDED_TABLE");
-        wireupExportTableToSocketExport("NO_NULLS");  // streamed table
-        wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
-        wireupExportTableToSocketExport("ADDED_TABLE_GRP");
-        wireupExportTableToSocketExport("NO_NULLS_GRP"); // streamed table
+        wireupExportTableToSocketExport("S_ALLOW_NULLS");
+        wireupExportTableToSocketExport("S_ADDED_STREAM");
 
-        project.addProcedures(PROCEDURES);
-        project.addProcedures(PROCEDURES3);
+        project.addProcedures(ALLOWNULLS_PROCEDURES);
+        project.addProcedures(ADDSTREAM_PROCEDURES);
         compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),
                 Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml"));

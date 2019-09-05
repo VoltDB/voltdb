@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -76,7 +76,7 @@ public class TrackEvent extends VoltProcedure {
         int site_id = (int)inventory.getLong(0);
         int page_id = (int)inventory.getLong(1);
 
-    voltQueueSQL( insertEvent,
+        voltQueueSQL( insertEvent,
                       utc_time,
                       ip_address,
                       cookie_uid,
@@ -95,7 +95,6 @@ public class TrackEvent extends VoltProcedure {
 
         voltExecuteSQL();
 
-    return ClientResponse.SUCCESS;
-
+        return ClientResponse.SUCCESS;
     }
 }

@@ -106,7 +106,7 @@ CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET f
 );
 
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportDoneTable;
-CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupDoneTable;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportDoneTable;
+CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportGroupDoneTable;

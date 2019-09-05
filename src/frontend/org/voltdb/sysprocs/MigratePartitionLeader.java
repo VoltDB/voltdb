@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.Map;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -30,11 +29,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-
-@ProcInfo(
-    singlePartition = true,
-    partitionInfo = "DUMMY: 0"
-)
 
 // The system procedure is used to move partition leader from one host to
 // another. It will be executed on the partition master
@@ -68,7 +62,7 @@ public class MigratePartitionLeader extends VoltSystemProcedure {
         }
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
-        Long targetHsid = db.getCartograhper().getHSIDForPartitionHost(hostId, partitionId);
+        Long targetHsid = db.getCartographer().getHSIDForPartitionHost(hostId, partitionId);
         if (targetHsid == null) {
             String msg = String.format("[@MigratePartitionLeader] The host %d is invalid.", hostId);
             t.addRow(VoltSystemProcedure.STATUS_FAILURE, msg);

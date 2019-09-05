@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -51,11 +52,6 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
     static final int K = 0;
-
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     private static String upgradeCatalogBasePath;
     private static String upgradeCatalogXMLPath;
@@ -233,7 +229,13 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                new ProcedurePartitionData("WAREHOUSE", "W_ID"));
+
         upgradeCatalogBasePath = Configuration.getPathToCatalogForTest("catalogupdate-for-upgrade");
         upgradeCatalogXMLPath = upgradeCatalogBasePath + ".xml";
         upgradeCatalogJarPath = upgradeCatalogBasePath + ".jar";

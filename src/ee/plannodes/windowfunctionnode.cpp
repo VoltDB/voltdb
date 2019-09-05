@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,16 +20,11 @@
 #include "windowfunctionnode.h"
 
 #include <sstream>
-#include "common/SerializableEEException.h"
 
 namespace voltdb {
-WindowFunctionPlanNode::~WindowFunctionPlanNode()
-{
+WindowFunctionPlanNode::~WindowFunctionPlanNode() { }
 
-}
-
-PlanNodeType WindowFunctionPlanNode::getPlanNodeType() const
-{
+PlanNodeType WindowFunctionPlanNode::getPlanNodeType() const {
     return PLAN_NODE_TYPE_WINDOWFUNCTION;
 }
 
@@ -107,10 +102,9 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             if (!containsExpressions) {
                 buffer << sep << "Aggregate Argument Expressions";
             }
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "WindowFunctionPlanNode::loadFromJSONObject:"
-                                      " Aggregate missing components: "
-                                      + buffer.str());
+            throwSerializableEEException(
+                    "WindowFunctionPlanNode::loadFromJSONObject: Aggregate missing components: %s",
+                    buffer.str().c_str());
         }
 
     }
@@ -134,10 +128,9 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             buffer << sep << "Order By List";
             sep = ", ";
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "WindowFunctionPlanNode::loadFromJSONObject:"
-                                  " Missing components: "
-                                  + buffer.str());
+        throwSerializableEEException(
+                "WindowFunctionPlanNode::loadFromJSONObject: Missing components: %s",
+                buffer.str().c_str());
     }
 }
 

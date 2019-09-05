@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -244,7 +244,7 @@ public class MaterializedViewFixInfo {
         NodeSchema aggSchema = new NodeSchema();
 
         // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: inlineProjSchema.getColumns()) {
+        for (SchemaColumn scol: inlineProjSchema) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());
@@ -281,7 +281,7 @@ public class MaterializedViewFixInfo {
 
         collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
-        AbstractExpression aggPostExpr = ExpressionUtil.combinePredicates(aggPostExprs);
+        AbstractExpression aggPostExpr = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, aggPostExprs);
         // Add post filters for the reAggregation node.
         m_reAggNode.setPostPredicate(aggPostExpr);
 
@@ -311,8 +311,8 @@ public class MaterializedViewFixInfo {
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
         for (ParsedColInfo gcol: groupByColumns) {
-            assert(gcol.expression instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) gcol.expression;
+            assert(gcol.m_expression instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) gcol.m_expression;
             if (tve.getTableName().equals(getMVTableName()) &&
                     ! mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
                 return false;
@@ -325,10 +325,10 @@ public class MaterializedViewFixInfo {
                 // Skip a group-by column pass-through.
                 continue;
             }
-            if (dcol.expression instanceof AggregateExpression == false) {
+            if (dcol.m_expression instanceof AggregateExpression == false) {
                 return false;
             }
-            AggregateExpression aggExpr = (AggregateExpression) dcol.expression;
+            AggregateExpression aggExpr = (AggregateExpression) dcol.m_expression;
             if (aggExpr.getLeft() instanceof TupleValueExpression == false) {
                 return false;
             }
@@ -466,7 +466,7 @@ public class MaterializedViewFixInfo {
                 aggPostExprs.add(expr);
             }
         }
-        AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(remaningExprs);
+        AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, remaningExprs);
         // Update new filters for the scanNode.
         return remaningFilters;
     }

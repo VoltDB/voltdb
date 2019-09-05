@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,8 @@
 
 package org.voltdb.np;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,8 +36,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -52,8 +53,10 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.LocalCluster;
+
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /*
@@ -122,15 +125,15 @@ public class Test2PTransactionExport {
         } else {
             builder.addLiteralSchema(Schema + REPLICATED_STREAM);
         }
-        builder.addSupplementalClasses(Test2PTransactionExport.TestProc.class);
+
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-        builder.addExport(true, "custom", props);
+        builder.addExport(true, ServerExportEnum.CUSTOM, props);
 
         cluster = new LocalCluster("test2pexport.jar", 4, 2, KFACTOR,
                                    BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING,
-                                   true, false, additionalEnv);
+                                   true, additionalEnv);
         cluster.setNewCli(true);
         cluster.setHasLocalServer(false);
         cluster.setCallingMethodName(method);

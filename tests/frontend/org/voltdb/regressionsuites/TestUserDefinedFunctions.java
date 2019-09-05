@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,8 +29,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -44,12 +42,14 @@ import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
 
+import junit.framework.Test;
+
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
  */
 public class TestUserDefinedFunctions extends RegressionSuite {
-    static private Random random = new Random();
-    static private final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
+    static protected Random random = new Random();
+    static protected final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
     static private final double PI = 3.1415926535897932384;
     static private final BigDecimal MIN_DECIMAL_VALUE = new BigDecimal("-99999999999999999999999999.999999999999");
     static private final BigDecimal MAX_DECIMAL_VALUE = new BigDecimal( "99999999999999999999999999.999999999999");
@@ -65,7 +65,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  initial INSERT statement; and which <i>tableName</i> to INSERT into
      *  and SELECT from. (If unspecified, the <i>tableName</i> is chosen,
      *  randomly, as either R1 or P1.) */
-    private void testFunction(String functionCall, Object expected, VoltType returnType,
+    protected void testFunction(String functionCall, Object expected, VoltType returnType,
             String[] columnNames, String[] columnValues, String tableName)
             throws IOException, ProcCallException {
 
@@ -124,7 +124,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  <i>columnValues</i> (in addition to ID=0) to be specified in the
      *  initial INSERT statement. The table to INSERT into and SELECT from
      *  is chosen, randomly, as either R1 or P1. */
-    private void testFunction(String functionCall, Object expected, VoltType returnType,
+    protected void testFunction(String functionCall, Object expected, VoltType returnType,
             String[] columnNames, String[] columnValues)
             throws IOException, ProcCallException {
         testFunction(functionCall, expected, returnType, columnNames, columnValues, null);
@@ -136,7 +136,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  <i>functionCall</i> value (as well as the ID) from that row.
      *  The table to INSERT into and SELECT from is chosen, randomly,
      *  as either R1 or P1. */
-    private void testFunction(String functionCall, Object expected, VoltType returnType)
+    protected void testFunction(String functionCall, Object expected, VoltType returnType)
             throws IOException, ProcCallException {
         testFunction(functionCall, expected, returnType, null, null);
     }
@@ -152,7 +152,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  initial INSERT statement.
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
-    private void testFunctionThrowsException(String functionCall, VoltType returnType,
+    protected void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExcepCauseType,
             String[] columnNames, String[] columnValues) {
         Class<? extends Throwable> expectedExceptionType = ProcCallException.class;
@@ -165,18 +165,17 @@ public class TestUserDefinedFunctions extends RegressionSuite {
             if (exceptionCause != null) {
                 actualExcepCauseType = exceptionCause.getClass();
             }
-
-            assertEquals("Unexpected Exception type for: "+functionCall, expectedExceptionType, actualExceptionType);
-
+            assertEquals("Unexpected Exception type for: " + functionCall,
+                    expectedExceptionType, actualExceptionType);
             // TODO: delete, once UDFs throwing exceptions with causes works (ENG-12863):
-            if (exceptionCause == null) {
-                return;
+            if (exceptionCause != null) {
+                assertEquals("Unexpected Exception *cause* type for " + functionCall,
+                        expectedExcepCauseType, actualExcepCauseType);
             }
-
-            assertEquals("Unexpected Exception *cause* type for "+functionCall, expectedExcepCauseType, actualExcepCauseType);
             return;
         }
-        fail(functionCall+" did not throw expected exception: "+expectedExceptionType+" (with "+expectedExcepCauseType+" cause)");
+        fail(functionCall + " did not throw expected exception: " + expectedExceptionType +
+                " (with " + expectedExcepCauseType + " cause)");
     }
 
     /** Tests the specified <i>functionCall</i>, and confirms that an Exception
@@ -187,7 +186,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  catching any Exception (or other Throwable) thrown.
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
-    private void testFunctionThrowsException(String functionCall, VoltType returnType,
+    protected void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExcepCauseType) {
         testFunctionThrowsException(functionCall, returnType, expectedExcepCauseType, null, null);
     }
@@ -598,10 +597,11 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
     }
 
-
-
     // Test more UDF's with two arguments; these UDF's have no null checking, so odd
     // things can happen, such as null plus one equals a number ...
+    // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite. These tests now succeed
+    // even when running in Git branch name that contains "calcite-", because we catch CalciteContextException, and
+    // rerun the query using legacy parser/planner. Nevertheless, ENG-15490 need to be resolved.
 
     public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
         testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
@@ -893,5 +893,4 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
         return builder;
     }
-
 }

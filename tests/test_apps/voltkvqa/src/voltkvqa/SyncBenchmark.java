@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
@@ -159,6 +160,9 @@ public class SyncBenchmark {
         @Option(desc = "Enable SSL with configuration file.")
         String sslfile = "";
 
+        @Option(desc = "User kerberos for authentication")
+        boolean kerberos = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -192,6 +196,9 @@ public class SyncBenchmark {
         if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
+        }
+        if (config.kerberos) {
+            clientConfig.enableKerberosAuthentication("VoltDBClient");
         }
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
@@ -420,7 +427,13 @@ public class SyncBenchmark {
                     try {
                         ClientResponse response = client.callProcedure("Get",
                                 processor.generateRandomKeyForRetrieval());
-
+                        // callProcedure is expected to throw on anything but success, but check that.
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl cri = (ClientResponseImpl) response;
+                            System.err.println(cri.toJSONString());
+                            System.out.println("ERROR: Bad Client response from SyncBenchmark Get");
+                            System.exit(1);
+                        }
                         final VoltTable pairData = response.getResults()[0];
                         // Cache miss (Key does not exist)
                         if (pairData.getRowCount() == 0)
@@ -442,7 +455,14 @@ public class SyncBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        ClientResponse response = client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        // callProcedure is expected to throw on anything but success, but check that.
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl cri = (ClientResponseImpl) response;
+                            System.err.println(cri.toJSONString());
+                            System.out.println("ERROR: Bad Client response from SyncBenchmark Put");
+                            System.exit(1);
+                        }
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {

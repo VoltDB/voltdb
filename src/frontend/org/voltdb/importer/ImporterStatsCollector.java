@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -88,6 +88,11 @@ public class ImporterStatsCollector extends SiteStatsSource
             statsInfo.m_pendingCount.decrementAndGet();
         }
         statsInfo.m_failureCount.incrementAndGet();
+    }
+
+    // Report that the importer was successfully initialized
+    public void reportInitialized(String importerName, String procName) {
+        getStatsInfo(importerName, procName);
     }
 
     // One insert succeeded

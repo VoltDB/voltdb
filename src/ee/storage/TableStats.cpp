@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,20 +45,48 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 
 // make sure to update schema in frontend sources (like TableStats.java) and tests when updating
 // the table-stats schema in here.
-void TableStats::populateTableStatsSchema(
-        vector<ValueType> &types,
-        vector<int32_t> &columnLengths,
-        vector<bool> &allowNull,
+void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull,
         vector<bool> &inBytes) {
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT);  columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));  allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
 }
 
 TempTable* TableStats::generateEmptyTableStatsTable() {
@@ -68,16 +96,10 @@ TempTable* TableStats::generateEmptyTableStatsTable() {
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
-    TableStats::populateTableStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull, columnInBytes);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, columnInBytes);
-
-    return TableFactory::buildTempTable(name,
-                                        schema,
-                                        columnNames,
-                                        NULL);
+    TableStats::populateTableStatsSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths,
+            columnAllowNull, columnInBytes);
+    return TableFactory::buildTempTable(name, schema, columnNames, NULL);
 }
 
 /*
@@ -86,9 +108,7 @@ TempTable* TableStats::generateEmptyTableStatsTable() {
 TableStats::TableStats(Table* table)
     : StatsSource(), m_table(table), m_lastTupleCount(0),
       m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
-      m_lastStringDataMemory(0)
-{
-}
+      m_lastStringDataMemory(0) { }
 
 /**
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
@@ -100,7 +120,7 @@ TableStats::TableStats(Table* table)
  * @parameter partitionId this stat source is associated with
  * @parameter databaseId Database this source is associated with
  */
-void TableStats::configure(string name) {
+void TableStats::configure(std::string const& name) {
     StatsSource::configure(name);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
@@ -148,8 +168,7 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
         m_lastStringDataMemory = m_table->nonInlinedMemorySize();
     }
 
-    tuple->setNValue(
-            StatsSource::m_columnName2Index["TUPLE_COUNT"],
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
             ValueFactory::getBigIntValue(allocated_tuple_mem_kb));
@@ -172,11 +191,8 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
  * end of a list.
  */
-void TableStats::populateSchema(
-        vector<ValueType> &types,
-        vector<int32_t> &columnLengths,
-        vector<bool> &allowNull,
-        vector<bool> &inBytes) {
+void TableStats::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
+        vector<bool> &allowNull, vector<bool> &inBytes) {
     TableStats::populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 

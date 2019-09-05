@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FATALEXCEPTION_HPP_
-#define FATALEXCEPTION_HPP_
+#pragma once
 
 #include <cstdio>
 #include <ostream>
@@ -27,18 +26,24 @@
 
 #include "common/debuglog.h"
 
-#define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define throwFatalException(...) {                           \
+    char msg[8192];                                          \
+    snprintf(msg, sizeof msg, __VA_ARGS__);                  \
+    msg[sizeof msg - 1] = '\0';                              \
+    throw voltdb::FatalException( msg, __FILE__, __LINE__);  \
+}
+
 #define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"
 
 namespace voltdb {
-class FatalException {
+class FatalException : public std::exception {
 public:
     /**
      * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
      *
      */
-    FatalException(std::string message, const char *filename, unsigned long lineno,
-                   std::string backtrace_path = HACK_HARDCODED_BACKTRACE_PATH);
+    FatalException(std::string const& message, const char *filename, unsigned long lineno,
+            std::string const& backtrace_path = HACK_HARDCODED_BACKTRACE_PATH);
 
     void reportAnnotations(const std::string& str);
 
@@ -50,8 +55,7 @@ public:
 };
 
 
-inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
-{
+inline std::ostream& operator<<(std::ostream& out, const FatalException& fe) {
     out << fe.m_reason << fe.m_filename << ':' << fe.m_lineno << std::endl;
     for (int ii=0; ii < fe.m_traces.size(); ii++) {
         out << fe.m_traces[ii] << std::endl;
@@ -86,17 +90,20 @@ inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
 class FatalLogicError : public FatalLogicErrorBase {
 public:
 // ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of printf-like __VARARGS__ arguments
-#define throwFatalLogicErrorFormatted(...) { \
-    char reallysuperbig_nonce_message[8192]; \
-    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); \
-    throw voltdb::FatalLogicError(reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define throwFatalLogicErrorFormatted(...) {                \
+    char msg[8192];                                         \
+    snprintf(msg, 8192, __VA_ARGS__);                       \
+    msg[sizeof msg - 1] = '\0';                             \
+    throw voltdb::FatalLogicError(msg, __FILE__, __LINE__); \
+}
 
     FatalLogicError(const char* buffer, const char *filename, unsigned long lineno);
 
 // ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of STREAMABLES separated by '<<'
-#define throwFatalLogicErrorStreamed(STREAMABLES) { \
+#define throwFatalLogicErrorStreamed(STREAMABLES) {                          \
     std::ostringstream tFLESbuffer; tFLESbuffer << STREAMABLES << std::endl; \
-    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__); }
+    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__);    \
+}
 
     FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno);
 
@@ -104,9 +111,10 @@ public:
 
 // member function wrapper macro supports any number of STREAMABLES separated by '<<'
 #define appendAnnotationToFatalLogicError(ERROR_AS_CAUGHT, STREAMABLES) { \
-    std::ostringstream aATFLEbuffer; \
+    std::ostringstream aATFLEbuffer;                                      \
     aATFLEbuffer << "rethrown from " << __FILE__ << ':' << __LINE__ << ':' << STREAMABLES << std::endl; \
-    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str()); }
+    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str());                 \
+}
 
     void appendAnnotation(const std::string& buffer);
 
@@ -145,7 +153,7 @@ private:
 //     DEBUG_IGNORE_OR_THROW_OR_CRASH(STREAMABLES) -- a flexible substitite for throwing runtime errors
 //         That is, instead of
 //
-//#ifdef DEBUG
+//#ifndef NDEBUG
 //             char msg[512];
 //             snprintf(msg, 512, "pos %d <= size %d", pos, size);
 //             throw SomeRuntimeErrorThatCouldMaskASeriousLogicError(msg);
@@ -182,7 +190,7 @@ inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
     return ( 2 / (3 - one_or_two_or_three) ) == 2;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 
     /// A macro to conditionally issue error responses, arbitrarily annotated
     /// -- purposely not a function, to allow file/line annotations and to defer evaluation
@@ -200,7 +208,7 @@ inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
                 throwFatalLogicErrorStreamed(STREAMABLES);                                    \
             } else {                                                                          \
                 std::cout << STREAMABLES;                                                     \
-                assert(CONDITION);                                                            \
+                vassert(CONDITION);                                                            \
             }                                                                                 \
         }                                                                                     \
     }
@@ -244,4 +252,3 @@ extern int control_ignore_or_throw_fatal_or_crash_123;
                                        STREAMABLES)
 
 }
-#endif /* FATALEXCEPTION_HPP_ */

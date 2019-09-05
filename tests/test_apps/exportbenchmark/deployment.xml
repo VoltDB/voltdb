@@ -4,8 +4,8 @@
                 want to use it as a starting point for a custom configuration. -->
 <deployment>
    <cluster hostcount="1" />
-   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.SocketExporter">
-     <configuration>
+   <export>
+     <configuration enabled="true" target="default" type="custom" exportconnectorclass="exportbenchmark.SocketExporter">
        <property name="socket.dest">localhost</property>
        <property name="socket.port">5001</property>
        <property name="stats.duration">5</property>

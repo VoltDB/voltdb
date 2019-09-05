@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@
 #define TABLE_STREAMER_INTERFACE_H
 
 #include <boost/shared_ptr.hpp>
+#include "common/HiddenColumnFilter.h"
 #include "common/types.h"
 #include "storage/TupleBlock.h"
 #include "storage/TableStreamerContext.h"
@@ -40,6 +41,7 @@ class PersistentTableSurgeon;
          */
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                     TableStreamType streamType,
+                                    const HiddenColumnFilter &filter,
                                     const std::vector<std::string> &predicateStrings) = 0;
 
         /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
@@ -35,6 +34,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
+import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
@@ -48,11 +48,8 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
-public class FragmentTask extends TransactionTask
+public class FragmentTask extends FragmentTaskBase
 {
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
-
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
@@ -127,12 +124,8 @@ public class FragmentTask extends TransactionTask
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
 
-        // if this has a procedure name from the initiation bundled,
-        // inform the site connection here
-        String procName = m_fragmentMsg.getProcedureName();
-        if (procName != null) {
-            siteConnection.setProcedureName(procName);
-        }
+        // Setup this procedure with the site connection
+        siteConnection.setupProcedure(m_fragmentMsg.getProcedureName());
 
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
@@ -155,12 +148,13 @@ public class FragmentTask extends TransactionTask
 
             //The fragment is not misrouted and the site may have been marked as non-leader via @MigratePartitionLeader
             //but it should be processed by the same site, act like a leader.
-            response.setForOldLeader(m_fragmentMsg.isForOldLeader());
+            response.setExecutedOnPreviousLeader(m_fragmentMsg.isExecutedOnPreviousLeader());
             deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
                 siteConnection.setBatchTimeout(originalTimeout);
             }
+            siteConnection.completeProcedure();
         }
 
         completeFragment();
@@ -213,6 +207,9 @@ public class FragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -225,13 +222,15 @@ public class FragmentTask extends TransactionTask
         // ignore response.
         processFragmentTask(siteConnection);
         completeFragment();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
+        }
     }
 
     private void completeFragment()
     {
         // Check and see if we can flush early
         // right now, this is just read-only and final task
-        // This
         if (m_fragmentMsg.isFinalTask() && m_txnState.isReadOnly())
         {
             doCommonSPICompleteActions();
@@ -278,6 +277,10 @@ public class FragmentTask extends TransactionTask
             }
         }
 
+        int totalTableSize = 0;
+        int drBufferChanged = 0;
+        boolean exceptionThrown = false;
+        boolean exceptionCaught = false;
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -338,60 +341,59 @@ public class FragmentTask extends TransactionTask
                         m_txnState.isReadOnly(),
                         VoltTrace.log(VoltTrace.Category.EE) != null);
 
-                // get a copy of the result buffers from the cache buffer so we can post the
-                // fragment response to the network
-                final int tableSize;
-                final byte fullBacking[];
-                try {
-                    // read the complete size of the buffer used
-                    fragResult.readInt();
-                    // read number of dependencies (1)
-                    fragResult.readInt();
-                    // read the dependencyId() -1;
-                    fragResult.readInt();
-                    tableSize = fragResult.readInt();
-                    fullBacking = new byte[tableSize];
-                    // get a copy of the buffer
-                    fragResult.readFully(fullBacking);
-                } catch (final IOException ex) {
-                    LOG.error("Failed to deserialze result table" + ex);
-                    throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
-                }
+                if (!exceptionThrown) {
+                    // Ignore results for all work done after an exception is thrown. We need to still do
+                    // the work because Shared Replicated Table changes require participation by all sites.
 
-                if (hostLog.isTraceEnabled()) {
-                    hostLog.l7dlog(Level.TRACE,
-                       LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
-                       new Object[] { outputDepId }, null);
+                    // get a copy of the result buffers from the cache buffer so we can post the
+                    // fragment response to the network
+                    final int tableSize;
+                    final byte fullBacking[];
+                    try {
+                        // read the size of the DR buffer used
+                        drBufferChanged = fragResult.readInt();
+                        // read the complete size of the buffer used
+                        fragResult.readInt();
+                        // read number of dependencies (1)
+                        fragResult.readInt();
+                        // read the dependencyId() -1;
+                        fragResult.readInt();
+                        tableSize = fragResult.readInt();
+
+                        if ((totalTableSize += tableSize) > m_fragmentMsg.getMaxResponseSize()) {
+                            hostLog.warn(String.format(
+                                    "Total table size (%d bytes) for mp response to %s is larger than max %d",
+                                    totalTableSize, m_fragmentMsg.getProcedureName(),
+                                    m_fragmentMsg.getMaxResponseSize()));
+                            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+                        }
+
+                        fullBacking = new byte[tableSize];
+                        // get a copy of the buffer
+                        fragResult.readFully(fullBacking);
+                    } catch (final IOException ex) {
+                        hostLog.error("Failed to deserialze result table" + ex);
+                        throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+
+                    if (hostLog.isTraceEnabled()) {
+                        hostLog.l7dlog(Level.TRACE,
+                           LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
+                           new Object[] { outputDepId }, null);
+                    }
+                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
                 }
-                currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
-            } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+            } catch (final EEException | SQLException | ReplicatedTableException | InterruptException e) {
+                if (!exceptionThrown) {
+                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                    if (currentFragResponse.getTableCount() == 0) {
+                        // Make sure the response has at least 1 result with a valid DependencyId
+                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                    }
+                    exceptionThrown = true;
                 }
-                break;
-            } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
-                break;
-            }
-            catch (final InterruptException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
-                break;
             }
             finally {
                 // ensure adhoc plans are unloaded
@@ -401,7 +403,7 @@ public class FragmentTask extends TransactionTask
                 // If the executed fragment comes from a stored procedure, we need to update the per-fragment stats for it.
                 // Notice that this code path is used to handle multi-partition stored procedures.
                 // The single-partition stored procedure handler is in the ProcedureRunner.
-                if (currRunner != null) {
+                if (currRunner != null && !exceptionCaught) {
                     succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
 
                     long stmtDuration = 0;
@@ -420,9 +422,15 @@ public class FragmentTask extends TransactionTask
                                                                stmtDuration,
                                                                stmtResultSize,
                                                                stmtParameterSetSize);
+                    if (exceptionThrown) {
+                        // skip the stats work for all fragments after the fragment that threw an exception
+                        exceptionCaught = true;
+                    }
                 }
             }
         }
+        // for multi fragments task, using the aggregated dr Buffer size
+        currentFragResponse.setDrBufferSize(drBufferChanged);
         return currentFragResponse;
     }
 
@@ -434,6 +442,22 @@ public class FragmentTask extends TransactionTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        sb.append("  TIMESTAMP: ");
+        MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
         return sb.toString();
+    }
+
+    @Override
+    public boolean needCoordination() {
+        return !(m_txnState.isReadOnly() || isBorrowedTask() || m_isNPartition);
+    }
+
+    public boolean isBorrowedTask() {
+        return false;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return m_fragmentMsg.getTimestamp();
     }
 }

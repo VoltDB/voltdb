@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -277,13 +277,13 @@ public class PerPartitionTable {
                     row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
                             currRow.m_rowData[i]);
                 }
+                m_table.addRow(row_args);
             } catch (Exception e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
                 loader.m_outstandingRowCount.decrementAndGet();
                 it.remove();
                 continue;
             }
-            m_table.addRow(row_args);
 
             Long prevValue;
             if ((prevValue = batchSizes.put(loader, 1L)) != null) {

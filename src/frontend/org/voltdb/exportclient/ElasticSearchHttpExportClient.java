@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,9 +53,9 @@ import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
 import org.voltdb.exportclient.decode.BatchDecoder.BulkException;
+import org.voltdb.exportclient.decode.ElasticSearchJsonEntityDecoder;
 import org.voltdb.exportclient.decode.EndpointExpander;
 import org.voltdb.exportclient.decode.EntityDecoder;
-import org.voltdb.exportclient.decode.ElasticSearchJsonEntityDecoder;
 import org.voltdb.exportclient.decode.JsonStringDecoder;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -74,7 +74,7 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
     static enum HttpMethod {POST} // PUT method not support Automatic ID Generation
 
     static enum DecodeType {
-        JSONString(ContentType.APPLICATION_JSON.withCharset("utf-8")), // for single index api
+        JSONString(ContentType.APPLICATION_JSON.withCharset(StandardCharsets.UTF_8)), // for single index api
         JSONEntity(ElasticSearchJsonEntityDecoder.JsonContentType); // for bulk api
 
         private final ContentType m_contentType;
@@ -88,14 +88,15 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         }
     }
 
-    static final EnumSet<DecodeType> BatchDecodeTypes = EnumSet
-            .of(DecodeType.JSONEntity);
+    static final EnumSet<DecodeType> BatchDecodeTypes = EnumSet.of(DecodeType.JSONEntity);
 
     // static LoginContext m_context;
 
     enum DecodedStatus {
 
-        OK(null), FAIL(null), BULK_OPERATION_FAILED("BulkOperationFailed");
+        OK(null),
+        FAIL(null),
+        BULK_OPERATION_FAILED("BulkOperationFailed");
 
         static final Map<String, DecodedStatus> exceptions;
 
@@ -121,24 +122,25 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
 
         static DecodedStatus fromResponse(HttpResponse rsp) {
 
-            if (rsp == null)
+            if (rsp == null) {
                 return FAIL;
+            }
             String msg = "";
             JSONObject json = new JSONObject();
             if (rsp.getEntity().getContentLength() > 0) {
                 try {
                     msg = EntityUtils.toString(rsp.getEntity(), StandardCharsets.UTF_8);
                     LOG.trace("Notification response: ", msg);
-                } catch (ParseException | IOException e) {
+                }
+                catch (ParseException | IOException e) {
                     LOG.warn("could not trace response body",e);
                 }
             }
-            if (msg != null && !msg.trim().isEmpty()){
-                try
-                {
+            if (msg != null && !msg.trim().isEmpty()) {
+                try {
                     json = new JSONObject(msg);
-                } catch (JSONException e)
-                {
+                }
+                catch (JSONException e) {
                     LOG.warn("could not load response body to parse error message",e);
                 }
             }
@@ -148,11 +150,10 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
             case HttpStatus.SC_CREATED:
             case HttpStatus.SC_ACCEPTED:
                 // for handling bulk
-                if (json.optBoolean("errors")){
+                if (json.optBoolean("errors")) {
                     return BULK_OPERATION_FAILED;
-                }else{
-                    return OK;
                 }
+                return OK;
 
             case HttpStatus.SC_BAD_REQUEST:
             case HttpStatus.SC_NOT_FOUND:
@@ -167,7 +168,6 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
 
     String m_endpoint = null;
     TimeZone m_timeZone = VoltDB.REAL_DEFAULT_TIMEZONE;
-    HttpMethod m_method = HttpMethod.POST;
     ContentType m_contentType = ContentType.APPLICATION_JSON;
     DecodeType m_decodeType = DecodeType.JSONEntity;
     boolean m_batchMode = true;
@@ -189,7 +189,8 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
             if (!("http".equals(scheme) || "https".equals(scheme))) {
                 throw new IllegalArgumentException("only 'http' or 'https' endpoints are supported");
             }
-        }catch (URISyntaxException | IllegalArgumentException e) {
+        }
+        catch (URISyntaxException | IllegalArgumentException e) {
             throw new IllegalArgumentException("could not expand endpoint " + m_endpoint, e);
         }
 
@@ -203,14 +204,15 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         // just for elastic search
         if (m_batchMode) {
             m_decodeType = DecodeType.JSONEntity;
-        }else {
+        }
+        else {
             m_decodeType = DecodeType.JSONString;
         }
 
         m_contentType = m_decodeType.contentType();
 
 
-        LOG.debug("Starting Elastic Export client with %s %s", m_method, m_endpoint);
+        LOG.debug("Starting Elastic Export client with %s", m_endpoint);
 
         //Dont do actual config in check mode.
         boolean configcheck = Boolean.parseBoolean(config.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
@@ -242,7 +244,8 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
 
             if (m_isKrb) {
                 // m_client = (CloseableHttpAsyncClient)Subject.doAs(m_context.getSubject(), new PrivilegedBuild(client));
-            } else {
+            }
+            else {
                 m_client = client.build();
             }
             m_client.start();
@@ -267,60 +270,25 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
      */
     private HttpUriRequest makeRequest(URI uri, final String requestBody)
     {
-        HttpUriRequest request;
-        if (m_method == HttpMethod.POST) {
-            final HttpPost post = new HttpPost(uri);
-            post.setEntity(new StringEntity(requestBody, m_contentType));
-            request = post;
-        } else {
-            // Should never reach here
-            request = null;
-        }
-        return request;
+        HttpPost post = new HttpPost(uri);
+        post.setEntity(new StringEntity(requestBody, m_contentType));
+        return post;
     }
 
-    private HttpUriRequest makeBatchRequest(URI uri, final AbstractHttpEntity enty) {
+    private HttpUriRequest makeBatchRequest(URI uri, final AbstractHttpEntity entity) {
         // ElasticSearch only accepts POST requests with application/json content type
-        if (enty != null) {
-            enty.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+        if (entity != null) {
+            entity.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         }
-        HttpUriRequest request;
-        if (m_method == HttpMethod.POST) {
-            final HttpPost post = new HttpPost(uri);
-            post.setEntity(enty);
-            request = post;
-        } else {
-            // Should never reach here
-            request = null;
-        }
-        return request;
+        HttpPost post = new HttpPost(uri);
+        post.setEntity(entity);
+        return post;
     }
 
 
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-        String endpoint = EndpointExpander.expand(
-                m_endpoint,
-                source.tableName.toLowerCase(), // elastic search index should be lower case
-                source.partitionId,
-                source.m_generation,
-                new Date(),
-                m_timeZone
-                );
-        URI path = null;
-        // just for elastic search
-        if (m_batchMode)  {
-            endpoint = new StringBuilder(endpoint.length()+6).append(endpoint).append("/_bulk").toString();
-        }
-        try {
-            path = new URI(endpoint);
-        } catch (URISyntaxException e) {
-            // should not get here as the endpoint URL syntax was validated at configure
-            LOG.error("Unable to create URI %s ", e, endpoint);
-            Throwables.propagate(e);
-        }
-        HttpExportDecoder dec = new HttpExportDecoder(source, path);
-        return dec;
+        return new HttpExportDecoder(source);
     }
 
     class HttpExportDecoder extends ExportDecoderBase {
@@ -328,14 +296,17 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         private final EntityDecoder m_entityDecoder;
         private final JsonStringDecoder m_jsonStringDecoder;
         private final List<Future<HttpResponse>> m_outstanding = Lists.newArrayList();
-        public volatile URI m_exportPath;
+        private URI m_exportPath = null;
+
+        // exposing it for test purpose
+        URI getExportPath() { return m_exportPath; }
 
         @Override
         public ListeningExecutorService getExecutor() {
             return m_es;
         }
 
-        public HttpExportDecoder(AdvertisedDataSource source, URI path) {
+        public HttpExportDecoder(AdvertisedDataSource source) {
             super(source);
 
             if (m_batchMode) {
@@ -343,114 +314,116 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
                 ElasticSearchJsonEntityDecoder.Builder entityBuilder = ElasticSearchJsonEntityDecoder.builder();
                 entityBuilder
                     .timeZone(m_timeZone)
-                    .columnNames(source.columnNames)
-                    .columnTypes(source.columnTypes)
                     .skipInternalFields(true)
                 ;
                 entityDecoder = entityBuilder.build();
                 m_entityDecoder = entityDecoder;
                 m_jsonStringDecoder = null;
 
-            } else {
+            }
+            else {
                 JsonStringDecoder.Builder builder = JsonStringDecoder.builder();
                 builder
                     .timeZone(m_timeZone)
-                    .columnNames(source.columnNames)
-                    .columnTypes(source.columnTypes)
                     .skipInternalFields(true)
                 ;
                 m_jsonStringDecoder = builder.build();
                 m_entityDecoder = null;
             }
-            m_exportPath = path;
+            // TODO: how to make it named unique
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Elastic Export Decoder for partition " + source.partitionId
-                    + " table " + source.tableName
-                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Elastic Export Decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+        }
+
+        void populateExportPath(String tableName, int partitionId, long generation) {
+            String endpoint = EndpointExpander.expand(
+                    m_endpoint,
+                    tableName.toLowerCase(), // elastic search index should be lower case
+                    partitionId,
+                    generation,
+                    new Date(),
+                    m_timeZone
+                    );
+            URI path = null;
+            // just for elastic search
+            if (m_batchMode)  {
+                endpoint = new StringBuilder(endpoint.length()+6).append(endpoint).append("/_bulk").toString();
+            }
+
+            try {
+                path = new URI(endpoint);
+            }
+            catch (URISyntaxException e) {
+                // should not get here as the endpoint URL syntax was validated at configure
+                LOG.error("Unable to create URI %s ", e, endpoint);
+                Throwables.propagate(e);
+            }
+            m_exportPath = path;
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData)
-                throws RestartBlockException {
+        public boolean processRow(ExportRow row) throws RestartBlockException {
             URI exportPath = m_exportPath;
             if (m_client == null || !m_client.isRunning()) {
                 try {
                     connect();
-                } catch (IOReactorException e) {
+                }
+                catch (IOReactorException e) {
                     LOG.error("Unable to create HTTP client", e);
                     throw new RestartBlockException("Unable to create HTTP client",e,true);
                 }
             }
 
-            ExportDecoderBase.ExportRowData row;
+            if (m_batchMode) {
+                try {
+                    m_entityDecoder.add(row.generation, row.tableName, row.types, row.names, row.values);
+                    return true;
+                }
+                catch (BulkException e) {
+                    // non restartable structural failure
+                    LOG.error("unable to acummulate export records in batch mode", e);
+                    return false;
+                }
+            }
+
+            HttpUriRequest request = null;
             try {
-                row = decodeRow(rowData);
-            } catch (IOException e) {
+                request = makeRequest(exportPath, m_jsonStringDecoder.decode(row.generation, row.tableName, row.types, row.names, null, row.values));
+            }
+            catch (JSONException e) {
                 // non restartable structural failure
-                LOG.error("Unable to decode notification", e);
+                LOG.error("unable to build an HTTP request from an exported row", e);
                 return false;
             }
 
-            HttpUriRequest rqst;
-
-            if (m_batchMode) {
-                try {
-                    m_entityDecoder.add(row.values);
-                    return true;
-                } catch (BulkException e) {
-                    // non restartable structural failure
-                    LOG.error("unable to acummulate export records in batch mode",e);
-                    return false;
-                }
-            } else {
-                try {
-                    rqst = makeRequest(exportPath, m_jsonStringDecoder.decode(null, row.values));
-                } catch (JSONException e) {
-                    // non restartable structural failure
-                    LOG.error("unable to build an HTTP request from an exported row", e);
-                    return false;
-                }
-            }
-
             try {
-                m_outstanding.add(m_client.execute(rqst, null));
-            } catch (Exception e) {
+                m_outstanding.add(m_client.execute(request, null));
+            }
+            catch (Exception e) {
                 // May be recoverable, retry with a backoff
-                LOG.error("Unable to dispatch a request to \"%s\"", e, rqst);
-                throw new RestartBlockException("Unable to dispatch a request to \"" + rqst + "\".", e, true);
+                LOG.error("Unable to dispatch a request to \"%s\"", e, request);
+                throw new RestartBlockException("Unable to dispatch a request to \"" + request + "\".", e, true);
             }
 
             return true;
         }
 
         @Override
-        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            if (m_entityDecoder != null) {
-                m_entityDecoder.discard();
-            }
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
-            }
-        }
-
-        @Override
-        public void onBlockStart() throws RestartBlockException
-        {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_outstanding.clear();
+            if (m_exportPath == null) {
+                populateExportPath(row.tableName,  row.partitionId, row.generation);
+            }
         }
 
         @Override
-        public void onBlockCompletion() throws RestartBlockException
-        {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             final URI exportPath = m_exportPath;
             if (m_batchMode) {
                 HttpUriRequest rqst = null;
                 try {
                     rqst = makeBatchRequest(
-                            exportPath, m_entityDecoder.harvest()
+                            exportPath, m_entityDecoder.harvest(row.generation)
                             );
                     Future<HttpResponse> fut = m_client.execute(rqst, null);
 
@@ -475,6 +448,19 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
                     LOG.error("Failure reported in request response.", e);
                     throw new RestartBlockException("Failure reported in request response.", true);
                 }
+            }
+        }
+
+        @Override
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            if (m_entityDecoder != null) {
+                m_entityDecoder.discard(0L);
+            }
+            m_es.shutdown();
+            try {
+                m_es.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                Throwables.propagate(e);
             }
         }
 

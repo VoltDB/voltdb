@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,17 +150,10 @@ static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeA
     voltdb::Table* tbl = NULL;
     if (tableType == PERSISTENT) {
         char signature[20];
-        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID,
-                                                       tableName,
-                                                       schema,
-                                                       names,
-                                                       signature);
+        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID, tableName.c_str(), schema, names, signature);
     }
     else {
-        tbl = voltdb::TableFactory::buildTempTable(tableName,
-                                                   schema,
-                                                   names,
-                                                   NULL);
+        tbl = voltdb::TableFactory::buildTempTable(tableName, schema, names, NULL);
     }
 
     return tbl;
@@ -184,7 +177,7 @@ static std::string randomString(int maxLen) {
 static void fillTable(Table* tbl, int64_t numRows) {
     const TupleSchema* schema = tbl->schema();
     StandAloneTupleStorage storage(schema);
-    TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
+    TableTuple srcTuple = storage.tuple();
 
     for (int64_t i = 0; i < numRows; ++i) {
         int numCols = schema->columnCount();
@@ -225,12 +218,10 @@ public:
 
         TableTuple srcTuple(srcTable->schema());
         StandAloneTupleStorage dstStorage(dstTable->schema());
-        TableTuple& dstTuple = const_cast<TableTuple&>(dstStorage.tuple());
+        TableTuple dstTuple = dstStorage.tuple();
         TableIterator iterator = srcTable->iteratorDeletingAsWeGo();
         while (iterator.next(srcTuple)) {
-
             projector.exec(dstTuple, srcTuple);
-
             dstTable->insertTuple(dstTuple);
         }
     }
@@ -269,7 +260,6 @@ public:
             std::cout << "Too many rows in dst table\n";
             return false;
         }
-
         return true;
     }
 

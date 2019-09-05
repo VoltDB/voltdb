@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -68,7 +68,7 @@ final public class TestStartWithClassesOnly {
                 kfactor,
                 clusterID,
                 BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
+                FailureState.ALL_RUNNING, false, null);
         cluster.setHasLocalServer(true);
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();

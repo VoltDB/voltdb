@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,11 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -74,12 +76,12 @@ public class CreateProcedureFromClass extends CreateProcedure {
             }
         }
 
-        ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+        ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
                 new ArrayList<String>(), null, clazz);
 
         // Parse the ALLOW and PARTITION clauses.
         // Populate descriptor roles and returned partition data as needed.
-        CreateProcedurePartitionData partitionData =
+        ProcedurePartitionData partitionData =
                 parseCreateProcedureClauses(descriptor, statementMatcher.group(1));
 
         // track the defined procedure

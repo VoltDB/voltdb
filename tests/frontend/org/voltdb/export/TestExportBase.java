@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,20 +24,26 @@
 package org.voltdb.export;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertAllowNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertNoNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportRollbackInsertNoNulls;
 
 public class TestExportBase extends RegressionSuite {
+    protected List<String> m_streamNames = new ArrayList<>();
 
     /** Shove a table name and pkey in front of row data */
     protected Object[] convertValsToParams(String tableName, final int i,
@@ -63,7 +69,6 @@ public class TestExportBase extends RegressionSuite {
     }
 
     /** Push pkey into expected row data */
-    @SuppressWarnings("unused")
     protected Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 1];
         row[0] = i;
@@ -130,20 +135,21 @@ public class TestExportBase extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-   public static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo( new String[]{"proc"}, Insert.class),
-        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
-        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
+    public static final ProcedureInfo[] NONULLS_PROCEDURES = {
+        new ProcedureInfo(ExportInsertNoNulls.class, new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"),
+                new String[]{"proc"}),
+        new ProcedureInfo(ExportRollbackInsertNoNulls.class,
+                new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"), new String[]{"proc"}),
     };
 
-    public static final ProcedureInfo[] PROCEDURES2 = {
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
+    public static final ProcedureInfo[] ALLOWNULLS_PROCEDURES = {
+            new ProcedureInfo(ExportInsertAllowNulls.class,
+                    new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
-    public static final ProcedureInfo[] PROCEDURES3 = {
-        new ProcedureInfo( new String[]{"proc"}, InsertAddedTable.class)
-    };
+    public TestExportBase(String s) {
+        super(s);
+    }
 
     /**
      * Wait for export processor to catch up and have nothing to be exported.
@@ -151,8 +157,10 @@ public class TestExportBase extends RegressionSuite {
      * @param client
      * @throws Exception
      */
-    public void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+    public void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
         boolean passed = false;
+        assertFalse(streamNames.isEmpty());
+        Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
 
         //Quiesc to see all data flushed.
         System.out.println("Quiesce client....");
@@ -165,7 +173,7 @@ public class TestExportBase extends RegressionSuite {
         //Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -179,18 +187,19 @@ public class TestExportBase extends RegressionSuite {
             }
             long ts = 0;
             while (stats.advanceRow()) {
-                String ttype = stats.getString("TABLE_TYPE");
+                String source = stats.getString("SOURCE");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch is change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
-                        passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
-                        break;
-                    }
+                if (0 != stats.getLong("TUPLE_PENDING")) {
+                    passedThisTime = false;
+                    System.out.println("Partition Not Zero. pendingTuples:"+stats.getLong("TUPLE_PENDING"));
+                    break;
+                }
+                else {
+                    matchStreams.remove(source);
                 }
             }
             if (passedThisTime) {
@@ -209,12 +218,15 @@ public class TestExportBase extends RegressionSuite {
         }
         System.out.println("Passed is: " + passed);
         //System.out.println(stats);
-        assertTrue(passed);
+        assertTrue(passed && matchStreams.isEmpty());
     }
 
-
-    public TestExportBase(String s) {
-        super(s);
+    public void setUp() throws Exception {
+        super.setUp();
+        m_streamNames = new ArrayList<>();
     }
 
+    public void tearDown() throws Exception {
+        super.tearDown();
+    }
 }

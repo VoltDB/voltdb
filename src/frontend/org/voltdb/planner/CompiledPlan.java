@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -119,27 +119,10 @@ public class CompiledPlan {
     }
 
     public int resetPlanNodeIds(int startId) {
-        int nextId = resetPlanNodeIds(rootPlanGraph, startId);
+        int nextId = rootPlanGraph.resetPlanNodeIds(startId);
         if (subPlanGraph != null) {
-            nextId = resetPlanNodeIds(subPlanGraph, nextId);
+            nextId = subPlanGraph.resetPlanNodeIds(nextId);
         }
-        return nextId;
-    }
-
-    private int resetPlanNodeIds(AbstractPlanNode node, int nextId) {
-        nextId = node.overrideId(nextId);
-        for (AbstractPlanNode inNode : node.getInlinePlanNodes().values()) {
-            // Inline nodes also need their ids to be overridden to make sure
-            // the subquery node ids are also globaly unique
-            nextId = resetPlanNodeIds(inNode, nextId);
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AbstractPlanNode child = node.getChild(i);
-            assert(child != null);
-            nextId = resetPlanNodeIds(child, nextId);
-        }
-
         return nextId;
     }
 

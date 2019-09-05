@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -59,7 +59,7 @@ public class VoltDBStatementProcessor extends StatementProcessor {
             m_returnAfterThis = true;
             return false;
         }
-        // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR
+        // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT, DR OR AGGREGATE
         m_commandPrefix = statementMatcher.group(1).toUpperCase();
         return false;
     }

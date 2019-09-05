@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,17 @@
 
 package org.voltdb.exportclient.decode;
 
+import static org.voltdb.exportclient.decode.RowDecoder.Builder.camelCaseNameUpperFirst;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.voltdb.VoltType;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 
 import com.google_voltpatches.common.base.Function;
@@ -32,24 +37,30 @@ import com.google_voltpatches.common.collect.ImmutableList;
 public class NVPairsDecoder extends RowDecoder<List<NameValuePair>, RuntimeException> {
 
     protected final StringArrayDecoder m_stringArrayDecoder;
-    protected final String [] m_columnNames;
+    private final Map<Long, List<String>> m_xformedColumnNames = new HashMap<Long, List<String>>();
 
     protected NVPairsDecoder(StringArrayDecoder stringArrayDecoder) {
         super(stringArrayDecoder);
         m_stringArrayDecoder = stringArrayDecoder;
-        m_columnNames = ImmutableList.copyOf(m_typeMap.keySet()).toArray(new String[0]);
     }
 
     @Override
-    public List<NameValuePair> decode(List<NameValuePair> to, Object[] fields)
+    public List<NameValuePair> decode(long generation, String tableName, List<VoltType> types, List<String> names, List<NameValuePair> to, Object[] fields)
             throws RuntimeException {
         ImmutableList.Builder<NameValuePair> lb = null;
         if (to == null) {
             lb = ImmutableList.builder();
         }
-        String [] values = m_stringArrayDecoder.decode(null, fields);
-        for (int i = 0; i < values.length && i < m_columnNames.length; ++i) {
-            NameValuePair pair = new BasicNameValuePair(m_columnNames[i], percentEncode(values[i]));
+        List<String> xformedcolumnNames = m_xformedColumnNames.get(generation);
+        if (xformedcolumnNames == null) {
+            List<String> namesToXForm = names;
+            xformedcolumnNames = FluentIterable.from(namesToXForm).transform(camelCaseNameUpperFirst).toList();
+            m_xformedColumnNames.put(generation, xformedcolumnNames);
+        }
+        String [] values = m_stringArrayDecoder.decode(generation, tableName, types, xformedcolumnNames, null, fields);
+        String [] columnNames = ImmutableList.copyOf(getTypeMap(generation, types, xformedcolumnNames).keySet()).toArray(new String[0]);
+        for (int i = 0; i < values.length && i < columnNames.length; ++i) {
+            NameValuePair pair = new BasicNameValuePair(columnNames[i], percentEncode(values[i]));
             if (lb != null) {
                 lb.add(pair);
             } else {
@@ -62,15 +73,15 @@ public class NVPairsDecoder extends RowDecoder<List<NameValuePair>, RuntimeExcep
     /**
      * Encode the given string using percent encoding in UTF-8 so that it's safe
      * to be included in the URL.
-     * @param s    The string to encode
+     * @param value    The string to encode
      * @return Encoded string.
      */
-    public static String percentEncode(String s) {
+    public static String percentEncode(String value) {
         try {
-            if (s == null) {
+            if (value == null) {
                 return "%00"; // URL encode null - rfc3986 & https://www.w3schools.com/tags/ref_urlencode.asp
             }
-            return URLEncoder.encode(s, "UTF-8")
+            return URLEncoder.encode(value, "UTF-8")
                     .replace("+", "%20")
                     .replace("*", "%2A")
                     .replace("%7E", "~");
@@ -107,10 +118,6 @@ public class NVPairsDecoder extends RowDecoder<List<NameValuePair>, RuntimeExcep
         }
 
         public NVPairsDecoder build() {
-            columnNames(FluentIterable.from(m_columnNames)
-                    .transform(camelCaseNameUpperFirst)
-                    .transform(percentEncodeName)
-                    .toList());
             m_delegateBuilder.use(this);
             return new NVPairsDecoder(m_delegateBuilder.build());
         }

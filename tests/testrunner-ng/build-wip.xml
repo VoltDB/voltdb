@@ -360,7 +360,7 @@ DISTRIBUTION
 
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
-        destdir="${dist.dir}/doc/procedure-api"
+        destdir="${dist.dir}/doc/server-api"
         Public="true"
         version="true"
         use="true"
@@ -375,7 +375,6 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/VoltProcedure.java" />
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/ProcInfo.java" />
         </fileset>
     </javadoc>
 

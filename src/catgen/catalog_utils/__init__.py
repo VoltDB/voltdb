@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,7 @@ def ensure_relative_path_exists(newdir):
                               "dir, '%s', already exists." % newdir)
     else:
         head, tail = os.path.split(newdir)
-        print "Head, Tail: %s, %s" % (head, tail)
+        print("Head, Tail: %s, %s" % (head, tail))
         if head and not os.path.isdir(head):
             ensure_relative_path_exists(head)
         if tail:

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -39,32 +39,29 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.planner;
+ */
+package org.voltdb.planner;
 
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansInsertIntoSelect extends PlannerTestCase {
     public void testInlineInsertReplicatedToReplicated() {
         validatePlan("INSERT INTO T1 SELECT * from T2;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                             PlanNodeType.PROJECTION,
-                                             PlanNodeType.INSERT));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                  PlanNodeType.PROJECTION,
+                                                  PlanNodeType.INSERT)));
         validatePlan("INSERT INTO T2 SELECT * from T1;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PROJECTION,
-                                             PlanNodeType.INSERT));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                  PlanNodeType.PROJECTION,
+                                                  PlanNodeType.INSERT)));
     }
 
     // Note that P1 and P2 have the same partition columns
@@ -73,134 +70,114 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
     // query.
     public void testInlineInsertPartitionedToPartitioned() {
         validatePlan("INSERT INTO P1 SELECT * from P2;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.AGGREGATE,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                             PlanNodeType.INSERT,
-                                             PlanNodeType.PROJECTION));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes
+                              (PlanNodeType.SEQSCAN,
+                               PlanNodeType.INSERT,
+                               PlanNodeType.PROJECTION)));
         validatePlan("INSERT INTO P2 SELECT * from P1;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.AGGREGATE,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.INSERT,
-                                             PlanNodeType.PROJECTION));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes
+                              (PlanNodeType.INDEXSCAN,
+                               PlanNodeType.INSERT,
+                               PlanNodeType.PROJECTION)));
     }
 
     public void testInlineInsertReplicatedToPartitioned() {
         validatePlan("INSERT INTO P1 SELECT * from T1;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.AGGREGATE,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PROJECTION,
-                                             PlanNodeType.INSERT));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes
+                              (PlanNodeType.INDEXSCAN,
+                               PlanNodeType.PROJECTION,
+                               PlanNodeType.INSERT)));
         validatePlan("INSERT INTO P1 SELECT * from T2;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.AGGREGATE,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                             PlanNodeType.PROJECTION,
-                                             PlanNodeType.INSERT));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              planWithInlineNodes
+                              (PlanNodeType.SEQSCAN,
+                               PlanNodeType.PROJECTION,
+                               PlanNodeType.INSERT)));
     }
 
     public void testNoInlineInsert() {
         // No inline insert for UPSERT.
         validatePlan("UPSERT INTO T1 SELECT ID, AAA, BBB FROM T1 ORDER BY ID;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     PlanNodeType.INDEXSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.INDEXSCAN));
         validatePlan("UPSERT INTO T1 SELECT * FROM T2 ORDER BY ID, AAA, BBB;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     PlanNodeType.ORDERBY,
-                     PlanNodeType.SEQSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.SEQSCAN));
         validatePlan("INSERT INTO T1 SELECT L.ID, L.AAA, R.BBB from T1 L JOIN T1 R ON L.ID = R.ID;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     PlanNodeType.PROJECTION,
-                     new PlanWithInlineNodes(PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN),
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.PROJECTION,
+                              planWithInlineNodes(PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN),
+                              planWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION)));
         validatePlan("INSERT INTO T1 SELECT ID, AAA, AAA+ID from T1 group by ID, AAA;",
-                     2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     PlanNodeType.PROJECTION,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PARTIALAGGREGATE,
-                                             PlanNodeType.PROJECTION));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.PROJECTION,
+                              planWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                  PlanNodeType.PARTIALAGGREGATE,
+                                                  PlanNodeType.PROJECTION)));
 
         // Recursive insert, sequential scan, cannot inline (ENG-13036).
         validatePlan("INSERT INTO T2 SELECT * from T2;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.LIMIT,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                PlanNodeType.INSERT,
-                PlanNodeType.SEQSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.SEQSCAN));
         validatePlan("INSERT INTO P2 SELECT * from P2;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.AGGREGATE,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                PlanNodeType.INSERT,
-                PlanNodeType.SEQSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.SEQSCAN));
 
         // Recursive insert, index scan, cannot inline (ENG-13036).
         validatePlan("INSERT INTO T1 SELECT * from T1;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.LIMIT,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                PlanNodeType.INSERT,
-                PlanNodeType.INDEXSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.LIMIT,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.INDEXSCAN));
         validatePlan("INSERT INTO P1 SELECT * from P1;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.AGGREGATE,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                PlanNodeType.INSERT,
-                PlanNodeType.INDEXSCAN);
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.INSERT,
+                              PlanNodeType.INDEXSCAN));
     }
 
     //
@@ -208,7 +185,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
     //
     @Override
     protected void setUp() throws Exception {
-        setupSchema(true, TestWindowedFunctions.class.getResource("testplans-insertintoselect-ddl.sql"), "testinsertintoselect");
+        setupSchema(true, TestPlansInsertIntoSelect.class.getResource("testplans-insertintoselect-ddl.sql"), "testinsertintoselect");
     }
 
     @Override

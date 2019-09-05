@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -1209,12 +1209,13 @@ class SQLGenerator:
     # The presence of an underbar apparently inside a quoted string after the LIKE keyword
     # is likely enough to be a false positive for an unresolved generator that it is
     # allowed to pass without the usual warning triggered by a leading underbar.
-    LIKELY_FALSE_ALARMS = re.compile(r"LIKE '[^']*_.*'")
+    LIKELY_FALSE_ALARMS = re.compile(r"(LIKE|STARTS WITH) '[^']*_.*'")
 
     def __generate_statement(self, text):
         text = self.__template.apply_macros(text)
         text = unicode(text)
 
+        print_warning = False
         for statement in self.__template.generate_statements_from_text(text):
             ### print ('VERBOSE DEBUG: text and statement post-generate_statements_from_text: "' + text + '", "' + statement + '"')
             statement, generators, field_map = BaseGenerator.prepare_generators(statement,
@@ -1224,6 +1225,7 @@ class SQLGenerator:
             if (SQLGenerator.UNRESOLVED_PUNCTUATION.search(statement) or
                 (SQLGenerator.UNRESOLVED_GENERATOR.search(statement) and
                  not SQLGenerator.LIKELY_FALSE_ALARMS.search(statement))):
+                print_warning = True
                 print ('WARNING: final statement contains suspicious unresolved symbol(s): "' +
                        statement + '"')
                 print ('with schema "' + self.__schema.debug_schema_to_string() + '"')
@@ -1231,7 +1233,13 @@ class SQLGenerator:
             for generated_stmt in BaseGenerator.generate_statements_from_list(statement,
                                                                               generators,
                                                                               field_map):
+                if print_warning:
+                    print ('generators:', str(generators))
+                    print ('field_map :', str(field_map))
+                    print ('statement :\n   ', str(statement))
+                    print ('generated_stmt:\n   ', str(generated_stmt))
                 yield generated_stmt
+            print_warning = False
 
     def generate(self, summarize_successes = False):
         for s in self.__statements:

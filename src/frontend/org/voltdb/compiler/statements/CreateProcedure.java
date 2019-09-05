@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -36,15 +37,6 @@ public abstract class CreateProcedure extends StatementProcessor {
         super(ddlCompiler);
     }
 
-    protected static class CreateProcedurePartitionData {
-        String tableName = null;
-        String columnName = null;
-        String parameterNo = null;
-        String tableName2 = null;
-        String columnName2 = null;
-        String parameterNo2 = null;
-    }
-
     /**
      * Parse and validate the substring containing ALLOW and PARTITION
      * clauses for CREATE PROCEDURE.
@@ -53,7 +45,7 @@ public abstract class CreateProcedure extends StatementProcessor {
      * @return  parsed and validated partition data or null if there was no PARTITION clause
      * @throws VoltCompilerException
      */
-    protected CreateProcedurePartitionData parseCreateProcedureClauses(
+    protected ProcedurePartitionData parseCreateProcedureClauses(
               ProcedureDescriptor descriptor,
               String clauses) throws VoltCompilerException {
 
@@ -63,7 +55,7 @@ public abstract class CreateProcedure extends StatementProcessor {
         if (clauses == null || clauses.isEmpty()) {
             return null;
         }
-        CreateProcedurePartitionData data = null;
+        ProcedurePartitionData data = null;
 
         Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
         int start = 0;
@@ -86,13 +78,8 @@ public abstract class CreateProcedure extends StatementProcessor {
                     throw m_compiler.new VoltCompilerException(
                         "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
                 }
-                data = new CreateProcedurePartitionData();
-                data.tableName = matcher.group(2);
-                data.columnName = matcher.group(3);
-                data.parameterNo = matcher.group(4);
-                data.tableName2 = matcher.group(5);
-                data.columnName2 = matcher.group(6);
-                data.parameterNo2 = matcher.group(7);
+                data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
+                        matcher.group(5), matcher.group(6), matcher.group(7));
             }
         }
 
@@ -101,50 +88,38 @@ public abstract class CreateProcedure extends StatementProcessor {
 
     protected void addProcedurePartitionInfo(
               String procName,
-              CreateProcedurePartitionData data,
+              ProcedurePartitionData data,
               String statement) throws VoltCompilerException {
-
-        assert(procName != null);
-
         // Will be null when there is no optional partition clause.
         if (data == null) {
             return;
         }
 
-        assert(data.tableName != null);
-        assert(data.columnName != null);
-
         // Check the identifiers.
         checkIdentifierStart(procName, statement);
-        checkIdentifierStart(data.tableName, statement);
-        checkIdentifierStart(data.columnName, statement);
+        checkIdentifierStart(data.m_tableName, statement);
+        checkIdentifierStart(data.m_columnName, statement);
 
         // if not specified default parameter index to 0
-        if (data.parameterNo == null) {
-            data.parameterNo = "0";
+        if (data.m_paramIndex == null) {
+            data.m_paramIndex = "0";
         }
-
-        String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
 
         // two partition procedure
-        if (data.tableName2 != null) {
-            assert(data.columnName2 != null);
+        if (data.m_tableName2 != null) {
+            checkIdentifierStart(data.m_tableName2, statement);
+            checkIdentifierStart(data.m_columnName2, statement);
 
-            checkIdentifierStart(data.tableName2, statement);
-            checkIdentifierStart(data.columnName2, statement);
-
-            if (data.parameterNo2 == null) {
-                if (data.parameterNo != "0") {
+            if (data.m_paramIndex2 == null) {
+                if (data.m_paramIndex != "0") {
                     String exceptionMsg = String.format("Two partition parameter must specify index for  " +
                             "second partitioning parameter if the first partitioning parameter index is non-zero.");
-                            throw m_compiler.new VoltCompilerException(exceptionMsg);
+                    throw m_compiler.new VoltCompilerException(exceptionMsg);
                 }
-                data.parameterNo2 = "1";
+                data.m_paramIndex2 = "1";
             }
-
-            partitionInfo += String.format(", %s.%s: %s", data.tableName2, data.columnName2, data.parameterNo2);
         }
 
-        m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
+        m_tracker.addProcedurePartitionInfoTo(procName, data);
     }
 }

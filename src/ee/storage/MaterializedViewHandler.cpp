@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@
 #include "catalog/statement.h"
 #include "catalog/table.h"
 #include "catalog/tableref.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/executorcontext.hpp"
 #include "indexes/tableindex.h"
 #include "TableCatalogDelegate.hpp"
@@ -35,11 +36,17 @@ namespace voltdb {
 
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable* destTable,
                                                      catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
-                                                     VoltDBEngine* engine) :
-            m_destTable(destTable),
-            m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+                                                     int32_t groupByColumnCount,
+                                                     VoltDBEngine* engine)
+            : m_destTable(destTable)
+            , m_index(destTable->primaryKeyIndex())
+            , m_groupByColumnCount(groupByColumnCount)
+            , m_supportSnapshot(true)
+            , m_enabled(true) // If this view is enabled, handling changes passed from the source tables.
+            , m_replicatedWrapper() {
+        if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
@@ -48,37 +55,98 @@ namespace voltdb {
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
-        for (int i=m_sourceTables.size()-1; i>=0; i--) {
-            dropSourceTable(m_sourceTables[i]);
+        VOLT_DEBUG("Deconstruct MaterializedViewHandler view %s (%p)",
+                            m_destTable->name().c_str(), m_destTable);
+        if (m_sourceTables.empty()) {
+            // Need this when this is an instance of ReplicatedMaterializedViewHandler
+            return;
+        }
+
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
+        {
+            ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_destTable->isReplicatedTable());
+            do {
+                dropSourceTable(viewHandlerPartitioned, m_sourceTables.begin());
+            } while (!m_sourceTables.empty());
         }
     }
 
-    void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        sourceTable->addViewHandler(this);
-        m_sourceTables.push_back(sourceTable);
+    void MaterializedViewHandler::addSourceTable(bool viewHandlerPartitioned,
+                PersistentTable *sourceTable, int32_t relativeTableIndex, VoltDBEngine* engine) {
+        VOLT_DEBUG("Adding source table %s (%p) for view %s (%p)", sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable);
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
+            vassert(viewHandlerPartitioned);
+            // We are adding our (partitioned) ViewHandler to a Replicated Table
+            if (!m_replicatedWrapper) {
+                m_replicatedWrapper.reset(new ReplicatedMaterializedViewHandler(m_destTable, this, engine->getPartitionId()));
+            }
+
+            ScopedReplicatedResourceLock scopedLock;
+            sourceTable->addViewHandler(m_replicatedWrapper.get());
+        }
+        else {
+            sourceTable->addViewHandler(this);
+        }
+        auto const& ret = m_sourceTables.emplace(sourceTable, relativeTableIndex);
+        vassert(ret.second);
+
+        m_dirty = true;
+    }
+
+    void MaterializedViewHandler::dropSourceTable(bool viewHandlerPartitioned,
+            std::map<PersistentTable*, int32_t>::iterator it) {
+        vassert(!m_sourceTables.empty());
+        auto sourceTable = it->first;
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
+            vassert(viewHandlerPartitioned);
+#ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
+            VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
+                                sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
+                                SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
+#endif
+            // We are dropping our (partitioned) ViewHandler to a Replicated Table
+            ScopedReplicatedResourceLock scopedLock;
+            sourceTable->dropViewHandler(m_replicatedWrapper.get());
+        }
+        else {
+            sourceTable->dropViewHandler(this);
+        }
+        // The last element is now excess.
+        m_sourceTables.erase(it);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
-        assert( ! m_sourceTables.empty());
-        sourceTable->dropViewHandler(this);
-        PersistentTable* lastTable = m_sourceTables.back();
-        if (sourceTable != lastTable) {
-            // iterator to vector element:
-            std::vector<PersistentTable*>::iterator it = find(m_sourceTables.begin(),
-                                                              m_sourceTables.end(),
-                                                              sourceTable);
-            assert(it != m_sourceTables.end());
-            // Use the last view to patch the potential hole.
-            *it = lastTable;
+        std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.find(sourceTable);
+        vassert(it != m_sourceTables.end());
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
+        vassert(!m_sourceTables.empty());
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
+            vassert(viewHandlerPartitioned);
+#ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
+            VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
+                    sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
+                    SynchronizedThreadLock::isInSingleThreadMode()?"true":"false", SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
+#endif
+            vassert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
+            sourceTable->dropViewHandler(m_replicatedWrapper.get());
+        }
+        else {
+            sourceTable->dropViewHandler(this);
         }
         // The last element is now excess.
-        m_sourceTables.pop_back();
+        m_sourceTables.erase(it);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                           VoltDBEngine *engine) {
+        const catalog::Table* catalogDestTable = mvHandlerInfo->destTable();
+        if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
+            // If the destination table (view table) is partitioned but there is no partition column,
+            // we cannot snapshot this view.
+            m_supportSnapshot = false;
+        }
         const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
         BOOST_FOREACH(TableIndex *index, targetIndexes) {
             if (index != m_index) {
@@ -87,15 +155,21 @@ namespace voltdb {
         }
         // Delete the existing handler if exists. When the existing handler is destructed,
         // it will automatically removes itself from all the viewsToTrigger lists of its source tables.
-        delete m_destTable->m_mvHandler;
+        {
+            ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
+            delete m_destTable->m_mvHandler;
+        }
+
         // The handler will not only be installed on the view table, but also the source tables.
         m_destTable->m_mvHandler = this;
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
         BOOST_FOREACH (LabeledTableRef labeledTableRef, mvHandlerInfo->sourceTables()) {
             catalog::TableRef *sourceTableRef = labeledTableRef.second;
             TableCatalogDelegate *sourceTcd =  engine->getTableDelegate(sourceTableRef->table()->name());
             PersistentTable *sourceTable = sourceTcd->getPersistentTable();
-            assert(sourceTable);
-            addSourceTable(sourceTable);
+            vassert(sourceTable);
+            int32_t relativeTableIndex = sourceTableRef->table()->relativeIndex();
+            addSourceTable(viewHandlerPartitioned, sourceTable, relativeTableIndex, engine);
         }
     }
 
@@ -122,13 +196,10 @@ namespace voltdb {
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
                     break; // legal value
-                default: {
-                    char message[128];
-                    snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
-                             (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
-                }
+                default:
+                    throwSerializableEEException(
+                            "Error in materialized view aggregation %d expression type %s",
+                            (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
             }
         }
     }
@@ -141,7 +212,7 @@ namespace voltdb {
 #ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             const std::string& hexString = createQueryStatement->explainplan();
-            assert(hexString.length() % 2 == 0);
+            vassert(hexString.length() % 2 == 0);
             int bufferLength = (int)hexString.size() / 2 + 1;
             char* explanation = new char[bufferLength];
             boost::shared_array<char> memoryGuard(explanation);
@@ -169,6 +240,7 @@ namespace voltdb {
     //TODO: *non-grouped views could instead set up a hard-coded initial
     // row as they do in the single-table case to avoid querying empty tables.
     void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         UniqueTempTableResult viewContent = ec->getEngine()->executePlanFragment(m_createQueryExecutorVector.get());
         TableIterator ti = viewContent->iterator();
@@ -200,7 +272,7 @@ namespace voltdb {
             iterator.next(m_existingTuple);
             // Please note that if there is no group by columns, the view shall always have one row.
             // This row will be initialized when the view is constructed. We have special code path for that. -yzhang
-            assert( ! m_existingTuple.isNullTuple());
+            vassert( ! m_existingTuple.isNullTuple());
             return true;
         }
 
@@ -251,7 +323,7 @@ namespace voltdb {
                         }
                         break;
                     default:
-                        assert(false); // Should have been caught when the matview was loaded.
+                        vassert(false); // Should have been caught when the matview was loaded.
                         // no break
                 }
             }
@@ -259,7 +331,42 @@ namespace voltdb {
         }
     }
 
+    void MaterializedViewHandler::setEnabled(bool enabled) {
+        if (! m_supportSnapshot) {
+            // If this view should not respond to any view status toggle requests
+            // (because the view is implicitly partitioned), ignore them.
+            return;
+        }
+        // If the value is not changed, no action needs to be taken.
+        if (m_enabled == enabled) {
+            return;
+        }
+        if (! enabled) {
+            // When turning off the maintenance of a view joining multiple tables, check if the source tables are empty.
+            // If not, ignore this request and log a message.
+            for (std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.begin();
+                 it != m_sourceTables.end(); ++it) {
+                if (! it->first->isPersistentTableEmpty()) {
+                    char msg[256];
+                    snprintf(msg, sizeof(msg),
+                            "The maintenance of the materialized view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
+                             m_destTable->name().c_str(), it->first->name().c_str());
+                    msg[sizeof msg - 1] = '\0';
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                    return;
+                }
+            }
+        }
+        // Only views that can be snapshoted are allowed to be disabled.
+        m_enabled = enabled;
+    }
+
     void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        // If the view is not enabled, ignore it.
+        // Snapshots will only do inserts, so this check is not added to handleTupleDelete.
+        if (! m_enabled) {
+            return;
+        }
         // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
         ScopedDeltaTableContext dtContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
@@ -336,7 +443,7 @@ namespace voltdb {
                             }
                             break;
                         default:
-                            assert(false); // Should have been caught when the matview was loaded.
+                            vassert(false); // Should have been caught when the matview was loaded.
                             // no break
                     }
                 }
@@ -412,6 +519,32 @@ namespace voltdb {
                                                             m_updatableIndexList, fallible);
             }
         }
+    }
+
+    ReplicatedMaterializedViewHandler::ReplicatedMaterializedViewHandler(PersistentTable* destTable,
+                                                                         MaterializedViewHandler* partitionedHandler,
+                                                                         int32_t handlerPartitionId) :
+        MaterializedViewHandler(destTable, NULL, 0, NULL),
+        m_partitionedHandler(partitionedHandler),
+        m_handlerPartitionId(handlerPartitionId)
+    {}
+
+    void ReplicatedMaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        vassert(SynchronizedThreadLock::isInSingleThreadMode());
+        vassert(SynchronizedThreadLock::usingMpMemory());
+        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+        m_partitionedHandler->handleTupleInsert(sourceTable, fallible);
+        SynchronizedThreadLock::assumeMpMemoryContext();
+    }
+
+    void ReplicatedMaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
+        vassert(SynchronizedThreadLock::isInSingleThreadMode());
+        vassert(SynchronizedThreadLock::usingMpMemory());
+        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+        m_partitionedHandler->handleTupleDelete(sourceTable, fallible);
+        SynchronizedThreadLock::assumeMpMemoryContext();
     }
 
 } // namespace voltdb

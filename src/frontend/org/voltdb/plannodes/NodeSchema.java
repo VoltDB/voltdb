@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,19 +21,26 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 /**
  * This class encapsulates the representation and common operations for
- * a PlanNode's output schema.
+ * a PlanNode's output schema.  These are also used to store the schema
+ * of a table in a StmtTableScan node, for table scans in FROM
+ * clauses.  We can iterate over these to get columns, and select
+ * individual columns.  We can also the schema's size.
  */
-public class NodeSchema {
+public class NodeSchema implements Iterable<SchemaColumn> {
     // Sometimes there are columns with identical names within a given table
     // and its schema.  We want to be able to differentiate these columns so that
     // m_columnsMapHelper can produce the right offset for columns that have the same
@@ -59,8 +66,42 @@ public class NodeSchema {
     private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
     public NodeSchema() {
-        m_columns = new ArrayList<SchemaColumn>();
+        m_columns = new ArrayList<>();
         m_columnsMapHelper = new TreeMap<>(BY_NAME);
+    }
+
+    // Substitute table name only for all schema columns and map entries
+    public NodeSchema resetTableName(String tbName, String tbAlias) {
+       m_columns.forEach(sc ->
+             sc.reset(tbName, tbAlias, sc.getColumnName(), sc.getColumnAlias()));
+       m_columnsMapHelper.forEach((k, v) ->
+             k.reset(tbName, tbAlias, k.getColumnName(), k.getColumnAlias()));
+       return this;
+    }
+
+    // Substitute column name with matching key to new value
+    // \pre: m_columns is a bi-map to \param m.
+    public NodeSchema toTVEAndFixColumns(Map<String, Pair<String, Integer>> nameMap) {
+      final NodeSchema ns = copyAndReplaceWithTVE();    // First convert all non-TVE expressions to TVE in a copy
+       m_columns.clear();
+       m_columnsMapHelper.clear();
+       for(int indx = 0; indx < ns.size(); ++indx) {    // then update columns
+           final SchemaColumn sc = ns.getColumn(indx);
+           assert(sc.getExpression() instanceof TupleValueExpression);
+           if(nameMap.containsKey(sc.getColumnName())) {
+               final String newColName = nameMap.get(sc.getColumnName()).getFirst();
+               sc.reset(sc.getTableName(), sc.getTableAlias(), newColName, sc.getColumnAlias());
+               sc.setDifferentiator(indx);
+               TupleValueExpression exp = (TupleValueExpression) sc.getExpression();
+               exp.setColumnIndex(indx);
+               exp.setColumnName(newColName);
+               exp.setDifferentiator(indx);
+           }
+       }
+       for(SchemaColumn sc : ns) {
+           addColumn(sc);
+       }
+       return this;
     }
 
     /**
@@ -101,21 +142,31 @@ public class NodeSchema {
         addColumn(scol);
     }
 
+    public SchemaColumn getColumn(int idx) {
+        return m_columns.get(idx);
+    }
 
     /**
      * @return a list of the columns in this schema.  These columns will be
      * in the order in which they will appear at the output of this node.
      */
-    public ArrayList<SchemaColumn> getColumns() { return m_columns; }
+    private ArrayList<SchemaColumn> getColumns() {
+        return m_columns;
+    }
 
-    public int size() { return m_columns.size(); }
+    /**
+     * @return The number of columns in this schema.
+     */
+    public int size() {
+        return m_columns.size();
+    }
 
     /**
      * Retrieve the SchemaColumn that matches the provided arguments.
-     * @param tableName
-     * @param tableAlias
-     * @param columnName
-     * @param columnAlias
+     * @param tableName The table name of the desired column.
+     * @param tableAlias The table alias of the desired column.
+     * @param columnName The column name of the desired column.
+     * @param columnAlias The column alias of the desired column.
      * @return The matching SchemaColumn.  Returns null if the column wasn't
      *         found.
      */
@@ -264,10 +315,8 @@ public class NodeSchema {
             return false;
         }
 
-        ArrayList<SchemaColumn> columns = schema.getColumns();
-
         for (int colIndex = 0; colIndex < size(); colIndex++ ) {
-            SchemaColumn col1 = columns.get(colIndex);
+            SchemaColumn col1 = schema.getColumn(colIndex);
             if ( ! col1.equals(m_columns.get(colIndex))) {
                 return false;
             }
@@ -286,9 +335,8 @@ public class NodeSchema {
             return false;
         }
 
-        ArrayList<SchemaColumn> columns = otherSchema.getColumns();
         for (int colIndex = 0; colIndex < size(); colIndex++ ) {
-            SchemaColumn col1 = columns.get(colIndex);
+            SchemaColumn col1 = otherSchema.getColumn(colIndex);
             SchemaColumn col2 = m_columns.get(colIndex);
             if (col1.compareNames(col2) != 0) {
                 return false;
@@ -327,7 +375,7 @@ public class NodeSchema {
      * Append the provided schema to this schema and return the result
      * as a new schema. Columns order: [this][provided schema columns].
      */
-    NodeSchema join(NodeSchema schema) {
+    public NodeSchema join(NodeSchema schema) {
         NodeSchema copy = this.clone();
         for (SchemaColumn column: schema.getColumns()) {
             copy.addColumn(column.clone());
@@ -370,6 +418,96 @@ public class NodeSchema {
                     colExpr.findAllSubexpressionsOfClass(aeClass);
             exprs.addAll(found);
         }
+    }
+
+    @Override
+    public Iterator<SchemaColumn> iterator() {
+        return m_columns.iterator();
+    }
+
+    /**
+     * Modifies this schema such that its columns can accommodate both values of its own types
+     * and that of otherSchema.  Does not modify otherSchema.
+     *
+     * @param otherSchema    The schema whose values we would like to accommodate in this schema
+     * @param schemaKindName The kind of schema we are harmonizing, for error reporting
+     * @return True iff we have changed something in the schema.
+     */
+    public boolean harmonize(NodeSchema otherSchema, String schemaKindName) {
+        if (size() != otherSchema.size()) {
+            throw new PlanningErrorException(
+                    "The "
+                    + schemaKindName + "schema and the statement output schemas have different lengths.");
+        }
+        boolean changedSomething = false;
+        for (int idx = 0; idx < size(); idx += 1) {
+            SchemaColumn myColumn = getColumn(idx);
+            SchemaColumn otherColumn = otherSchema.getColumn(idx);
+            VoltType myType = myColumn.getValueType();
+            VoltType otherType = otherColumn.getValueType();
+            VoltType commonType = myType;
+            if (! myType.canExactlyRepresentAnyValueOf(otherType)) {
+                if (otherType.canExactlyRepresentAnyValueOf(myType)) {
+                    commonType = otherType;
+                }
+                else {
+                    throw new PlanningErrorException(
+                            "The "
+                            + schemaKindName
+                            + " column type and the statement output type for column "
+                            + idx
+                            + " are incompatible.");
+                }
+            }
+            if (myType != commonType) {
+                changedSomething = true;
+                myColumn.setValueType(commonType);
+            }
+
+            // Now determine the length, and the "in bytes" flag if needed
+
+            assert (myType.isVariableLength() == otherType.isVariableLength());
+
+            // The type will be one of:
+            // - fixed size
+            // - VARCHAR (need special logic for bytes vs. chars)
+            // - Some other variable length type
+
+            int commonSize;
+            if (! myType.isVariableLength()) {
+                commonSize = myType.getLengthInBytesForFixedTypesWithoutCheck();
+            }
+            else if (myType == VoltType.STRING) {
+                boolean myInBytes = myColumn.getInBytes();
+                boolean otherInBytes = otherColumn.getInBytes();
+                if (myInBytes == otherInBytes) {
+                    commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
+                }
+                else {
+                    // one is in bytes and the other is in characters
+                    int mySizeInBytes = (myColumn.getInBytes() ? 1 : 4) * myColumn.getValueSize();
+                    int otherSizeInBytes = (otherColumn.getInBytes() ? 1 : 4) * otherColumn.getValueSize();
+                    if (! myColumn.getInBytes()) {
+                        myColumn.setInBytes(true);
+                        changedSomething = true;
+                    }
+
+                    commonSize = Math.max(mySizeInBytes, otherSizeInBytes);
+                    if (commonSize > VoltType.MAX_VALUE_LENGTH) {
+                        commonSize = VoltType.MAX_VALUE_LENGTH;
+                    }
+                }
+            }
+            else {
+                commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
+            }
+
+            if (commonSize != myColumn.getValueSize()) {
+                myColumn.setValueSize(commonSize);
+                changedSomething = true;
+            }
+        }
+        return changedSomething;
     }
 
 }

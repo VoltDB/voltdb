@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,32 +63,38 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("timestamptz", "TIMESTAMP");
         m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
         m_PostgreSQLTypeNames.put("varbit", "VARBINARY");
-        m_PostgreSQLTypeNames.put("char", "CHARACTER");
+        m_PostgreSQLTypeNames.put("char", "VARCHAR");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
         m_PostgreSQLTypeNames.put("unknown", "VARCHAR");  // this usually means a quoted string, e.g. 'abc'
         m_PostgreSQLTypeNames.put("geography", "GEOGRAPHY");
         // NOTE: what VoltDB calls "GEOGRAPHY_POINT" would also be called
         // "geography" by PostgreSQL, so this mapping is imperfect; however,
-        // so far this has not caused test failures
+        // so far this has not been a problem, since the only query transformer
+        // that specifies those two column types treats them the same
     }
+
+    // Used below (twice), for an UPSERT INTO SELECT statement
+    private static final String COLUMN_DEFN = "(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w"
+            + "+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/|\\|\\|)"
+            + "\\s*(\\w|')+)*(\\s+(ASC|DESC))?";
 
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
     // those will be ignored (similar to
     // voltdb/tests/scripts/examples/sql_coverage/StandardNormalizer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?",
+            "ORDER BY\\s+(?<column1>"+COLUMN_DEFN+")"
+            + "((?<column2>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column3>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column4>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column5>\\s*,\\s*"+COLUMN_DEFN+"))?"
+            + "((?<column6>\\s*,\\s*"+COLUMN_DEFN+"))?",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an ORDER BY clause, by adding (for each
     // order-by column) either NULLS FIRST or (after "DESC") NULL LAST, so
     // that PostgreSQL results will match VoltDB results
     private static final QueryTransformer orderByQueryTransformer
             = new QueryTransformer(orderByQuery)
-            .initialText("ORDER BY").suffix(" NULLS FIRST")
+            .initialText("ORDER BY ").suffix(" NULLS FIRST")
             .alternateSuffix("DESC", " NULLS LAST")
             .groups("column1", "column2", "column3", "column4", "column5", "column6");
 
@@ -122,7 +128,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     private static final QueryTransformer avgQueryTransformer
             = new QueryTransformer(avgQuery)
             .prefix("TRUNC ( ").suffix(" )").groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.INTEGER);
+            .useWholeMatch().columnType(ColumnType.INTEGER)
+            .allColumnsShouldMatchType();
 
     // Constants used in the two QueryTransformer's below,
     // divisionQueryTransformer & bigintDivisionQueryTransformer
@@ -146,8 +153,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             .prefix(DIVISION_QUERY_TRANSFORMER_PREFIX)
             .suffix(DIVISION_QUERY_TRANSFORMER_SUFFIX)
             .exclude(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
-            .groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.INTEGER);
+            .groups("column1", "column2").useWholeMatch()
+            .columnType(ColumnType.INTEGER).allColumnsShouldMatchType();
     // Also modifies a query containing expression1 / expression2, but in this
     // case at least one of the expressions is a BIGINT, which can complicate
     // matters (for very large values), so here we change it to:
@@ -162,8 +169,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(divisionQuery)
             .prefix(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
             .suffix(BIGINT_DIV_QUERY_TRANSFORMER_SUFFIX)
-            .groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.BIGINT);
+            .groups("column1", "column2").useWholeMatch()
+            .columnType(ColumnType.BIGINT);
 
     // Captures the use of CEILING(columnName) or FLOOR(columnName)
     private static final Pattern ceilingOrFloorQuery = Pattern.compile(
@@ -173,8 +180,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // function, where <i>columnName</i> is of an integer type, for which
     // PostgreSQL returns a numeric (non-integer) value, unlike VoltDB, which
     // returns an integer; so change it to:
-    // CAST ( CEILING(columnName) as INTEGER ), or
-    // CAST ( FLOOR(columnName) as INTEGER ), respectively.
+    // CAST ( CEILING(columnName) as BIGINT ), or
+    // CAST ( FLOOR(columnName) as BIGINT ), respectively.
     private static final QueryTransformer ceilingOrFloorQueryTransformer
             = new QueryTransformer(ceilingOrFloorQuery)
             .prefix("CAST( ").suffix(" as BIGINT)").groups("column")
@@ -316,6 +323,26 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(spaceQuery)
             .replacementText("REPEAT(' ', ").useWholeMatch();
 
+    // Captures the use of the STARTS WITH operator, including on a string
+    // (VARCHAR) constant containing up to 4 percent (%) signs
+    private static final Pattern startsWithQuery = Pattern.compile(
+            "(?<startswith>STARTS\\s+WITH)\\s+"
+            + "(?<string>'[^']*'|" + COLUMN_EXPRESSION_PATTERN + ")",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing 'STARTS WITH FOO' (where FOO may be any
+    // string in single-quotes or a column or column expression), which
+    // PostgreSQL does not support, and replaces it with:
+    //     LIKE REPLACE(REPLACE(FOO, '%', '\%'), '_', '\_') || '%',
+    // which is an equivalent that PostgreSQL does support; the two calls to
+    // PostgreSQL's REPLACE function are to escape any '%' or '_' characters,
+    // since PostgreSQL's LIKE operator treats these characters specially, but
+    // VoltDB's STARTS WITH does not.
+    private static final QueryTransformer startsWithQueryTransformer
+            = new QueryTransformer(startsWithQuery)
+            .groups("startswith", "string")
+            .groupReplacementText("LIKE",
+                    "REPLACE(REPLACE({string}, '%', '\\%'), '_', '\\_') || '%'")
+            .useWholeMatch();
 
     // Used in both versions, below, of an UPSERT statement: an
     // UPSERT INTO VALUES or an UPSERT INTO SELECT
@@ -408,6 +435,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     private static final QueryTransformer varbinaryConstantTransformer
             = new QueryTransformer(varbinaryConstant)
             .prefix("E'\\\\x").suffix("'").groups("bytes");
+
+    // Captures the use of CAST(FOO AS VARCHAR)
+    private static final Pattern castVarchar = Pattern.compile(
+            "CAST\\s*\\(\\s*(?<column>\\w*)\\s+AS\\s+VARCHAR\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a SQL statement containing CAST(FOO AS VARCHAR), where FOO is
+    // a VARCHAR column of some size, which PostgreSQL treats differently from
+    // VoltDB, and replaces it with CAST(FOO AS TEXT), which works better,
+    // particularly in the context of a Recursive CTE statement
+    private static final QueryTransformer castVarcharTransformer
+            = new QueryTransformer(castVarchar)
+            .prefix("CAST(").suffix(" AS TEXT)").groups("column")
+            .columnType(ColumnType.VARCHAR);
 
 
     // Captures the use of DROP TABLE T1 IF EXISTS (in DDL)
@@ -550,7 +590,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 logQueryTransformer, log10QueryTransformer,
                 secondQueryTransformer, weekdayQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
-                spaceQueryTransformer,
+                spaceQueryTransformer, castVarcharTransformer,
+                startsWithQueryTransformer,
                 upsertValuesQueryTransformer, upsertSelectQueryTransformer);
     }
 
@@ -576,7 +617,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @Override
     protected String getVoltColumnTypeName(String columnTypeName) {
         String equivalentTypeName = m_PostgreSQLTypeNames.get(columnTypeName);
-        return (equivalentTypeName == null) ? columnTypeName : equivalentTypeName;
+        return (equivalentTypeName == null) ? columnTypeName.toUpperCase() : equivalentTypeName;
     }
 
     /**
@@ -645,14 +686,18 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  takes care not to cause mismatched parentheses by including more
      *  close-parentheses than open-parentheses before the <i>suffix</i>: if the
      *  group does contain more close-parens than open-parens, the <i>suffix</i>
-     *  is inserted just after the matching close-parens (i.e., after the number
-     *  of close-parens that equals the number of open-parens), instead of at
-     *  the very end; but if there are no open-parens, then the <i>suffix</i> is
-     *  inserted just before the first close-parens.<p>
+     *  is inserted just before the first non-matching close-parens (i.e.,
+     *  before the first close-parens that does not have a corresponding
+     *  open-parens), instead of at the very end.<p>
+     *  Similarly, if there are more open-parentheses than close-parentheses,
+     *  then the <i>prefix</i> is inserted just after the last non-matching
+     *  open-parens (i.e., after the last open-parens that does not have a
+     *  corresponding close-parens).<p>
      *  Also, there is a special case when using the divisionQueryTransformer or
      *  bigintDivisionQueryTransformer (i.e., for 'expression1 / expression2'),
      *  in which case both the <i>prefix</i> and the <i>suffix</i> need to be
-     *  placed so as to not cause mismatched parentheses. */
+     *  placed so as to not cause mismatched parentheses on either side of the
+     *  division operator ('/'). */
     @Override
     protected String handleParens(String group, String prefix, String suffix, boolean debugPrint) {
         // Default values, which indicate that the prefix simply goes before
@@ -663,9 +708,30 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         int numOpenParens  = numOccurencesOfCharIn(group, '(');
         int numCloseParens = numOccurencesOfCharIn(group, ')');
 
+        if (debugPrint) {
+            System.out.println("    In PostgreSQLBackend.handleParens:");
+            System.out.println("      prefix: " + prefix);
+            System.out.println("      group : " + group);
+            System.out.println("      suffix: " + suffix);
+            System.out.println("      numOpenParens, numCloseParens: "+numOpenParens+", "+numCloseParens);
+        }
+
+        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
+        // something like: AVG(expression); check if the expression  has too
+        // many close-parentheses in it, and if so, put the suffix before the
+        // extra close-parentheses
+        if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
+            s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens + 1);
+
+        // Similarly, check if the expression has too many open-parentheses in
+        // it, and if so, put the prefix after the extra open-parentheses
+        } else if (numOpenParens > numCloseParens && !prefix.isEmpty()) {
+            p_index = indexOfNthOccurrenceOfCharIn(group, '(', numOpenParens-numCloseParens) + 1;
+        }
+
         // Special case, for divisionQueryTransformer or bigintDivisionQueryTransformer,
         // i.e., the group is something like: expression1 / expression2; check
-        // if the expressions have too many open- or close-parentheses in them
+        // if there are too many open-parentheses
         if (!group.toUpperCase().startsWith("AVG") && (
                 ( DIVISION_QUERY_TRANSFORMER_PREFIX.equals(prefix)
                         && DIVISION_QUERY_TRANSFORMER_SUFFIX.equals(suffix) )
@@ -678,34 +744,39 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 // a potentially ambiguous situation
                 System.out.println("\nWARNING: in PostgreSQLBackend.handleParens, "
                         + "numDivOperators is not 1: " + numDivOperators);
-                debugPrint = true;
+                if (!debugPrint) {
+                    System.out.println("In PostgreSQLBackend.handleParens:");
+                    System.out.println("  prefix: " + prefix);
+                    System.out.println("  group : " + group);
+                    System.out.println("  suffix: " + suffix);
+                    System.out.println("  numOpenParens, numCloseParens: "+numOpenParens+", "+numCloseParens);
+                    debugPrint = true;
+                }
             }
             if (numDivOperators > 0) {
                 div_index = group.indexOf('/');
-                String subgroup = group.substring(0, div_index);
-                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
-                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
-                if (numOpenParens > numCloseParens) {
-                    // Put the prefix after the last unmatched open parenthesis
-                    p_index = indexOfNthOccurrenceOfCharIn(subgroup, '(', numOpenParens-numCloseParens) + 1;
+                String preDiv = group.substring(0, div_index);
+                int numPreDivOpenParens  = numOccurencesOfCharIn(preDiv, '(');
+                int numPreDivCloseParens = numOccurencesOfCharIn(preDiv, ')');
+                String postDiv = group.substring(div_index);
+                int numPostDivOpenParens  = numOccurencesOfCharIn(postDiv, '(');
+                int numPostDivCloseParens = numOccurencesOfCharIn(postDiv, ')');
+                if (numPreDivOpenParens > numPreDivCloseParens) {
+                    // Put the prefix after the last unmatched open-parenthesis
+                    p_index = indexOfNthOccurrenceOfCharIn(preDiv, '(', numPreDivOpenParens-numPreDivCloseParens) + 1;
                 }
-                subgroup = group.substring(div_index);
-                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
-                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
-                if (numCloseParens > numOpenParens) {
-                    // Put the suffix before the first unmatched closed parenthesis
-                    s_index = div_index + indexOfNthOccurrenceOfCharIn(subgroup, ')', numOpenParens+1);
+                if (numPreDivOpenParens >= numPreDivCloseParens && numPostDivOpenParens < numPostDivCloseParens) {
+                    // Put the suffix before the first unmatched close-parenthesis
+                    s_index = div_index + indexOfNthOccurrenceOfCharIn(postDiv, ')', numPostDivOpenParens+1);
                 }
-            }
 
-        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
-        // something like: AVG(expression); check if the expression  has too
-        // many close-parentheses in it
-        } else if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
-            if (numOpenParens == 0) {
-                s_index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
-            } else {
-                s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
+                if (debugPrint) {
+                    System.out.println("    div_index: " + div_index);
+                    System.out.println("    preDiv   : " + preDiv);
+                    System.out.println("    postDiv  : " + postDiv);
+                    System.out.println("    numPreDivOpenParens,  numPreDivCloseParens : "+numPreDivOpenParens+", "+numPreDivCloseParens);
+                    System.out.println("    numPostDivOpenParens, numPostDivCloseParens: "+numPostDivOpenParens+", "+numPostDivCloseParens);
+                }
             }
         }
 
@@ -714,14 +785,36 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                          + group.substring(s_index);
 
         if (debugPrint) {
-            System.out.println("  In PostgreSQLBackend.handleParens:");
-            System.out.println("    p_index, s_index: " + p_index + ", " + s_index);
-            System.out.println("    prefix: " + prefix);
-            System.out.println("    group : " + group);
-            System.out.println("    suffix: " + suffix);
+            System.out.println("    p_index, s_index: " + p_index+", "+s_index);
             System.out.println("    result: " + result);
         }
 
+        return result;
+    }
+
+    /** Returns the specified String, after replacing certain simple "variables",
+     *  if any, such as {foo}, where "foo" is in the List of groupNames, with
+     *  the corresponding element in the List of groupValues. This handles the
+     *  simple cases in replaceGroupNameVariables below, that do not have to
+     *  do complicated substitutions of table and column names, or worry about
+     *  primary keys (e.g., for an UPSERT statement). */
+    protected String replaceSimpleGroupNameVariables(String str, List<String> groupNames,
+            List<String> groupValues, boolean debugPrint) {
+        String result = str;
+        int length = Math.min(groupNames.size(), groupValues.size());
+        for (int i=0; i < length; i++) {
+            if (groupNames  != null && groupNames.get(i)  != null &&
+                groupValues != null && groupValues.get(i) != null) {
+                result = result.replace("{"+groupNames.get(i)+"}", groupValues.get(i));
+            }
+        }
+        if (debugPrint) {
+            System.out.println("    In PostgreSQLBackend.replaceSimpleGroupNameVariables:");
+            System.out.println("      str        : " + str);
+            System.out.println("      groupNames : " + groupNames);
+            System.out.println("      groupValues: " + groupValues);
+            System.out.println("      result     : " + result);
+        }
         return result;
     }
 
@@ -755,10 +848,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     protected String replaceGroupNameVariables(String str, List<String> groupNames,
             List<String> groupValues, boolean debugPrint) {
         if (debugPrint) {
-            System.out.println("  In PostgreSQLBackend.replaceGroupNameVariables:");
-            System.out.println("    str        : " + str);
-            System.out.println("    groupNames : " + groupNames);
-            System.out.println("    groupValues: " + groupValues);
+            System.out.println("    In PostgreSQLBackend.replaceGroupNameVariables:");
+            System.out.println("      str        : " + str);
+            System.out.println("      groupNames : " + groupNames);
+            System.out.println("      groupValues: " + groupValues);
         }
         // If any of the inputs are null or empty, then never mind - just
         // return the original String (str)
@@ -767,7 +860,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             return str;
         }
 
-        // If a table was specified & found, use that; otherwise, never mind
+        // If a table was specified & found, use that; otherwise, just do a
+        // simple text replacement, e.g., replace "{foo}" with "bar", where
+        // "foo" is in the list of groupNames and "bar" is the corresponding
+        // element in the list of groupValues.
         // (Note: this table represents the main table in an UPSERT statement,
         // e.g., "T1", in: UPSERT INTO T1 ...)
         String table = null;
@@ -775,7 +871,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         if (index > -1 && index < groupValues.size()) {
             table = groupValues.get(index);
         } else {
-            return str;
+            return replaceSimpleGroupNameVariables(str, groupNames, groupValues, debugPrint);
         }
 
         // If column values were specified & found, use those; otherwise, never
@@ -950,16 +1046,16 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         }
         matcher.appendTail(modified_str);
         if (debugPrint) {
-            System.out.println("    table               : " + table);
-            System.out.println("    columnValues        : " + columnValues);
-            System.out.println("    primaryKeyColumns   : " + primaryKeyColumns);
-            System.out.println("    nonPrimaryKeyColumns: " + nonPrimaryKeyColumns);
-            System.out.println("    selectTables        : " + selectTables);
-            System.out.println("    columns             : " + columns);
-            System.out.println("    pkColumnValues      : " + pkColumnValues);
-            System.out.println("    pkWhereClause       : " + pkWhereClause);
-            System.out.println("    str                 : " + str);
-            System.out.println("    modified_str        : " + modified_str);
+            System.out.println("      table               : " + table);
+            System.out.println("      columnValues        : " + columnValues);
+            System.out.println("      primaryKeyColumns   : " + primaryKeyColumns);
+            System.out.println("      nonPrimaryKeyColumns: " + nonPrimaryKeyColumns);
+            System.out.println("      selectTables        : " + selectTables);
+            System.out.println("      columns             : " + columns);
+            System.out.println("      pkColumnValues      : " + pkColumnValues);
+            System.out.println("      pkWhereClause       : " + pkWhereClause);
+            System.out.println("      str                 : " + str);
+            System.out.println("      modified_str        : " + modified_str);
         }
         return modified_str.toString();
     }

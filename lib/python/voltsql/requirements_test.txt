@@ -1,0 +1,7 @@
+mock==2.0.0
+pytest==3.7.1
+Pygments==2.2.0
+sqlparse==0.2.4
+prompt_toolkit==2.0.4
+click==6.7
+tox==3.1.3

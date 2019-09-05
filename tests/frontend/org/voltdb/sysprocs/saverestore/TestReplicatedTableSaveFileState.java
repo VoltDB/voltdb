@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,11 +23,19 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Set;
 
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -36,14 +44,16 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
-import junit.framework.TestCase;
 
-public class TestReplicatedTableSaveFileState extends TestCase
+public class TestReplicatedTableSaveFileState
 {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private static final String TABLE_NAME = "test_table";
     private static final String DATABASE_NAME = "database";
 
-    @Override
+    @Before
     public void setUp()
     {
         m_state = new ReplicatedTableSaveFileState(TABLE_NAME, 0);
@@ -51,6 +61,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
     }
 
+    @Test
     public void testLoadOperation()
     {
         assertEquals(m_state.getTableName(), TABLE_NAME);
@@ -82,6 +93,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertTrue(sites.contains(3));
     }
 
+    @Test
     public void testInconsistentIsReplicated()
     {
         addHostToTestData(0);
@@ -112,6 +124,8 @@ public class TestReplicatedTableSaveFileState extends TestCase
      * Test the easiest possible restore plan: table is replicated before and
      * after save/restore, and every site has a copy of the table
      */
+    @Test
+    @Flaky(description="TestReplicatedTableSaveFileState.testEasyRestorePlan")
     public void testEasyRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator =
@@ -160,7 +174,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
-        checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
         catalog_creator.shutdown(null);
@@ -170,6 +183,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
      * Test the restore plan when one of the sites doesn't have access to
      * a copy of the table
      */
+    @Test
     public void testSiteMissingTableRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator = new MockVoltDB();
@@ -223,12 +237,11 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertFalse(test_plan[number_of_sites - 1].multipartition);
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[0],
                      TABLE_NAME);
-        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  CoreUtils.getHSIdFromHostAndSite( 3, 3));
+        assertEquals(3, test_plan[number_of_sites - 1].parameters.toArray()[1]);
 
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
-        checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
         catalog_creator.shutdown(null);
@@ -244,32 +257,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
     {
         m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, 0, "FALSE", 0, 2);
-    }
-
-    private void checkPlanDependencies(SynthesizedPlanFragment[] plan)
-    {
-        Set<Integer> aggregate_deps = new HashSet<Integer>();
-        for (int dependency_id : plan[plan.length - 1].inputDepIds)
-        {
-            aggregate_deps.add(dependency_id);
-        }
-        Set<Integer> plan_deps = new HashSet<Integer>();
-        for (int i = 0; i < plan.length - 1; ++i)
-        {
-            int fragment_dep = -1;
-            if (plan[i].fragmentId ==
-                SysProcFragmentId.PF_restoreLoadReplicatedTable)
-            {
-                fragment_dep = (Integer) plan[i].parameters.toArray()[1];
-            }
-            else if (plan[i].fragmentId ==
-                SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated)
-            {
-                fragment_dep = (Integer) plan[i].parameters.toArray()[2];
-            }
-            plan_deps.add(fragment_dep);
-        }
-        assertTrue(aggregate_deps.equals(plan_deps));
     }
 
     private ReplicatedTableSaveFileState m_state;

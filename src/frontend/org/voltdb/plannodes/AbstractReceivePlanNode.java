@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -84,7 +84,7 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
         assert (inputSchema.equals(outputSchema));
-        for (SchemaColumn col : outputSchema.getColumns()) {
+        for (SchemaColumn col : outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);

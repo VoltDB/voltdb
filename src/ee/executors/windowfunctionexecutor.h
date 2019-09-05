@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -200,6 +200,13 @@ private:
      * for each group and cannot be disabled.
      */
     void endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType);
+
+    /**
+    * Call endRow for each column after insertion to output tuple.  This will happen
+    * for each row and cannot be disabled.
+    */
+    void endRowForAggs(TableWindow &tableWindow, EdgeType edgeType);
+
     /**
      * Insert the output tuple.
      */

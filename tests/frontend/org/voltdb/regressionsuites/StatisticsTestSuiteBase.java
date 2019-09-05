@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
@@ -54,11 +55,6 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
                     +   "E_AGE INTEGER NOT NULL"
                     +   ");\n"
                     +   "DR TABLE EMPLOYEE;\n";
-
-    protected static final Class<?>[] PROCEDURES
-            = {
-                GoSleep.class
-            };
 
     public StatisticsTestSuiteBase(String name) {
         super(name);
@@ -236,7 +232,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
 
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(GoSleep.class, new ProcedurePartitionData("NEW_ORDER", "NO_W_ID"));
 
         // Enable asynchronous logging for test of commandlog test
         if (MiscUtils.isPro() && isCommandLogTest) {

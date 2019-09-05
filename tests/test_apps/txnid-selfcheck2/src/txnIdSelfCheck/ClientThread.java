@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -210,13 +210,12 @@ public class ClientThread extends BenchmarkThread {
                 cri.getStatusString().contains("EXPECTED ROLLBACK")) {
             return;
         }
-        // this implies bad data and is fatal
-        if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
-                (cri.getStatus() == ClientResponse.USER_ABORT)) {
-            hardStop("ClientThread had a proc-call exception that indicated bad data", cri);
-        }
         // other proc call exceptions are logged, but don't stop the thread
-        else {
+        if (cri.getStatus() == ClientResponse.CONNECTION_LOST ||
+                cri.getStatus() == ClientResponse.CONNECTION_TIMEOUT ||
+                cri.getStatus() == ClientResponse.SERVER_UNAVAILABLE ||
+                cri.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+
             log.warn("ClientThread had a proc-call exception that didn't indicate bad data: " + e.getMessage());
             log.warn(cri.toJSONString());
 
@@ -230,6 +229,10 @@ public class ClientThread extends BenchmarkThread {
             }
             while (m_client.getConnectedHostList().size() == 0);
 
+        }
+        // this implies bad data and is fatal
+        else{
+            hardStop("ClientThread had a proc-call exception that indicated bad data", cri);
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,13 +18,11 @@
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
 
-#include <vector>
-#include <deque>
 #include <stdint.h>
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 
-#include "common/Pool.hpp"
+#include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
 
 namespace voltdb
@@ -52,20 +50,20 @@ namespace voltdb
             // Since ExecutionSite is using monotonically increasing
             // token values, every new quanta we're asked to generate should be
             // larger than any token value we've seen before
-            assert(nextUndoToken > m_lastUndoToken);
-            assert(nextUndoToken > m_lastReleaseToken);
+            vassert(nextUndoToken > m_lastUndoToken);
+            vassert(nextUndoToken > m_lastReleaseToken);
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
-            if (m_undoDataPools.size() == 0) {
+            if (m_undoDataPools.empty()) {
                 pool = new Pool(TEMP_POOL_CHUNK_SIZE, 1);
             } else {
                 pool = m_undoDataPools.back();
                 m_undoDataPools.pop_back();
             }
-            assert(pool);
-            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool);
-            m_undoQuantums.push_back(undoQuantum);
-            return undoQuantum;
+            vassert(pool);
+            m_undoQuantums.emplace_back(createInstanceFromPool<UndoQuantum>(*pool,
+                     nextUndoToken, pool));
+            return m_undoQuantums.back();
         }
 
         /*
@@ -81,14 +79,13 @@ namespace voltdb
             // commenting out this assertion because it isn't valid (hugg 3/29/13)
             // if you roll back a proc that hasn't done any work, you can run
             // into this situation. Needs a better fix than this.
-            // assert(m_lastReleaseToken < m_lastUndoToken);
+            // vassert(m_lastReleaseToken < m_lastUndoToken);
 
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand
             // us the largest token value that definitely doesn't
             // exist; this will just result in all undo quanta being undone.
-            assert(undoToken >= m_lastReleaseToken);
-
+            vassert(undoToken >= m_lastReleaseToken);
             if (undoToken > m_lastUndoToken) {
                 // a procedure may abort before it sends work to the EE
                 // (informing the EE of its undo token. For example, it
@@ -99,26 +96,25 @@ namespace voltdb
             }
 
             m_lastUndoToken = undoToken - 1;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.back();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken < undoToken) {
-                    return;
+                   break;
                 }
 
                 m_undoQuantums.pop_back();
                 // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = undoQuantum->undo();
+                Pool *pool = UndoQuantum::undo(std::move(*undoQuantum));
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
+                } else {
+                    delete pool;
                 }
 
                 if(undoQuantumToken == undoToken) {
-                    return;
+                   break;
                 }
             }
         }
@@ -132,9 +128,9 @@ namespace voltdb
             //std::cout << "Releasing token " << undoToken
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
-            assert(m_lastReleaseToken < undoToken);
+            vassert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
@@ -143,13 +139,12 @@ namespace voltdb
 
                 m_undoQuantums.pop_front();
                 // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = undoQuantum->release();
+                Pool *pool = UndoQuantum::release(std::move(*undoQuantum));
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
+                } else {
+                    delete pool;
                 }
                 if(undoQuantumToken == undoToken) {
                     return;
@@ -160,13 +155,13 @@ namespace voltdb
         int64_t getSize() const
         {
             int64_t total = 0;
-            for (int i = 0; i < m_undoDataPools.size(); i++)
+            for (auto iter = m_undoDataPools.cbegin(); iter != m_undoDataPools.cend(); ++iter)
             {
-                total += m_undoDataPools[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
-            for (int i = 0; i < m_undoQuantums.size(); i++)
+            for (auto iter = m_undoQuantums.cbegin(); iter != m_undoQuantums.cend(); ++iter)
             {
-                total += m_undoQuantums[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
             return total;
         }

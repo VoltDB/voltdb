@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -360,6 +360,7 @@ class JavaBundle(object):
            cli.StringOption(None, '--client', 'clientport', 'specify the client port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internal', 'internalport', 'specify the internal port as [ipaddress:]port-number used to communicate between cluster nodes'),
            cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--drpublic', 'drpublic', 'Specifies the interface (ipaddress[:port-number]) advertised to consumer clusters as the DR interface, used in hosted environments where internal interfaces are not reachable'),
            cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port as [ipaddress:]port-number (1st of 3 sequential ports)'),
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
@@ -369,6 +370,7 @@ class JavaBundle(object):
 
 
     def start(self, verb, runner):
+        verb.add_options(cli.StringOption(None, '--credentials', "credentials", "contains username and password information"))
         pass
 
     def go(self, verb, runner):
@@ -539,6 +541,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
+        if runner.opts.drpublic:
+            final_args.extend(['drpublic', runner.opts.drpublic])
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])
@@ -587,6 +591,7 @@ class ConnectionBundle(object):
                            default_port = self.default_port),
             cli.StringOption('-p', '--password', 'password', "the connection password"),
             cli.StringOption('-u', '--user', 'username', 'the connection user name'),
+            cli.StringOption(None, '--credentials', 'credentials', 'the credentials file which contains user name and password'),
             cli.StringOption(None, '--ssl', 'ssl_config','''enable and config ssl''', default=None),
             cli.BooleanOption(None, '--kerberos', 'kerberos', '''enable kerberos'''))
 

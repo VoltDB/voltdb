@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,7 +51,6 @@ package org.voltdb.benchmark.tpcc.procedures;
 
 import java.util.Arrays;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -65,10 +64,6 @@ import org.voltdb.types.TimestampType;
 //return VoltTable[] has N element(s):
 //1) var_name, represented as a NxN table representing typeFOOBAR.
 
-@ProcInfo (
-    //partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = false
-)
 public class paymentByCustomerId extends VoltProcedure {
 
     final int misc_expected_string_len = 32 + 2 + 32 + 32 + 32 + 32 + 2 + 9 + 32 + 2 + 500;

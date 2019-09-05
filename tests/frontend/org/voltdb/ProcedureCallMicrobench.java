@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,7 +48,9 @@ public class ProcedureCallMicrobench {
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
-        pb.addProcedures(EmptyProcedure.class, MultivariateEmptyProcedure.class);
+        ProcedurePartitionData data = new ProcedurePartitionData("WAREHOUSE", "W_ID", "0");
+        pb.addProcedure(EmptyProcedure.class, data);
+        pb.addProcedure(MultivariateEmptyProcedure.class, data);
 
         pb.compile("procedureCallMicrobench.jar", siteCount, 0);
 
@@ -107,6 +109,7 @@ public class ProcedureCallMicrobench {
 
                 for (int i = 0; i < clientCount; i++) {
                     futures.add(executor.submit(new Callable<Integer>() {
+                        @Override
                         public Integer call() {
                             try {
                                 ClientConfig config = new ClientConfig("program", "none");

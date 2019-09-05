@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -376,9 +376,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem2.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -386,9 +383,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -432,9 +426,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem2.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -442,9 +433,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem4 = new Semaphore(0);
         LeaderNoticeHandler r4 = new LeaderNoticeHandler() {
@@ -452,9 +440,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem4.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -504,20 +489,12 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem1.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {
-            }
         };
         final Semaphore sem7 = new Semaphore(0);
         LeaderNoticeHandler r7 = new LeaderNoticeHandler() {
             @Override
             public void becomeLeader() {
                 sem7.release();
-            }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {
             }
         };
 
@@ -585,9 +562,6 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
-
-            @Override
-            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.List;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -96,7 +97,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         String colName = partitionCol.getTypeName();
         SchemaColumn scol =
                 new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
-        m_partitioningColumns = new ArrayList<SchemaColumn>();
+        m_partitioningColumns = new ArrayList<>();
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;
     }
@@ -104,7 +105,7 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public List<Index> getIndexes() {
         if (m_indexes == null) {
-            m_indexes = new ArrayList<Index>();
+            m_indexes = new ArrayList<>();
             for (Index index : m_table.getIndexes()) {
                 m_indexes.add(index);
             }
@@ -120,6 +121,14 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_columns.get(columnIndex).getTypeName();
     }
 
+    /*
+     * Process this tve named columnName.  Most often we just
+     * resolve the tve in the table of this scan.  But if this
+     * is a table which is a replacement for a derived table,
+     * we may need to return the expression which is in the
+     * display list for the derived table and update aliases
+     * in tves in that expression.
+     */
     @Override
     public AbstractExpression processTVE(TupleValueExpression tve, String columnName) {
         if (m_origSubqueryScan == null) {
@@ -139,12 +148,17 @@ public class StmtTargetTableScan extends StmtTableScan {
         // from the original column (T.C)
         Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
                 tve.getDifferentiator());
-        assert(columnIndex != null);
-        SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
-        assert(origColumnSchema != null);
-        String origColumnName = origColumnSchema.getColumnName();
+        if (columnIndex == null) {
+            throw new PlanningErrorException("Column <"
+                                                + columnName
+                                                + "> not found. Please update your query.",
+                                             1);
+        }
+        SchemaColumn originalSchemaColumn = m_origSubqueryScan.getSchemaColumn(columnIndex);
+        assert(originalSchemaColumn != null);
+        String origColumnName = originalSchemaColumn.getColumnName();
         // Get the original column expression and adjust its aliases
-        AbstractExpression colExpr = origColumnSchema.getExpression();
+        AbstractExpression colExpr = originalSchemaColumn.getExpression();
         List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(colExpr);
         for (TupleValueExpression subqTve : tves) {
             if (subqTve == colExpr) {
@@ -160,5 +174,10 @@ public class StmtTargetTableScan extends StmtTableScan {
 
     public void setOriginalSubqueryScan(StmtSubqueryScan origSubqueryScan) {
         m_origSubqueryScan = origSubqueryScan;
+    }
+
+    @Override
+    public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
+        return new TableLeafNode(nodeId, joinExpr, whereExpr, this);
     }
 }

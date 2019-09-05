@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,14 +18,14 @@
 #ifndef JSONFUNCTIONS_H_
 #define JSONFUNCTIONS_H_
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <string>
 #include <sstream>
 #include <algorithm>
 
-#include <jsoncpp/jsoncpp.h>
-#include <jsoncpp/jsoncpp-forwards.h>
+#include <json/json.h>
+#include <json/forwards.h>
 
 namespace voltdb {
 
@@ -278,7 +278,7 @@ private:
     }
 
     bool readChar(char& c) {
-        assert(m_head != NULL && m_tail != NULL);
+        vassert(m_head != NULL && m_tail != NULL);
         if (m_head == m_tail) {
             return false;
         }
@@ -288,27 +288,21 @@ private:
     }
 
     void throwInvalidPathError(const char* err) const {
-        char msg[1024];
-        snprintf(msg, sizeof(msg), "Invalid JSON path: %s [position %d]", err, m_pos);
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON path: %s [position %d]", err, m_pos);
     }
 
     void throwJsonFormattingError() const {
-        char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", m_reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", m_reader.getFormatedErrorMessages().c_str());
     }
 };
 
 /** implement the 2-argument SQL FIELD function */
 template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& docNVal = arguments[0];
     const NValue& pathNVal = arguments[1];
@@ -328,11 +322,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     }
 
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
     int32_t lenPath;
-    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
+    const char* pathChars = pathNVal.getObject_withoutNull(lenPath);
     std::string result;
     if (doc.get(pathChars, lenPath, result)) {
         return getTempStringValue(result.c_str(), result.length() - 1);
@@ -342,7 +336,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
 
 /** implement the 2-argument SQL ARRAY_ELEMENT function */
 template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& docNVal = arguments[0];
     if (docNVal.isNull()) {
@@ -357,7 +351,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
         return getNullStringValue();
     }
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     const std::string doc(docChars, lenDoc);
 
     int32_t index = indexNVal.castAsIntegerAndGetValue();
@@ -365,14 +359,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     Json::Value root;
     Json::Reader reader;
 
-    if ( ! reader.parse(doc, root)) {
-        char msg[1024];
+    if (! reader.parse(doc, root)) {
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
     }
 
     // only array type contains elements. objects, primitives do not
@@ -417,20 +408,17 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     }
 
     int32_t lenDoc;
-    const char* docChars = getObject_withoutNull(&lenDoc);
+    const char* docChars = getObject_withoutNull(lenDoc);
     const std::string doc(docChars, lenDoc);
 
     Json::Value root;
     Json::Reader reader;
 
     if ( ! reader.parse(doc, root)) {
-        char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
+        throwSQLException(SQLException::data_exception_invalid_parameter,
+                "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
     }
 
     // only array type contains indexed elements. objects, primitives do not
@@ -446,7 +434,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
 
 /** implement the 3-argument SQL SET_FIELD function */
 template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
+    vassert(arguments.size() == 3);
 
     const NValue& docNVal = arguments[0];
     const NValue& pathNVal = arguments[1];
@@ -477,13 +465,13 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
     }
 
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
     int32_t lenPath;
-    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
+    const char* pathChars = pathNVal.getObject_withoutNull(lenPath);
     int32_t lenValue;
-    const char* valueChars = valueNVal.getObject_withoutNull(&lenValue);
+    const char* valueChars = valueNVal.getObject_withoutNull(lenValue);
 
     try {
         doc.set(pathChars, lenPath, valueChars, lenValue);

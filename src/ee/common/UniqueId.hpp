@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,16 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UNIQUEID_H_
-#define UNIQUEID_H_
+#pragma once
 
 #include "common/types.h"
-#include <cassert>
+#include "common/debuglog.h"
 #include <sstream>
 
 namespace voltdb
 {
-const static int64_t VOLT_EPOCH = 1199145600000000L;
+const static int64_t VOLT_EPOCH =           1199145600000000L;
 const static int64_t VOLT_EPOCH_IN_MILLIS = 1199145600000L;
 
 class UniqueId {
@@ -43,9 +42,9 @@ public:
         // compute the time in millis since VOLT_EPOCH_IN_MILLIS
         int64_t uniqueId = ts - VOLT_EPOCH_IN_MILLIS;
         // verify all fields are the right size
-        assert(uniqueId <= TIMESTAMP_MAX_VALUE);
-        assert(seqNo <= COUNTER_MAX_VALUE);
-        assert(partitionId <= PARTITIONID_MAX_VALUE);
+        vassert(uniqueId <= TIMESTAMP_MAX_VALUE);
+        vassert(seqNo <= COUNTER_MAX_VALUE);
+        vassert(partitionId <= PARTITIONID_MAX_VALUE);
 
         // put this time value in the right offset
         uniqueId = uniqueId << (COUNTER_BITS + PARTITIONID_BITS);
@@ -71,6 +70,13 @@ public:
     static int64_t ts(UniqueId uid) {
         int64_t time = uid >> (COUNTER_BITS + PARTITIONID_BITS);
         time += VOLT_EPOCH;
+        return time;
+    }
+
+    // Timestamp excluding the counter
+    static int64_t tsInMillis(UniqueId uid) {
+        int64_t time = uid >> (COUNTER_BITS + PARTITIONID_BITS);
+        time += VOLT_EPOCH_IN_MILLIS;
         return time;
     }
 
@@ -106,4 +112,4 @@ public:
     }
 };
 }
-#endif /* UNIQUEID_H_ */
+

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,8 +90,8 @@ public class ScanDeterminizer {
         }
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
-        if (scanNode.isSubQuery()) {
-            // This is a sub-query and can't have indexes
+        if (! scanNode.isPersistentTableScan()) {
+            // This is a subquery or common table and can't have indexes
             return plan;
         }
 

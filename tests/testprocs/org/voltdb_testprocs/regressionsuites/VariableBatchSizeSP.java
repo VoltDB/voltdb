@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,19 +23,15 @@
 
 package org.voltdb_testprocs.regressionsuites;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-@ProcInfo (
-    singlePartition = true,
-    partitionInfo = "P1.ID:0"
-)
 public class VariableBatchSizeSP extends VariableBatchSizeMP {
     // override the replicated write so this will compile
     final SQLStmt rWrite = new SQLStmt("update P1 set id = 1 where id = 1;");
 
     @Override
     public long run(long partitionParam, int[] opsForBatch1, int[] opsForBatch2) {
+        m_isSp = true;
         return super.run(partitionParam, opsForBatch1, opsForBatch2);
     }
 }

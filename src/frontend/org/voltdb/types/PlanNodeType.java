@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,36 +21,16 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexCountPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.MaterializedScanPlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.SwapTablesPlanNode;
-import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.plannodes.TupleScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
-import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
+import org.voltdb.plannodes.*;
 
 /**
+ * This is the type of plan nodes.
  *
+ * Note that this implements PlanMatcher.  A PlanNodeType object
+ * matches an AbstractPlanNode if the AbstractPlanNode's type is
+ * the PlanNodeType object.  This is used in testing plans.
  */
-public enum PlanNodeType {
+public enum PlanNodeType implements PlanMatcher {
     INVALID         (0, null), // for parsing...
 
     //
@@ -68,6 +48,7 @@ public enum PlanNodeType {
     //
     NESTLOOP        (20, NestLoopPlanNode.class),
     NESTLOOPINDEX   (21, NestLoopIndexPlanNode.class),
+    MERGEJOIN       (22, MergeJoinPlanNode.class),
 
     //
     // Operator Nodes
@@ -77,6 +58,7 @@ public enum PlanNodeType {
     DELETE          (32, DeletePlanNode.class),
     // UPSERT       (33, UpsertPlanNode.class),// UNUSED: Upserts are inserts.
     SWAPTABLES      (34, SwapTablesPlanNode.class),
+    MIGRATE          (35, MigratePlanNode.class),
 
     //
     // Communication Nodes
@@ -97,7 +79,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     WINDOWFUNCTION  (58, WindowFunctionPlanNode.class),
-    COMMONTABLE     (59, null),
+    COMMONTABLE     (59, CommonTablePlanNode.class),
     ;
 
     private final int val;
@@ -141,5 +123,14 @@ public enum PlanNodeType {
     public static PlanNodeType get(String name) {
         PlanNodeType ret = PlanNodeType.name_lookup.get(name.toLowerCase().intern());
         return (ret == null ? PlanNodeType.INVALID : ret);
+    }
+
+    @Override
+    public String match(AbstractPlanNode node) {
+        if (node.getPlanNodeType() == this) {
+            return null;
+        }
+        return "Expected a plan node of type " + this
+                + " in node " + node.getPlanNodeId() + ".";
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 #include "TupleOutputStream.h"
 #include "TupleOutputStreamProcessor.h"
 #include "tabletuple.h"
-#include <limits>
 
 namespace voltdb {
 
@@ -95,7 +94,7 @@ void TupleOutputStreamProcessor::close()
  * Expects buffer space was already checked.
  * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
+bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter, bool *deleteRow)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
@@ -104,7 +103,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
     // Predicates, if supplied, are one per output stream (previously asserted).
     StreamPredicateList::iterator ipredicate;
     std::vector<bool>::iterator iDeleteFlag;
-    assert(m_predicates != NULL);
+    vassert(m_predicates != NULL);
 
     if (!m_predicates->empty()) {
         ipredicate = m_predicates->begin();
@@ -122,7 +121,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
             // Keep walking through predicates in lock-step with the streams.
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.
-            assert(ipredicate != m_predicates->end());
+            vassert(ipredicate != m_predicates->end());
             if (accepted && deleteRow != NULL) {
                 (*deleteRow) = (*deleteRow) || *iDeleteFlag;
             }
@@ -135,7 +134,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            iter->writeRow(tuple);
+            iter->writeRow(tuple, hiddenColumnFilter);
 
             // Check if we'll need to yield after handling this row.
             if (!yield) {

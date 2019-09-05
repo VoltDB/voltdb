@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,25 +48,32 @@ public abstract class TopologyZKUtils {
     }
 
     public static AbstractTopology readTopologyFromZK(ZooKeeper zk) {
-        AbstractTopology topology = null;
         try {
-            byte[] data = zk.getData(VoltZK.topology, false, null);
-            String jsonTopology = new String(data, Charsets.UTF_8);
-            topology = AbstractTopology.topologyFromJSON(jsonTopology);
+            return readTopologyFromZK(zk, null);
         } catch (KeeperException | InterruptedException | JSONException e) {
             VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying", true, e);
         }
-        return topology;
+        return null;
+    }
+
+    public static AbstractTopology readTopologyFromZK(ZooKeeper zk, Stat stat)
+            throws KeeperException, InterruptedException, JSONException {
+        byte[] data = zk.getData(VoltZK.topology, false, stat);
+        String jsonTopology = new String(data, Charsets.UTF_8);
+        return AbstractTopology.topologyFromJSON(jsonTopology);
     }
 
     public static void updateTopologyToZK(ZooKeeper zk, AbstractTopology topology) {
-        Stat stat = new Stat();
         try {
-            zk.getData(VoltZK.topology, false, stat);
-            byte[] payload = topology.topologyToJSON().toString().getBytes(Charsets.UTF_8);
-            zk.setData(VoltZK.topology, payload, stat.getVersion());
+            updateTopologyToZK(zk, topology, -1);
         } catch (KeeperException | InterruptedException | JSONException e) {
             VoltDB.crashLocalVoltDB("Unable to update topology to ZK, dying", true, e);
         }
+    }
+
+    public static void updateTopologyToZK(ZooKeeper zk, AbstractTopology topology, int version)
+            throws KeeperException, InterruptedException, JSONException {
+        byte[] payload = topology.topologyToJSON().toString().getBytes(Charsets.UTF_8);
+        zk.setData(VoltZK.topology, payload, version);
     }
 }

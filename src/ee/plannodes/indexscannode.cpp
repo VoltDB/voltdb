@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,9 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "indexscannode.h"
-
-#include "common/debuglog.h"
-#include "expressions/abstractexpression.h"
 
 #include <sstream>
 
@@ -104,6 +101,10 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
     m_lookup_type = stringToIndexLookup(lookupTypeString);
+
+    if (obj.hasKey("HAS_OFFSET_RANK")) {
+        m_hasOffsetRank = obj.valueForKey("HAS_OFFSET_RANK").asBool();
+    }
 
     std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
     m_sort_direction = stringToSortDirection(sortDirectionString);

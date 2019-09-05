@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,15 +43,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
-#include "common/SerializableEEException.h"
-#include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
-#include "catalog/index.h"
-#include "expressions/tuplevalueexpression.h"
-#include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
 #include "indexes/CompactingTreeMultiMapIndex.h"
@@ -229,7 +224,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     const TupleSchema *tupleSchema = scheme.tupleSchema;
-    assert(tupleSchema);
+    vassert(tupleSchema);
     bool isIntsOnly = true;
     bool isInlinesOrColumnsOnly = true;
     std::vector<ValueType> keyColumnTypes;
@@ -294,7 +289,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     TupleSchema *keySchema = TupleSchema::createKeySchema(keyColumnTypes, keyColumnLengths, keyColumnInBytes);
-    assert(keySchema);
+    vassert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);
     TableIndex *retval = picker.getInstance();

@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <export enabled="true" target="jdbc">
-        <configuration>
+        <configuration enabled="true" target="abc" type="jdbc">
             <property name="jdbcurl">jdbc:postgresql://localhost/vexport</property>
             <property name="jdbcuser">vexport</property>
         </configuration>

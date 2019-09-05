@@ -43,6 +43,7 @@ begin Database                       "A set of schema, procedures and other meta
   Function*  functions               "The set of user-defined functions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  Task*  tasks                       "The set of configured tasks"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
   string securityprovider            "The security provider used to authenticate users"
 end
@@ -92,6 +93,7 @@ end
 
 begin User javaonly
   GroupRef* groups
+  string password "encrypted password version for catalog comparison usage"
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
   string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
 end
@@ -164,6 +166,17 @@ begin Table                                  "A table (relation) in the database
   int tuplelimit                             "A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
+  TimeToLive* timeToLive                     "Time to live"
+  int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
+  string migrationTarget                     "The target where the data are migrated to"
+end
+
+begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"
+  int ttlValue                        "time value-life span of data"
+  string ttlUnit                      "time unit, second, minute, hour or day. default: second"
+  Column? ttlColumn                   "A column used to determine the duration of data"
+  int batchSize                       "Number of tuples to be deleted in a batch. default: 1000"
+  int maxFrequency                    "Maximal number of times of deleting batchSize rows per second.default: 1"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
@@ -243,6 +256,7 @@ end
 begin Index                        "A index structure on a database table's columns"
   bool unique                      "May the index contain duplicate keys?"
   bool assumeUnique                "User allow unique index on partition table without including partition key?"
+  bool migrating                   "Does this index implicitly include hidden migrating column of a migrating table?"
   bool countable                   "Index counter feature"
   int type                         "What data structure is the index using and what kinds of keys does it support?"
   ColumnRef* columns               "Columns referenced by the index"
@@ -297,4 +311,23 @@ begin SnapshotSchedule javaonly "A schedule for the database to follow when crea
   int frequencyValue            "Frequency in some unit"
   int retain                    "How many snapshots to retain"
   string prefix                 "Prefix for snapshot filenames"
+end
+
+begin TaskParameter javaonly
+  int index                     "Index of this parameter in the set of parameters to pass to the scheduler"
+  string parameter              "Parameter to be passed to the scheduler constructor"
+end
+
+begin Task javaonly "Defined tasks which run on a schedule"
+  bool enabled                              "Whether or not this task is enabled"
+  string name                               "Name of the task"
+  string schedulerClass                     "Class which defines the action scheduler"
+  TaskParameter* schedulerParameters        "The set of parameters to the action scheduler"
+  string actionGeneratorClass               "Class which defines the action generator"
+  TaskParameter* actionGeneratorParameters  "The set of parameters to the action generator"
+  string scheduleClass                      "Class which defines the action schedule"
+  TaskParameter* scheduleParameters         "The set of parameters to the action schedule"
+  string scope                              "Where this task should be executed"
+  string onError                            "How procedure errors should be hanlded"
+  string user                               "User to be used when executing procedures"
 end

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,8 +49,7 @@ public class TestOrderBySuite extends RegressionSuite {
      * A_POOL_STR VARCHAR(1024), PRIMARY_KEY (PKEY) );
      */
 
-    static final Class<?>[] PROCEDURES = {InsertO1.class,
-                                          InsertO3.class,
+    static final Class<?>[] MP_PROCEDURES = {InsertO3.class,
                                           OrderByCountStarAlias.class,
                                           OrderByNonIndex.class,
                                           OrderByOneIndex.class };
@@ -864,10 +863,16 @@ public class TestOrderBySuite extends RegressionSuite {
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Partitions Result sets are ordered by index with LIMIT/OFFSET
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY LIMIT 3 OFFSET 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{4}, {5}, {6}};
+        validateTableOfLongs(vt, expected);
+
         sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{4}, {3}, {2}};
         validateTableOfLongs(vt, expected);
+
         sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{7}, {6}, {5}};
@@ -902,12 +907,13 @@ public class TestOrderBySuite extends RegressionSuite {
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) does not cover ORDER BY expressions (P_D3 / 5, P_D2)
+        // Trivial coordinator makes MERGE RECEIVE possible
         sql = "select P_D0 from P where P.P_D3 / 10 > 0 order by P_D3 / 5, P_D2";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {0}, {2}, {3}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertFalse(vt.toString().contains("MERGE RECEIVE"));
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // P_D0 is a partition column for P. All rows are from a single partition.
@@ -1171,7 +1177,8 @@ public class TestOrderBySuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(InsertO1.class, "O1.PKEY: 0");
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,6 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -33,18 +32,10 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    partitionInfo = "ADDED_TABLE.PKEY: 1",
-    singlePartition = true
-)
-
 public class InsertAddedTable extends VoltProcedure {
 
     public final SQLStmt i_addedtable = new SQLStmt
     ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-    public final SQLStmt i_addedtable_grp = new SQLStmt
-    ("INSERT INTO ADDED_TABLE_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
             String tablename,
@@ -79,12 +70,6 @@ public class InsertAddedTable extends VoltProcedure {
 
         if (tablename.equals("ADDED_TABLE")) {
             voltQueueSQL(i_addedtable, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("ADDED_TABLE_GRP")) {
-            voltQueueSQL(i_addedtable_grp, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
                          a_geography_point, a_geography);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,37 +18,24 @@
 #include "common/FatalException.hpp"
 
 #include <cxxabi.h>   // for abi
-#include <execinfo.h> // for backtrace, backtrace_symbols
-
-#include <cstring> // for strn*
-#include <dlfcn.h>
-#include <stdio.h> // for fopen, fprintf, fclose
-#include <string.h>
-#include "common/debuglog.h"
 
 #ifdef MACOSX // mac os requires _XOPEN_SOURCE for ucontext for some reason
 #define _XOPEN_SOURCE
 #endif
-#include <ucontext.h>
 
 namespace voltdb {
-FatalException::FatalException(std::string message,
-                               const char *filename, unsigned long lineno,
-                               std::string backtrace_path)
-  : m_reason(message)
-  , m_filename(filename), m_lineno(lineno)
-  , m_backtracepath(backtrace_path)
-{
+FatalException::FatalException(std::string const& message,
+        const char *filename, unsigned long lineno, std::string const& backtrace_path) :
+    m_reason(message), m_filename(filename), m_lineno(lineno),
+    m_backtracepath(backtrace_path) {
     FILE *bt = fopen(m_backtracepath.c_str(), "a+");
-
     if (bt) {
         StackTrace::printMangledAndUnmangledToFile(bt);
         fclose(bt);
     }
 }
 
-void FatalException::reportAnnotations(const std::string& str)
-{
+void FatalException::reportAnnotations(const std::string& str) {
     FILE *bt = fopen(m_backtracepath.c_str(), "a+");
     if (!bt) {
         return;
@@ -59,29 +46,24 @@ void FatalException::reportAnnotations(const std::string& str)
 }
 
 FatalLogicError::FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno)
-  : FatalLogicErrorBaseInitializer("FatalLogicError")
-  , m_fatality(buffer, filename, lineno)
-{
+  : FatalLogicErrorBaseInitializer("FatalLogicError"), m_fatality(buffer, filename, lineno) {
     initWhat();
 }
 
-FatalLogicError::~FatalLogicError() throw () {} // signature required by exception base class?
+FatalLogicError::~FatalLogicError() noexcept {} // signature required by exception base class?
 
-void FatalLogicError::initWhat()
-{
+void FatalLogicError::initWhat() {
     std::ostringstream buffer;
     buffer << m_fatality;
     m_whatwhat = buffer.str();
 }
 
-void FatalLogicError::appendAnnotation(const std::string& buffer)
-{
+void FatalLogicError::appendAnnotation(const std::string& buffer) {
     m_whatwhat += buffer;
     m_fatality.reportAnnotations(buffer);
 }
 
-const char* FatalLogicError::what() const throw()
-{
+const char* FatalLogicError::what() const throw() {
     return m_whatwhat.c_str();
 }
 

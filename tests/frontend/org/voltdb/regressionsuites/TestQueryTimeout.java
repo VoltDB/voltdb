@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -508,16 +509,17 @@ public class TestQueryTimeout extends RegressionSuite {
     public TestQueryTimeout(String name) {
         super(name);
     }
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadOnlyProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadWriteProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedWriteReadProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadOnlyProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadWriteProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionWriteReadProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.SPPartitionReadOnlyProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.AdHocPartitionReadOnlyProc.class
     };
+
+
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -544,7 +546,10 @@ public class TestQueryTimeout extends RegressionSuite {
         catch (IOException e) {
             fail();
         }
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.querytimeout.SPPartitionReadOnlyProc.class,
+                new ProcedurePartitionData("P1", "PHONE_NUMBER", "0"));
+
         project.setQueryTimeout(TIMEOUT_NORMAL);
 
         UserInfo users[] = new UserInfo[] {

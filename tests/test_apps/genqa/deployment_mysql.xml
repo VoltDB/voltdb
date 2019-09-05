@@ -4,8 +4,8 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true" target="jdbc">
-        <configuration>
+    <export>
+        <configuration enabled="true" target="abc" type="jdbc">
             <property name="jdbcurl">jdbc:mysql://localhost:3306/mysql?zeroDateTimeBehavior=convertToNull</property>
             <property name="jdbcuser">root</property>
             <property name="schema">vexport</property>

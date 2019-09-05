@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,15 +26,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientResponseWithPartitionKey;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -83,22 +86,17 @@ public class ProcedureRunnerNT {
     protected String m_appStatusString = null;
     protected final boolean m_isAdmin;
 
-    ProcedureRunnerNT(long id,
-                      AuthUser user,
-                      Connection ccxn,
-                      boolean isAdmin,
-                      long ciHandle,
-                      long clientHandle,
-                      int timeout,
-                      VoltNonTransactionalProcedure procedure,
-                      String procName,
-                      Method procMethod,
-                      Class<?>[] paramTypes,
-                      ExecutorService executorService,
-                      NTProcedureService procSet,
-                      Mailbox mailbox,
-                      ProcedureStatsCollector statsCollector)
-    {
+    // Track the outstanding all host procedures
+    private final Object m_allHostCallbackLock = new Object();
+    private Set<Integer> m_outstandingAllHostProcedureHostIds;
+    private Map<Integer, ClientResponse> m_allHostResponses;
+    private CompletableFuture<Map<Integer, ClientResponse>> m_allHostFut;
+
+    ProcedureRunnerNT(
+            long id, AuthUser user, Connection ccxn, boolean isAdmin, long ciHandle, long clientHandle, int timeout,
+            VoltNonTransactionalProcedure procedure, String procName, Method procMethod, Class<?>[] paramTypes,
+            ExecutorService executorService, NTProcedureService procSet, Mailbox mailbox,
+            ProcedureStatsCollector statsCollector) {
         m_id = id;
         m_user = user;
         m_ccxn = ccxn;
@@ -144,11 +142,6 @@ public class ProcedureRunnerNT {
         }
     }
 
-    Object m_allHostCallbackLock = new Object();
-    Set<Integer> m_outstandingAllHostProcedureHostIds;
-    Map<Integer,ClientResponse> m_allHostResponses;
-    CompletableFuture<Map<Integer,ClientResponse>> m_allHostFut;
-
     /**
      * This is called when an all-host proc responds from a particular node.
      * It completes the future when all of the
@@ -157,22 +150,24 @@ public class ProcedureRunnerNT {
      * Since this is just for sysprocs, VoltDB devs making sysprocs should know
      * that string app status doesn't work.
      */
-    public synchronized void allHostNTProcedureCallback(ClientResponse clientResponse) {
-        int hostId = Integer.parseInt(clientResponse.getAppStatusString());
-        boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
-        // log this for now... I don't expect it to ever happen, but will be interesting to see...
-        if (!removed) {
-            tmLog.error(String.format(
-                      "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
-                      m_procedureName, hostId));
-            return;
-        }
+    public void allHostNTProcedureCallback(ClientResponse clientResponse) {
+        synchronized(m_allHostCallbackLock) {
+            int hostId = Integer.parseInt(clientResponse.getAppStatusString());
+            assert (m_outstandingAllHostProcedureHostIds != null);
+            boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
+            // log this for now... I don't expect it to ever happen, but will be interesting to see...
+            if (!removed) {
+                tmLog.error(String.format(
+                          "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
+                          m_procedureName, hostId));
+                return;
+            }
 
-        m_allHostResponses.put(hostId, clientResponse);
-        if (m_outstandingAllHostProcedureHostIds.size() == 0) {
-            m_outstandingAllHostProc.set(false);
-
-            m_allHostFut.complete(m_allHostResponses);
+            m_allHostResponses.put(hostId, clientResponse);
+            if (m_outstandingAllHostProcedureHostIds.size() == 0) {
+                m_outstandingAllHostProc.set(false);
+                m_allHostFut.complete(m_allHostResponses);
+            }
         }
     }
 
@@ -185,6 +180,64 @@ public class ProcedureRunnerNT {
         return cb.fut();
     }
 
+    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(final String procedureName, final Object... params) {
+        final Object[] args = new Object[params.length + 1];
+        System.arraycopy(params, 0, args, 1, params.length);
+
+        // get the partition keys
+        VoltTable keys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+
+        @SuppressWarnings("unchecked")
+        final CompletableFuture<ClientResponse>[] futureList = (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
+        final int[] keyList = new int[keys.getRowCount()];
+
+        // get a list of all keys and call the procedure for each
+        keys.resetRowPosition();
+        for (int i = 0; keys.advanceRow(); i++) {
+            keyList[i] = (int) keys.getLong(1);
+            args[0] = keyList[i];
+            futureList[i] = callProcedure(procedureName, args);
+        }
+
+        // create the block to handle the procedure responses
+        Function<Void, ClientResponseWithPartitionKey[]> processResponses = v -> {
+            final ClientResponseWithPartitionKey[] crs = new ClientResponseWithPartitionKey[futureList.length];
+            for (int j = 0; j < futureList.length; ++j) {
+                ClientResponse cr2 = null;
+                try {
+                    cr2 = futureList[j].get();
+                } catch (InterruptedException | ExecutionException e) {
+                    cr2 = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.toString());
+                }
+
+                crs[j] = new ClientResponseWithPartitionKey(keyList[j], cr2);
+            }
+            return crs;
+        };
+
+        // make a meta-future that waits on all individual responses
+        CompletableFuture<Void> gotAllResponsesCF = CompletableFuture.allOf(futureList);
+
+        // block until all responses have been received then call the block to process them
+        return gotAllResponsesCF.thenApply(processResponses).exceptionally(t -> {
+            // exception handling code should be called very rarely
+
+            // this checks for really bad things and tries not to swallow them
+            // it's probably overkill here because we're not directly calling user code
+            if (CoreUtils.isStoredProcThrowableFatalToServer(t)) {
+                throw (Error) t;
+            }
+
+            // get an appropriate error response
+            ClientResponse cr = ProcedureRunner.getErrorResponse(
+                    m_procedureName, true, 0, m_appStatusCode, m_appStatusString,
+                    null, t);
+            // wrap this with the right type for the response
+            ClientResponseWithPartitionKey crwpk = new ClientResponseWithPartitionKey(0, cr);
+            return new ClientResponseWithPartitionKey[] { crwpk };
+        });
+    }
+
     /**
      * Send an invocation directly to each host's CI mailbox.
      * This ONLY works for NT procedures.
@@ -192,47 +245,35 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
         // only one of these at a time
-        if (m_outstandingAllHostProc.get()) {
+        if (!m_outstandingAllHostProc.compareAndSet(false, true)) {
             throw new VoltAbortException(new IllegalStateException("Only one AllNodeNTProcedure operation can be running at a time."));
         }
-        m_outstandingAllHostProc.set(true);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName(procName);
         invocation.setParams(params);
         invocation.setClientHandle(m_id);
 
-        final Iv2InitiateTaskMessage workRequest =
-                new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                                           m_mailbox.getHSId(),
-                                           Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                                           m_id,
-                                           m_id,
-                                           true,
-                                           false,
-                                           invocation,
-                                           m_id,
-                                           ClientInterface.NT_REMOTE_PROC_CID,
-                                           false);
+        final Iv2InitiateTaskMessage workRequest = new Iv2InitiateTaskMessage(
+                m_mailbox.getHSId(), m_mailbox.getHSId(), TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE,
+                m_id, m_id, true, false, invocation, m_id, ClientInterface.NT_REMOTE_PROC_CID,
+                false);
 
         m_allHostFut = new CompletableFuture<>();
         m_allHostResponses = new HashMap<>();
 
-        Set<Integer> liveHostIds = null;
-
         // hold this lock while getting the count of live nodes
         // also held when
+        long[] hsids;
         synchronized(m_allHostCallbackLock) {
             // collect the set of live client interface mailbox ids
-            liveHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
-            m_outstandingAllHostProcedureHostIds = liveHostIds;
+            m_outstandingAllHostProcedureHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
+            // convert host ids to hsids
+            hsids = m_outstandingAllHostProcedureHostIds.stream()
+                    .mapToLong(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
+                    .toArray();
         }
 
-        // convert host ids to hsids
-        long[] hsids = liveHostIds.stream()
-                .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                .mapToLong(x -> x)
-                .toArray();
         // send the invocation to all live nodes
         // n.b. can't combine this step with above because sometimes the callbacks comeback so fast
         //  you get a concurrent modification exception
@@ -283,9 +324,8 @@ public class ProcedureRunnerNT {
         // send the response to caller
         // must be done as IRM to CI mailbox for backpressure accounting
         response.setClientHandle(m_clientHandle);
-        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
-                                                                                       m_ccxn.connectionId(),
-                                                                                       response);
+        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(
+                m_ciHandle, m_ccxn.connectionId(), response);
         m_mailbox.deliver(irm);
 
         // remove record of this procedure in NTPS
@@ -314,9 +354,8 @@ public class ProcedureRunnerNT {
         // send the response to the caller
         // must be done as IRM to CI mailbox for backpressure accounting
         response.setClientHandle(m_clientHandle);
-        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
-                                                                                       m_ccxn.connectionId(),
-                                                                                       response);
+        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(
+                m_ciHandle, m_ccxn.connectionId(), response);
         m_mailbox.deliver(irm);
 
         m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
@@ -328,7 +367,7 @@ public class ProcedureRunnerNT {
      * async task still running.
      */
     private ClientResponseImpl coreCall(Object... paramListIn) {
-        VoltTable[] results = null;
+        final VoltTable[] results;
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -340,8 +379,8 @@ public class ProcedureRunnerNT {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
-                    " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
+                String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + m_paramTypes.length +
+                    " PARAMS, BUT RECEIVED " + paramList.length;
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                 return ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
@@ -352,8 +391,7 @@ public class ProcedureRunnerNT {
                     // check the result type in an assert
                     assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
                 } catch (Exception e) {
-                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
-                            ": " + e.toString();
+                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i + ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                     return ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
                 }
@@ -385,8 +423,7 @@ public class ProcedureRunnerNT {
 
                         if (innerRawResult instanceof ClientResponseImpl) {
                             response = (ClientResponseImpl) innerRawResult;
-                        }
-                        else {
+                        } else {
                             try {
                                 VoltTable[] r = ParameterConverter.getResultsFromRawResults(m_procedureName, innerRawResult);
                                 response = responseFromTableArray(r);
@@ -400,10 +437,8 @@ public class ProcedureRunnerNT {
                                         m_clientHandle);
                             }
                         }
-
                         completeCall(response);
-                    })
-                    .exceptionally(e -> {
+                    }).exceptionally(e -> {
                         //
                         // Exception path. Some bit of async work threw something.
                         //
@@ -413,8 +448,11 @@ public class ProcedureRunnerNT {
                         }
 
                         String msg = "PROCEDURE " + m_procedureName + " THREW EXCEPTION: ";
-                        if (se != null) msg += se.getMessage();
-                        else msg += e.toString();
+                        if (se != null) {
+                            msg += se.getMessage();
+                        } else {
+                            msg += e.toString();
+                        }
                         m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                         completeCall(ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, se));
                         return null;
@@ -423,13 +461,10 @@ public class ProcedureRunnerNT {
                     return null;
                 }
                 results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
-            }
-            catch (IllegalAccessException e) {
-                // If reflection fails, invoke the same error handling that other exceptions do
+            } catch (IllegalAccessException e) { // If reflection fails, invoke the same error handling that other exceptions do
                 throw new InvocationTargetException(e);
             }
-        }
-        catch (InvocationTargetException itex) {
+        } catch (InvocationTargetException itex) {
             //itex.printStackTrace();
             Throwable ex = itex.getCause();
             if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
@@ -437,16 +472,12 @@ public class ProcedureRunnerNT {
                 // a missing object that results in an error, throw the error and let the server deal with
                 // the condition as best as it can (usually a crashLocalVoltDB).
                 throw (Error)ex;
+            } else {
+                return ProcedureRunner.getErrorResponse(
+                        m_procedureName, true, 0, m_appStatusCode, m_appStatusString,
+                        null, ex);
             }
-            return ProcedureRunner.getErrorResponse(m_procedureName,
-                                                    true,
-                                                    0,
-                                                    m_appStatusCode,
-                                                    m_appStatusString,
-                                                    null,
-                                                    ex);
         }
-
         return responseFromTableArray(results);
     }
 
@@ -454,23 +485,14 @@ public class ProcedureRunnerNT {
         // don't leave empty handed
         if (results == null) {
             results = new VoltTable[0];
-        }
-        else if (results.length > Short.MAX_VALUE) {
+        } else if (results.length > Short.MAX_VALUE) {
             String statusString = "Stored procedure returns too much data. Exceeded maximum number of VoltTables: " + Short.MAX_VALUE;
             return new ClientResponseImpl(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    ClientResponse.GRACEFUL_FAILURE,
-                    statusString,
-                    new VoltTable[0],
+                    ClientResponse.GRACEFUL_FAILURE, ClientResponse.GRACEFUL_FAILURE, statusString, new VoltTable[0],
                     statusString);
         }
-
         return new ClientResponseImpl(
-                    m_statusCode,
-                    m_appStatusCode,
-                    m_appStatusString,
-                    results,
-                    m_statusString);
+                    m_statusCode, m_appStatusCode, m_appStatusString, results, m_statusString);
     }
 
     /**
@@ -480,9 +502,9 @@ public class ProcedureRunnerNT {
      * ICH and the other plumbing should handle regular, txn procs.
      */
     public void processAnyCallbacksFromFailedHosts(Set<Integer> failedHosts) {
-        synchronized(m_allHostCallbackLock) {
-            failedHosts.stream()
-                .forEach(i -> {
+        if (m_outstandingAllHostProcedureHostIds != null) {
+            synchronized (m_allHostCallbackLock) {
+                failedHosts.forEach(i -> {
                     if (m_outstandingAllHostProcedureHostIds.contains(i)) {
                         ClientResponseImpl cri = new ClientResponseImpl(
                                 ClientResponse.CONNECTION_LOST,
@@ -495,6 +517,7 @@ public class ProcedureRunnerNT {
                         allHostNTProcedureCallback(cri);
                     }
                 });
+            }
         }
     }
 

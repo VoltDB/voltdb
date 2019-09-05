@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -52,11 +53,11 @@ import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
+import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.planner.parseinfo.SubqueryLeafNode;
-import org.voltdb.planner.parseinfo.TableLeafNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
@@ -67,7 +68,7 @@ import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class AbstractParsedStmt {
 
-    public static final String TEMP_TABLE_NAME = "VOLT_TEMP_TABLE";
+    public static final String TEMP_TABLE_NAME = "$$_VOLT_TEMP_TABLE_$$";
     public static final String WINDOWED_AGGREGATE_COLUMN_NAME = "WINAGG_COLUMN";
 
     protected String m_contentDeterminismMessage = null;
@@ -76,7 +77,7 @@ public abstract class AbstractParsedStmt {
     public static int NEXT_STMT_ID = 0;
 
     // The unique id to identify the statement
-    public int m_stmtId;
+    private int m_stmtId;
 
     public String m_sql;
 
@@ -110,7 +111,7 @@ public abstract class AbstractParsedStmt {
     // the parser for possible use as a default join order.
     protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<>();
 
-    protected final String[] m_paramValues;
+    protected String[] m_paramValues;
     public final Database m_db;
 
     // Parent statement if any
@@ -125,6 +126,7 @@ public abstract class AbstractParsedStmt {
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
     private static final String DELETE_NODE_NAME = "delete";
+    private static final String MIGRATE_NODE_NAME = "migrate";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
     private static final String SWAP_NODE_NAME = "swap";
@@ -134,7 +136,8 @@ public abstract class AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    protected AbstractParsedStmt(String[] paramValues, Database db) {
+    protected AbstractParsedStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
     }
@@ -152,7 +155,8 @@ public abstract class AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    private static AbstractParsedStmt getParsedStmt(
+    protected static AbstractParsedStmt getParsedStmt(
+            AbstractParsedStmt parent,
             VoltXMLElement stmtTypeElement,
             String[] paramValues,
             Database db) {
@@ -165,25 +169,27 @@ public abstract class AbstractParsedStmt {
 
         // create non-abstract instances
         if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
-            retval = new ParsedInsertStmt(paramValues, db);
+            retval = new ParsedInsertStmt(parent, paramValues, db);
             if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
                 retval.m_isUpsert = true;
             }
         }
         else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
-            retval = new ParsedUpdateStmt(paramValues, db);
+            retval = new ParsedUpdateStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
-            retval = new ParsedDeleteStmt(paramValues, db);
+            retval = new ParsedDeleteStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
-            retval = new ParsedSelectStmt(paramValues, db);
+            retval = new ParsedSelectStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
-            retval = new ParsedUnionStmt(paramValues, db);
+            retval = new ParsedUnionStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
-            retval = new ParsedSwapStmt(paramValues, db);
+            retval = new ParsedSwapStmt(parent, paramValues, db);
+        } else if (stmtTypeElement.name.equalsIgnoreCase(MIGRATE_NODE_NAME)) {
+            retval = new ParsedMigrateStmt(parent, paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -199,7 +205,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param joinOrder
      */
-    private static void parse(AbstractParsedStmt parsedStmt, String sql,
+    protected static void parse(AbstractParsedStmt parsedStmt, String sql,
             VoltXMLElement stmtTypeElement, String joinOrder) {
         // parse tables and parameters
         parsedStmt.parseTablesAndParams(stmtTypeElement);
@@ -219,12 +225,12 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+    public static AbstractParsedStmt parse(AbstractParsedStmt parent, String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
             Database db, String joinOrder) {
 
         // reset the statement counters
         NEXT_STMT_ID = 0;
-        AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
+        AbstractParsedStmt retval = getParsedStmt(parent, stmtTypeElement, paramValues, db);
 
         parse(retval, sql, stmtTypeElement, joinOrder);
         return retval;
@@ -275,9 +281,12 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     void parseTablesAndParams(VoltXMLElement root) {
+
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
         parseParameters(root);
+
+        parseCommonTableExpressions(root);
 
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
@@ -288,6 +297,19 @@ public abstract class AbstractParsedStmt {
             }
         }
     }
+
+    /**
+     * Parse the common table expressions.  These are the
+     * tables found in the with clauses, if there are any.
+     * For now these CTEs are found only in select statements.
+     * So they are a noop for insert and delete.
+     * we may eventually have insert into select statements whose
+     * select subquery is a common table query.
+     *
+     * @param root
+     * @param stmtId TODO
+     */
+    abstract protected void parseCommonTableExpressions(VoltXMLElement root);
 
     /**Miscellaneous post parse activity
      * .
@@ -345,41 +367,30 @@ public abstract class AbstractParsedStmt {
                                  VoltXMLElement element);
     }
 
-    private static Map<String, XMLElementExpressionParser> m_exprParsers;
+    private static Map<String, XMLElementExpressionParser> m_exprParsers =
+            new HashMap<String, XMLElementExpressionParser>() {{
+                put("value",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseValueExpression(element));
+                put("vector",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseVectorExpression(element));
+                put("columnref",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseColumnRefExpression(element));
+                put("operation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseOperationExpression(element));
+                put("aggregation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseAggregationExpression(element));
+                put("asterisk",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> null);
+                put("win_aggregation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseWindowedAggregationExpression(element));
+                put("function",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseFunctionExpression(element));
+                put("tablesubquery",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseSubqueryExpression(element));
+                put("row",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseRowExpression(element));
 
-    static {
-        m_exprParsers = new HashMap<>();
-        m_exprParsers.put("value",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseValueExpression(element));
-        m_exprParsers.put("vector",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseVectorExpression(element));
-        m_exprParsers.put("columnref",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseColumnRefExpression(element));
-        m_exprParsers.put("operation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseOperationExpression(element));
-        m_exprParsers.put("aggregation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseAggregationExpression(element));
-        m_exprParsers.put("asterisk",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> null);
-        m_exprParsers.put("win_aggregation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseWindowedAggregationExpression(element));
-        m_exprParsers.put("function",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseFunctionExpression(element));
-        m_exprParsers.put("tablesubquery",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseSubqueryExpression(element));
-        m_exprParsers.put("row",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseRowExpression(element));
-    }
+            }};
 
     /**
      * Given a VoltXMLElement expression node, translate it into an
@@ -388,13 +399,12 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression parseExpressionNode(VoltXMLElement exprNode) {
         String elementName = exprNode.name.toLowerCase();
-        AbstractExpression retval = null;
 
         XMLElementExpressionParser parser = m_exprParsers.get(elementName);
         if (parser == null) {
-            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
+            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'", 0);
         }
-        retval = parser.parse(this, exprNode);
+        AbstractExpression retval = parser.parse(this, exprNode);
         assert("asterisk".equals(elementName) || retval != null);
         return retval;
     }
@@ -548,7 +558,17 @@ public abstract class AbstractParsedStmt {
 
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
-        // correlated queries it may not be THIS statement but its parent
+        // correlated queries or common table queries it may not be THIS statement
+        // but its parent.  For example, in the statement
+        //   with recursive rt as (
+        //       select ... base case
+        //     union all
+        //       select ... from data join rt on ... <---
+        //   ) select id from rt;  <===
+        // The reference to rt (marked <---) will be in the recursive
+        // parsed statement, but the reference to rt will be in the main
+        // parsed statement.  The scan is defined in the main parsed
+        // statement, and is in the main parsed statement's scan list.
         StmtTableScan tableScan = resolveStmtTableScanByAlias(tableAlias);
         if (tableScan == null) {
             // This never used to happen.  HSQL should make sure all the
@@ -559,7 +579,7 @@ public abstract class AbstractParsedStmt {
         }
         AbstractExpression resolvedExpr = tableScan.resolveTVE(tve);
 
-        if (m_stmtId == tableScan.getStatementId()) {
+        if ((tableScan instanceof StmtCommonTableScan) || (m_stmtId == tableScan.getStatementId())) {
             return resolvedExpr;
         }
 
@@ -728,6 +748,20 @@ public abstract class AbstractParsedStmt {
         return new RowSubqueryExpression(exprs);
     }
 
+    /**
+     * @return How many scans there are.
+     */
+    public int getScanCount() {
+        return m_tableAliasMap.size();
+    }
+
+    /**
+     * @return What are the aliases of all the scans.
+     */
+    public Set<String> getScanAliases() {
+        return m_tableAliasMap.keySet();
+    }
+
     public Collection<StmtTableScan> allScans() {
         return m_tableAliasMap.values();
     }
@@ -738,6 +772,10 @@ public abstract class AbstractParsedStmt {
      */
     public StmtTableScan getStmtTableScanByAlias(String tableAlias) {
         return m_tableAliasMap.get(tableAlias);
+    }
+
+    protected Set<Entry<String, StmtTableScan>> getScanEntrySet() {
+        return m_tableAliasMap.entrySet();
     }
 
     /**
@@ -824,7 +862,7 @@ public abstract class AbstractParsedStmt {
         // Only SELECT from a single TARGET TABLE is allowed
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
-        for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
+        for (Map.Entry<String, StmtTableScan> entry : selectSubquery.getScanEntrySet()) {
             if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
@@ -881,7 +919,7 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
-        AbstractExpression expr = null;
+        AbstractExpression expr;
 
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
@@ -1177,6 +1215,9 @@ public abstract class AbstractParsedStmt {
 
     private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("optype");
+        String tempId = exprNode.attributes.get("user_aggregate_id");
+        int userAggregateId = tempId == null ? -1 : Integer.parseInt(tempId);
+        String functionName = exprNode.attributes.get("name");
         ExpressionType exprType = ExpressionType.get(type);
 
         if (exprType == ExpressionType.INVALID) {
@@ -1201,7 +1242,7 @@ public abstract class AbstractParsedStmt {
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
 
-        AggregateExpression expr = new AggregateExpression(exprType);
+        AggregateExpression expr = new AggregateExpression(exprType, userAggregateId, functionName);
         expr.setLeft(childExpr);
 
         String node;
@@ -1303,6 +1344,7 @@ public abstract class AbstractParsedStmt {
         m_tableAliasListAsJoinOrder.add(tableAlias);
 
         VoltXMLElement subqueryElement = null;
+
         // Possible sub-query
         for (VoltXMLElement childNode : tableNode.children) {
             if ( ! childNode.name.equals("tablesubquery")) {
@@ -1325,13 +1367,18 @@ public abstract class AbstractParsedStmt {
         // In case of a subquery we need to preserve its filter expressions
         AbstractExpression simplifiedSubqueryFilter = null;
 
-        if (subqueryElement == null) {
-            table = getTableFromDB(tableName);
-            assert(table != null);
-            tableScan = addTableToStmtCache(table, tableAlias);
-            m_tableList.add(table);
-        }
-        else {
+        // This might be a common table, persistent table or a derived
+        // table, which we call a subquery.  We will know that it's the
+        // latter case if subqueryElement is non-null.  But we can't really
+        // differentiate between persistent tables and common tables.
+        // So, first look for derived tables, then common tables and
+        // finally persistent tables.
+        //
+        // First, look for a common table by its name.  This will
+        // return a new object which we need to define, or else
+        // null if we can't find it.
+        if (subqueryElement != null) {
+            // This has to be a derived table, which we call a subquery.
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
             StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
             tableScan = subqueryScan;
@@ -1357,7 +1404,26 @@ public abstract class AbstractParsedStmt {
                 }
             }
         }
-
+        else {
+            tableScan = resolveCommonTableByName(tableName, tableAlias);
+            if (tableScan != null) {
+                // Make the alias refer to the table scan we
+                // just found.
+                assert(tableScan instanceof StmtCommonTableScan);
+                defineTableScanByAlias(tableAlias, tableScan);
+            }
+            else {
+                // Well, this is not a common table, so look for a table in the catalog.
+                table = getTableFromDB(tableName);
+                if (table != null) {
+                    tableScan = addTableToStmtCache(table, tableAlias);
+                    m_tableList.add(table);
+                }
+            }
+        }
+        // It has to be one of the cases above.  Anything else is an
+        // internal error.  Perhaps this should be an assert?
+        assert(tableScan != null);
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
         if (simplifiedSubqueryFilter != null) {
@@ -1375,15 +1441,7 @@ public abstract class AbstractParsedStmt {
         int nodeId = (m_joinTree == null) ? 0 : m_joinTree.getId() + 1;
 
         JoinNode leafNode;
-        if (table != null) {
-            assert(tableScan instanceof StmtTargetTableScan);
-            leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
-        }
-        else {
-            assert(tableScan instanceof StmtSubqueryScan);
-            leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
-            leafNode.updateContentDeterminismMessage(((StmtSubqueryScan) tableScan).calculateContentDeterminismMessage());
-        }
+        leafNode = tableScan.makeLeafNode(nodeId, joinExpr, whereExpr);
 
         if (m_joinTree == null) {
             // this is the first table
@@ -1398,6 +1456,70 @@ public abstract class AbstractParsedStmt {
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
        }
+    }
+
+    /**
+     * Define a common table by alias.  This happens when a common
+     * table is defined in a "from" clause.  For example,
+     * in the SQL:  "select * from T as A" the table T is defined
+     * as the alias A.  See the declaration of m_commonTableNameMap.
+     *
+     * @param tableAlias
+     * @param tableScan
+     */
+    protected void defineTableScanByAlias(String tableAlias, StmtTableScan tableScan) {
+        m_tableAliasMap.put(tableAlias, tableScan);
+    }
+
+
+    /**
+     * Look for a common table by name, possibly in parent scopes.
+     * This is different from resolveStmtTableByAlias in that it
+     * looks for common tables and only by name, not by alias.  Of
+     * course, a name and an alias are both strings, so this is kind
+     * of a stylized distinction.
+     *
+     * @param tableName
+     * @return
+     */
+    private StmtCommonTableScan resolveCommonTableByName(String tableName, String tableAlias) {
+        StmtCommonTableScan answer = null;
+        StmtCommonTableScanShared scan = null;
+        for (AbstractParsedStmt scope = this; scope != null && scan == null; scope = scope.getParentStmt()) {
+            scan = scope.getCommonTableByName(tableName);
+        }
+        if (scan != null) {
+            answer = new StmtCommonTableScan(tableName, tableAlias, scan);
+        }
+        return answer;
+    }
+
+    private Map<String, StmtCommonTableScanShared> m_commonTableSharedMap = new HashMap<>();
+
+    private StmtCommonTableScanShared getCommonTableByName(String tableName) {
+        return m_commonTableSharedMap.get(tableName);
+    }
+    /**
+     * Lookup or define the shared part of a common table by name.  This happens when the
+     * common table name is first encountered.  For example,
+     * in the SQL: "with name as ( select * from ttt ) select name as a, name as b"
+     * the name "name" is a common table name.  It's not an
+     * alias.  This is comparable to defining a table name in
+     * the catalog, but it does not persist past the current
+     * statement.  So it does not make any sense to make it a
+     * catalog entry.
+     *
+     * @param tableName The table name, not the table alias.
+     */
+    protected StmtCommonTableScanShared defineCommonTableScanShared(String tableName, int stmtId) {
+        assert (m_commonTableSharedMap.get(tableName) == null);
+        StmtCommonTableScanShared answer = new StmtCommonTableScanShared(tableName, stmtId);
+        m_commonTableSharedMap.put(tableName, answer);
+        return answer;
+    }
+
+    private AbstractParsedStmt getParentStmt() {
+        return m_parentStmt;
     }
 
     /**
@@ -1476,7 +1598,7 @@ public abstract class AbstractParsedStmt {
                     pve.setParamIsVector();
                 }
                 m_paramsById.put(id, pve);
-                m_paramsByIndex.put(index, pve);
+                getParamsByIndex().put(index, pve);
             }
         }
     }
@@ -1485,12 +1607,12 @@ public abstract class AbstractParsedStmt {
      * may be overridden by subclasses, e.g., insert statements have a subquery
      * but does not use m_joinTree.
      **/
-    public List<StmtSubqueryScan> getSubqueryScans() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+    public List<StmtEphemeralTableScan> getEphemeralTableScans() {
+        List<StmtEphemeralTableScan> scans = new ArrayList<>();
         if (m_joinTree != null) {
-            m_joinTree.extractSubQueries(subqueries);
+            m_joinTree.extractEphemeralTableQueries(scans);
         }
-        return subqueries;
+        return scans;
     }
 
     // The parser currently attaches the summary parameter list
@@ -1507,7 +1629,7 @@ public abstract class AbstractParsedStmt {
     // in tables from an outer query.  These are represented as parameters
     // in the EE.
     protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
-        m_paramsByIndex.putAll(childStmt.m_paramsByIndex);
+        getParamsByIndex().putAll(childStmt.getParamsByIndex());
         m_parameterTveMap.putAll(childStmt.m_parameterTveMap);
     }
 
@@ -1523,6 +1645,12 @@ public abstract class AbstractParsedStmt {
         return m_joinTree.getAllEquivalenceFilters();
     }
 
+    /**
+     * Look up a table by name.  This table may be stored in the
+     * local catalog or else the global catalog.
+     * @param tableName
+     * @return
+     */
     protected Table getTableFromDB(String tableName) {
         Table table = m_db.getTables().getExact(tableName);
         return table;
@@ -1531,17 +1659,29 @@ public abstract class AbstractParsedStmt {
     @Override
     public String toString() {
         String retval = "SQL:\n\t" + m_sql + "\n";
+        String sep;
 
         retval += "PARAMETERS:\n\t";
-        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : m_paramsByIndex.entrySet()) {
-            retval += paramEntry.getValue().toString() + " ";
+        sep = "";
+        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : getParamsByIndex().entrySet()) {
+            retval += sep + paramEntry.getValue().toString();
+            sep = ", ";
         }
 
         retval += "\nTABLE SOURCES:\n\t";
+        sep = "";
         for (Table table : m_tableList) {
-            retval += table.getTypeName() + " ";
+            retval += sep + table.getTypeName();
+            sep = ", ";
         }
-
+        // Find the common table sources.
+        for (String commonTableName : m_tableAliasMap.keySet()) {
+            StmtTableScan scan = m_tableAliasMap.get(commonTableName);
+            if (scan instanceof StmtCommonTableScan) {
+                retval += sep + commonTableName + " (CTE)";
+                sep = ", ";
+            }
+        }
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;
         for (StmtTableScan tableScan : m_tableAliasMap.values()) {
@@ -1574,20 +1714,18 @@ public abstract class AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseFromSubQuery(VoltXMLElement queryNode) {
-        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
+        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
-        subquery.m_paramsByIndex = m_paramsByIndex;
+        subquery.setParamsByIndex(m_paramsByIndex);
 
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_joinOrder);
-        subquery.m_parentStmt = this;
         return subquery;
     }
 
     protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
-        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(suqueryElmt, m_paramValues, m_db);
+        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(this, suqueryElmt, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
-        subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
 
         AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_joinOrder);
@@ -1633,8 +1771,8 @@ public abstract class AbstractParsedStmt {
             return m_parentStmt.getParameters();
         }
 
-        return m_paramsByIndex.values().toArray(
-                new ParameterValueExpression[m_paramsByIndex.size()]);
+        return getParamsByIndex().values().toArray(
+                new ParameterValueExpression[getParamsByIndex().size()]);
     }
 
     public void setParentAsUnionClause() {
@@ -1792,7 +1930,7 @@ public abstract class AbstractParsedStmt {
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<>();
         for (ParsedColInfo col : orderByColumns()) {
-            AbstractExpression expr = col.expression;
+            AbstractExpression expr = col.m_expression;
             //
             // Compute the set of tables mentioned in the expression.
             //   1. Search out all the TVEs.
@@ -1929,7 +2067,7 @@ public abstract class AbstractParsedStmt {
         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence =
                 analyzeValueEquivalence();
         for (ParsedColInfo colInfo : candidateColumns) {
-            AbstractExpression colExpr = colInfo.expression;
+            AbstractExpression colExpr = colInfo.m_expression;
             if (colExpr instanceof TupleValueExpression) {
                 Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
                 if (tveEquivs != null) {
@@ -1981,7 +2119,7 @@ public abstract class AbstractParsedStmt {
             }
         }
         for (ParsedColInfo colInfo : candidateColumns) {
-            AbstractExpression expr = colInfo.expression;
+            AbstractExpression expr = colInfo.m_expression;
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
                 // If one of the indices is completely covered
@@ -2060,9 +2198,7 @@ public abstract class AbstractParsedStmt {
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
         assert(m_joinTree != null);
-        // TO DO: If performance is an issue,
-        // hard-code a tree walk that stops at the first subquery scan.
-        if ( ! getSubqueryScans().isEmpty()) {
+        if (m_joinTree.hasSubqueryScans() ) {
             return true;
         }
 
@@ -2249,12 +2385,35 @@ public abstract class AbstractParsedStmt {
     public Collection<String> calculateUDFDependees() {
         List<String> answer = new ArrayList<>();
         Collection<AbstractExpression> fCalls = findAllSubexpressionsOfClass(FunctionExpression.class);
+        Collection<AbstractExpression> aCalls = findAllSubexpressionsOfClass(AggregateExpression.class);
         for (AbstractExpression fCall : fCalls) {
             FunctionExpression fexpr = (FunctionExpression)fCall;
             if (fexpr.isUserDefined()) {
                 answer.add(fexpr.getFunctionName());
             }
         }
+        for (AbstractExpression aCall : aCalls) {
+            AggregateExpression aexpr = (AggregateExpression)aCall;
+            if (aexpr.isUserDefined()) {
+                answer.add(aexpr.getFunctionName());
+            }
+        }
         return answer;
+    }
+
+    public TreeMap<Integer, ParameterValueExpression> getParamsByIndex() {
+        return m_paramsByIndex;
+    }
+
+    public void setParamsByIndex(TreeMap<Integer, ParameterValueExpression> paramsByIndex) {
+        m_paramsByIndex = paramsByIndex;
+    }
+
+    public Integer getStmtId() {
+        return m_stmtId;
+    }
+
+    public void setStmtId(int id) {
+        m_stmtId = id;
     }
 }

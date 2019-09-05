@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -157,7 +157,8 @@ public class SocketExporter extends ExportClientBase {
         try {
             Socket pushSocket = new Socket(server, port);
             OutputStream out = pushSocket.getOutputStream();
-            m_logger.info("Connected to export endpoint node at: " + server + ":" + port);
+            m_logger.info("Connected to export endpoint node at: " + server +
+                    ":" + port + " using port " + pushSocket.getLocalPort());
             return out;
         } catch (UnknownHostException e) {
             m_logger.rateLimitedLog(120, Level.ERROR, e, "Don't know about host: " + server);
@@ -188,15 +189,12 @@ public class SocketExporter extends ExportClientBase {
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
                 .timeZone(m_timeZone)
                 .binaryEncoding(m_binaryEncoding)
-                .columnNames(source.columnNames)
-                .columnTypes(source.columnTypes)
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
             m_es =
                     CoreUtils.getListeningSingleThreadExecutor(
-                            "Socket Export decoder for partition " + source.partitionId
-                            + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                            "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
         }
 
         @Override
@@ -216,24 +214,29 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+        public boolean processRow(ExportRow rd) throws ExportDecoderBase.RestartBlockException {
             try {
-                if (haplist.isEmpty()) {
-                    connect();
-                }
-                if (haplist.isEmpty()) {
-                    m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
-                    throw new RestartBlockException(true);
-                }
-                ExportRowData rd = decodeRow(rowData);
-                String decoded = m_decoder.decode(null, rd.values).concat("\n");
+                String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);
                 buf.flip();
-                for (OutputStream hap : haplist.values()) {
-                    hap.write(buf.array());
-                    hap.flush();
+                m_atomicWorkLock.lock();
+                try {
+                    if (haplist.isEmpty()) {
+                        connect();
+                    }
+                    if (haplist.isEmpty()) {
+                        m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
+                        throw new RestartBlockException(true);
+                    }
+                    for (OutputStream hap : haplist.values()) {
+                        hap.write(buf.array());
+                        hap.flush();
+                    }
+                }
+                finally {
+                    m_atomicWorkLock.unlock();
                 }
             } catch (Exception e) {
                 m_logger.error(e.getLocalizedMessage());
@@ -245,7 +248,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion() {
+        public void onBlockCompletion(ExportRow row) {
             try {
                 for (OutputStream hap : haplist.values()) {
                     hap.flush();

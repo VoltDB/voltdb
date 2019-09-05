@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -57,13 +57,15 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 class Test;
 
 // Contains and runs a collection of tests.
 class TestSuite {
 public:
-    void registerTest(Test* (*test_factory)());
+    typedef Test * (*test_factory_t)();
+    void registerTest(test_factory_t);
 
     // Returns the number of failed tests.
     int runAll();
@@ -73,7 +75,7 @@ public:
     static TestSuite* globalInstance();
 
 private:
-    std::vector<Test* (*)()> test_factories_;
+    std::vector<test_factory_t> test_factories_;
 };
 
 // Base class for a single test. Each test creates a subclass of this that
@@ -111,6 +113,9 @@ public:
     RegisterTest(TestSuite* suite) {
         if (suite != NULL)
             suite->registerTest(&RegisterTest<T>::create);
+    }
+
+    ~RegisterTest() {
     }
 
     static Test* create() {
@@ -191,7 +196,7 @@ do { \
         STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
         fail(__FILE__, __LINE__, #one " " #operation " " #two); \
     } \
-} while (0)
+} while (false)
 
 #define EXPECT_EQ(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(==, one, two)
 #define EXPECT_NE(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(!=, one, two)

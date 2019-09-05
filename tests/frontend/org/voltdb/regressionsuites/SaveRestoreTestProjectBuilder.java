@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -38,11 +39,6 @@ import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreSelect;
 
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
-    public static Class<?> PROCEDURES[] =
-        new Class<?>[] { MatView.class, SaveRestoreSelect.class, GetTxnId.class};
-    public static Class<?> PROCEDURES_NOPARTITIONING[] =
-            new Class<?>[] { MatView.class, SaveRestoreSelect.class};
-
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
                         {"CHANGE_COLUMNS", "ID"},
@@ -56,12 +52,15 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
     public void addDefaultProcedures()
     {
-        addProcedures(PROCEDURES);
+        addProcedure(MatView.class);
+        addProcedure(SaveRestoreSelect.class);
+        addProcedure(GetTxnId.class, new ProcedurePartitionData("PARTITION_TESTER", "PT_ID"));
     }
 
     public void addDefaultProceduresNoPartitioning()
     {
-        addProcedures(PROCEDURES_NOPARTITIONING);
+        addProcedure(MatView.class);
+        addProcedure(SaveRestoreSelect.class);
     }
 
     public void addDefaultPartitioning()
@@ -88,11 +87,13 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addDefaultSchema();
         addDefaultPartitioning();
         addDefaultProcedures();
-        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
+        ProcedurePartitionData data = new ProcedurePartitionData("JUMBO_ROW", "PKEY");
+
+        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", data);
+        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", data);
         addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
-        addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)", data);
+        addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?", data);
     }
 
     /*

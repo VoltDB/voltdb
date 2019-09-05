@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,18 +15,17 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+//#include "common/UndoQuantum.h"
+#include "common/SynchronizedThreadLock.h"
 
-#include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
+#include "executors/insertexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
-#include "storage/DRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
+#include "storage/persistenttable.h"
+#include "plannodes/insertnode.h"
+#include "debuglog.h"
 
-#include "boost/foreach.hpp"
-
-#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-
-#include <pthread.h>
 #ifdef LINUX
 #include <malloc.h>
 #endif // LINUX
@@ -35,13 +34,25 @@ using namespace std;
 
 namespace voltdb {
 
-static pthread_key_t static_key;
-static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
+namespace {
+/**
+ * This is the pthread_specific key for the ExecutorContext
+ * of the logically executing site.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t logical_executor_context_static_key;
+/**
+ * This is the pthread_specific key for the Topend
+ * of the site actually executing.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t physical_topend_static_key;
+pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
 /**
  * This function will initiate global settings and create thread key once per process.
  * */
-static void globalInitOrCreateOncePerProcess() {
+void globalInitOrCreateOncePerProcess() {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
     // operating system (and thus reducing RSS) when freeing. See
@@ -52,7 +63,7 @@ static void globalInitOrCreateOncePerProcess() {
     // their default values.
 
     // Note: The parameters and default values come from looking at
-    // the glibc 2.5 source, which I is the version that shipps
+    // the glibc 2.5 source, which is the version that ships
     // with redhat/centos 5. The code seems to also be effective on
     // newer versions of glibc (tested againsts 2.12.1).
 
@@ -69,46 +80,30 @@ static void globalInitOrCreateOncePerProcess() {
     std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
-    (void)pthread_key_create(&static_key, NULL);
+    (void) pthread_key_create(&logical_executor_context_static_key, NULL);
+    (void) pthread_key_create(&physical_topend_static_key, NULL);
+    SynchronizedThreadLock::create();
 }
 
-ExecutorContext::ExecutorContext(int64_t siteId,
-                CatalogId partitionId,
-                UndoQuantum *undoQuantum,
-                Topend* topend,
-                Pool* tempStringPool,
-                VoltDBEngine* engine,
-                std::string hostname,
-                CatalogId hostId,
-                AbstractDRTupleStream *drStream,
-                AbstractDRTupleStream *drReplicatedStream,
-                CatalogId drClusterId) :
-    m_topend(topend),
-    m_tempStringPool(tempStringPool),
-    m_undoQuantum(undoQuantum),
-    m_staticParams(MAX_PARAM_COUNT),
-    m_usedParamcnt(0),
-    m_tuplesModifiedStack(),
-    m_executorsMap(NULL),
-    m_subqueryContextMap(),
-    m_drStream(drStream),
+}
+
+void globalDestroyOncePerProcess() {
+    SynchronizedThreadLock::destroy();
+    pthread_key_delete(logical_executor_context_static_key);
+    pthread_key_delete(physical_topend_static_key);
+    static_keyOnce = PTHREAD_ONCE_INIT;
+}
+
+ExecutorContext::ExecutorContext(int64_t siteId, CatalogId partitionId, UndoQuantum *undoQuantum,
+        Topend* topend, Pool* tempStringPool, VoltDBEngine* engine, std::string const& hostname,
+        CatalogId hostId, AbstractDRTupleStream *drStream, AbstractDRTupleStream *drReplicatedStream,
+        CatalogId drClusterId) : m_topend(topend), m_tempStringPool(tempStringPool),
+    m_undoQuantum(undoQuantum), m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
     m_engine(engine),
-    m_txnId(0),
-    m_spHandle(0),
-    m_uniqueId(0),
-    m_currentTxnTimestamp(0),
-    m_currentDRTimestamp(0),
-    m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
-    m_traceOn(false),
-    m_lastCommittedSpHandle(0),
-    m_siteId(siteId),
-    m_partitionId(partitionId),
-    m_hostname(hostname),
-    m_hostId(hostId),
-    m_drClusterId(drClusterId),
-    m_progressStats()
-{
+    m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024, siteId), // engine may be null in unit tests
+    m_siteId(siteId), m_partitionId(partitionId), m_hostname(hostname),
+    m_hostId(hostId), m_drClusterId(drClusterId) {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
 }
@@ -118,64 +113,89 @@ ExecutorContext::~ExecutorContext() {
 
     // currently does not own any of its pointers
 
-    VOLT_DEBUG("De-installing EC(%ld)", (long)this);
+    VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
-    pthread_setspecific(static_key, NULL);
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
 }
 
-void ExecutorContext::bindToThread()
-{
-    pthread_setspecific(static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+void ExecutorContext::assignThreadLocals(const EngineLocals& mapping) {
+    pthread_setspecific(logical_executor_context_static_key, const_cast<ExecutorContext*>(mapping.context));
+    ThreadLocalPool::assignThreadLocals(mapping);
+}
+
+void ExecutorContext::resetStateForTest() {
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
+    ThreadLocalPool::resetStateForTest();
+}
+
+void ExecutorContext::bindToThread() {
+    pthread_setspecific(logical_executor_context_static_key, this);
+    // At this point the logical and physical sites must be the
+    // same.  So the two top ends are identical.
+    pthread_setspecific(physical_topend_static_key, m_topend);
+    VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
-    return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
+    return static_cast<ExecutorContext*>(pthread_getspecific(logical_executor_context_static_key));
 }
 
-UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
-{
+Topend* ExecutorContext::getPhysicalTopend() {
+    (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
+    return static_cast<Topend *>(pthread_getspecific(physical_topend_static_key));
+}
+
+UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId) {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     return executeExecutors(executorList, subqueryId);
 }
 
-UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                         int subqueryId)
-{
+UniqueTempTableResult ExecutorContext::executeExecutors(
+      const std::vector<AbstractExecutor*>& executorList, int subqueryId) {
     // Walk through the list and execute each plannode.
     // The query planner guarantees that for a given plannode,
     // all of its children are positioned before it in this list,
     // therefore dependency tracking is not needed here.
     int ctr = 0;
-
     try {
-        BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert(executor);
+        for (AbstractExecutor *executor: executorList) {
+            vassert(executor);
 
             if (isTraceOn()) {
                 char name[32];
                 snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
-                m_topend->traceLog(true, name, NULL);
+                getPhysicalTopend()->traceLog(true, name, NULL);
             }
 
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
                 if (isTraceOn()) {
-                    m_topend->traceLog(false, NULL, NULL);
+                    getPhysicalTopend()->traceLog(false, NULL, NULL);
                 }
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
+                InsertExecutor* insertExecutor = dynamic_cast<InsertExecutor*>(executor);
+                if (insertExecutor != nullptr && insertExecutor->exceptionMessage() != nullptr) {
+                   throw SerializableEEException(insertExecutor->exceptionMessage());
+                } else {
+                   throw SerializableEEException("Unspecified execution error detected");
+                }
             }
 
             if (isTraceOn()) {
-                m_topend->traceLog(false, NULL, NULL);
+                getPhysicalTopend()->traceLog(false, NULL, NULL);
             }
 
             ++ctr;
         }
     } catch (const SerializableEEException &e) {
+        if (SynchronizedThreadLock::isInSingleThreadMode()) {
+            // Assign the correct pool back to this thread
+            SynchronizedThreadLock::signalLowestSiteFinished();
+        }
+
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.
@@ -189,8 +209,8 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         // But if an active executor can be that smart, an active executor with
         // (potential) inline children could also be smart enough to clean up
         // after its inline children, and this post-processing would not be needed.
-        BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert (executor);
+        for (AbstractExecutor *executor: executorList) {
+            vassert(executor);
             AbstractPlanNode * node = executor->getPlanNode();
             std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
             std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
@@ -199,7 +219,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 inlineNode->getExecutor()->cleanupMemoryPool();
             }
         }
-
         if (subqueryId == 0) {
             VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
         } else {
@@ -212,36 +231,31 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     return UniqueTempTableResult(result);
 }
 
-Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
-{
+Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
-    assert(!executorList.empty());
+    vassert(!executorList.empty());
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
-AbstractTempTable* ExecutorContext::getCommonTable(const std::string& tableName,
-                                                   int cteStmtId) {
+AbstractTempTable* ExecutorContext::getCommonTable(const std::string& tableName, int cteStmtId) {
     AbstractTempTable* table = NULL;
     auto it = m_commonTableMap.find(tableName);
     if (it == m_commonTableMap.end()) {
         UniqueTempTableResult result = executeExecutors(cteStmtId);
         table = result.release();
         m_commonTableMap.insert(std::make_pair(tableName, table));
-    }
-    else {
+    } else {
         table = it->second;
     }
 
     return table;
 }
 
-void ExecutorContext::cleanupAllExecutors()
-{
+void ExecutorContext::cleanupAllExecutors() {
     // If something failed before we could even instantiate the plan,
     // there won't even be an executors map.
     if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-        BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
+        for(auto& entry : *m_executorsMap) {
             int subqueryId = entry.first;
             cleanupExecutorsForSubquery(subqueryId);
         }
@@ -252,15 +266,15 @@ void ExecutorContext::cleanupAllExecutors()
     m_commonTableMap.clear();
 }
 
-void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
-    BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-        assert(executor);
+void ExecutorContext::cleanupExecutorsForSubquery(
+        const std::vector<AbstractExecutor*>& executorList) const {
+    for (AbstractExecutor *executor: executorList) {
+        vassert(executor);
         executor->cleanupTempOutputTable();
     }
 }
 
-void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
-{
+void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     cleanupExecutorsForSubquery(executorList);
 }
@@ -270,7 +284,7 @@ void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
     }
-    assert (m_tuplesModifiedStack.size() == 0);
+    vassert(m_tuplesModifiedStack.size() == 0);
 
     executorVector->resetLimitStats();
 }
@@ -282,11 +296,11 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 
     //Update stats in java and let java determine if we should cancel this query.
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
-    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
-                                        m_progressStats.LastAccessedPlanNodeType,
-                                        m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
-                                        allocated,
-                                        peak);
+
+    int64_t tupleReportThreshold = getPhysicalTopend()->fragmentProgressUpdate(
+            m_engine->getCurrentIndexInBatch(), m_progressStats.LastAccessedPlanNodeType,
+            m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
+            allocated, peak);
     m_progressStats.TuplesProcessedSinceReport = 0;
 
     if (tupleReportThreshold < 0) {
@@ -295,17 +309,15 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
         snprintf(buff, 100,
                 "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
-
         throw InterruptException(std::string(buff));
     }
     m_progressStats.TupleReportThreshold = tupleReportThreshold;
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
-    if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-        BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
-            BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+    if (m_executorsMap != nullptr) {
+        for(auto& entry : *m_executorsMap) {
+            for(auto const* executor : entry.second) {
                 if (! executor->outputTempTableIsEmpty()) {
                     return false;
                 }
@@ -317,9 +329,9 @@ bool ExecutorContext::allOutputTempTablesAreEmpty() const {
 }
 
 void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
-    assert (m_drStream != NULL);
-    assert (drStream != NULL);
-    assert (m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
+    vassert(m_drStream != NULL);
+    vassert(drStream != NULL);
+    vassert(m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openSpHandle);
     m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
@@ -332,7 +344,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
         m_drReplicatedStream = drReplicatedStream;
         return;
     }
-    assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
+    vassert(m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
@@ -348,19 +360,19 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
  * For single partition transactions, DR stream's binary logging is handled as is
  * at persistenttable level.
  */
-void ExecutorContext::checkTransactionForDR() {
+bool ExecutorContext::checkTransactionForDR() {
+    bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream && m_drStream->drStreamStarted()) {
-            if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+        if (m_externalStreamsEnabled && m_drStream && m_drStream->drStreamStarted()) {
+            if (m_drStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                                 m_drStream->m_committedUso, 0));
             }
+            result = true;
         }
         if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
-            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drReplicatedStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,
@@ -368,6 +380,7 @@ void ExecutorContext::checkTransactionForDR() {
             }
         }
     }
+    return result;
 }
 
 } // end namespace voltdb

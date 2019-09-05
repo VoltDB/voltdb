@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,22 +25,17 @@ package org.voltdb.regressionsuites;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalSingleProcessServer;
 
 /**
  * Implementation of a LocalSingleProcessServer that supports changing the
  * VoltProjectBuilder used to construct the catalog
  */
 @SuppressWarnings("deprecation")
-public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
-{
+public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer {
     VoltProjectBuilder m_origBuilder;
     private int m_originalSiteCount = 0;
 
-    public CatalogChangeSingleProcessServer(String jarFileName,
-                                            int siteCount,
-                                            BackendTarget target)
-    {
+    public CatalogChangeSingleProcessServer(String jarFileName, int siteCount, BackendTarget target) {
         super(jarFileName, siteCount, target);
     }
 
@@ -52,15 +47,13 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
         return compiled;
     }
 
-    public boolean recompile(VoltProjectBuilder builder)
-    {
+    public boolean recompile(VoltProjectBuilder builder) {
         boolean compiled = builder.compile(m_jarFileName, m_siteCount, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return compiled;
     }
 
-    public boolean recompile(int siteCount)
-    {
+    public boolean recompile(int siteCount) {
         m_originalSiteCount = m_siteCount;
         m_siteCount = siteCount;
         boolean compiled = m_origBuilder.compile(m_jarFileName, siteCount, 0);
@@ -68,8 +61,7 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
         return compiled;
     }
 
-    public boolean recompile(VoltProjectBuilder builder, int siteCount)
-    {
+    public boolean recompile(VoltProjectBuilder builder, int siteCount) {
         m_originalSiteCount = m_siteCount;
         m_siteCount = siteCount;
         boolean compiled = builder.compile(m_jarFileName, siteCount, 0);
@@ -77,8 +69,7 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
         return compiled;
     }
 
-    public boolean revertCompile()
-    {
+    public boolean revertCompile() {
         if (m_originalSiteCount > 0) {
             m_siteCount = m_originalSiteCount;
         }

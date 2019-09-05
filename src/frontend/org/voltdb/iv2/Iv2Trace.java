@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -297,7 +297,7 @@ public class Iv2Trace
             String logmsg = "txnQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                         txnIdToString(task.getSpHandle()),
-                    task.m_txnState.isSinglePartition() ? "SP" : "MP"));
+                    (task.m_txnState != null && task.m_txnState.isSinglePartition()) ? "SP" : "MP"));
         }
     }
 
@@ -307,7 +307,7 @@ public class Iv2Trace
             String logmsg = "tskQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                             txnIdToString(task.getSpHandle()),
-                    task.m_txnState.isSinglePartition() ? "SP" : "MP"));
+                    (task.m_txnState != null && task.m_txnState.isSinglePartition()) ? "SP" : "MP"));
         }
     }
 }

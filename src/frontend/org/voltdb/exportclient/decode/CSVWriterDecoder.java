@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,9 @@
 package org.voltdb.exportclient.decode;
 
 import java.io.IOException;
+import java.util.List;
+
+import org.voltdb.VoltType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -31,8 +34,8 @@ public class CSVWriterDecoder extends RowDecoder<CSVWriter, IOException> {
     }
 
     @Override
-    public CSVWriter decode(CSVWriter to, Object[] fields) throws IOException {
-        to.writeNext(m_stringArrayDecoder.decode(null, fields));
+    public CSVWriter decode(long generation, String tableName, List<VoltType> types, List<String> names, CSVWriter to, Object[] fields) throws IOException {
+        to.writeNext(m_stringArrayDecoder.decode(generation, tableName, types, names, null, fields));
         return to;
     }
 

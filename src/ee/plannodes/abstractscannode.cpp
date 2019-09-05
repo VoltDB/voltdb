@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -98,9 +98,11 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 
     m_tcd = NULL;
     m_cteStmtId = -1;
-    if (obj.hasKey("IS_CTE_SCAN") && obj.valueForKey("IS_CTE_SCAN").asBool()) {
-        m_scanType = CTE_SCAN;
+    if (obj.hasKey("CTE_STMT_ID")) {
         m_cteStmtId = obj.valueForKey("CTE_STMT_ID").asInt();
+        if (m_cteStmtId > -1) {
+            m_scanType = CTE_SCAN;
+        }
     }
     else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
         m_scanType = SUBQUERY_SCAN;

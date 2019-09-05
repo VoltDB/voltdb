@@ -213,7 +213,7 @@ public abstract class Statement {
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                "this type of sql statement is not supported or is not not allowed in this context");
+                "this type of sql statement is not supported or is not allowed in this context");
     }
     /**********************************************************************/
 }

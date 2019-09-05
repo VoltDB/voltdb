@@ -89,11 +89,11 @@ function client() {
          --duration=120 \
          --servers=$SERVERS \
          --ratelimit=20000 \
-         --sites=100 \
-         --pagespersite=10 \
-         --advertisers=20 \
-         --campaignsperadvertiser=5 \
-         --creativespercampaign=5
+         --sites=200 \
+         --pagespersite=20 \
+         --advertisers=40 \
+         --campaignsperadvertiser=10 \
+         --creativespercampaign=10
 }
 
 function help() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,6 @@
 
 package org.voltdb.client;
 
-import org.voltdb.client.ClientResponse;
-
 /**
  * Packages up the data to be sent back to the client as a stored
  * procedure response for a partition
@@ -33,7 +31,7 @@ public class ClientResponseWithPartitionKey {
      * @param partitionKey  A partition key to reach the partition
      * @param response The ClientResponse instance from the procedure execution
      */
-    ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
+    public ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
         this.partitionKey = partitionKey;
         this.response = response;
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -179,7 +179,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             nullExprIndex = m_searchkeyExpressions.size() - 1;
         }
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
-                nullExprIndex, m_catalogIndex, m_tableScan,
+                nullExprIndex, m_catalogIndex, m_tableScan, 0,
                 m_searchkeyExpressions, m_compareNotDistinct);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());

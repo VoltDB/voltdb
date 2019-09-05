@@ -483,7 +483,7 @@ public interface ErrorCode {
     int X_42000 = 5000;                                   // syntax error or access rule violation - generic - 200x
 
     // HSQLDB database object names
-    int X_42501 = 5501;                                   // user lacks privilege or object not found
+    int X_42501 = 5501;                                   // object not found
     int X_42502 = 5502;                                   // dependent objects exist
     int X_42503 = 5503;                                   // system object cannot be modified
     int X_42504 = 5504;                                   // object name already exists
@@ -611,6 +611,7 @@ public interface ErrorCode {
     // A VoltDB extension to implement subquery syntax limitations
     int X_47000 = 7000;                                   // invalid WHERE expression
     int X_47001 = 7001;                                   // subquery WHERE expression with parent aggregates
+    int X_47002 = 7002;                                   // zero-column table
 
     // End of VoltDB extension
     // Unknown Error: Catch-All - xxxx
@@ -658,4 +659,6 @@ public interface ErrorCode {
 
     // CLI-specific condition - 200x
     int X_HY093 = 6800;                                   // CLI-specific condition: invalid datalink value
+    
+    int X_UDAF01 = 6900;                                  // user-defined aggregate functions are not allowed to have "distinct" keyword
 }

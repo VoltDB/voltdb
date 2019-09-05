@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,19 +32,17 @@ import java.util.Properties;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
+import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.utils.VoltFile;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
 
 public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
     private static LocalCluster m_config;
@@ -64,12 +62,6 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-   public static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo( new String[]{"proc"}, Insert.class),
-        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
-        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
-    };
 
     public TestExportWithMisconfiguredExportClient(final String s) {
         super(s);
@@ -136,8 +128,7 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
         project.setSecurityEnabled(true, true);
         project.addRoles(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
+        project.addSchema(TestExportBaseSocketExport.class.getResource("export-nonulls-ddl-with-target.sql"));
 
         Properties props = new Properties();
         // omit nonce
@@ -147,24 +138,16 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
                 "with-schema", "true",
                 "complain", "true",
                 "outdir", "/tmp/" + System.getProperty("user.name")));
-        project.addExport(true /* enabled */, "custom", props);
-        project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("NO_NULLS_GRP", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS_GRP", "PKEY");
-        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
-        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
-        project.addPartitionInfo("JUMBO_ROW", "PKEY");
+        project.addExport(true /* enabled */, ServerExportEnum.CUSTOM, props);
+        project.addPartitionInfo("S_NO_NULLS", "PKEY");
 
-        project.addProcedures(PROCEDURES);
+        project.addProcedures(TestExportBaseSocketExport.NONULLS_PROCEDURES);
 
         /*
          * compile the catalog all tests start with
          */
         m_config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         m_config.setExpectedToCrash(true);
         m_config.setHasLocalServer(false);
         boolean compile = m_config.compile(project);

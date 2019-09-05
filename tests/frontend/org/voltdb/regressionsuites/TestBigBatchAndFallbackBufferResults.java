@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -164,18 +165,17 @@ public class TestBigBatchAndFallbackBufferResults extends RegressionSuite {
         super(name);
     }
 
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.fallbackbuffers.SPPopulatePartitionTable.class,
-        org.voltdb_testprocs.regressionsuites.fallbackbuffers.SPMultiStatementQuery.class,
-        };
-
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestBigBatchAndFallbackBufferResults.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.fallbackbuffers.SPPopulatePartitionTable.class,
+                new ProcedurePartitionData("P1", "NUM"));
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.fallbackbuffers.SPMultiStatementQuery.class,
+                new ProcedurePartitionData("P1", "NUM"));
+
         final String literalSchema =
                 "CREATE TABLE p1 ( "
                 + "id INTEGER DEFAULT 0 NOT NULL assumeunique, "

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,19 +26,13 @@ package org.voltdb.regressionsuites;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
+import junit.framework.Test;
+
 public class TestMaliciousClientSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        GoSleep.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -441,7 +435,7 @@ public class TestMaliciousClientSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(GoSleep.class);
 
         boolean success;
 

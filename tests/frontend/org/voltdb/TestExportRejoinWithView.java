@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -31,13 +30,14 @@ import java.util.Properties;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
 import org.voltdb.export.TestExportBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Export to nowhere and build view. Rejoin nodes and verify view is intact.
@@ -50,9 +50,7 @@ public class TestExportRejoinWithView extends TestExportBase {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
     }
@@ -68,7 +66,7 @@ public class TestExportRejoinWithView extends TestExportBase {
         System.out.println("testExportViewWithRejoin");
         Client client = getClient();
         client.callProcedure("@AdHoc", "CREATE TABLE foo (PKEY INTEGER NOT NULL, VAL INTEGER)");
-        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY (PKEY INTEGER NOT NULL, VAL INTEGER)");
+        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY EXPORT TO TARGET CONN (PKEY INTEGER NOT NULL, VAL INTEGER)");
         client.callProcedure("@AdHoc", "CREATE VIEW V_EXPORT_WITH_VIEW (PKEY, KEYCOUNT) AS\n" +
                                         "SELECT PKEY, COUNT(*) FROM EXPORT_WITH_VIEW GROUP BY PKEY");
         client.callProcedure("@AdHoc", "CREATE INDEX V_IDX ON V_EXPORT_WITH_VIEW ( ABS(PKEY) )");
@@ -79,7 +77,6 @@ public class TestExportRejoinWithView extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
         client.close();
@@ -97,7 +94,7 @@ public class TestExportRejoinWithView extends TestExportBase {
         System.out.println("testExportViewWithRejoin");
         Client client = getClient();
         client.callProcedure("@AdHoc", "CREATE TABLE foo (PKEY INTEGER NOT NULL, VAL INTEGER)");
-        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY (PKEY INTEGER NOT NULL, VAL INTEGER)");
+        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY EXPORT TO TARGET CONN (PKEY INTEGER NOT NULL, VAL INTEGER)");
         client.callProcedure("@AdHoc", "CREATE VIEW V_EXPORT_WITH_VIEW (PKEY, KEYCOUNT) AS\n" +
                                         "SELECT PKEY, COUNT(*) FROM EXPORT_WITH_VIEW GROUP BY PKEY");
         StringBuilder insertSql;
@@ -107,13 +104,12 @@ public class TestExportRejoinWithView extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
         client.callProcedure("@AdHoc", "delete from V_EXPORT_WITH_VIEW where PKEY = 0");
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");
         assertEquals(response.getResults()[0].asScalarLong(), 4999);
         client.close();
 
-        //Recycle through all hosts and verify view is uptodate.
+        //Recycle through all hosts and verify view is up to date.
         ((LocalCluster) m_config).killSingleHost(1);
         ((LocalCluster) m_config).recoverOne(1, null, "");
         Thread.sleep(500);
@@ -126,12 +122,11 @@ public class TestExportRejoinWithView extends TestExportBase {
         System.out.println("testExportViewWithRejoin");
         Client client = getClient();
         client.callProcedure("@AdHoc", "CREATE TABLE foo (PKEY INTEGER NOT NULL, VAL INTEGER)");
-        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY (PKEY INTEGER NOT NULL, VAL INTEGER)");
+        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY EXPORT TO TARGET CONN (PKEY INTEGER NOT NULL, VAL INTEGER)");
         client.callProcedure("@AdHoc", "CREATE VIEW V_EXPORT_WITH_VIEW (PKEY, KEYCOUNT) AS\n" +
                                         "SELECT PKEY, COUNT(*) FROM EXPORT_WITH_VIEW GROUP BY PKEY");
         client.callProcedure("@AdHoc", "insert into EXPORT_WITH_VIEW values(0,0)");
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
         client.callProcedure("@AdHoc", "update V_EXPORT_WITH_VIEW set KEYCOUNT = 10");
         ClientResponse response = client.callProcedure("@AdHoc", "select KEYCOUNT from V_EXPORT_WITH_VIEW");
         assertEquals(response.getResults()[0].asScalarLong(), 10);
@@ -150,7 +145,7 @@ public class TestExportRejoinWithView extends TestExportBase {
         System.out.println("testStreamViewWithRejoin");
         Client client = getClient();
         client.callProcedure("@AdHoc", "CREATE TABLE foo (PKEY INTEGER NOT NULL, VAL INTEGER)");
-        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY (PKEY INTEGER NOT NULL, VAL INTEGER)");
+        client.callProcedure("@AdHoc", "CREATE STREAM EXPORT_WITH_VIEW PARTITION ON COLUMN PKEY EXPORT TO TARGET CONN (PKEY INTEGER NOT NULL, VAL INTEGER)");
         client.callProcedure("@AdHoc", "CREATE VIEW V_EXPORT_WITH_VIEW (PKEY, KEYCOUNT) AS\n" +
                 "SELECT PKEY, COUNT(*) FROM EXPORT_WITH_VIEW GROUP BY PKEY");
         StringBuilder insertSql;
@@ -160,7 +155,6 @@ public class TestExportRejoinWithView extends TestExportBase {
         client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
         client.close();
@@ -193,13 +187,13 @@ public class TestExportRejoinWithView extends TestExportBase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         Properties props = new Properties();
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "CONN");
 
         /*
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setMaxHeap(1024);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,52 +21,52 @@ import org.voltdb.VoltSystemProcedure;
 
 public class SysProcFragmentId
 {
-    // @LastCommittedTransaction
-    public static final long PF_lastCommittedScan = 1;
-    public static final long PF_lastCommittedResults = 2;
+    // @LastCommittedTransaction -- UNUSED
+    public static final int PF_lastCommittedScan = 1;
+    public static final int PF_lastCommittedResults = 2;
 
-    // @UpdateLogging
-    public static final long PF_updateLoggers = 3;
+    // @UpdateLogging -- UNUSED
+    public static final int PF_updateLoggers = 3;
 
-    // @Statistics
-    public static final long PF_starvationData = 4;
-    public static final long PF_starvationDataAggregator = 5;
-    public static final long PF_tableData = 6;
-    public static final long PF_tableAggregator = 7;
-    public static final long PF_indexData = 8;
-    public static final long PF_indexAggregator = 9;
-    public static final long PF_nodeMemory = 10;
-    public static final long PF_nodeMemoryAggregator = 11;
-    public static final long PF_procedureData = 13;
-    public static final long PF_procedureAggregator = 14;
-    public static final long PF_initiatorData = 15;
-    public static final long PF_initiatorAggregator = 16;
-    public static final long PF_partitionCount = 17;
-    public static final long PF_ioData = 18;
-    public static final long PF_ioDataAggregator = 19;
-    public static final long PF_liveClientData = 20;
-    public static final long PF_liveClientDataAggregator = 21;
-    public static final long PF_plannerData = 22;
-    public static final long PF_plannerAggregator = 23;
+    // @Statistics -- UNUSED
+    public static final int PF_starvationData = 4;
+    public static final int PF_starvationDataAggregator = 5;
+    public static final int PF_tableData = 6;
+    public static final int PF_tableAggregator = 7;
+    public static final int PF_indexData = 8;
+    public static final int PF_indexAggregator = 9;
+    public static final int PF_nodeMemory = 10;
+    public static final int PF_nodeMemoryAggregator = 11;
+    public static final int PF_procedureData = 13;
+    public static final int PF_procedureAggregator = 14;
+    public static final int PF_initiatorData = 15;
+    public static final int PF_initiatorAggregator = 16;
+    public static final int PF_partitionCount = 17;
+    public static final int PF_ioData = 18;
+    public static final int PF_ioDataAggregator = 19;
+    public static final int PF_liveClientData = 20;
+    public static final int PF_liveClientDataAggregator = 21;
+    public static final int PF_plannerData = 22;
+    public static final int PF_plannerAggregator = 23;
 
     // @Shutdown
-    public static final long PF_shutdownSync = 26;
-    public static final long PF_shutdownSyncDone = 27;
-    public static final long PF_shutdownCommand = 28;
-    public static final long PF_procedureDone = 29;
+    public static final int PF_shutdownSync = 26;
+    public static final int PF_shutdownSyncDone = 27;
+    public static final int PF_shutdownCommand = 28;
+    public static final int PF_procedureDone = 29;
 
-    // @AdHoc
-    public static final long PF_runAdHocFragment = 31;
+    // @AdHoc -- UNUSED
+    public static final int PF_runAdHocFragment = 31;
 
     // @SnapshotSave
     /*
      * Create and distribute tasks and targets to each EE
      */
-    public static final long PF_createSnapshotTargets = 42;
+    public static final int PF_createSnapshotTargets = 42;
     /*
      * Confirm the targets were successfully created
      */
-    public static final long PF_createSnapshotTargetsResults = 43;
+    public static final int PF_createSnapshotTargetsResults = 43;
 
     public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
@@ -77,86 +77,105 @@ public class SysProcFragmentId
         return isSnapshotSaveFragment(planHash);
     }
 
-    //This method exists because there is no procedure name in fragment task message
-    // for sysprocs and we cant distinguish if this needs to be replayed or not.
-    public static boolean isDurableFragment(byte[] planHash) {
-        long fragId = VoltSystemProcedure.hashToFragId(planHash);
-        return (fragId == PF_prepBalancePartitions  ||
-                fragId == PF_balancePartitions ||
-                fragId == PF_balancePartitionsData ||
-                fragId == PF_balancePartitionsClearIndex ||
-                fragId == PF_distribute ||
-                fragId == PF_applyBinaryLog);
-    }
-
     // @LoadMultipartitionTable
-    public static final long PF_distribute = 50;
-    public static final long PF_aggregate = 51;
+    public static final int PF_distribute = 50;
+    public static final int PF_aggregate = 51;
 
     // @SnapshotRestore
-    public static final long PF_restoreScan = 60;
-    public static final long PF_restoreScanResults = 61;
-    public static final long PF_restoreDigestScan = 62;
-    public static final long PF_restoreDigestScanResults = 63;
-    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 64;
-    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 65;
-    public static final long PF_restoreAsyncRunLoop = 66;
-    public static final long PF_restoreAsyncRunLoopResults = 67;
-    public static final long PF_restoreLoadTable = 70;                                  // called by 4 distribute cases, to load received table
-    public static final long PF_restoreReceiveResultTables = 71;                        // union received result tables
-    public static final long PF_restoreLoadReplicatedTable = 72;                        // special case for replicated-to-replicated
-    public static final long PF_restoreDistributeReplicatedTableAsReplicated = 73;      // replicated to replicated
-    public static final long PF_restoreDistributePartitionedTableAsPartitioned = 74;    // partitioned to partitioned
-    public static final long PF_restoreDistributePartitionedTableAsReplicated = 75;     // partitioned to replicated
-    public static final long PF_restoreDistributeReplicatedTableAsPartitioned = 76;     // replicated to replicated
-    public static final long PF_restoreHashinatorScan = 77;
-    public static final long PF_restoreHashinatorScanResults = 78;
-    public static final long PF_restoreDistributeHashinator = 79;
-    public static final long PF_restoreDistributeHashinatorResults = 80;
+    public static final int PF_restoreScan = 60;
+    public static final int PF_restoreScanResults = 61;
+    /*
+     * Plan fragments for retrieving the digests
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    public static final int PF_restoreDigestScan = 62;
+    public static final int PF_restoreDigestScanResults = 63;
+    /*
+     * Plan fragments for distributing the full set of export sequence numbers
+     * to every partition where the relevant ones can be selected
+     * and forwarded to the EE. Also distributes the txnId of the snapshot
+     * which is used to truncate export data on disk from after the snapshot
+     */
+    public static final int PF_restoreDistributeExportAndPartitionSequenceNumbers = 64;
+    public static final int PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 65;
+    /*
+     * Plan fragment for entering an asynchronous run loop that generates a mailbox
+     * and sends the generated mailbox id to the MP coordinator which then propagates the info.
+     * The MP coordinator then sends plan fragments through this async mailbox,
+     * bypassing the master/slave replication system that doesn't understand plan fragments
+     * directed at individual executions sites.
+     */
+    public static final int PF_restoreAsyncRunLoop = 66;
+    public static final int PF_restoreAsyncRunLoopResults = 67;
+    public static final int PF_restoreLoadTable = 70; // called by 4 distribute cases, to load received table
+    public static final int PF_restoreReceiveResultTables = 71; // union received result tables
+    public static final int PF_restoreLoadReplicatedTable = 72; // special case for replicated-to-replicated
+    public static final int PF_restoreDistributeReplicatedTableAsReplicated = 73; // replicated to replicated
+    public static final int PF_restoreDistributePartitionedTableAsPartitioned = 74; // partitioned to partitioned
+    public static final int PF_restoreDistributePartitionedTableAsReplicated = 75; // partitioned to replicated
+    public static final int PF_restoreDistributeReplicatedTableAsPartitioned = 76; // replicated to replicated
+    /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    public static final int PF_restoreHashinatorScan = 77;
+    public static final int PF_restoreHashinatorScanResults = 78;
+    /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    public static final int PF_restoreDistributeHashinator = 79;
+    public static final int PF_restoreDistributeHashinatorResults = 80;
 
-    // @StartSampler
-    public static final long PF_startSampler = 90;
+    // @StartSampler -- UNUSED
+    public static final int PF_startSampler = 90;
 
     // @Quiesce
-    public static final long PF_quiesce_sites = 100;
-    public static final long PF_quiesce_processed_sites = 101;
+    public static final int PF_quiesce_sites = 100;
+    public static final int PF_quiesce_processed_sites = 101;
+
+    // @SnapshotScan -- UNUSED
+    public static final int PF_snapshotDigestScan = 124;
+    public static final int PF_snapshotDigestScanResults = 125;
+    public static final int PF_snapshotScan = 120;
+    public static final int PF_snapshotScanResults = 121;
+    public static final int PF_hostDiskFreeScan = 122;
+    public static final int PF_hostDiskFreeScanResults = 123;
 
     // @SnapshotScan
-    public static final long PF_snapshotDigestScan = 124;
-    public static final long PF_snapshotDigestScanResults = 125;
-    public static final long PF_snapshotScan = 120;
-    public static final long PF_snapshotScanResults = 121;
-    public static final long PF_hostDiskFreeScan = 122;
-    public static final long PF_hostDiskFreeScanResults = 123;
+    public static final int PF_snapshotDelete = 130;
+    public static final int PF_snapshotDeleteResults = 131;
 
-    // @SnapshotScan
-    public static final long PF_snapshotDelete = 130;
-    public static final long PF_snapshotDeleteResults = 131;
+    // @InstanceId -- UNUSED
+    public static final int PF_retrieveInstanceId = 160;
+    public static final int PF_retrieveInstanceIdAggregator = 161;
+    public static final int PF_setInstanceId = 162;
+    public static final int PF_setInstanceIdAggregator = 163;
 
-    // @InstanceId
-    public static final long PF_retrieveInstanceId = 160;
-    public static final long PF_retrieveInstanceIdAggregator = 161;
-    public static final long PF_setInstanceId = 162;
-    public static final long PF_setInstanceIdAggregator = 163;
-
-    // @Rejoin
-    public static final long PF_rejoinBlock = 170;
-    public static final long PF_rejoinPrepare = 171;
-    public static final long PF_rejoinCommit = 172;
-    public static final long PF_rejoinRollback = 173;
-    public static final long PF_rejoinAggregate = 174;
+    // @Rejoin -- UNUSED
+    public static final int PF_rejoinBlock = 170;
+    public static final int PF_rejoinPrepare = 171;
+    public static final int PF_rejoinCommit = 172;
+    public static final int PF_rejoinRollback = 173;
+    public static final int PF_rejoinAggregate = 174;
 
     // @SystemInformation
-    public static final long PF_systemInformationDeployment = 190;
-    public static final long PF_systemInformationAggregate = 191;
-    public static final long PF_systemInformationOverview = 192;
-    public static final long PF_systemInformationOverviewAggregate = 193;
+    public static final int PF_systemInformationDeployment = 190;
+    public static final int PF_systemInformationAggregate = 191;
+    public static final int PF_systemInformationOverview = 192;
+    public static final int PF_systemInformationOverviewAggregate = 193;
 
     // @Update application catalog
-    public static final long PF_updateCatalogPrecheckAndSync = 210;
-    public static final long PF_updateCatalogPrecheckAndSyncAggregate = 211;
-    public static final long PF_updateCatalog = 212;
-    public static final long PF_updateCatalogAggregate = 213;
+    public static final int PF_updateCatalogPrecheckAndSync = 210;
+    public static final int PF_updateCatalogPrecheckAndSyncAggregate = 211;
+    public static final int PF_updateCatalog = 212;
+    public static final int PF_updateCatalogAggregate = 213;
 
     public static boolean isCatalogUpdateFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
@@ -166,59 +185,99 @@ public class SysProcFragmentId
     }
 
     // @BalancePartitions
-    public static final long PF_prepBalancePartitions = 228;
-    public static final long PF_prepBalancePartitionsAggregate = 229;
-    public static final long PF_balancePartitions = 230;
-    public static final long PF_balancePartitionsAggregate = 231;
-    public static final long PF_balancePartitionsData = 232;
-    public static final long PF_balancePartitionsClearIndex = 233;
-    public static final long PF_balancePartitionsClearIndexAggregate = 234;
+    public static final int PF_prepBalancePartitions = 228;
+    public static final int PF_prepBalancePartitionsAggregate = 229;
+    public static final int PF_balancePartitions = 230;
+    public static final int PF_balancePartitionsAggregate = 231;
+    public static final int PF_balancePartitionsData = 232;
+    public static final int PF_balancePartitionsClearIndex = 233;
+    public static final int PF_balancePartitionsClearIndexAggregate = 234;
 
     // @ValidatePartitioning
-    public static final long PF_validatePartitioning = 240;
-    public static final long PF_validatePartitioningResults = 241;
+    public static final int PF_validatePartitioning = 240;
+    public static final int PF_validatePartitioningResults = 241;
 
     // @MatchesHashinator
-    public static final long PF_matchesHashinator = 250;
-    public static final long PF_matchesHashinatorResults = 251;
+    public static final int PF_matchesHashinator = 250;
+    public static final int PF_matchesHashinatorResults = 251;
 
     // @ApplyBinaryLog
-    public static final long PF_applyBinaryLog = 260;
-    public static final long PF_applyBinaryLogAggregate = 261;
+    public static final int PF_applyBinaryLog = 260;
+    public static final int PF_applyBinaryLogAggregate = 261;
 
     // @LoadVoltTable
-    public static final long PF_loadVoltTable = 270;
-    public static final long PF_loadVoltTableAggregate = 271;
+    public static final int PF_loadVoltTable = 270;
+    public static final int PF_loadVoltTableAggregate = 271;
 
     // @ResetDR
-    public static final long PF_resetDR = 280;
-    public static final long PF_resetDRAggregate = 281;
+    public static final int PF_resetDR = 280;
+    public static final int PF_resetDRAggregate = 281;
 
     // @ResetDRSingle
-    public static final long PF_preResetDRSingle = 282;
-    public static final long PF_preResetDRSingleAggregate = 283;
-    public static final long PF_postResetDRSingle = 284;
-    public static final long PF_postResetDRSingleAggregate = 285;
+    public static final int PF_preResetDRSingle = 282;
+    public static final int PF_preResetDRSingleAggregate = 283;
+    public static final int PF_postResetDRSingle = 284;
+    public static final int PF_postResetDRSingleAggregate = 285;
 
     // @DropDRSelf
-    public static final long PF_DropDRSelf = 286;
-    public static final long PF_DropDRSelfAggregate = 287;
+    public static final int PF_DropDRSelf = 286;
+    public static final int PF_DropDRSelfAggregate = 287;
 
     // @ExecuteTask
-    public static final long PF_executeTask = 290;
-    public static final long PF_executeTaskAggregate = 291;
+    public static final int PF_executeTask = 290;
+    public static final int PF_executeTaskAggregate = 291;
 
     // @UpdatedSettings
-    public static final long PF_updateSettingsBarrier = 300;
-    public static final long PF_updateSettingsBarrierAggregate = 301;
-    public static final long PF_updateSettings = 302;
-    public static final long PF_updateSettingsAggregate = 303;
+    public static final int PF_updateSettingsBarrier = 300;
+    public static final int PF_updateSettingsBarrierAggregate = 301;
+    public static final int PF_updateSettings = 302;
+    public static final int PF_updateSettingsAggregate = 303;
 
     // @PrepareShutdown
-    public static final long PF_prepareShutdown = 310;
-    public static final long PF_prepareShutdownAggregate = 311;
+    public static final int PF_prepareShutdown = 310;
+    public static final int PF_prepareShutdownAggregate = 311;
 
     // @SwapTables
-    public static final long PF_swapTables = 320;
-    public static final long PF_swapTablesAggregate = 321;
+    public static final int PF_swapTables = 320;
+    public static final int PF_swapTablesAggregate = 321;
+
+    // @PingPartitions
+    public static final int PF_pingPartitions = 330;
+    public static final int PF_pingPartitionsAggregate = 331;
+    public static final int PF_enableScoreboard = 332;
+    public static final int PF_enableScoreboardAggregate = 333;
+
+    // Pause/resume materialized views
+    public static final int PF_setViewEnabled = 340;
+
+    // @ExportControl
+    public static final int PF_exportControl = 350;
+    public static final int PF_exportControlAggregate = 351;
+
+    // @CancelShutdown
+    public static final int PF_cancelShutdown = 360;
+    public static final int PF_cancelShutdownAggregate = 361;
+
+    // @MigrateRowsAcked_MP
+    public static final int PF_migrateRows = 370;
+    public static final int PF_migrateRowsAggregate = 371;
+
+    // @ElasticRemove
+    public static final int PF_elasticRemoveSites = 380;
+    public static final int PF_elasticRemoveSitesAggregate = 381;
+    public static final int PF_elasticRemoveResume = 382;
+    public static final int PF_elasticRemoveResumeAggregate = 383;
+
+    // @License
+    public static final int PF_systemInformationLicense = 390;
+
+    // @CollectDrTrackers
+    public static final int PF_collectDrTrackers = 400;
+    public static final int PF_collectDrTrackersAgg = 401;
+
+    public static boolean isEnableScoreboardFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
+        return (fragId == PF_enableScoreboard);
+    }
 }

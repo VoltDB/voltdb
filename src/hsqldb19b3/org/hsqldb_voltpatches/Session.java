@@ -70,6 +70,7 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Random;
 import java.util.SimpleTimeZone;
@@ -158,6 +159,7 @@ public class Session implements SessionInterface {
     boolean               isProcessingLog;
     public SessionContext sessionContext;
     int                   resultMaxMemoryRows;
+    HashMap<String, Table> localTables = null;
 
     //
     public SessionData sessionData;
@@ -868,7 +870,6 @@ public class Session implements SessionInterface {
     public Statement compileStatement(String sql) {
 
         parser.reset(sql);
-
         Statement cs = parser.compileStatement();
 
         return cs;
@@ -1848,7 +1849,49 @@ public class Session implements SessionInterface {
         return null;
     }
 
-//
+    /**
+     * Define a local table with the given name, column names and column types.
+     *
+     * @param tableName
+     * @param colNames
+     * @param colTypes
+     * @return
+     */
+    public Table defineLocalTable(HsqlName tableName, HsqlName[] colNames, Type[] colTypes) {
+        // I'm not sure the table type, here TableBase.CACHED_TABLE, matters
+        // all that much.
+    	assert(localTables != null);
+        Table newTable = TableUtil.newTable(database, TableBase.CACHED_TABLE, tableName);
+        TableUtil.setColumnsInSchemaTable(newTable, colNames, colTypes);
+        newTable.createPrimaryKey(new int[0]);
+        localTables.put(tableName.name, newTable);
+        return newTable;
+    }
+
+    public Table getLocalTable(String tableName) {
+    	if (localTables != null) {
+    		return localTables.get(tableName);
+    	}
+    	return null;
+    }
+
+    /**
+     * Update the local table with new types.  This is very dubious.
+     *
+     * @param queryName
+     * @param finalTypes
+     */
+    public void updateLocalTable(HsqlName queryName, Type[] finalTypes) {
+        assert(localTables != null);
+        Table tbl = getLocalTable(queryName.name);
+        assert (tbl != null);
+        TableUtil.updateColumnTypes(tbl, finalTypes);
+    }
+
+	public void clearLocalTables() {
+		localTables = new HashMap<>();
+	}
+
     public int getResultMemoryRowCount() {
         return resultMaxMemoryRows;
     }
@@ -2078,7 +2121,7 @@ public class Session implements SessionInterface {
     }
 
     private long nextExpressionNodeId = 1;
-    java.util.Map<Expression, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<Expression, Long>();
+    java.util.Map<Expression, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<>();
 
     public long getNodeIdForExpression(Expression expr) {
         Long id = null;
@@ -2090,7 +2133,7 @@ public class Session implements SessionInterface {
         if (id == null) {
             id = nextExpressionNodeId++;
             hsqlExpressionNodeIdsToVoltNodeIds.put(expr, id);
-        } 
+        }
         return id;
     }
 
@@ -2107,4 +2150,5 @@ public class Session implements SessionInterface {
         return m_parameterStateManager;
     }
     /**********************************************************************/
+
 }

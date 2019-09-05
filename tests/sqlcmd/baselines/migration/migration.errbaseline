@@ -1,0 +1,4 @@
+SQL error while compiling query: Error in "MIGRATE FROM dont_migrate_me" - invalid WHERE expression
+SQL error while compiling query: MIGRATE FROM dont_migrate_me WHERE not migrating: Cannot migrate from table DONT_MIGRATE_ME because the table definition does not specify a migration target
+SQL error while compiling query: Error in "MIGRATE FROM migrate_me" - invalid WHERE expression
+SQL error while compiling query: MIGRATE FROM migrate_me where i > 0: Cannot migrate from table MIGRATE_ME because the WHERE clause does not contain NOT MIGRATING()

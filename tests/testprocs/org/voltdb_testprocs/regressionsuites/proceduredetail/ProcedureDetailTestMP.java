@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,20 +23,18 @@
 
 package org.voltdb_testprocs.regressionsuites.proceduredetail;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.ProcStatsOption;
 import org.voltdb.VoltTable;
 
 /* This Java stored procedure is used to test the PROCEDUREDETAIL selector in @Statistics.
  * It will queue batches based on the parameters you gave to test the behavior of PROCEDUREDETAIL
  * under different scenarios. */
-@ProcInfo (
-    singlePartition = false
-)
+
 @ProcStatsOption (
     procSamplingInterval = 1,
     stmtSamplingInterval = 1
-)
+    )
+
 public class ProcedureDetailTestMP extends ProcedureDetailTestSP {
     // Nothing to change here, I just want to have a separate class that does the same thing as
     // ProcedureDetailTestSP but I can load it as a multi-partition stored procedure.

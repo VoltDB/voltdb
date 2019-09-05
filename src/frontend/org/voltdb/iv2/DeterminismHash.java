@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,6 +57,8 @@ public class DeterminismHash {
 
     public final static int MAX_HASHES_COUNT = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 32) * 2;
 
+    public final static int HASH_NOT_INCLUDE = Integer.MAX_VALUE;
+
     int m_catalogVersion = 0;
     int m_hashCount = 0;
 
@@ -107,19 +109,35 @@ public class DeterminismHash {
      *
      * For now, just compares first integer value in array.
      */
-    public static boolean compareHashes(int[] leftHashes, int[] rightHashes) {
+    public static int compareHashes(int[] leftHashes, int[] rightHashes) {
         assert(leftHashes != null);
         assert(rightHashes != null);
         assert(leftHashes.length >= 3);
         assert(rightHashes.length >= 3);
 
-        return leftHashes[0] == rightHashes[0];
+        // Compare total checksum first
+        if (leftHashes[0] == rightHashes[0]) {
+            return -1;
+        }
+        int includedHashLeft = Math.min(leftHashes[2], MAX_HASHES_COUNT);
+        int includedHashRight = Math.min(rightHashes[2], MAX_HASHES_COUNT);
+        int includedHashMin = Math.min(includedHashLeft, includedHashRight);
+        int pos = 0;
+        for(int i = HEADER_OFFSET ; i < HEADER_OFFSET + includedHashMin; i += 2) {
+            if(leftHashes[i] != rightHashes[i] || leftHashes[i + 1] != rightHashes[i + 1]) {
+                return pos;
+            }
+            pos++;
+        }
+        // If the number of per-statement hashes is more than MAX_HASHES_COUNT and
+        // the mismatched hash isn't included in the per-statement hashes
+        return HASH_NOT_INCLUDE;
     }
 
     /**
      * Log the contents of the hash array
      */
-    public static String description(int[] hashes) {
+    public static String description(int[] hashes, int m_hashMismatchPos) {
         assert(hashes != null);
         assert(hashes.length >= 3);
         StringBuilder sb = new StringBuilder();
@@ -129,12 +147,22 @@ public class DeterminismHash {
         sb.append(", Statement Count ").append(hashes[2] / 2);
 
         int includedHashes = Math.min(hashes[2], MAX_HASHES_COUNT);
+        int pos = 0;
         for (int i = HEADER_OFFSET; i < HEADER_OFFSET + includedHashes; i += 2) {
             sb.append("\n  Ran Statement ").append(hashes[i]);
             sb.append(" with Parameters ").append(hashes[i + 1]);
+            if(pos == m_hashMismatchPos) {
+                sb.append(" <--- ALERT: Hash mismatch starts from here!");
+            }
+            pos++;
         }
         if (hashes[2] > MAX_HASHES_COUNT) {
-            sb.append("\n  Additional SQL statements truncated");
+            sb.append("\n  Additional SQL statements truncated.");
+            if (m_hashMismatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
+                sb.append("\n  The mismatched hash is also truncated. "
+                        + "For debugging purpose, use VOLTDB_OPTS=\"-DMAX_STATEMENTS_WITH_DETAIL=<hashcount>\" to set to a higher value, "
+                        + "it could impact performance.");
+            }
         }
         return sb.toString();
     }

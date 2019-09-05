@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -282,7 +282,7 @@ public class TestExpressionUtil extends TestCase {
 
         AbstractExpression combined_exp = null;
         try {
-            combined_exp = ExpressionUtil.combinePredicates(combine_exps);
+            combined_exp = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, combine_exps);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -339,7 +339,8 @@ public class TestExpressionUtil extends TestCase {
         }
         AbstractExpression var_combined_exp = null;
         try {
-            var_combined_exp = ExpressionUtil.combinePredicates(combine_exps1, combine_exps2, combine_exps3, combine_exps4);
+            var_combined_exp = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND,
+                    combine_exps1, combine_exps2, combine_exps3, combine_exps4);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

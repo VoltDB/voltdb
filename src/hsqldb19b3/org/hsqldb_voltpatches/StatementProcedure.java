@@ -67,7 +67,7 @@ public class StatementProcedure extends StatementDMQL {
 
         this.expression = expression;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -83,7 +83,7 @@ public class StatementProcedure extends StatementDMQL {
         this.procedure = procedure;
         this.arguments = arguments;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 

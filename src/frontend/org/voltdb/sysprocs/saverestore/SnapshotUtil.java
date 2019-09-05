@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,6 +60,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -70,16 +71,13 @@ import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -110,6 +108,10 @@ public class SnapshotUtil {
     public static final String JSON_SERVICE = "service";
     public static final String JSON_PARTITION_COUNT = "partitionCount";
     public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
+    public static final String JSON_TABLES = "tables";
+    public static final String JSON_SKIPTABLES = "skiptables";
+    public static final String JSON_ELASTIC_OPERATION = "elasticOperationMetadata";
+
     /**
      * milestone used to mark a shutdown save snapshot
      */
@@ -189,7 +191,7 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair("txnId", txnId);
                 stringer.keySymbolValuePair("timestamp", timestamp);
                 stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
-                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -625,8 +627,9 @@ public class SnapshotUtil {
             return null;
         } finally {
             try {
-                if (fis != null)
+                if (fis != null) {
                     fis.close();
+                }
             } catch (IOException e) {}
         }
     }
@@ -858,7 +861,9 @@ public class SnapshotUtil {
             try {
                 if (f.getName().endsWith(".digest")) {
                     JSONObject digest = CRCCheck(f, logger);
-                    if (digest == null) continue;
+                    if (digest == null) {
+                        continue;
+                    }
                     Long snapshotTxnId = digest.getLong("txnId");
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
@@ -956,7 +961,7 @@ public class SnapshotUtil {
      * @param expectHashinator
      */
     public static Pair<Boolean, String> generateSnapshotReport(
-            Long snapshotTxnId, Snapshot snapshot, boolean expectHashinator) {
+            Long snapshotTxnId, Snapshot snapshot) {
         CharArrayWriter caw = new CharArrayWriter();
         PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
@@ -1043,14 +1048,12 @@ public class SnapshotUtil {
         /*
          * Check the hash data (if expected).
          */
-        if (expectHashinator) {
-            pw.print(indentString + "Hash configuration: ");
-            if (snapshot.m_hashConfig != null) {
-                pw.println(indentString + "present");
-            } else {
-                pw.println(indentString + "not present");
-                snapshotConsistent = false;
-            }
+        pw.print(indentString + "Hash configuration: ");
+        if (snapshot.m_hashConfig != null) {
+            pw.println(indentString + "present");
+        } else {
+            pw.println(indentString + "not present");
+            snapshotConsistent = false;
         }
 
         /*
@@ -1264,31 +1267,18 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
-    public static final List<Table> getTablesToSave(Database database)
-    {
+    public static final List<Table> getTablesToSave(Database database) {
         CatalogMap<Table> all_tables = database.getTables();
         ArrayList<Table> my_tables = new ArrayList<Table>();
-        for (Table table : all_tables)
-        {
-            //If table has view and table is export table snapshot view table.
-            if ((table.getMaterializer() != null) &&
-                    (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
-            {
-                //Non partitioned export table are not allowed so it should not get here.
-                Column bpc = table.getMaterializer().getPartitioncolumn();
-                if (bpc == null) continue;
-
-                String bPartName = bpc.getName();
-                Column pc = table.getColumns().get(bPartName);
-                if (pc != null) {
-                    my_tables.add(table);
-                }
+        for (Table table : all_tables) {
+            // STREAM tables are not included in the snapshot.
+            if (TableType.isStream(table.getTabletype())) {
                 continue;
             }
-            // Make a list of all non-materialized, non-export only tables
-            if ((table.getMaterializer() != null) ||
-                    (CatalogUtil.isTableExportOnly(database, table)))
-            {
+            // If the table is a view and it shouldn't be included into the snapshot, skip.
+            if (table.getMaterializer() != null
+                    && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
+                    && ! CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
             my_tables.add(table);
@@ -1314,7 +1304,9 @@ public class SnapshotUtil {
     }
 
     public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
-        if (results.length < 1) return "HAD NO RESULT TABLES";
+        if (results.length < 1) {
+            return "HAD NO RESULT TABLES";
+        }
         final VoltTable result = results[0];
         result.resetRowPosition();
         //Crazy old code would return one column with an error message.
@@ -1480,7 +1472,9 @@ public class SnapshotUtil {
                             response = responses.poll(
                                     TimeUnit.HOURS.toMillis(2) - (System.currentTimeMillis() - startTime),
                                     TimeUnit.MILLISECONDS);
-                            if (response == null) break;
+                            if (response == null) {
+                                break;
+                            }
                         } catch (InterruptedException e) {
                             VoltDB.crashLocalVoltDB("Should never happen", true, e);
                         }
@@ -1594,7 +1588,7 @@ public class SnapshotUtil {
                 }
             }
         }
-        if (hashData == null && TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
+        if (hashData == null) {
             throw new IOException("Missing hashinator data in snapshot");
         }
         return hashData;
@@ -1683,5 +1677,23 @@ public class SnapshotUtil {
         StringBuilder sb = new StringBuilder(64).append(dfmt.format(new Date()))
                 .append(Long.toString(zkTxnId, Character.MAX_RADIX));
         return sb.toString();
+    }
+
+    public static String makeSnapshotNonce(String type, long hsid) {
+        return type + "_" + hsid + "_" + System.currentTimeMillis();
+    }
+
+    public static String makeSnapshotRequest(SnapshotRequestConfig config) {
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            config.toJSONString(jsStringer);
+            jsStringer.endObject();
+            return jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+        // unreachable;
+        return null;
     }
 }

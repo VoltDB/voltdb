@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     }
 
     private List<AbstractExpression> m_columnList =
-            new ArrayList<AbstractExpression>();
+            new ArrayList<>();
 
     public TupleScanPlanNode() {
         super();
@@ -99,7 +99,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void resolveColumnIndexes() {
         // output columns
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);
@@ -145,7 +145,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
                 int paramIdx = paramIdxArray.getInt(i);
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(paramIdx);
-                AbstractExpression expr = m_outputSchema.getColumns().get(i).getExpression();
+                AbstractExpression expr = m_outputSchema.getColumn(i).getExpression();
                 pve.setValueSize(expr.getValueSize());
                 pve.setValueType(expr.getValueType());
                 m_columnList.add(pve);

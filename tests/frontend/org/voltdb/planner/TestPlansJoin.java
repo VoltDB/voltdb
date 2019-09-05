@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,6 +34,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -82,14 +83,14 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.SEND,
                 PlanNodeType.PROJECTION,
                 PlanNodeType.NESTLOOP);
-        assertEquals(4, pn.getOutputSchema().getColumns().size());
+        assertEquals(4, pn.getOutputSchema().size());
 
         for (JoinOp joinOp : JoinOp.JOIN_OPS) {
             perJoinOpTestBasicInnerJoin(joinOp);
         }
 
         query = "SELECT R2.C FROM R1 JOIN R2 USING(X)";
-        pattern = "user lacks privilege or object not found: X";
+        pattern = "object not found: X";
         failToCompile(query, pattern);
 
     }
@@ -98,7 +99,7 @@ public class TestPlansJoin extends PlannerTestCase {
         String query;
         String pattern;
         AbstractPlanNode pn;
-        List<SchemaColumn> selectColumns;
+        NodeSchema selectColumns;
 
         // SELECT * with ON clause should return all columns from all tables
         query = "SELECT * FROM R1 JOIN R2 ON R1.C" +
@@ -130,9 +131,9 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.PROJECTION,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
-        assertEquals("R1", selectColumns.get(0).getTableName());
-        assertEquals("R2", selectColumns.get(1).getTableName());
+        selectColumns = pn.getOutputSchema();
+        assertEquals("R1", selectColumns.getColumn(0).getTableName());
+        assertEquals("R2", selectColumns.getColumn(1).getTableName());
 
         // The output table for C can be either R1 or R2 because it's an INNER join
         query = "SELECT R1.A, C, R1.D FROM R1 JOIN R2 USING(C)";
@@ -140,16 +141,16 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.PROJECTION,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
-        assertEquals("R1", selectColumns.get(0).getTableName());
-        String table = selectColumns.get(1).getTableName();
+        selectColumns = pn.getOutputSchema();
+        assertEquals("R1", selectColumns.getColumn(0).getTableName());
+        String table = selectColumns.getColumn(1).getTableName();
         assertTrue("R2".equals(table) || "R1".equals(table));
-        table = selectColumns.get(2).getTableName();
+        table = selectColumns.getColumn(2).getTableName();
         assertEquals("R1", table);
 
         query = "SELECT R2.C FROM R1 JOIN R2 ON R1.X" +
                 joinOp + "R2.X";
-        pattern = "user lacks privilege or object not found: R1.X";
+        pattern = "object not found: R1.X";
         failToCompile(query, pattern);
 
         query = "SELECT * FROM R1 JOIN R2 ON R1.C" +
@@ -526,13 +527,13 @@ public class TestPlansJoin extends PlannerTestCase {
         AbstractExpression predicate;
         SeqScanPlanNode seqScan;
         SchemaColumn sc0;
-        List<SchemaColumn> selectColumns;
+        NodeSchema selectColumns;
 
         query = "SELECT max(A) FROM R1 JOIN R2 USING(A)";
         pn = compileToTopDownTree(query, 1, PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         for (SchemaColumn sc : selectColumns) {
             AbstractExpression e = sc.getExpression();
             assertTrue(e instanceof TupleValueExpression);
@@ -547,7 +548,7 @@ public class TestPlansJoin extends PlannerTestCase {
         pn = compileToTopDownTree(query, 1, PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         for (SchemaColumn sc : selectColumns) {
             AbstractExpression e = sc.getExpression();
             assertTrue(e instanceof TupleValueExpression);
@@ -562,7 +563,7 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         for (SchemaColumn sc : selectColumns) {
             AbstractExpression e = sc.getExpression();
             assertTrue(e instanceof TupleValueExpression);
@@ -621,9 +622,9 @@ public class TestPlansJoin extends PlannerTestCase {
         lpn = compileToFragments(query);
         assertProjectingCoordinator(lpn);
         pn = lpn.get(0);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         assertEquals(1, selectColumns.size());
-        sc0 = selectColumns.get(0);
+        sc0 = selectColumns.getColumn(0);
         assertEquals("AP1", sc0.getTableAlias());
         assertEquals("P1", sc0.getTableName());
 
@@ -646,9 +647,9 @@ public class TestPlansJoin extends PlannerTestCase {
         predicate = seqScan.getPredicate();
         assertExprTopDownTree(predicate, ExpressionType.COMPARE_GREATERTHAN,
                 ExpressionType.VALUE_TUPLE, ExpressionType.VALUE_CONSTANT);
-        selectColumns = seqScan.getOutputSchema().getColumns();
+        selectColumns = seqScan.getOutputSchema();
         assertEquals(1, selectColumns.size());
-        sc0 = selectColumns.get(0);
+        sc0 = selectColumns.getColumn(0);
         assertEquals("AP1", sc0.getTableAlias());
         assertEquals("P1", sc0.getTableName());
     }
@@ -867,7 +868,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // USING expression can have only comma separated list of column names
         query = "SELECT * FROM R1 JOIN R2 USING (ABS(A))";
-        pattern = "user lacks privilege or object not found: ABS";
+        pattern = "object not found: ABS";
         failToCompile(query, pattern);
     }
 
@@ -2086,7 +2087,7 @@ public class TestPlansJoin extends PlannerTestCase {
         query = "SELECT R2.C FROM (R1 JOIN R2 ON R1.C" +
                 joinOp + "R2.C) JOIN R3 ON R1.C" +
                 joinOp + "R3.C";
-        pattern = "user lacks privilege or object not found: R1.C";
+        pattern = "object not found: R1.C";
         failToCompile(query, pattern);
 
         // JOIN with join hierarchy (HSQL limitation)
@@ -2728,7 +2729,7 @@ public class TestPlansJoin extends PlannerTestCase {
         OrderByPlanNode orderBy;
         NestLoopPlanNode nlj;
         AggregatePlanNode aggr;
-        List<SchemaColumn> selectColumns;
+        NodeSchema selectColumns;
         SchemaColumn col;
         AbstractExpression colExp;
         AbstractExpression predicate;
@@ -2783,8 +2784,8 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
-        col = selectColumns.get(0);
+        selectColumns = pn.getOutputSchema();
+        col = selectColumns.getColumn(0);
         assertEquals("C", col.getColumnAlias());
         colExp = col.getExpression();
         assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
@@ -2798,9 +2799,9 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         assertEquals(1, selectColumns.size());
-        col = selectColumns.get(0);
+        col = selectColumns.getColumn(0);
         assertEquals("C", col.getColumnAlias());
         colExp = col.getExpression();
         assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
@@ -2812,9 +2813,9 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         assertEquals(1, selectColumns.size());
-        col = selectColumns.get(0);
+        col = selectColumns.getColumn(0);
         assertEquals("C", col.getColumnAlias());
         colExp = col.getExpression();
         assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
@@ -2826,9 +2827,9 @@ public class TestPlansJoin extends PlannerTestCase {
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.SEQSCAN);
-        selectColumns = pn.getOutputSchema().getColumns();
+        selectColumns = pn.getOutputSchema();
         assertEquals(1, selectColumns.size());
-        col = selectColumns.get(0);
+        col = selectColumns.getColumn(0);
         assertEquals("C", col.getColumnAlias());
         colExp = col.getExpression();
         assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());

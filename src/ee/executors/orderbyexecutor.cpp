@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -44,21 +44,11 @@
  */
 
 #include "orderbyexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
-
-#include <algorithm>
-#include <vector>
 
 namespace voltdb {
 
@@ -68,15 +58,15 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init OrderBy Executor");
     // We cannot yet do any sorting with large queries.
-    assert(! executorVector.isLargeQuery());
+    vassert(! executorVector.isLargeQuery());
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     if (!node->isInline()) {
-        assert(node->getInputTableCount() == 1);
+        vassert(node->getInputTableCount() == 1);
 
-        assert(node->getChildren()[0] != NULL);
+        vassert(node->getChildren()[0] != NULL);
 
         //
         // Our output table should look exactly like our input table
@@ -89,8 +79,8 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
             dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     } else {
-        assert(node->getChildren().empty());
-        assert(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) == NULL);
+        vassert(node->getChildren().empty());
+        vassert(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) == NULL);
     }
 
 #if defined(VOLT_LOG_LEVEL)
@@ -109,11 +99,11 @@ bool
 OrderByExecutor::p_execute(const NValueArray &params)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
     AbstractTempTable* output_table = dynamic_cast<AbstractTempTable*>(node->getOutputTable());
-    assert(output_table);
+    vassert(output_table);
     Table* input_table = node->getInputTable();
-    assert(input_table);
+    vassert(input_table);
 
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -128,7 +118,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
-    TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
     // If limit == 0 we have no work here.  There's no need to sort anything,
@@ -138,10 +127,11 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit != 0) {
         vector<TableTuple> xs;
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
+        TableIterator iterator = input_table->iterator();
         while (iterator.next(tuple))
         {
             pmp.countdownProgress();
-            assert(tuple.isActive());
+            vassert(tuple.isActive());
             xs.push_back(tuple);
         }
         VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",

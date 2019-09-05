@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,10 +19,11 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Queue;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.utils.FixedDBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Rejoin message used to drive the whole rejoin process. It is only sent between
@@ -48,11 +49,11 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
-    private FixedDBBPool m_bufferPool = null;
+    private Queue<BBContainer> m_dataBufferPool = null;
+    private Queue<BBContainer> m_compressedDataBufferPool = null;
     // number of sources sending to this site
-    private int m_snapshotSourceCount = 1;
     private long m_snapshotSinkHSId = -1;
-    private boolean m_schemaHasNoTables = false;
+    private boolean m_schemaHasPersistentTables = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -75,14 +76,15 @@ public class RejoinMessage extends VoltMessage {
      * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
-                         int sourceCount, FixedDBBPool bufferPool,
-                         boolean schemaHasNoTables) {
+                         Queue<BBContainer> dataBufferPool,
+                         Queue<BBContainer> compressedDataBufferPool,
+                         boolean schemaHasPersistentTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
-        m_snapshotSourceCount = sourceCount;
-        m_bufferPool = bufferPool;
-        m_schemaHasNoTables = schemaHasNoTables;
+        m_dataBufferPool = dataBufferPool;
+        m_compressedDataBufferPool = compressedDataBufferPool;
+        m_schemaHasPersistentTables = schemaHasPersistentTables;
     }
 
     /**
@@ -112,18 +114,18 @@ public class RejoinMessage extends VoltMessage {
         return m_masterHSId;
     }
 
-    public FixedDBBPool getSnapshotBufferPool()
+    public Queue<BBContainer> getSnapshotDataBufferPool()
     {
-        return m_bufferPool;
+        return m_dataBufferPool;
     }
 
-    public int getSnapshotSourceCount()
+    public Queue<BBContainer> getSnapshotCompressedDataBufferPool()
     {
-        return m_snapshotSourceCount;
+        return m_compressedDataBufferPool;
     }
 
-    public boolean schemaHasNoTables() {
-        return m_schemaHasNoTables;
+    public boolean schemaHasPersistentTables() {
+        return m_schemaHasPersistentTables;
     }
 
     /**

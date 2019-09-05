@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,13 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
+#include <jni.h>
+
 #include "boost/shared_array.hpp"
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/Pool.hpp"
-#include <jni.h>
 
 namespace voltdb {
 
@@ -43,18 +45,17 @@ public:
                 int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
-            int64_t exportGeneration,
             int32_t partitionId,
             std::string signature,
-            StreamBlock *block,
-            bool sync,
-            bool endOfStream);
+            ExportStreamBlock *block);
+    void pushEndOfStream(
+            int32_t partitionId,
+            std::string signature);
 
-    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -70,9 +71,14 @@ public:
 
     bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId);
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
+    int32_t callJavaUserDefinedAggregateStart(int functionId);
+    int32_t callJavaUserDefinedAggregateAssemble();
+    int32_t callJavaUserDefinedAggregateCombine();
+    int32_t callJavaUserDefinedAggregateWorkerEnd();
+    int32_t callJavaUserDefinedAggregateCoordinatorEnd();
     void resizeUDFBuffer(int32_t size);
 
 private:
@@ -83,6 +89,7 @@ private:
      * if this is NULL, VoltDBEngine will fail to call sendDependency().
     */
     jobject m_javaExecutionEngine;
+    jclass m_jniClass;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
     jmethodID m_traceLogMID;
@@ -90,12 +97,17 @@ private:
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
-    jmethodID m_getQueuedExportBytesMID;
+    jmethodID m_pushExportEOFMID;
     jmethodID m_pushDRBufferMID;
     jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jmethodID m_callJavaUserDefinedFunctionMID;
+    jmethodID m_callJavaUserDefinedAggregateStartMID;
+    jmethodID m_callJavaUserDefinedAggregateAssembleMID;
+    jmethodID m_callJavaUserDefinedAggregateCombineMID;
+    jmethodID m_callJavaUserDefinedAggregateWorkerEndMID;
+    jmethodID m_callJavaUserDefinedAggregateCoordinatorEndMID;
     jmethodID m_resizeUDFBufferMID;
     jmethodID m_storeLargeTempTableBlockMID;
     jmethodID m_loadLargeTempTableBlockMID;
@@ -103,6 +115,7 @@ private:
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
+    jmethodID initJavaUserDefinedMethod(const char* name);
 };
 
 }

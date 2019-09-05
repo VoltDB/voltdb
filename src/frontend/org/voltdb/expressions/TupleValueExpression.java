@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -126,8 +126,23 @@ public class TupleValueExpression extends AbstractValueExpression {
         this(tableName, null, columnName, null, columnIndex, -1);
     }
 
+    public TupleValueExpression(Column column) {
+        this(column.getParent().getTypeName(), column.getTypeName(), column.getIndex());
+        setValueType(VoltType.get((byte) column.getType()));
+    }
+
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
+    }
+
+    @Override
+    public TupleValueExpression anonymize() {
+       setTableName(null);
+       setTableAlias(null);
+       setColumnName(null);
+       setColumnAlias(null);
+       setDifferentiator(-1);
+       return this;
     }
 
     /*
@@ -228,11 +243,11 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     boolean matchesTableAlias(String tableAlias) {
-        if (m_tableAlias == null) {
-            return m_tableName.equals(tableAlias);
-        }
-
-        return m_tableAlias.equals(tableAlias);
+       if (m_tableAlias == null) {
+          return m_tableName.equals(tableAlias);
+       } else {
+          return m_tableAlias.equals(tableAlias);
+       }
     }
 
     public int getTableIndex() {
@@ -289,8 +304,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     public void setTypeSizeAndInBytes(SchemaColumn typeSource) {
-        setValueType(typeSource.getType());
-        setValueSize(typeSource.getSize());
+        setValueType(typeSource.getValueType());
+        setValueSize(typeSource.getValueSize());
         m_inBytes = typeSource.getExpression().getInBytes();
     }
 
@@ -339,6 +354,8 @@ public class TupleValueExpression extends AbstractValueExpression {
                 return false;
             }
         }
+        // NOTE: m_ColumnIndex was ignored in comparison, because it might not get properly set
+        // till end of planning, when query is made across several tables.
         return true;
     }
 
@@ -379,6 +396,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
+    /**
+     * Resolve a TVE in the context of the given table.  Since
+     * this is a TVE, it is a leaf node in the expression tree.
+     * We just look up the metadata from the table and copy it
+     * here, to this object.
+     */
     @Override
     public void resolveForTable(Table table) {
         assert(table != null);
@@ -408,7 +431,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (getValueType() == null) {
             // In case of sub-queries the TVE may not have its
             // value type and size resolved yet. Try to resolve it now
-            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+            SchemaColumn inputColumn = inputSchema.getColumn(index);
             setTypeSizeAndInBytes(inputColumn);
         }
         return index;

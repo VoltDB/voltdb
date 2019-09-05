@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,22 +74,20 @@ public class TestPlansSubQueries extends PlannerTestCase {
     private void checkOutputSchema(AbstractPlanNode planNode,
             String tableAlias, String[] columns) {
         NodeSchema schema = planNode.getOutputSchema();
-        List<SchemaColumn> schemaColumn = schema.getColumns();
-        assertEquals(columns.length, schemaColumn.size());
+        assertEquals(columns.length, schema.size());
 
-        for (int i = 0; i < schemaColumn.size(); ++i) {
-            SchemaColumn col = schemaColumn.get(i);
+        for (int i = 0; i < schema.size(); ++i) {
+            SchemaColumn col = schema.getColumn(i);
             checkOutputColumn(tableAlias, columns[i], col);
         }
     }
 
     private void checkOutputSchema(NodeSchema schema, String... qualifiedColumns) {
-        List<SchemaColumn> schemaColumn = schema.getColumns();
-        assertEquals(qualifiedColumns.length, schemaColumn.size());
+        assertEquals(qualifiedColumns.length, schema.size());
 
         for (int i = 0; i < qualifiedColumns.length; ++i) {
             String[] qualifiedColumn = qualifiedColumns[i].split("\\.");
-            SchemaColumn col = schemaColumn.get(i);
+            SchemaColumn col = schema.getColumn(i);
             checkOutputColumn(qualifiedColumn[0], qualifiedColumn[1], col);
         }
     }
@@ -1533,9 +1531,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // sub-selected table must have an alias
         //
         failToCompile("select A, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
-                "user lacks privilege or object not found: A");
+                "object not found: A");
         failToCompile("select A+1, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
-                "user lacks privilege or object not found: A");
+                "object not found: A");
 
         // (2)
         // sub-selected table must have an alias
@@ -1597,9 +1595,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Ambiguous column aliases with and without the subquery optimization
         failToCompile("select * from (select A AC, C AC from R1) T where AC > 0",
-                "user lacks privilege or object not found: AC");
+                "object not found: AC");
         failToCompile("select * from (select A AC, C AC from R1  LIMIT 10) T where AC > 0",
-                "user lacks privilege or object not found: AC");
+                "object not found: AC");
 
         //
         // (6) Subquery with partition table join with partition table on outer level
@@ -2649,7 +2647,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         String sql = "select C1 from ( select cast(a as varchar), c as c1 from r5 ) as SQ where SQ.C1 < 0;";
     AbstractPlanNode pn = compile(sql);
     assertNotNull(pn);
-    VoltType vt = pn.getOutputSchema().getColumns().get(0).getType();
+    VoltType vt = pn.getOutputSchema().getColumn(0).getValueType();
     assert(VoltType.INTEGER.equals(vt));
     }
 }

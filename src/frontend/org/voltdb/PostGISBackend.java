@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     private static final QueryTransformer castGeoAsVarcharQueryTransformer
             = new QueryTransformer(castGeoAsVarcharQuery)
             .prefix("ST_AsText(").suffix(")").groups("column")
-            .useWholeMatch().columnType(ColumnType.GEO);
+            .columnType(ColumnType.GEO);
 
     // Captures the use of PointFromText('POINT...
     private static final Pattern pointFromTextQuery = Pattern.compile(

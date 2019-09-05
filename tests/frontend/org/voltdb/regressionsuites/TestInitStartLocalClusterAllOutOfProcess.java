@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,26 +24,25 @@
 package org.voltdb.regressionsuites;
 
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertNotNull;
-import static junit.framework.TestCase.assertTrue;
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.utils.MiscUtils;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -53,7 +52,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
-
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
@@ -83,8 +82,8 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashJVM.class);
-        builder.addProcedures(CrashVoltDBProc.class);
+        builder.addProcedure(CrashJVM.class);
+        builder.addProcedure(CrashVoltDBProc.class);
         builder.setUseDDLSchema(true);
 
         cluster = new LocalCluster("collect.jar",

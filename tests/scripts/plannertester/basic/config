@@ -1,0 +1,15 @@
+DDL:
+./basic/ddl.sql
+
+SQL:
+select * from t where a = ? order by b;
+select * from t where a > ? order by b limit ?;
+select * from t where a < ? order by b limit ?;
+select * from t where a > ? and a < ? order by b limit ?;
+select * from t where a = ? order by b limit ?;
+select * from l, t where l.a=t.a order by l.a limit ?;
+select * from t, l where t.a=l.a;
+
+Partition Columns:
+L.a
+

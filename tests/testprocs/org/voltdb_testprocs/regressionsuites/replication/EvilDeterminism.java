@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,16 +26,11 @@ package org.voltdb_testprocs.regressionsuites.replication;
 import java.util.Date;
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
-@ProcInfo(
-        partitionInfo = "P1.ID: 0",
-        singlePartition = true
-)
 public class EvilDeterminism extends VoltProcedure {
 
     public VoltTable run(int id)
