@@ -65,7 +65,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
     }
 
     public void sendPoisonPill(long targetId) {
-        m_mb.deliver(new RejoinDataAckMessage(true, targetId, -1));
+        m_mb.deliver(m_msgFactory.makePoisonPillMessage(targetId));
     }
 
     @Override
@@ -100,9 +100,16 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
                 AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));
                 if (ackCallback == null) {
-                    rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
-                                    " in stream snapshot ack message");
-                } else if (m_msgFactory.getAckBlockIndex(msg) != -1) {
+                    // Elastic coordinator or snapshot site processor may send extra EOS to
+                    // ensure thread is properly terminated, don't panic.
+                    if (!m_msgFactory.isAckEOS(msg)) {
+                        rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
+                                        " in stream snapshot ack message");
+                    }
+                    continue;
+                }
+
+                if (m_msgFactory.getAckBlockIndex(msg) != -1) {
                     ackCallback.receiveAck(m_msgFactory.getAckBlockIndex(msg));
                 }
 
