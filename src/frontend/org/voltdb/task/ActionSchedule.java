@@ -15,8 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * Provides classes and interfaces for supporting task creation for execution of procedures and custom java on a
- * schedule
- */
 package org.voltdb.task;
+
+/**
+ * Interface which calculates the length of delay until the next action should be performed according to this schedule
+ */
+public interface ActionSchedule extends Initializable {
+    /**
+     * This method is invoked for the delay of the first action to be performed. All subsequent invocation will be of
+     * {@link ActionDelay#getCallback()}
+     * <p>
+     * If this method throws an exception or returns {@code null} the task instance will halted and put into an error
+     * state.
+     *
+     * @return {@link ActionDelay} with the delay until the next action should be performed and callback to invoke
+     */
+    ActionDelay getFirstDelay();
+}

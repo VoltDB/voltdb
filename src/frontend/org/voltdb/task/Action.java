@@ -17,28 +17,27 @@
 
 package org.voltdb.task;
 
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
+import static java.util.Objects.requireNonNull;
+
+import java.util.function.Function;
 
 /**
- * Action to be performed on behalf of a {@link Scheduler} as returned by {@link Scheduler#getFirstAction()} or by
- * {@link Scheduler#getNextAction(ActionResult)}.
+ * Class which defines an action to be taken as well as a callback to be invoked when that action has been performed.
+ * There is no callback present if the type of action is a stop action.
  */
-public final class Action {
-    private final Type m_type;
-    private String m_statusMessage;
-    private final ScheduledAction m_scheduledAction;
+public final class Action extends ActionDescription {
+    private final Function<ActionResult, Action> m_callback;
 
     /**
      * Create an {@link Action} which indicates that an unrecoverable error has occurred and the scheduler must exit.
      * <p>
      * {@code statusMessage} is the same status message which is set by calling {@link #setStatusMessage(String)}
      *
-     * @param statusMessage to log indicating the details of the error. May be {@code null}
-     * @return A new {@link Type#ERROR} instance of {@link Action}
+     * @param statusMessage To log indicating the details of the error. May be {@code null}
+     * @return A new {@link ActionType#ERROR} instance of {@link Action}
      */
     public static Action createError(String statusMessage) {
-        return new Action(Type.ERROR, statusMessage, null);
+        return new Action(ActionType.ERROR, statusMessage, null, null);
     }
 
     /**
@@ -46,111 +45,68 @@ public final class Action {
      * <p>
      * {@code statusMessage} is the same status message which is set by calling {@link #setStatusMessage(String)}
      *
-     * @param statusMessage to log indicating the details of the error. May be {@code null}
-     * @return A new {@link Type#EXIT} instance of {@link Action}
+     * @param statusMessage To log indicating the details of the error. May be {@code null}
+     * @return A new {@link ActionType#EXIT} instance of {@link Action}
      */
     public static Action createExit(String statusMessage) {
-        return new Action(Type.EXIT, statusMessage, null);
+        return new Action(ActionType.EXIT, statusMessage, null, null);
     }
 
     /**
-     * Schedule a procedure to be executed after a delay
+     * Create an {@link Action} which executes a procedure with given parameters
      *
-     * @param delay               time for the procedure to be executed
-     * @param timeUnit            {#link TimeUnit} of {@code delay}
-     * @param procedure           name of procedure to execute
-     * @param procedureParameters to pass to procedure during execution
-     * @return A new {@link Type#PROCEDURE} instance of {@link Action}
+     * @param callback            To be invoked after this procedure is executed
+     * @param procedure           Name of procedure to execute
+     * @param procedureParameters That are passed to procedure for execution
+     * @return A new {@link ActionType#PROCEDURE} instance of {@link Action}
      */
-    public static Action createProcedure(long delay, TimeUnit timeUnit, String procedure,
+    public static Action createProcedure(Function<ActionResult, Action> callback, String procedure,
             Object... procedureParameters) {
-        return new Action(Type.PROCEDURE, null, new ScheduledAction(Type.PROCEDURE, delay, timeUnit,
-                Objects.requireNonNull(procedure), procedureParameters));
+        return new Action(ActionType.PROCEDURE, null, requireNonNull(callback),
+                requireNonNull(procedure), requireNonNull(procedureParameters));
     }
 
     /**
-     * Schedule the scheduler to be invoked again without a procedure being executed. This causes the
-     * {@link Scheduler#getNextAction(ActionResult)} to be called again after a delay. A {@link ActionResult} will be
-     * associated with this call however it will have a {@code null} procedure but an {@code attachment} can be used.
+     * Create an {@link Action} which causes the {@code callback} to be invoked. An {@link ActionResult} will be
+     * associated with this call however it will have a {@code null} {@code procedure} and {@code result}.
      *
-     * @param delay    time for the scheduler to be executed
-     * @param timeUnit {@link TimeUnit} of {@code delay}
-     * @return A new {@link Type#RERUN} instance of {@link Action}
+     * @param callback To be invoked for this action
+     * @return A new {@link ActionType#CALLBACK} instance of {@link Action}
      */
-    public static Action createRerun(long delay, TimeUnit timeUnit) {
-        return new Action(Type.RERUN, null, new ScheduledAction(Type.RERUN, delay, timeUnit, null));
+    public static Action createCallback(Function<ActionResult, Action> callback) {
+        return new Action(ActionType.CALLBACK, null, callback, null);
     }
 
-    private Action(Type status, String message, ScheduledAction scheduledAction) {
-        m_type = status;
-        m_statusMessage = message;
-        m_scheduledAction = scheduledAction;
+    private Action(ActionType type, String statusMessage, Function<ActionResult, Action> callback, String procedure,
+            Object... procedureParameters) {
+        super(type, statusMessage, procedure, procedureParameters);
+        m_callback = callback;
     }
 
     /**
-     * @return The {@link Type} of this action
-     */
-    public Type getType() {
-        return m_type;
-    }
-
-    /**
-     * @return Optional status message provided with any action
-     */
-    public String getStatusMessage() {
-        return m_statusMessage;
-    }
-
-    /**
-     * Set the optional status massage which will be reported in the statistics for a {@link Scheduler} and if this is
-     * an {@link Type#ERROR} or {@link Type#EXIT} action then it will also be logged. For {@link Type#ERROR} or
-     * {@link Type#EXIT} actions this can be provided as part of the factory method.
+     * Set the optional status massage which will be reported in the statistics for a task and if this is an
+     * {@link ActionType#ERROR} or {@link ActionType#EXIT} action then it will also be logged. For
+     * {@link ActionType#ERROR} or {@link ActionType#EXIT} actions this can be provided as part of the factory method.
      *
-     * @param statusMessage to be reported
+     * @param statusMessage To be reported
      * @return {@code this}
      */
+    @Override
     public Action setStatusMessage(String statusMessage) {
-        m_statusMessage = statusMessage;
+        super.setStatusMessage(statusMessage);
         return this;
     }
 
     /**
-     * Add an arbitrary attachment to this action so that it can be retrieved upon the next
-     * {@link Scheduler#getNextAction(ActionResult)} invocation.
-     *
-     * @param attachment object to attach. May be {@code null}
-     * @return {@code this}
-     * @throws IllegalArgumentException if the type of action is either {@link Type#EXIT} or {@link Type#ERROR}
+     * @return callback to be invoked after any provided procedure is executed. Will be {@code null} if the type of
+     *         action is a stop action
      */
-    public Action setAttachment(Object attachment) throws IllegalArgumentException {
-        if (m_type == Type.ERROR || m_type == Type.EXIT) {
-            throw new IllegalArgumentException("Cannot set attachment when action type is " + m_type);
-        }
-        m_scheduledAction.setAttachment(attachment);
-        return this;
+    public Function<ActionResult, Action> getCallback() {
+        return m_callback;
     }
 
     @Override
     public String toString() {
-        return "Action [m_type=" + m_type + ", m_statusMessage=" + m_statusMessage + ", m_scheduledAction="
-                + m_scheduledAction + "]";
-    }
-
-    ScheduledAction getScheduledAction() {
-        return m_scheduledAction;
-    }
-
-    /**
-     * Enum used to describe the type of the {@link Action}.
-     */
-    public enum Type {
-        /** Schedule a procedure to be executed */
-        PROCEDURE,
-        /** Schedule the scheduler to be invoked again without a procedure being executed */
-        RERUN,
-        /** Unexpected error occurred within the scheduler and another procedures will not be scheduled */
-        ERROR,
-        /** Scheduler has reached an end to its life cycle and is not scheduling any more procedures */
-        EXIT;
+        return "Action [m_callback=" + m_callback + ", " + super.toString() + "]";
     }
 }

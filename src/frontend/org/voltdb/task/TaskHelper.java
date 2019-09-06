@@ -28,8 +28,8 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 
 /**
- * Helper class passed to {@link Scheduler} instances for calling in to the volt system to perform logging, validation
- * and other operations
+ * Helper class passed to {@link ActionSchedule}, {@link ActionGenerator} and {@link ActionScheduler} instances for
+ * calling in to the volt system to perform logging, validation and other operations
  */
 public final class TaskHelper {
     private final VoltLogger m_logger;
@@ -135,7 +135,7 @@ public final class TaskHelper {
      *
      * @param errors                   {@link TaskValidationErrors} instance to collect errors
      * @param restrictProcedureByScope If true type of procedures will be restricted. See
-     *                                 {@link Scheduler#restrictProcedureByScope()}
+     *                                 {@link ActionScheduler#restrictProcedureByScope()}
      * @param procedureName            Name of procedure to validate
      * @param parameters               that will be passed to {@code name}
      */

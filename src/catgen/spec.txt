@@ -326,11 +326,15 @@ begin TaskParameter javaonly
 end
 
 begin Task javaonly "Defined tasks which run on a schedule"
-  bool enabled                  "Whether or not this task is enabled"
-  string name                   "Name of the task"
-  string schedulerClass         "Class which defines the schedule"
-  TaskParameter* parameters     "The set of parameters to this scheduler"
-  string scope                  "Where this task should be executed"
-  string onError                "How procedure errors should be hanlded"
-  string user                   "User to be used when executing procedures"
+  bool enabled                              "Whether or not this task is enabled"
+  string name                               "Name of the task"
+  string schedulerClass                     "Class which defines the action scheduler"
+  TaskParameter* schedulerParameters        "The set of parameters to the action scheduler"
+  string actionGeneratorClass               "Class which defines the action generator"
+  TaskParameter* actionGeneratorParameters  "The set of parameters to the action generator"
+  string scheduleClass                      "Class which defines the action schedule"
+  TaskParameter* scheduleParameters         "The set of parameters to the action schedule"
+  string scope                              "Where this task should be executed"
+  string onError                            "How procedure errors should be hanlded"
+  string user                               "User to be used when executing procedures"
 end
