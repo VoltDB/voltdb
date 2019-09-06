@@ -688,6 +688,18 @@ public class Benchmark {
             replttlMigratelt.start();
         }
 
+
+        // Load a simple table and track scheduled TASK progress -- currently a time driven delete
+        if (!config.disabledThreads.contains("parttask")) {
+            partTasklt = new TaskLoader(client, "taskp", 100000, 1024, 50, permits, partitionCount);
+            partTasklt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("repltask"))) {
+            replTasklt = new TaskLoader(client, "taskr", 100000, 1024, 3, permits, partitionCount);
+            replTasklt.start();
+        }
+
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         scheduleRunTimer();

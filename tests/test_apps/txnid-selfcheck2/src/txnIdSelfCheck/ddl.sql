@@ -445,6 +445,28 @@ CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
 ) USING TTL 30 SECONDS ON COLUMN ts;
 CREATE INDEX ttlmigrateidxr ON ttlmigrater(ts) WHERE NOT MIGRATING;
 
+-- Table for scheduled task -- partitioned
+CREATE TABLE taskp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
+);
+PARTITION TABLE taskp ON COLUMN p;
+
+-- Table for scheduled task -- replicated
+CREATE TABLE taskr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
+);
+
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
@@ -514,11 +536,17 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
 PARTITION PROCEDURE NIBDPTableInsert ON TABLE nibdp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDRTableInsert;
+CREATE PROCEDURE deleteSomeP AS DELETE FROM taskp WHERE ts < DATEADD(SECOND, ?, NOW);
+PARTITION PROCEDURE deleteSomeP ON TABLE taskp COLUMN p;
+CREATE PROCEDURE deleteSomeR AS DELETE FROM taskr WHERE ts < DATEADD(SECOND, ?, NOW);
 
 -- functions
 CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
 CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
 CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
 
+-- tasks
+CREATE TASK taskDeleteP ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeP WITH (-100) ON ERROR LOG;
+CREATE TASK taskDeleteR ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeR WITH (-100) ON ERROR LOG;
 
 END_OF_BATCH
