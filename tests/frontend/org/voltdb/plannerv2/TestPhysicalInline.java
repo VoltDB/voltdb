@@ -261,31 +261,4 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         + "\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
                 .pass();
     }
-
-    // Hack:
-    // For ambiguous plans (due to planning undeterminism, or due to bug), checks that the
-    // .transform() and .json() should at least succeed in one of the list.
-    private void either(String sql, Collection<Pair<String, String>> transformedAndJSONs) {
-        Optional<Error> error = Optional.empty();
-        for (Pair<String, String> transformedAndJSON : transformedAndJSONs) {
-            final String transformed = transformedAndJSON.getFirst();
-            final String json = transformedAndJSON.getSecond();
-            try {
-                m_tester.sql(sql).transform(transformed).json(json);
-                m_tester.pass();
-                System.err.println("Succeeded!!!!!" + sql + ": " + transformed);
-                return;
-            } catch (Error e) {
-                System.err.println("+++++++" + e.getMessage() + "+++++++");
-                if (! error.isPresent()) {
-                    error = Optional.of(e);
-                }
-            }
-        }
-        if (error.isPresent()) {
-            System.err.println("?????" + sql);
-
-        }
-        error.ifPresent(e -> {throw e;});
-    }
 }
