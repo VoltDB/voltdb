@@ -47,6 +47,12 @@ import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * Base class for planner v2 test cases.
  *
@@ -66,11 +72,11 @@ public class Plannerv2TestCase extends PlannerTestCase {
         m_planner = new VoltPlanner(m_schemaPlus);
     }
 
-    protected RelTraitSet getEmptyTraitSet() {
+    private RelTraitSet getEmptyTraitSet() {
         return m_planner.getEmptyTraitSet();
     }
 
-    protected SchemaPlus getSchemaPlus() {
+    SchemaPlus getSchemaPlus() {
         return m_schemaPlus;
     }
 
@@ -78,8 +84,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
         SqlParserUtil.StringAndPos m_sap;
         String m_expectedException;
         String m_expectedPlan;
-        String m_expectedTransform;
-        String m_expectedVoltPlanJson;
+        final Set<String> m_expectedTransforms = new HashSet<>();
+        final Set<String> m_expectedVoltPlanJsons = new HashSet<>();
         SqlNode m_parsedNode;
         SqlNode m_validatedNode;
         RelRoot m_root;
@@ -87,9 +93,24 @@ public class Plannerv2TestCase extends PlannerTestCase {
         int m_ruleSetIndex = -1;
         boolean m_canCommuteJoins = false;
 
+        <E> void anyMatch(Collection<E> set, E actual) {
+            Optional<Error> anyError = Optional.empty();
+            for (E expected : set) {
+                try {
+                    assertEquals(expected, actual);
+                    return;
+                } catch (Error e) {
+                    anyError = Optional.of(e);
+                }
+            }
+            anyError.ifPresent(e -> { throw e; });
+        }
+
         void reset() {
             m_sap = null;
-            m_expectedException = m_expectedPlan = m_expectedTransform = m_expectedVoltPlanJson = null;
+            m_expectedException = m_expectedPlan = null;
+            m_expectedTransforms.clear();
+            m_expectedVoltPlanJsons.clear();
             m_parsedNode = m_validatedNode = null;
             m_root = null;
             m_transformedNode = null;
@@ -112,7 +133,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         }
 
         public Tester json(String expectedVoltPlanJson) {
-            m_expectedVoltPlanJson = expectedVoltPlanJson;
+            m_expectedVoltPlanJsons.add(expectedVoltPlanJson);
             return this;
         }
 
@@ -122,7 +143,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         }
 
         public Tester transform(String expectedTransform) {
-            m_expectedTransform = expectedTransform;
+            m_expectedTransforms.add(expectedTransform);
             return this;
         }
 
@@ -150,8 +171,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 throw new AssertionError("Unexpected exception thrown: " + m_sap.sql, ex);
             } else if (ex instanceof SqlParseException){
                 String errMessage = ex.getMessage();
-                if (errMessage == null
-                        || ! ex.getMessage().matches(m_expectedException)) {
+                if (errMessage == null || ! ex.getMessage().matches(m_expectedException)) {
                     throw new AssertionError("Exception thrown not matching the pattern: "
                             + m_expectedException, ex);
                 }
@@ -211,9 +231,9 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
             m_transformedNode = m_planner.transform(PlannerRules.Phase.LOGICAL.ordinal(),
                     getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION), m_root.rel);
-            if (m_ruleSetIndex == PlannerRules.Phase.LOGICAL.ordinal() && m_expectedTransform != null) {
+            if (m_ruleSetIndex == PlannerRules.Phase.LOGICAL.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
-                assertEquals(m_expectedTransform, actualTransform);
+                anyMatch(m_expectedTransforms, actualTransform);
             }
         }
     }
@@ -244,8 +264,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
                                         distribution.getPartitionEqualValue().toString()),
                         distribution.getIsSP());
             } catch (PlanningErrorException e) {    // transform stage is allowed to throw:
-                assertEquals(                       // See RelDistributionUtils#isJoinSP()
-                        "SQL error while compiling query: This query is not plannable.  "
+                // See RelDistributionUtils#isJoinSP()
+                assertEquals("SQL error while compiling query: This query is not plannable.  "
                                 + "The planner cannot guarantee that all rows would be in a single partition.",
                         e.getMessage());
             }
@@ -260,9 +280,9 @@ public class Plannerv2TestCase extends PlannerTestCase {
             }
 
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.OUTER_JOIN, m_transformedNode);
-            if (m_ruleSetIndex == PlannerRules.Phase.OUTER_JOIN.ordinal() && m_expectedTransform != null) {
+            if (m_ruleSetIndex == PlannerRules.Phase.OUTER_JOIN.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
-                assertEquals(m_expectedTransform, actualTransform);
+                anyMatch(m_expectedTransforms, actualTransform);
             }
         }
     }
@@ -277,9 +297,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
                     Phase.PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE : Phase.PHYSICAL_CONVERSION;
             m_transformedNode = m_planner.transform(physicalPhase.ordinal(),
                     physicalTraits, m_transformedNode);
-            if (m_ruleSetIndex == Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {
-                String actualTransform = RelOptUtil.toString(m_transformedNode);
-                assertEquals(m_expectedTransform, actualTransform);
+            if (m_ruleSetIndex == Phase.PHYSICAL_CONVERSION.ordinal()) {
+                anyMatch(m_expectedTransforms, RelOptUtil.toString(m_transformedNode));
             }
         }
     }
@@ -295,19 +314,20 @@ public class Plannerv2TestCase extends PlannerTestCase {
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
                     HepMatchOrder.ARBITRARY, m_transformedNode, true);
             if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal()) {
-                if (m_expectedTransform != null) {
-                    String actualTransform = RelOptUtil.toString(m_transformedNode);
+                if (! m_expectedTransforms.isEmpty()) {
                     // eliminate the HepRelVertex number which can be arbitrary
-                    m_expectedTransform = m_expectedTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
-                    actualTransform = actualTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
-                    assertEquals(m_expectedTransform, actualTransform);
+                    anyMatch(m_expectedTransforms
+                                    .stream()
+                                    .map(key -> key.replaceAll("HepRelVertex#\\d+", "HepRelVertex"))
+                                    .collect(Collectors.toSet()),
+                            RelOptUtil.toString(m_transformedNode)
+                                    .replaceAll("HepRelVertex#\\d+", "HepRelVertex"));
                 }
-                if (m_expectedVoltPlanJson != null) {
+                if (! m_expectedVoltPlanJsons.isEmpty()) {
                     assertTrue(m_transformedNode instanceof VoltPhysicalRel);
                     AbstractPlanNode voltPlan = ((VoltPhysicalRel)m_transformedNode).toPlanNode();
                     PlanNodeList planNodeList = new PlanNodeList(voltPlan, false);
-                    String actualPlan = planNodeList.toJSONString();
-                    assertEquals(m_expectedVoltPlanJson, actualPlan);
+                    anyMatch(m_expectedVoltPlanJsons, planNodeList.toJSONString());
                 }
             }
         }
