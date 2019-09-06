@@ -239,7 +239,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         getCluster(0).killSingleHost(1);
 
         table = getScheduleStats(client);
-        assertEquals(4, table.getRowCount());
+        assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("DISABLED", table.getString("STATE"));
         }
