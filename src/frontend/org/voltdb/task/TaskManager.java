@@ -998,8 +998,8 @@ public final class TaskManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        ActionScheduler constructScheduler(TaskHelper helper) {
-            return m_factory.construct(helper);
+        ActionScheduler constructScheduler(TaskHelper helper, TaskScope scope, int id) {
+            return m_factory.construct(helper, scope, id);
         }
 
         String generateLogMessage(String body) {
@@ -1225,7 +1225,7 @@ public final class TaskManager {
             }
 
             if (m_stats == null) {
-                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getSiteId());
+                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getScopeId());
                 m_stats.register(m_statsAgent);
             }
 
@@ -1247,7 +1247,8 @@ public final class TaskManager {
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
-                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
+                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface), getScope(),
+                        getScopeId());
                 submitHandleNextRun();
             }
         }
@@ -1576,9 +1577,15 @@ public final class TaskManager {
             return m_handler.generateLogMessage(body);
         }
 
+        /**
+         * @return The scope which this is running on
+         */
         abstract TaskScope getScope();
 
-        abstract int getSiteId();
+        /**
+         * @return The ID of the scope which this running on
+         */
+        abstract int getScopeId();
 
         private void setState(SchedulerWrapperState state) {
             m_wrapperState = state;
@@ -1600,7 +1607,7 @@ public final class TaskManager {
         }
 
         @Override
-        int getSiteId() {
+        int getScopeId() {
             return -1;
         }
     }
@@ -1619,8 +1626,8 @@ public final class TaskManager {
         }
 
         @Override
-        int getSiteId() {
-            return -1;
+        int getScopeId() {
+            return m_hostId;
         }
     }
 
@@ -1654,7 +1661,7 @@ public final class TaskManager {
         }
 
         @Override
-        int getSiteId() {
+        int getScopeId() {
             return m_partition;
         }
     }
@@ -1662,9 +1669,11 @@ public final class TaskManager {
     private interface SchedulerFactory {
         /**
          * @param helper which can be passed to the constructed classes
+         * @param scope  {@link TaskScope} in which this instance will run
+         * @param id     for the {@code scope} in which this instance will run
          * @return New instance of an {@link ActionScheduler}
          */
-        ActionScheduler construct(TaskHelper helper);
+        ActionScheduler construct(TaskHelper helper, TaskScope scope, int id);
 
         /**
          * Compare the hashes of the classes used to construct the {@link ActionScheduler} returned by this factory and
@@ -1699,19 +1708,20 @@ public final class TaskManager {
             this.m_classHash = classHash;
         }
 
-        public T construct(TaskHelper helper) {
+        public T construct(TaskHelper helper, TaskScope scope, int id) {
             try {
-                T scheduler = m_constructor.newInstance();
+                T instance = m_constructor.newInstance();
                 if (m_initMethod != null) {
                     if (m_takesHelper) {
                         m_parameters[0] = helper;
                     }
-                    m_initMethod.invoke(scheduler, m_parameters);
+                    m_initMethod.invoke(instance, m_parameters);
                 }
+                instance.setScopeId(scope, id);
                 if (m_classDeps == null) {
-                    m_classDeps = scheduler.getDependencies();
+                    m_classDeps = instance.getDependencies();
                 }
-                return scheduler;
+                return instance;
             } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
                 throw new IllegalArgumentException(e);
             }
@@ -1762,8 +1772,8 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper) {
-            return m_factory.construct(helper);
+        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
+            return m_factory.construct(helper, scope, id);
         }
 
         @Override
@@ -1790,9 +1800,9 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper) {
-            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper),
-                    m_actionScheduleFactory.construct(helper));
+        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
+            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper, scope, id),
+                    m_actionScheduleFactory.construct(helper, scope, id));
         }
 
         @Override
