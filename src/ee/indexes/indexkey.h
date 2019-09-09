@@ -125,6 +125,8 @@ struct IntsKey {
     using KeyEqualityChecker = IntsEqualityChecker<keySize>;
     using KeyComparator = IntsComparator<keySize> ;
     using KeyHasher = IntsHasher<keySize>;
+    // actual location of data
+    uint64_t data[keySize];
 
     static inline bool keyDependsOnTupleAddress() {
         return false;
@@ -271,13 +273,13 @@ struct IntsKey {
         }
     }
 
-    IntsKey(const TableTuple *tuple, const std::vector<int> &indices, const std::vector<AbstractExpression*> &indexed_expressions,
-            const TupleSchema *keySchema) {
+    IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
+            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
-        if (indexed_expressions.size() != 0) {
+        if (! indexed_expressions.empty()) {
             for (int ii = 0; ii < columnCount; ii++) {
                 AbstractExpression* ae = indexed_expressions[ii];
                 switch(ae->getValueType()) {
@@ -349,9 +351,6 @@ struct IntsKey {
             }
         }
     }
-
-    // actual location of data
-    uint64_t data[keySize];
 };
 
 /** comparator for Int specialized indexes.
@@ -419,7 +418,7 @@ private:
  */
 template <std::size_t keySize>
 struct IntsHasher {
-    IntsHasher(const TupleSchema *unused_keySchema) {}
+    IntsHasher(const TupleSchema*) {}
 
     inline size_t operator()(IntsKey<keySize> const& p) const {
         size_t seed = 0;
@@ -443,6 +442,8 @@ struct GenericKey {
     using KeyEqualityChecker = GenericEqualityChecker<keySize>;
     using KeyComparator = GenericComparator<keySize>;
     using KeyHasher = GenericHasher<keySize>;
+    // actual location of data, extends past the end.
+    char data[keySize];
 
     static inline bool keyDependsOnTupleAddress() {
         return false;
@@ -466,7 +467,7 @@ struct GenericKey {
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
         const int columnCount = keySchema->columnCount();
-        if (indexed_expressions.size() > 0) {
+        if (! indexed_expressions.empty()) {
             for (int ii = 0; ii < columnCount; ++ii) {
                 AbstractExpression* ae = indexed_expressions[ii];
                 keyTuple.setNValue(ii, ae->eval(tuple, NULL));
@@ -477,9 +478,6 @@ struct GenericKey {
             }
         }
     }
-
-    // actual location of data, extends past the end.
-    char data[keySize];
 };
 
 /**
@@ -492,7 +490,14 @@ struct GenericKey {
  * its ability to persist the indexed expression values using pooled storage.
  */
 template <std::size_t keySize>
-struct GenericPersistentKey : public GenericKey<keySize> {
+class GenericPersistentKey : public GenericKey<keySize> {
+    // The keySchema is only retained for object memory reclaim purposes.
+    // If NULL, this was either constructed as an ephemeral search key,
+    // or it has been "demoted" in the process of shuffling keys around
+    // in the map, passing its memory management responsibilities
+    // to another key, so no reclaim is required.
+    const TupleSchema *m_keySchema = nullptr;
+public:
     // These keys Compare and Hash as GenericKeys
     GenericPersistentKey() = default;
 
@@ -500,14 +505,14 @@ struct GenericPersistentKey : public GenericKey<keySize> {
     GenericPersistentKey(const TableTuple *tuple) : GenericKey<keySize>(tuple) { }
 
     GenericPersistentKey(const TableTuple *tuple, const std::vector<int> &notUsedIndices,
-                         const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
+                         const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) :
         // Not bothering to delegate to the full-blown GenericKey constructor,
         // since in some ways the special case processing here is simpler.
-        : GenericKey<keySize>(), m_keySchema(keySchema) {
+        GenericKey<keySize>(), m_keySchema(keySchema) {
         vassert(tuple);
         // Assume that there are indexed expressions.
         // Columns-only indexes don't use GenericPersistentKey
-        vassert(indexed_expressions.size() > 0);
+        vassert(! indexed_expressions.empty());
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
         const int columnCount = keySchema->columnCount();
@@ -515,7 +520,7 @@ struct GenericPersistentKey : public GenericKey<keySize> {
             AbstractExpression* ae = indexed_expressions[ii];
             NValue indexedValue;
             try {
-                indexedValue = ae->eval(tuple, NULL);
+                indexedValue = ae->eval(tuple, nullptr);
             } catch (const SQLException& ignoredDuringIndexing) {
                 // For the sake of keeping non-unique index upkeep as a non-failable operation,
                 // all exception-throwing expression evaluations get treated as NULL for index
@@ -541,7 +546,7 @@ struct GenericPersistentKey : public GenericKey<keySize> {
         , m_keySchema(other.m_keySchema) {
         ::memcpy(this->data, other.data, keySize);
         // Only one key, this, can own the tuple and its objects.
-        const_cast<GenericPersistentKey&>(other).m_keySchema = NULL;
+        const_cast<GenericPersistentKey&>(other).m_keySchema = nullptr;
     }
 
     const GenericPersistentKey& operator=(const GenericPersistentKey& other) {
@@ -565,9 +570,7 @@ struct GenericPersistentKey : public GenericKey<keySize> {
             // Other needs to lifeboat the original value of *this.
             char keptData[keySize];
             ::memcpy(keptData, this->data, keySize);
-
             ::memcpy(this->data, other.data, keySize);
-
             ::memcpy(writableOther.data, keptData, keySize);
         } else {
             // *this was ephemeral, so other must become ephemeral.
@@ -586,18 +589,12 @@ struct GenericPersistentKey : public GenericKey<keySize> {
             keyTuple.freeObjectColumns();
         }
     }
-
-private:
-    // The keySchema is only retained for object memory reclaim purposes.
-    // If NULL, this was either constructed as an ephemeral search key,
-    // or it has been "demoted" in the process of shuffling keys around
-    // in the map, passing its memory management responsibilities
-    // to another key, so no reclaim is required.
-    const TupleSchema *m_keySchema = nullptr;
 };
 
 template <std::size_t keySize>
-struct GenericNullAsMaxComparator {
+class GenericNullAsMaxComparator {
+    const TupleSchema *m_keySchema;
+public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
@@ -612,9 +609,6 @@ struct GenericNullAsMaxComparator {
     int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
         return operator()(lhs, rhs);
     }
-
-private:
-    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -623,6 +617,9 @@ private:
  */
 template <std::size_t keySize>
 struct GenericComparator {
+protected:
+    const TupleSchema *m_keySchema;
+public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
@@ -641,9 +638,6 @@ struct GenericComparator {
     const GenericNullAsMaxComparator<keySize> getNullAsMaxComparator() const {
         return GenericNullAsMaxComparator<keySize>(m_keySchema);
     }
-
-protected:
-    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -651,17 +645,18 @@ protected:
  * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericEqualityChecker {
+class GenericEqualityChecker {
+    const TupleSchema *m_keySchema;
+public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
-
     inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        TableTuple lhTuple(m_keySchema);
+        lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_keySchema);
+        rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
         return lhTuple.equalsNoSchemaCheck(rhTuple);
     }
-private:
-    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -669,17 +664,18 @@ private:
  * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericHasher {
+class GenericHasher {
+    const TupleSchema *m_keySchema;
+public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericHasher(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     /** Generate a 64-bit number for the key value */
     inline size_t operator()(GenericKey<keySize> const &p) const {
-        TableTuple pTuple(m_keySchema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
+        TableTuple pTuple(m_keySchema);
+        pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
         return pTuple.hashCode();
     }
-private:
-    const TupleSchema *m_keySchema;
 };
 
 struct TupleKeyComparator;
@@ -707,6 +703,16 @@ struct TupleKeyComparator;
  * comparing nvalues.
  */
 struct TupleKey {
+protected:
+    // TableIndex owns these vectors which are used to extract key values from a persistent tuple
+    // - both are NULL for an ephemeral key
+    const std::vector<int> *m_columnIndices = nullptr;
+    const std::vector<AbstractExpression*> *m_indexedExprs = nullptr;
+
+    // Pointer to a persistent tuple in the non-ephemeral case.
+    const void *m_keyTuple = nullptr;
+    const TupleSchema *m_keyTupleSchema = nullptr;
+public:
     // typedef TupleKeyEqualityChecker KeyEqualityChecker; // Required by (future?) support for CompactingHash...
     using KeyComparator = TupleKeyComparator;
     // typedef TupleKeyHasher KeyHasher; // Required by (future?) support for CompactingHash...
@@ -731,12 +737,12 @@ struct TupleKey {
     TupleKey(const TableTuple *tuple, const std::vector<int> &indices,
              const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *unused_keySchema) {
         vassert(tuple);
-        vassert(indices.size() > 0);
+        vassert(! indices.empty());
         m_columnIndices = &indices;
-        if (indexed_expressions.size() != 0) {
+        if (! indexed_expressions.empty()) {
             m_indexedExprs = &indexed_expressions;
         } else {
-            m_indexedExprs = NULL;
+            m_indexedExprs = nullptr;
         }
         m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
@@ -749,30 +755,22 @@ struct TupleKey {
 
     // Return the indexColumn'th key-schema column.
     NValue indexedValue(const TableTuple &tuple, int indexColumn) const {
-        if (m_columnIndices == NULL) {
+        if (m_columnIndices == nullptr) {
             // Pass through the values from an ephemeral index key "tuple".
             return tuple.getNValue(indexColumn);
-        }
-        if (m_indexedExprs == NULL) {
+        } else if (m_indexedExprs == nullptr) {
             // Project key column values from a column index's persistent tuple
             return tuple.getNValue((*m_columnIndices)[indexColumn]);
+        } else {
+            // Evaluate more complicated key expressions on a persistent tuple.
+            return (*m_indexedExprs)[indexColumn]->eval(&tuple, nullptr);
         }
-        // Evaluate more complicated key expressions on a persistent tuple.
-        return (*m_indexedExprs)[indexColumn]->eval(&tuple, NULL);
     }
-
-protected:
-    // TableIndex owns these vectors which are used to extract key values from a persistent tuple
-    // - both are NULL for an ephemeral key
-    const std::vector<int> *m_columnIndices = nullptr;
-    const std::vector<AbstractExpression*> *m_indexedExprs = nullptr;
-
-    // Pointer to a persistent tuple in the non-ephemeral case.
-    const void *m_keyTuple = nullptr;
-    const TupleSchema *m_keyTupleSchema = nullptr;
 };
 
-struct TupleKeyNullAsMaxComparator {
+class TupleKeyNullAsMaxComparator {
+    const TupleSchema *m_keySchema;
+public:
     TupleKeyNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     // return -1/0/1 if lhs </==/> rhs
@@ -794,9 +792,6 @@ struct TupleKeyNullAsMaxComparator {
     int compareWithoutPointer(const TupleKey &lhs, const TupleKey &rhs) const {
         return operator()(lhs, rhs);
     }
-
-private:
-    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -851,13 +846,10 @@ template <typename KeyType> struct NullAsMaxComparatorWithPointer;
 template <typename KeyType>
 struct KeyWithPointer : public KeyType {
     using KeyComparator = ComparatorWithPointer<KeyType>;
-    friend struct ComparatorWithPointer<KeyType>;
-    friend struct NullAsMaxComparatorWithPointer<KeyType>;
+    const void* m_keyTuple = nullptr;
 
     KeyWithPointer() = default;
-
     KeyWithPointer(const TableTuple *tuple) : KeyType(tuple) {}
-
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
             const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
         : KeyType(tuple, indices, indexed_expressions, keySchema) {
@@ -877,9 +869,6 @@ struct KeyWithPointer : public KeyType {
         m_keyTuple = value;
         return rv;
     }
-
-private:
-    const void* m_keyTuple = nullptr;
 };
 
 template <>
@@ -887,15 +876,12 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
     using KeyComparator = ComparatorWithPointer<TupleKey>;
     friend struct ComparatorWithPointer<TupleKey>;
     friend struct NullAsMaxComparatorWithPointer<TupleKey>;
-
-    KeyWithPointer() : TupleKey() {}
-
+    KeyWithPointer() = default;
     KeyWithPointer(const TableTuple *tuple) : TupleKey(tuple) {}
-
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
-                   const std::vector<AbstractExpression*> &indexed_expressions,
-                   const TupleSchema *unused_keySchema)
-        : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *unused_keySchema) :
+        TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
 
     const void * const& getValue() const {
         return m_keyTuple;
@@ -913,9 +899,8 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
 template <typename KeyType>
 struct NullAsMaxComparatorWithPointer : public KeyType::KeyComparator {
     NullAsMaxComparatorWithPointer(const TupleSchema *keySchema) : KeyType::KeyComparator(keySchema) {}
-
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
-        int rv = KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
+        int const rv = KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
     }
     // Do a comparison, but don't compare pointers to tuple storage.
@@ -926,11 +911,10 @@ struct NullAsMaxComparatorWithPointer : public KeyType::KeyComparator {
 
 template <typename KeyType>
 struct ComparatorWithPointer : public KeyType::KeyComparator {
-    ComparatorWithPointer(const TupleSchema *keySchema)
-        : KeyType::KeyComparator(keySchema) {}
+    ComparatorWithPointer(const TupleSchema *keySchema) : KeyType::KeyComparator(keySchema) {}
 
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
-        int rv = KeyType::KeyComparator::operator()(lhs, rhs);
+        int const rv = KeyType::KeyComparator::operator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
     }
 
@@ -942,12 +926,11 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
     const NullAsMaxComparatorWithPointer<KeyType> getNullAsMaxComparator() const {
         return NullAsMaxComparatorWithPointer<KeyType>(this->m_keySchema);
     }
-
 };
 
 // overload template
 template <typename KeyType>
-inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) {
+inline void setPointerValue(KeyWithPointer<KeyType>& k, const void* v) {
     k.setValue(v);
 }
 
