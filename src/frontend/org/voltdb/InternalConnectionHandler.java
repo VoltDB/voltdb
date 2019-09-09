@@ -19,7 +19,7 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -98,7 +98,7 @@ public class InternalConnectionHandler {
             int timeout,
             ProcedureCallback cb,
             boolean ntPriority,
-            Function<Integer, Boolean> backPressurePredicate,
+            Predicate<Integer> backPressurePredicate,
             String procName,
             Object...args)
     {
@@ -112,10 +112,9 @@ public class InternalConnectionHandler {
             int timeout,
             ProcedureCallback cb,
             boolean ntPriority,
-            Function<Integer, Boolean> backPressurePredicate,
+            Predicate<Integer> backPressurePredicate,
             String procName,
-            Object...args)
-    {
+            Object... args) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s. Procedure not found.";
@@ -128,25 +127,36 @@ public class InternalConnectionHandler {
         task.setProcName(procName);
         task.setParams(args);
 
+        if (timeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            task.setBatchTimeout(timeout);
+        }
+
+        return callProcedure(hostname, user, isAdmin, task, catProc, cb, ntPriority, backPressurePredicate);
+    }
+
+    public boolean callProcedure(String hostname, AuthUser user, boolean isAdmin, StoredProcedureInvocation task,
+            Procedure catProc, ProcedureCallback cb, boolean ntPriority, Predicate<Integer> backPressurePredicate) {
+        assert task.getProcName().equals(catProc.getTypeName()) || catProc.getSystemproc();
+
         try {
             task = MiscUtils.roundTripForCL(task);
         } catch (Exception e) {
             String fmt = "Cannot invoke procedure %s. failed to create task.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, task.getProcName());
             m_failedCount.incrementAndGet();
             return false;
-        }
-
-        if (timeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
-            task.setBatchTimeout(timeout);
         }
 
         int[] partitions = null;
         try {
             partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
+            if (partitions == null) {
+                m_logger.debug("Destination partition for task " + task + " does not exist");
+                return false;
+            }
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s. Partition not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, task.getProcName());
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -157,7 +167,8 @@ public class InternalConnectionHandler {
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 adapterName, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partitions, ntPriority, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, catProc, cb, null, task, user, partitions, ntPriority,
+                backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -167,7 +178,7 @@ public class InternalConnectionHandler {
 
     // Use null backPressurePredicate for no back pressure
     public boolean callProcedure(InternalConnectionContext caller,
-                                 Function<Integer, Boolean> backPressurePredicate,
+                                 Predicate<Integer> backPressurePredicate,
                                  InternalConnectionStatsCollector statsCollector,
                                  ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
@@ -193,6 +204,10 @@ public class InternalConnectionHandler {
         int[] partitions = null;
         try {
             partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
+            if (partitions == null) {
+                m_logger.debug("Destination partition for task " + task + " does not exist");
+                return false;
+            }
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
@@ -206,7 +221,8 @@ public class InternalConnectionHandler {
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partitions, false, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, catProc, procCallback, statsCollector, task, user, partitions,
+                false, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }

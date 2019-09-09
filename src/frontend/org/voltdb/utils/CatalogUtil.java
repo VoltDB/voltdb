@@ -646,9 +646,7 @@ public abstract class CatalogUtil {
     }
 
     public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        return db.getConnectors();
+        return catalogContext.database.getConnectors();
     }
 
     public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
@@ -888,7 +886,7 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
-            Cluster catCluster = catalog.getClusters().get("cluster");
+            Cluster catCluster = getCluster(catalog);
 
             // add our hacky Deployment to the catalog
             if (catCluster.getDeployment().get("deployment") == null) {
@@ -976,9 +974,9 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        org.voltdb.catalog.CommandLog config = getCluster(catalog).getLogconfig().get("log");
         if (config == null) {
-            config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+            config = getCluster(catalog).getLogconfig().add("log");
         }
 
         Frequency freq = commandlog.getFrequency();
@@ -1364,7 +1362,7 @@ public abstract class CatalogUtil {
         ClusterType cluster = deployment.getCluster();
         int kFactor = cluster.getKfactor();
 
-        Cluster catCluster = catalog.getClusters().get("cluster");
+        Cluster catCluster = getCluster(catalog);
         // copy the deployment info that is currently not recorded anywhere else
         Deployment catDeploy = catCluster.getDeployment().get("deployment");
         catDeploy.setKfactor(kFactor);
@@ -1815,7 +1813,7 @@ public abstract class CatalogUtil {
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType) {
-        final Cluster cluster = catalog.getClusters().get("cluster");
+        final Cluster cluster = getCluster(catalog);
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
@@ -2093,7 +2091,7 @@ public abstract class CatalogUtil {
      * @param security security element of the deployment xml
      */
     private static void setSecurityEnabled( Catalog catalog, SecurityType security) {
-        Cluster cluster = catalog.getClusters().get("cluster");
+        Cluster cluster = getCluster(catalog);
         Database database = cluster.getDatabases().get("database");
 
         cluster.setSecurityenabled(security.isEnabled());
@@ -2106,7 +2104,7 @@ public abstract class CatalogUtil {
      * @param snapshot A reference to the <snapshot> element of the deployment.xml file.
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
         SnapshotSchedule schedule = db.getSnapshotschedule().get("default");
         if (schedule == null) {
             schedule = db.getSnapshotschedule().add("default");
@@ -2359,7 +2357,7 @@ public abstract class CatalogUtil {
         // in project.xml). However, it must always be named "database", so
         // I've temporarily hardcoded it here until a more robust solution is
         // available.
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
 
         SecureRandom sr = new SecureRandom();
 
@@ -2446,7 +2444,7 @@ public abstract class CatalogUtil {
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd, SslType ssl) {
-        Cluster cluster = catalog.getClusters().get("cluster");
+        Cluster cluster = getCluster(catalog);
 
         // set the catalog info
         int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
@@ -2460,7 +2458,7 @@ public abstract class CatalogUtil {
     private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType,
             int drFlushInterval, boolean isPlaceHolderCatalog) {
         int clusterId;
-        Cluster cluster = catalog.getClusters().get("cluster");
+        Cluster cluster = getCluster(catalog);
         final Database db = cluster.getDatabases().get("database");
         assert cluster != null;
         if (dr != null) {
@@ -2768,7 +2766,7 @@ public abstract class CatalogUtil {
         Set<String> optionalTableNames = new HashSet<>();
         Catalog catalog = new Catalog();
         catalog.execute(getSerializedCatalogStringFromJar(jarfile));
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
         Pair<List<Table>, Set<String>> ret;
 
         ret = getSnapshotableTables(db, true);
@@ -3361,5 +3359,13 @@ public abstract class CatalogUtil {
      */
     public static VoltTable.ColumnInfo catalogColumnToInfo(Column column) {
         return new VoltTable.ColumnInfo(column.getTypeName(), VoltType.get((byte) column.getType()));
+    }
+
+    public static Cluster getCluster(Catalog catalog) {
+        return catalog.getClusters().get("cluster");
+    }
+
+    public static Database getDatabase(Catalog catalog) {
+        return getCluster(catalog).getDatabases().get("database");
     }
 }

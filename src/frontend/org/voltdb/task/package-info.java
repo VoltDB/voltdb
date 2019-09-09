@@ -16,6 +16,7 @@
  */
 
 /**
- * Provides classes and interfaces for for supporting tasks executing on a schedule
+ * Provides classes and interfaces for supporting task creation for execution of procedures and custom java on a
+ * schedule
  */
 package org.voltdb.task;

@@ -27,6 +27,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -45,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -76,6 +78,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
+import org.voltdb.task.TaskManager.TaskValidationResult;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -83,8 +86,8 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class TestTaskManager {
 
-    static AtomicInteger s_firstSchedulerCallCount = new AtomicInteger();
-    static AtomicInteger s_postRunSchedulerCallCount = new AtomicInteger();
+    static AtomicInteger s_firstActionSchedulerCallCount = new AtomicInteger();
+    static AtomicInteger s_postRunActionSchedulerCallCount = new AtomicInteger();
 
     private static final String PROCEDURE_NAME = "SomeProcedure";
 
@@ -96,13 +99,16 @@ public class TestTaskManager {
     private InternalConnectionHandler m_internalConnectionHandler;
     private TaskManager m_taskManager;
     private Database m_database;
-    private Procedure m_procedure = new Procedure();
+    private Procedure m_procedure;
     private StatsAgent m_statsAgent = new StatsAgent();
     private TaskSettingsType m_schedulesConfig = new TaskSettingsType();
     private ClientResponse m_response;
 
     @Before
     public void setup() {
+        m_database = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        m_procedure = m_database.getProcedures().add(PROCEDURE_NAME);
+
         m_authSystem = mock(AuthSystem.class);
         when(m_authSystem.getUser(anyString())).then(m -> mock(AuthUser.class));
 
@@ -121,10 +127,8 @@ public class TestTaskManager {
 
         m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0);
 
-        s_firstSchedulerCallCount.set(0);
-        s_postRunSchedulerCallCount.set(0);
-
-        m_database = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        s_firstActionSchedulerCallCount.set(0);
+        s_postRunActionSchedulerCallCount.set(0);
     }
 
     @After
@@ -138,20 +142,20 @@ public class TestTaskManager {
      */
     @Test
     public void systemScheduleCreateDrop() throws Exception {
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
 
         startSync();
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(task);
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         promoteToLeaderSync(task);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
-                s_postRunSchedulerCallCount.get() > 0);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -161,19 +165,19 @@ public class TestTaskManager {
      */
     @Test
     public void hostScheduleCreateDrop() throws Exception {
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_HOSTS);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_HOSTS);
 
         m_procedure.setTransactional(false);
 
         startSync();
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(task);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
-                s_postRunSchedulerCallCount.get() > 0);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -186,7 +190,7 @@ public class TestTaskManager {
     public void partitionScheduleCreateDrop() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -196,27 +200,29 @@ public class TestTaskManager {
         m_procedure.setPartitioncolumn(column);
 
         startSync();
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(task);
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         promotedPartitionsSync(0, 4);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(2, s_firstSchedulerCallCount.get());
-        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
-                s_postRunSchedulerCallCount.get() > 0);
+        assertEquals(2, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
 
         demotedPartitionsSync(0, 4);
-        assertCountsAfterScheduleCanceled(2);
+        assertCountsAfterScheduleCanceled(2, false);
 
-        int previousCount = s_postRunSchedulerCallCount.get();
+        int previousCount = s_postRunActionSchedulerCallCount.get();
         promotedPartitionsSync(0);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(20);
-        assertTrue("Scheduler should have been called at least " + previousCount + " times: "
-                + s_postRunSchedulerCallCount.get(), s_postRunSchedulerCallCount.get() > previousCount);
+        assertTrue(
+                "ActionScheduler should have been called at least " + previousCount + " times: "
+                        + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > previousCount);
 
         dropScheduleAndAssertCounts(3);
     }
@@ -226,20 +232,20 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithParameters() throws Exception {
-        Task task = createTask(TestSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "AFFA47");
+        Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "AFFA47");
 
         startSync();
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(task);
-        assertEquals(0, s_firstSchedulerCallCount.get());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
 
         promoteToLeaderSync(task);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
-                s_postRunSchedulerCallCount.get() > 0);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -249,16 +255,16 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithBadParameters() throws Exception {
-        Task task = createTask(TestSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
+        Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
 
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
-        task.getParameters().get("0").setParameter("NAN");
-        task.getParameters().get("2").setParameter("7894");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        task.getSchedulerparameters().get("0").setParameter("NAN");
+        task.getSchedulerparameters().get("2").setParameter("7894");
+        assertFalse(validateTask(task).isValid());
 
-        task.setSchedulerclass(TestScheduler.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        task.setSchedulerclass(TestActionScheduler.class.getName());
+        assertFalse(validateTask(task).isValid());
     }
 
     /*
@@ -268,8 +274,8 @@ public class TestTaskManager {
     public void shutdownWithSchedulesActive() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        Task task1 = createTask(TestScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask(m_name.getMethodName() + "_p", TestScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task1 = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task2 = createTask(m_name.getMethodName() + "_p", TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -282,7 +288,7 @@ public class TestTaskManager {
         promoteToLeaderSync(task1, task2);
         promotedPartitionsSync(0, 1, 2, 3);
         Thread.sleep(50);
-        assertEquals(5, s_firstSchedulerCallCount.get());
+        assertEquals(5, s_firstActionSchedulerCallCount.get());
         m_taskManager.shutdown().get();
     }
 
@@ -290,15 +296,15 @@ public class TestTaskManager {
      * Test that a scheduler can just schedule itself to be rerun multple times
      */
     @Test
-    public void rerunScheduler() throws Exception {
-        Task task = createTask(TestSchedulerRerun.class, TaskManager.SCOPE_DATABASE, 5);
+    public void rerunActionScheduler() throws Exception {
+        Task task = createSchedulerTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE, 5);
 
         startSync(task);
         promoteToLeaderSync(task);
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertEquals(4, s_postRunSchedulerCallCount.get());
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertEquals(4, s_postRunActionSchedulerCallCount.get());
     }
 
     /*
@@ -306,13 +312,13 @@ public class TestTaskManager {
      * enabled
      */
     @Test
-    public void disableReenableScheduler() throws Exception {
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_DATABASE);
+    public void disableReenableActionScheduler() throws Exception {
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
 
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
 
         task.setEnabled(false);
         processUpdateSync(task);
@@ -330,7 +336,7 @@ public class TestTaskManager {
      */
     @Test
     public void partitionPromotionAndDisabledSchedules() throws Exception {
-        Task task = createTask(TestSchedulerRerun.class, TaskManager.SCOPE_PARTITIONS, 5);
+        Task task = createSchedulerTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_PARTITIONS, 5);
 
         startSync(task);
 
@@ -373,12 +379,12 @@ public class TestTaskManager {
     @Test
     public void minDelay() throws Exception {
         m_schedulesConfig.setMinDelayMs(10000);
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertEquals(0, s_postRunSchedulerCallCount.get());
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertEquals(0, s_postRunActionSchedulerCallCount.get());
     }
 
     /*
@@ -387,12 +393,12 @@ public class TestTaskManager {
     @Test
     public void maxRunFrequency() throws Exception {
         m_schedulesConfig.setMaxRunFrequency(1.0);
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
-        assertEquals(1, s_firstSchedulerCallCount.get());
-        assertEquals(1, s_postRunSchedulerCallCount.get());
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertEquals(1, s_postRunActionSchedulerCallCount.get());
     }
 
     /*
@@ -406,8 +412,8 @@ public class TestTaskManager {
         VoltCompiler vc = new VoltCompiler(false);
         vc.addClassToJar(jarFile, TestTaskManager.class);
 
-        Task task1 = createTask("TestScheduler", TestScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask("TestSchedulerRerun", TestSchedulerRerun.class, TaskManager.SCOPE_DATABASE,
+        Task task1 = createTask("TestActionScheduler", TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task2 = createTask("TestActionSchedulerRerun", TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE,
                 Integer.MAX_VALUE);
 
         startSync();
@@ -445,7 +451,7 @@ public class TestTaskManager {
             String scheduleName = table.getString("NAME");
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             long previousCount = invocationCounts.put(scheduleName, currentCount);
-            if (scheduleName.equals("TestScheduler")) {
+            if (scheduleName.equals("TestActionScheduler")) {
                 assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
             } else {
                 assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
@@ -459,7 +465,7 @@ public class TestTaskManager {
         vc = new VoltCompiler(false);
         jarFile = new InMemoryJarfile();
         vc.addClassToJar(jarFile, TestTaskManager.class);
-        jarFile.removeClassFromJar(TestSchedulerParams.class.getName());
+        jarFile.removeClassFromJar(TestActionSchedulerParams.class.getName());
         processUpdateSync(jarFile.getLoader(), true, task1, task2);
         Thread.sleep(5);
 
@@ -479,7 +485,7 @@ public class TestTaskManager {
     @Test
     public void changeOnErrorWhileRunning() throws Exception {
         when(m_response.getStatus()).thenReturn(ClientResponse.USER_ABORT);
-        Task task = createTask(TestScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
         m_procedure.setSinglepartition(true);
         task.setOnerror("IGNORE");
 
@@ -488,9 +494,9 @@ public class TestTaskManager {
 
         // Long sleep because it sometimes takes a while for the first execution
         Thread.sleep(50);
-        assertEquals(6, s_firstSchedulerCallCount.get());
-        assertTrue("Scheduler should have been called at least once: " + s_postRunSchedulerCallCount.get(),
-                s_postRunSchedulerCallCount.get() > 0);
+        assertEquals(6, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
 
         validateStats("RUNNING", r -> assertNull(r.getString("SCHEDULER_STATUS")));
 
@@ -506,64 +512,151 @@ public class TestTaskManager {
      */
     @Test
     public void testValidateParameters() throws Exception {
-        Task task = createTask(TestSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
+        Task task = createSchedulerTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
 
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertTrue(validateTask(task).isValid());
 
-        task.setSchedulerclass(TestSchedulerValidateParamsWithHelper.class.getName());
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        task.setSchedulerclass(TestActionSchedulerValidateParamsWithHelper.class.getName());
+        assertTrue(validateTask(task).isValid());
 
         // Parameter fails validation
-        task.getParameters().get("0").setParameter("FAIL");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        task.getSchedulerparameters().get("0").setParameter("FAIL");
+        assertFalse(validateTask(task).isValid());
 
-        task.setSchedulerclass(TestSchedulerValidateParams.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        task.setSchedulerclass(TestActionSchedulerValidateParams.class.getName());
+        assertFalse(validateTask(task).isValid());
+    }
+
+    /*
+     * Test providing a custom ActionSchedule to the manager
+     */
+    @Test
+    public void testCustomSchedule() throws Exception {
+        Task task = createSchedulerTask(TestActionSchedule.class, TaskManager.SCOPE_DATABASE, 50, 250);
+
+        startSync();
+        promoteToLeaderSync(task);
+
+        Thread.sleep(50);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
+
+        dropScheduleAndAssertCounts(1, true);
+    }
+
+    /*
+     * Test providing a custom ActionGenerator to the manager
+     */
+    @Test
+    public void testCustomGenerator() throws Exception {
+        Task task = createSchedulerTask(TestActionGenerator.class, TaskManager.SCOPE_DATABASE);
+
+        startSync();
+        promoteToLeaderSync(task);
+
+        Thread.sleep(50);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
+                s_postRunActionSchedulerCallCount.get() > 0);
+        validateStats();
+        processUpdateSync();
+
+        // Same as assertCountsAfterScheduleCanceled(1) except only 1/2 the calls are to the procedure
+        int previousCount = s_postRunActionSchedulerCallCount.get();
+        Thread.sleep(10);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
+
+        int procedureCalls = previousCount/2;
+
+        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), eq(false), anyInt(), any(),
+                eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), eq(false),
+                anyInt(), any(), eq(PROCEDURE_NAME), any());
+
+        verify(m_clientInterface, atLeast(procedureCalls)).getProcedureFromName(eq(PROCEDURE_NAME));
+        verify(m_clientInterface, atMost(procedureCalls + 1)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {
-        dropScheduleAndAssertCounts(1);
+        dropScheduleAndAssertCounts(1, false);
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        validateStats();
-        processUpdateSync();
-        assertCountsAfterScheduleCanceled(startCount);
+        dropScheduleAndAssertCounts(startCount, false);
     }
 
-    private void assertCountsAfterScheduleCanceled(int startCount) throws InterruptedException {
-        int previousCount = s_postRunSchedulerCallCount.get();
+    private void dropScheduleAndAssertCounts(int startCount, boolean procedureValidated) throws Exception {
+        validateStats();
+        processUpdateSync();
+        assertCountsAfterScheduleCanceled(startCount, procedureValidated);
+    }
+
+    private void assertCountsAfterScheduleCanceled(int startCount, boolean procedureValidated)
+            throws InterruptedException {
+        int previousCount = s_postRunActionSchedulerCallCount.get();
         Thread.sleep(10);
-        assertEquals(startCount, s_firstSchedulerCallCount.get());
-        assertEquals(previousCount, s_postRunSchedulerCallCount.get());
+        assertEquals(startCount, s_firstActionSchedulerCallCount.get());
+        assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
 
         verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), eq(false), anyInt(), any(),
                 eq(PROCEDURE_NAME), any());
         verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), eq(false),
                 anyInt(), any(), eq(PROCEDURE_NAME), any());
 
+        if (procedureValidated) {
+            previousCount += startCount;
+        }
         verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
-    private Task createTask(Class<? extends Scheduler> clazz, String scope, Object... params) {
+    private Task createSchedulerTask(Class<? extends Initializable> clazz, String scope, Object... params) {
         return createTask(m_name.getMethodName(), clazz, scope, params);
     }
 
-    private Task createTask(String scheduleName, Class<? extends Scheduler> clazz, String scope, Object... params) {
-        Task task = m_database.getTasks().add(scheduleName);
-        task.setEnabled(true);
-        task.setName(scheduleName);
-        task.setScope(scope);
-        task.setSchedulerclass(clazz.getName());
-        task.setUser("user");
-        task.setOnerror("ABORT");
-        CatalogMap<TaskParameter> paramMap = task.getParameters();
+    private Task createTask(String name, Class<? extends Initializable> clazz, String scope,
+            Object... params) {
+        Task task = initializeTask(name, scope);
+
+        if (ActionScheduler.class.isAssignableFrom(clazz)) {
+            task.setSchedulerclass(clazz.getName());
+            setParameters(task.getSchedulerparameters(), params);
+        } else if (ActionGenerator.class.isAssignableFrom(clazz)) {
+            task.setActiongeneratorclass(clazz.getName());
+            setParameters(task.getActiongeneratorparameters(), params);
+
+            task.setScheduleclass(DelaySchedule.class.getName());
+            setParameters(task.getScheduleparameters(), 1, "MILLISECONDS");
+        } else if (ActionSchedule.class.isAssignableFrom(clazz)) {
+            task.setScheduleclass(clazz.getName());
+            setParameters(task.getScheduleparameters(), params);
+
+            task.setActiongeneratorclass(SingleProcGenerator.class.getName());
+            setParameters(task.getActiongeneratorparameters(), PROCEDURE_NAME);
+        } else {
+            fail("Unsupported class: " + clazz);
+        }
+
+        return task;
+    }
+
+    private void setParameters(CatalogMap<TaskParameter> paramMap, Object... params) {
         for (int i = 0; i < params.length; ++i) {
             TaskParameter tp = paramMap.add(Integer.toString(i));
             tp.setIndex(i);
             tp.setParameter(params[i] == null ? null : params[i].toString());
         }
+    }
+
+    private Task initializeTask(String name, String scope) {
+        Task task = m_database.getTasks().add(name);
+        task.setEnabled(true);
+        task.setName(name);
+        task.setScope(scope);
+        task.setUser("user");
+        task.setOnerror("ABORT");
         return task;
     }
 
@@ -615,57 +708,60 @@ public class TestTaskManager {
 
     private void validateStats(String state, Consumer<VoltTableRow> validator) {
         VoltTable table = getScheduleStats();
-        long totalSchedulerInvocations = 0;
+        long totalActionSchedulerInvocations = 0;
         long totalProcedureInvocations = 0;
         while (table.advanceRow()) {
             if (validator != null) {
                 validator.accept(table);
             }
             assertEquals(state, table.getString("STATE"));
-            totalSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
+            totalActionSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
             totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
         }
 
-        assertTrue(totalSchedulerInvocations >= totalProcedureInvocations);
-        assertTrue(totalSchedulerInvocations <= s_firstSchedulerCallCount.get() + s_postRunSchedulerCallCount.get());
+        assertTrue(totalActionSchedulerInvocations >= totalProcedureInvocations);
+        assertTrue(totalActionSchedulerInvocations <= s_firstActionSchedulerCallCount.get()
+                + s_postRunActionSchedulerCallCount.get());
     }
 
-    public static class TestScheduler implements Scheduler {
+    private TaskValidationResult validateTask(Task task) {
+        return TaskManager.validateTask(task, null, getClass().getClassLoader());
+    }
+
+    public static class TestActionScheduler implements ActionScheduler {
         @Override
-        public Action getFirstAction() {
-            s_firstSchedulerCallCount.getAndIncrement();
-            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        public DelayedAction getFirstDelayedAction() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
-        @Override
-        public Action getNextAction(ActionResult previousProcedureRun) {
-            s_postRunSchedulerCallCount.getAndIncrement();
-            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
+            s_postRunActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
         @Override
         public Collection<String> getDependencies() {
-            return Collections.singleton(TestSchedulerParams.class.getName());
+            return Collections.singleton(TestActionSchedulerParams.class.getName());
         }
     }
 
-    public static class TestSchedulerParams implements Scheduler {
+    public static class TestActionSchedulerParams implements ActionScheduler {
         public void initialize(int arg1, String arg2, byte[] arg3) {}
 
         @Override
-        public Action getFirstAction() {
-            s_firstSchedulerCallCount.getAndIncrement();
-            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        public DelayedAction getFirstDelayedAction() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
-        @Override
-        public Action getNextAction(ActionResult previousProcedureRun) {
-            s_postRunSchedulerCallCount.getAndIncrement();
-            return Action.createProcedure(100, TimeUnit.MICROSECONDS, PROCEDURE_NAME);
+        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
+            s_postRunActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
     }
 
-    public static class TestSchedulerRerun implements Scheduler {
+    public static class TestActionSchedulerRerun implements ActionScheduler {
         private int m_maxRunCount;
         private int m_runCount = 0;
 
@@ -674,23 +770,24 @@ public class TestTaskManager {
         }
 
         @Override
-        public Action getFirstAction() {
-            s_firstSchedulerCallCount.getAndIncrement();
-            return ++m_runCount < m_maxRunCount ? Action.createRerun(100, TimeUnit.MICROSECONDS)
-                    : Action.createExit(null);
+        public DelayedAction getFirstDelayedAction() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return ++m_runCount < m_maxRunCount
+                    ? DelayedAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : DelayedAction.createExit(null);
         }
 
-        @Override
-        public Action getNextAction(ActionResult previousProcedureRun) {
+        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
             assertNull(previousProcedureRun.getProcedure());
-            s_postRunSchedulerCallCount.getAndIncrement();
+            s_postRunActionSchedulerCallCount.getAndIncrement();
 
-            return ++m_runCount < m_maxRunCount ? Action.createRerun(100, TimeUnit.MICROSECONDS)
-                    : Action.createExit(null);
+            return ++m_runCount < m_maxRunCount
+                    ? DelayedAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : DelayedAction.createExit(null);
         }
     }
 
-    public static class TestSchedulerValidateParams implements Scheduler {
+    public static class TestActionSchedulerValidateParams implements ActionScheduler {
         public static String validateParameters(String value) {
             return value;
         }
@@ -698,23 +795,57 @@ public class TestTaskManager {
         public void initialize(String value) {}
 
         @Override
-        public Action getFirstAction() {
-            return null;
-        }
-
-        @Override
-        public Action getNextAction(ActionResult result) {
+        public DelayedAction getFirstDelayedAction() {
             return null;
         }
     }
 
-    public static class TestSchedulerValidateParamsWithHelper extends TestSchedulerValidateParams {
+    public static class TestActionSchedulerValidateParamsWithHelper extends TestActionSchedulerValidateParams {
         public static String validateParameters(TaskHelper helper, String value) {
-            return TestSchedulerValidateParams.validateParameters(value);
+            return TestActionSchedulerValidateParams.validateParameters(value);
         }
 
         public void initialize(TaskHelper helper, String value) {
             super.initialize(value);
+        }
+    }
+
+    public static class TestActionSchedule implements ActionSchedule {
+        private long m_min;
+        private long m_max;
+
+        public void initialize(long min, long max) {
+            m_min = min;
+            m_max = max;
+        }
+
+        @Override
+        public ActionDelay getFirstDelay() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return new ActionDelay(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
+                    this::getNextDelay);
+        }
+
+        private ActionDelay getNextDelay(ActionResult result) {
+            s_postRunActionSchedulerCallCount.getAndIncrement();
+            return new ActionDelay(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
+                    this::getNextDelay);
+        }
+    }
+
+    public static class TestActionGenerator implements ActionGenerator {
+        private long m_count = 0;
+
+        @Override
+        public Action getFirstAction() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return Action.createProcedure(this::getNextAction, PROCEDURE_NAME);
+        }
+
+        private Action getNextAction(ActionResult result) {
+            s_postRunActionSchedulerCallCount.getAndIncrement();
+            return (++m_count & 0x1) == 0 ? Action.createProcedure(this::getNextAction, PROCEDURE_NAME)
+                    : Action.createCallback(this::getNextAction);
         }
     }
 }

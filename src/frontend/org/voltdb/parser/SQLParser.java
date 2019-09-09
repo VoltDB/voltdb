@@ -423,13 +423,23 @@ public class SQLParser extends SQLPatternFactory
      * <p>
      *
      * <pre>
-     * CREATE TASK &lt;task name&gt; USING &lt;scheduler class&gt;
-     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER &lt;user&gt;]
-     *     [DISABLED] [WITH arg1, ...]
-     * or
-     * CREATE TASK &lt;task name&gt; (DELAY &lt;delay&gt;|CRON &lt;cron expression&gt;)
-     *     [ON ERROR (CONTINUE|ABORT|INGORE_PROCEDURE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER &lt;user&gt;]
-     *     [DISABLED] AS &lt;procedure&gt; [arg1, ...]
+     * CREATE TASK {name}
+     *     {
+     *         {
+     *             ON SCHEDULE {
+     *                 DELAY {interval} {unit} |
+     *                 EVERY {interval} {unit} |
+     *                 CRON {exp} |
+     *                 FROM CLASS {class} [WITH {args}]
+     *             }
+     *             PROCEDURE {{name} | FROM CLASS {class}} [WITH {args}]
+     *         } |
+     *         FROM CLASS {class} [WITH {args}]
+     *     }
+     *     [ ON ERROR { STOP | CONTINUE | IGNORE } ]
+     *     [ RUN ON { DATABASE | HOSTS | PARTITIONS } ]
+     *     [ AS USER {user-name} ]
+     *     [ ENABLE | DISABLE ]
      * </pre>
      */
     private static final Pattern PAT_CREATE_TASK =
@@ -448,11 +458,27 @@ public class SQLParser extends SQLPatternFactory
                             SPF.clause(SPF.token("cron"),
                                 SPF.capture("cron",
                                     SPF.clause(SPF.token("[0-9\\*\\-,/]+").withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                                    SPF.repeat(5, 5, SPF.token("[0-9\\*\\?\\-,/LW#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                                    SPF.repeat(5, 5, SPF.token("[\\w\\*\\?\\-,/#]+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                                )
+                            ),
+                            SPF.clause(
+                                SPF.token("from"), SPF.token("class"), SPF.capture("scheduleClass", SPF.className()),
+                                SPF.optional(
+                                    SPF.clause(
+                                        SPF.token("with"), SPF.token("\\(\\s*"),
+                                        SPF.capture("scheduleParameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                                    )
                                 )
                             )
                         ),
-                        SPF.token("procedure"), SPF.capture("procedure", SPF.token("@?[\\w.$]+"))
+                        SPF.token("procedure"),
+                        SPF.oneOf(
+                            SPF.capture("procedure", SPF.token("@?[\\w.$]+")),
+                            SPF.clause(
+                                SPF.token("from"), SPF.token("class"), SPF.capture("generatorClass", SPF.className())
+                            )
+                        )
                     )
                 ),
                 SPF.optional(
@@ -1092,7 +1118,7 @@ public class SQLParser extends SQLPatternFactory
      * <td>Name of task</td>
      * </tr>
      * <tr>
-     * <td>class|intervalSchedule|cron</td>
+     * <td>class|intervalSchedule|cron|scheduleClass</td>
      * <td>Required</td>
      * <td>Scheduler class, fixed delay, every or cron expression to be used</td>
      * </tr>
@@ -1107,14 +1133,19 @@ public class SQLParser extends SQLPatternFactory
      * <td>Time unit of the interval</td>
      * </tr>
      * <tr>
-     * <td>procedure</td>
-     * <td>Required for cron, delay or every</td>
+     * <td>scheduleParameters</td>
+     * <td>Optional</td>
+     * <td>Parameters to pass to the scheduleClass</td>
+     * </tr>
+     * <tr>
+     * <td>procedure|generatorClass</td>
+     * <td>Required for cron, delay, every or scheduleClass</td>
      * <td>Procedure name with comma separated list of parameters to pass to the procedure</td>
      * </tr>
      * <tr>
      * <td>parameters</td>
      * <td>Optional</td>
-     * <td>Comma separated list of parameters to pass to the scheduler or procedure</td>
+     * <td>Comma separated list of parameters to pass to the scheduler, procedure or generator</td>
      * </tr>
      * <tr>
      * <td>onError</td>
@@ -1216,9 +1247,13 @@ public class SQLParser extends SQLPatternFactory
      *
      * Capture groups (when captureTokens is true):
      *  (1) ALLOW clause: entire role list with commas and internal whitespace
-     *  (2) PARTITION clause: procedure name
-     *  (3) PARTITION clause: table name
-     *  (4) PARTITION clause: column name
+     *  (2) PARTITION clause: table name
+     *  (3) PARTITION clause: column name
+     *  (4) PARTITION clause: parameter number
+     *  (5) PARTITION clause: table name 2
+     *  (6) PARTITION clause: column name 2
+     *  (7) PARTITION clause: parameter number 2
+     *  (8) PARTITIONED clause for work procedures
      */
     private static SQLPatternPart makeInnerProcedureModifierClausePattern(boolean captureTokens)
     {
@@ -1254,7 +1289,8 @@ public class SQLParser extends SQLPatternFactory
                             )
                         )
                      )
-                )
+                ),
+                SPF.group(captureTokens, SPF.token("partitioned"))
             );
     }
 

@@ -105,9 +105,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
                 + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
                 + getTableName(0, TableType.REPLICATED) + ";') ON ERROR IGNORE;";
 
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "DELAY 50 MILLISECONDS", 1));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "delay 50 MILLISECONDS", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
-        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 MILLISECONDS", 3));
+        client.callProcedure("@AdHoc", String.format(summaryFormat, schedule3, "EVERY 75 milliseconds", 3));
 
         // Give everything some time to run
         Thread.sleep(1000);
@@ -252,6 +252,14 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
         }
+
+        try {
+            client.callProcedure("@AdHoc", "DROP PROCEDURE " + procName);
+            fail("Should not have been able to drop: " + procName);
+        } catch (ProcCallException e) {
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Procedure does not exist: " + procName));
+        }
     }
 
     @Test
@@ -286,7 +294,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         return client.callProcedure("@Statistics", "TASK", 0).getResults()[0];
     }
 
-    public static class CustomScheduler implements Scheduler {
+    public static class CustomScheduler implements ActionScheduler {
         private int m_delayMs;
         private String m_status;
 
@@ -296,13 +304,13 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
 
         @Override
-        public Action getFirstAction() {
+        public DelayedAction getFirstDelayedAction() {
             return getNextAction(null);
         }
 
-        @Override
-        public Action getNextAction(ActionResult result) {
-            return Action.createRerun(m_delayMs, TimeUnit.MILLISECONDS).setStatusMessage(m_status);
+        public DelayedAction getNextAction(ActionResult result) {
+            return DelayedAction.createCallback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
+                    .setStatusMessage(m_status);
         }
 
     }

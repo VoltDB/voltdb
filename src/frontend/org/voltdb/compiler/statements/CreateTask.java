@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.Scanner;
 import org.hsqldb_voltpatches.Tokens;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Task;
@@ -32,9 +31,10 @@ import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
-import org.voltdb.task.CronScheduler;
-import org.voltdb.task.DelayScheduler;
-import org.voltdb.task.IntervalScheduler;
+import org.voltdb.task.CronSchedule;
+import org.voltdb.task.DelaySchedule;
+import org.voltdb.task.IntervalSchedule;
+import org.voltdb.task.SingleProcGenerator;
 import org.voltdb.task.TaskManager;
 
 import com.google_voltpatches.common.base.MoreObjects;
@@ -63,13 +63,6 @@ public class CreateTask extends StatementProcessor {
 
         Task task = tasks.add(name);
         configureTask(task, matcher, ddlStatement.newDdl);
-
-        TaskManager.TaskValidationResult result = VoltDB.instance().getTaskManager()
-                .validateTask(task, m_classLoader);
-        if (!result.isValid()) {
-            tasks.delete(name);
-            throw m_compiler.new VoltCompilerException(result.getErrorMessage());
-        }
         return true;
     }
 
@@ -80,37 +73,48 @@ public class CreateTask extends StatementProcessor {
                 MoreObjects.firstNonNull(matcher.group("scope"), TaskManager.SCOPE_DEFAULT).toUpperCase());
         if (matcher.group("class") != null) {
             task.setSchedulerclass(matcher.group("class"));
-            fillOutParams(task.getParameters(), matcher.group("parameters"), 0);
+            fillOutParams(task.getSchedulerparameters(), matcher.group("parameters"), 0);
             if (matcher.group("procedure") != null) {
                 throw m_compiler.new VoltCompilerException(
                         "Schedule configures procdure when scheduler parameters are expected.");
             }
         } else {
-            CatalogMap<TaskParameter> params = task.getParameters();
+            CatalogMap<TaskParameter> scheduleParams = task.getScheduleparameters();
+            String scheduleClass = matcher.group("scheduleClass");
+
+            if (scheduleClass == null) {
+                if (matcher.group("cron") != null) {
+                    task.setScheduleclass(CronSchedule.class.getName());
+                    addParameter(scheduleParams, 0, matcher.group("cron"));
+                } else {
+                    String intervalSchedule = matcher.group("intervalSchedule");
+                    if ("delay".equalsIgnoreCase(intervalSchedule)) {
+                        task.setScheduleclass(DelaySchedule.class.getName());
+                    } else if ("every".equalsIgnoreCase(intervalSchedule)) {
+                        task.setScheduleclass(IntervalSchedule.class.getName());
+                    } else {
+                        throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
+                    }
+                    addParameter(scheduleParams, 0, matcher.group("interval"));
+                    addParameter(scheduleParams, 1, matcher.group("timeUnit").toUpperCase());
+                }
+            } else {
+                task.setScheduleclass(scheduleClass);
+                fillOutParams(scheduleParams, matcher.group("scheduleParameters"), 0);
+            }
+
+            CatalogMap<TaskParameter> actionGeneratorParams = task.getActiongeneratorparameters();
+            String generatorClass = matcher.group("generatorClass");
+
             int index = 0;
 
-            if (matcher.group("cron") != null) {
-                task.setSchedulerclass(CronScheduler.class.getName());
-                addParameter(params, index++, matcher.group("cron"));
+            if (generatorClass == null) {
+                task.setActiongeneratorclass(SingleProcGenerator.class.getName());
+                addParameter(actionGeneratorParams, index++, matcher.group("procedure"));
             } else {
-                String intervalSchedule = matcher.group("intervalSchedule");
-                if ("delay".equalsIgnoreCase(intervalSchedule)) {
-                task.setSchedulerclass(DelayScheduler.class.getName());
-                } else if ("every".equalsIgnoreCase(intervalSchedule)) {
-                    task.setSchedulerclass(IntervalScheduler.class.getName());
-                } else {
-                    throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
-                }
-                addParameter(params, index++, matcher.group("interval"));
-                addParameter(params, index++, matcher.group("timeUnit"));
+                task.setActiongeneratorclass(generatorClass);
             }
-
-            if (matcher.group("procedure") == null) {
-                throw m_compiler.new VoltCompilerException("Schedule does not specify procedure to execute");
-            }
-
-            addParameter(params, index++, matcher.group("procedure"));
-            fillOutParams(params, matcher.group("parameters"), index);
+            fillOutParams(actionGeneratorParams, matcher.group("parameters"), index);
         }
         String user = matcher.group("asUser");
         // If no user is set and this is new DDL use the user which is creating the schedule

@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -367,8 +368,34 @@ public final class InvocationDispatcher {
         }
 
         // check for allPartition invocation and provide a nice error if it's misused
-        if (task.getAllPartition()) {
+        if (task.hasPartitionDestination()) {
+            if (!catProc.getSinglepartition()
+                    || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)
+                    || catProc.getSystemproc()) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                        "Invalid procedure for " + (task.getAllPartition() ? "all-partition" : "work procedure")
+                                + " execution. Targeted procedure must be partitioned, "
+                                + "must be partitioned on the first parameter or none, "
+                                + "and must not be a system procedure.",
+                        task.clientHandle);
+            }
+
+            if (task.getPartitionDestination() < 0 || task.getPartitionDestination() >= MpInitiator.MP_INIT_PID) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                        "Invalid destination partition provided: " + task.getPartitionDestination(),
+                        task.clientHandle);
+            }
+
+            if (catProc.getPartitionparameter() == -1
+                    && task.getParams().size() == catProc.getParameters().size() + 1) {
+                // Client provided a partition parameter for backwards compatibility so strip off the first parameter
+                Object[] params = task.getParams().toArray();
+                task.setParams(Arrays.copyOfRange(params, 1, params.length));
+
+            }
+        } else if (task.getAllPartition()) {
             // must be single partition and must be partitioned on parameter 0
+            // TODO could add support for calling a procedure without a partition parameter
             if (!catProc.getSinglepartition() || (catProc.getPartitionparameter() != 0) || catProc.getSystemproc()) {
                 return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                         new VoltTable[0], "Invalid procedure for all-partition execution. " +
@@ -490,6 +517,10 @@ public final class InvocationDispatcher {
         do {
             try {
                 partitions = getPartitionsForProcedure(catProc, task);
+                if (partitions == null) {
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                            "Partition does not exist: " + task.getPartitionDestination(), task.clientHandle);
+                }
             } catch (Exception e) {
                 // unable to hash to a site, return an error
                 return getMispartitionedErrorResponse(task, catProc, e);
@@ -512,6 +543,10 @@ public final class InvocationDispatcher {
                                 + "it should be safe to resend the work, as the work was never started.",
                         task.clientHandle);
             case PARTITION_REMOVED:
+                if (task.hasPartitionDestination()) {
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                            "Partition does not exist: " + task.getPartitionDestination(), task.clientHandle);
+                }
                 // Loop back around and try to figure out the partitions again
                 Thread.yield();
             }
@@ -532,9 +567,14 @@ public final class InvocationDispatcher {
     }
 
     public final static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
-        Procedure catProc = catalogContext.procedures.get(procName);
+        return getProcedureFromName(procName, catalogContext.procedures, catalogContext.m_defaultProcs);
+    }
+
+    public final static Procedure getProcedureFromName(String procName, CatalogMap<Procedure> procedures,
+            DefaultProcedureManager defaultProcs) {
+        Procedure catProc = procedures.get(procName);
         if (catProc == null) {
-            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procName);
+            catProc = defaultProcs.checkForDefaultProcedure(procName);
         }
 
         if (catProc == null) {
@@ -867,6 +907,7 @@ public final class InvocationDispatcher {
         spi.setBatchTimeout(task.getBatchTimeout());
         spi.type = task.getType();
         spi.setAllPartition(task.getAllPartition());
+        spi.setPartitionDestination(task.getPartitionDestination());
         return spi;
     }
 
@@ -1378,12 +1419,28 @@ public final class InvocationDispatcher {
         return CreateTransactionResult.SUCCESS;
     }
 
+    /**
+     * @param procedure Which will be executed
+     * @param task      Describing how to execute the procedure
+     * @return the array of partitions {@code task} should target or {@code null} if a destination is provided that does
+     *         not exist
+     */
     final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
         final CatalogContext.ProcedurePartitionInfo ppi =
                 (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
+            if (procedure.getPartitionparameter() == -1) {
+                if (task.hasPartitionDestination()) {
+                    return new int[] { task.getPartitionDestination() };
+                } else {
+                    throw new RuntimeException("Procedure " + procedure.getTypeName()
+                            + " is a work procedure and needs to invoked appropriatly. "
+                            + "In the client callAllPartitionProcedure should be used.");
+                }
+            }
             // break out the Hashinator and calculate the appropriate partition
             Object invocationParameter = task.getParameterAtIndex(ppi.index);
+
             if (invocationParameter == null && procedure.getReadonly()) {
                 // AdHoc replicated table reads are optimized as single partition,
                 // but without partition params, since replicated table reads can
@@ -1396,7 +1453,43 @@ public final class InvocationDispatcher {
                 int partitionId = partitionIds.get(partitionIdIndex);
                 return new int[] {partitionId};
             }
-            return new int[] { TheHashinator.getPartitionForParameter(ppi.type, invocationParameter) };
+            int hashedPartitionId = TheHashinator.getPartitionForParameter(ppi.type, invocationParameter);
+
+            if (task.hasPartitionDestination() && hashedPartitionId != task.getPartitionDestination()) {
+                // Client sent a destination partition but that doesn't align with the partition parameter so force it
+                hashedPartitionId = task.getPartitionDestination();
+
+                // Find a parameter which should go to the destination partition
+                VoltType type = VoltType.typeFromObject(invocationParameter);
+                VoltTable origTable = TheHashinator.getPartitionKeys(type);
+                VoltTable copyTable = PrivateVoltTableFactory.createVoltTableFromBuffer(origTable.getBuffer(), true);
+
+                Object newParameter = null;
+                copyTable.resetRowPosition();
+                while (copyTable.advanceRow()) {
+                    if (hashedPartitionId == copyTable.getLong(0)) {
+                        newParameter = copyTable.get(1, type);
+                        break;
+                    }
+                }
+
+                if (newParameter == null) {
+                    return null;
+                }
+
+                if (log.isDebugEnabled()) {
+                    log.debug("Hashed partition, " + hashedPartitionId + ", does not match destination, "
+                            + task.getPartitionDestination() + " Updating partition paramter from ("
+                            + invocationParameter + ") to (" + newParameter + ')');
+                }
+
+                // Update parameters
+                Object[] updatedParams = task.getParams().toArray();
+                updatedParams[ppi.index] = newParameter;
+                task.setParams(updatedParams);
+            }
+
+            return new int[] { hashedPartitionId };
         } else if (procedure.getPartitioncolumn2() != null) {
             // two-partition procedure
             VoltType partitionParamType1 = VoltType.get((byte)procedure.getPartitioncolumn().getType());

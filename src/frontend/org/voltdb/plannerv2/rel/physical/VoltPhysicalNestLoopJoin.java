@@ -82,10 +82,6 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        if (joinType != JoinRelType.INNER) {        // We support inner join for now
-            // change/remove this when we support more join types
-            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
-        }
         final NestLoopPlanNode nlpn = new NestLoopPlanNode();
         nlpn.setJoinType(JoinType.INNER);
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));

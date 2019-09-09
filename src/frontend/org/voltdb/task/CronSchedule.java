@@ -19,31 +19,26 @@ package org.voltdb.task;
 
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.TimeUnit;
 
 import fc.cron.CronExpression;
 
 /**
- * {@link Scheduler} implementation which executes a single procedure with a static set of parameters based upon a cron
- * style configuration schedule
+ * {@link ActionSchedule} based upon a cron style configuration schedule
  */
-public class CronScheduler extends SingleProcScheduler {
+public final class CronSchedule implements ActionSchedule {
     private CronExpression m_cronExpression;
 
-    public static String validateParameters(TaskHelper helper, String cronConfiguration,
-            String procedure, String... procedureParameters) {
-        TaskValidationErrors errors = new TaskValidationErrors();
-        SingleProcScheduler.validateParameters(errors, helper, procedure, procedureParameters);
+    public static String validateParameters(String cronConfiguration) {
         try {
             new CronExpression(cronConfiguration, true);
         } catch (RuntimeException e) {
-            errors.addErrorMessage(e.getMessage());
+            return e.getMessage();
         }
-        return errors.getErrorMessage();
+        return null;
     }
 
-    public void initialize(TaskHelper helper, String cronConfiguration, String procedure,
-            String... procedureParameters) {
-        super.initialize(helper, procedure, procedureParameters);
+    public void initialize(String cronConfiguration) {
         m_cronExpression = new CronExpression(cronConfiguration, true);
     }
 
@@ -53,7 +48,11 @@ public class CronScheduler extends SingleProcScheduler {
     }
 
     @Override
-    long getNextDelayNs() {
+    public ActionDelay getFirstDelay() {
+        return new ActionDelay(getDelayNs(), TimeUnit.NANOSECONDS, r -> getFirstDelay());
+    }
+
+    private long getDelayNs() {
         ZonedDateTime now = ZonedDateTime.now();
         ZonedDateTime barrier = now.plusYears(20);
         ZonedDateTime runAt = m_cronExpression.nextTimeAfter(now, barrier);
