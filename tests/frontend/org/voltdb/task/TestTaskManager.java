@@ -213,7 +213,7 @@ public class TestTaskManager {
                 s_postRunActionSchedulerCallCount.get() > 0);
 
         demotedPartitionsSync(0, 4);
-        assertCountsAfterScheduleCanceled(2, false);
+        assertCountsAfterScheduleCanceled(2);
 
         int previousCount = s_postRunActionSchedulerCallCount.get();
         promotedPartitionsSync(0);
@@ -542,7 +542,7 @@ public class TestTaskManager {
         assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
                 s_postRunActionSchedulerCallCount.get() > 0);
 
-        dropScheduleAndAssertCounts(1, true);
+        dropScheduleAndAssertCounts(1);
     }
 
     /*
@@ -580,20 +580,16 @@ public class TestTaskManager {
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {
-        dropScheduleAndAssertCounts(1, false);
+        dropScheduleAndAssertCounts(1);
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        dropScheduleAndAssertCounts(startCount, false);
-    }
-
-    private void dropScheduleAndAssertCounts(int startCount, boolean procedureValidated) throws Exception {
         validateStats();
         processUpdateSync();
-        assertCountsAfterScheduleCanceled(startCount, procedureValidated);
+        assertCountsAfterScheduleCanceled(startCount);
     }
 
-    private void assertCountsAfterScheduleCanceled(int startCount, boolean procedureValidated)
+    private void assertCountsAfterScheduleCanceled(int startCount)
             throws InterruptedException {
         int previousCount = s_postRunActionSchedulerCallCount.get();
         Thread.sleep(10);
@@ -605,9 +601,6 @@ public class TestTaskManager {
         verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), eq(false),
                 anyInt(), any(), eq(PROCEDURE_NAME), any());
 
-        if (procedureValidated) {
-            previousCount += startCount;
-        }
         verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
