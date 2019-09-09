@@ -31,7 +31,7 @@ public abstract class StreamSnapshotBase {
 
     public static interface MessageFactory {
         public VoltMessage makeDataMessage(long targetId, byte[] data);
-        public VoltMessage makePoisonPillMessage(long targetId);
+
         public boolean isAckEOS(VoltMessage msg);
         public long getAckTargetId(VoltMessage msg);
         public int getAckBlockIndex(VoltMessage msg);
@@ -43,11 +43,6 @@ public abstract class StreamSnapshotBase {
         public VoltMessage makeDataMessage(long targetId, byte[] data)
         {
             return new RejoinDataMessage(targetId, data);
-        }
-
-        @Override
-        public VoltMessage makePoisonPillMessage(long targetId) {
-            return new RejoinDataAckMessage(true, targetId, -1);
         }
 
         @Override

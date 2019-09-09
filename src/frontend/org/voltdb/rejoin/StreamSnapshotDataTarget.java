@@ -111,7 +111,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         if (rejoinLog.isDebugEnabled()) {
             rejoinLog.debug(String.format("Initializing snapshot stream processor " +
-                    "for source site id: %s, and with processorid: %d",
+                    "for destination site id: %s, and with processorid: %d",
                     CoreUtils.hsIdToString(HSId), m_targetId));
         }
 
@@ -342,6 +342,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         final Map<Long, AtomicLong> m_bytesSent;
         final Map<Long, AtomicLong> m_worksSent;
         volatile Exception m_lastException = null;
+        volatile boolean m_stop;
 
         public SnapshotSender(Mailbox mb)
         {
@@ -357,6 +358,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
             m_worksSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+            m_stop = false;
         }
 
         public void registerDataTarget(long targetId)
@@ -371,13 +373,17 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_workQueue.offer(work);
         }
 
+        public void forceStop() {
+            m_stop = true;
+        }
+
         @Override
         public void run() {
             if (rejoinLog.isTraceEnabled()) {
                 rejoinLog.trace("Starting stream sender thread");
             }
 
-            while (true) {
+            while (!m_stop) {
                 SendWork work;
 
                 try {
@@ -387,7 +393,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     work = m_workQueue.poll(10, TimeUnit.MINUTES);
 
                     if (work == null) {
-                        rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
+                        if (!m_stop) {
+                            rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
+                        }
                         break;
                     } else if (work.m_isEmpty) {
                         // Empty work indicates the end of the queue.
@@ -553,9 +561,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // we'll send the correct EOS to the receiving end
             sendEOS();
 
-            // Terminate the sender and ack receiver thread after the last block
+            // Terminate the sender thread after the last block
             m_sender.offer(new SendWork());
-            m_ackReceiver.sendPoisonPill(m_targetId);
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
