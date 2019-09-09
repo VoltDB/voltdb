@@ -40,13 +40,24 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestTasksEnd2End extends LocalClustersTestBase {
+    private static final String s_userName = "TestUser";
+
+    private final VoltProjectBuilder m_builder = new VoltProjectBuilder();
+
     @Override
     public void setUp() throws Exception {
         super.setUp();
 
-        configureClustersAndClients(Collections.singletonList(new ClusterConfiguration(4, 3, 1)), 2, 2);
+        String roleName = "TestRole";
+        m_builder.addRoles(new VoltProjectBuilder.RoleInfo[] {
+                new VoltProjectBuilder.RoleInfo(roleName, true, true, true, true, true, true) });
+        m_builder.addUsers(new VoltProjectBuilder.UserInfo[] {
+                new VoltProjectBuilder.UserInfo(s_userName, "password", new String[] { roleName }) });
+
+        configureClustersAndClients(Collections.singletonList(new ClusterConfiguration(4, 3, 1, m_builder)), 2, 2);
     }
 
     @After
@@ -114,7 +125,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         producer.interrupt();
         producer.join();
 
-        VoltTable table = getScheduleStats(client);
+        VoltTable table = getTaskStats(client);
         assertEquals(3, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
@@ -125,7 +136,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
 
         Thread.sleep(5);
 
-        table = getScheduleStats(client);
+        table = getTaskStats(client);
         assertEquals(3, table.getRowCount());
         while (table.advanceRow()) {
             String scheduleName = table.getString("NAME");
@@ -210,7 +221,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         producer.interrupt();
         producer.join();
 
-        VoltTable table = getScheduleStats(client);
+        VoltTable table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
@@ -222,7 +233,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
 
         Thread.sleep(5);
 
-        table = getScheduleStats(client);
+        table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("DISABLED", table.getString("STATE"));
@@ -238,7 +249,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         // Test that partition schedules fail over
         getCluster(0).killSingleHost(1);
 
-        table = getScheduleStats(client);
+        table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("DISABLED", table.getString("STATE"));
@@ -246,7 +257,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
 
         client.callProcedure("@AdHoc", "ALTER TASK " + schedule + " ENABLE;");
 
-        table = getScheduleStats(client);
+        table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
@@ -269,7 +280,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
                         + " WITH (5, NULL);");
         Thread.sleep(1000);
 
-        VoltTable table = getScheduleStats(client);
+        VoltTable table = getTaskStats(client);
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
             assertNull(table.getString("SCHEDULER_STATUS"));
@@ -280,15 +291,53 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
                 "CREATE TASK " + getMethodName() + " FROM CLASS " + CustomScheduler.class.getName()
                         + " WITH (5, 'STATUS');");
 
-        table = getScheduleStats(client);
+        table = getTaskStats(client);
         while (table.advanceRow()) {
             assertEquals("RUNNING", table.getString("STATE"));
             assertEquals("STATUS", table.getString("SCHEDULER_STATUS"));
         }
-
     }
 
-    private static VoltTable getScheduleStats(Client client)
+    /*
+     * Test creating tasks with AS USER clause
+     */
+    @Test
+    public void tasksAsUser() throws Exception {
+        Client client = getClient(0);
+
+        String tableName = getTableName(0, TableType.PARTITIONED);
+        String procName = getMethodName() + "_prune";
+
+        client.callProcedure("@AdHoc",
+                "CREATE PROCEDURE " + procName + " PARTITIONED AS DELETE FROM " + tableName
+                        + " ORDER BY key OFFSET 10");
+
+        try {
+            client.callProcedure("@AdHoc",
+                    "CREATE TASK " + getMethodName() + " ON SCHEDULE DELAY 5 MILLISECONDS PROCEDURE " + procName
+                            + " RUN ON PARTITIONS AS USER BOGUS_USER;");
+            fail("Should have failed to create a task with a bogus user");
+        } catch (ProcCallException e) {}
+
+        client.callProcedure("@AdHoc", "CREATE TASK " + getMethodName() + " ON SCHEDULE DELAY 5 MILLISECONDS PROCEDURE "
+                + procName + " RUN ON PARTITIONS AS USER " + s_userName + ";");
+
+        Thread.sleep(500);
+
+        VoltTable table = getTaskStats(client);
+        assertEquals(6, table.getRowCount());
+        while (table.advanceRow()) {
+            assertEquals("RUNNING", table.getString("STATE"));
+        }
+
+        m_builder.clearUsers();
+        try {
+            getCluster(0).updateCatalog(m_builder);
+            fail("Should have failed to update the catalog since the user is in use");
+        } catch (ProcCallException e) {}
+    }
+
+    private static VoltTable getTaskStats(Client client)
             throws NoConnectionsException, IOException, ProcCallException {
         return client.callProcedure("@Statistics", "TASK", 0).getResults()[0];
     }

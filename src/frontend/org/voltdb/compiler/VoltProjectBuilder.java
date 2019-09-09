@@ -445,6 +445,10 @@ public class VoltProjectBuilder {
         }
     }
 
+    public void clearUsers() {
+        m_users.clear();
+    }
+
     public void addRoles(final RoleInfo roles[]) {
         for (final RoleInfo info : roles) {
             transformer.append("CREATE ROLE " + info.name);

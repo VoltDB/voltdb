@@ -410,6 +410,14 @@ public final class TaskManager {
      * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
      */
     static TaskValidationResult validateTask(Task definition, Database database, ClassLoader classLoader) {
+        if (database != null) {
+            String user = definition.getUser();
+            if (user != null && database.getUsers().get(user) == null) {
+                return new TaskValidationResult(
+                        String.format("%s: User does not exist: %s", definition.getName(), user));
+            }
+        }
+
         String schedulerClassName = definition.getSchedulerclass();
         SchedulerFactory factory;
         if (!StringUtils.isBlank(schedulerClassName)) {
@@ -424,8 +432,8 @@ public final class TaskManager {
                 }
                 factory = new SchedulerFactoryImpl(result.getSecond());
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", schedulerClassName), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), schedulerClassName), e);
             }
         } else {
             // Construct the scheduler by combining a generator with a schedule
@@ -433,8 +441,8 @@ public final class TaskManager {
             String actionScheduleClass = definition.getScheduleclass();
 
             if (StringUtils.isBlank(actionGeneratorClass) || StringUtils.isBlank(actionScheduleClass)) {
-                return new TaskValidationResult(
-                        "If an ActionScheduler is not defined then both an ActionGenerator and ActionSchedule must be defined.");
+                return new TaskValidationResult(definition.getName()
+                        + ": If an ActionScheduler is not defined then both an ActionGenerator and ActionSchedule must be defined.");
             }
 
             InitializableFactory<ActionGenerator> actionGeneratorFactory;
@@ -449,8 +457,8 @@ public final class TaskManager {
                 }
                 actionGeneratorFactory = result.getSecond();
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", actionGeneratorClass), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), actionGeneratorClass), e);
             }
 
             try {
@@ -463,8 +471,8 @@ public final class TaskManager {
                 }
                 actionScheduleFactory = result.getSecond();
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", actionScheduleClass), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), actionScheduleClass), e);
             }
 
             factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory)

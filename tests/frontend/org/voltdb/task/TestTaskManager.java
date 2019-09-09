@@ -89,6 +89,7 @@ public class TestTaskManager {
     static AtomicInteger s_postRunActionSchedulerCallCount = new AtomicInteger();
 
     private static final String PROCEDURE_NAME = "SomeProcedure";
+    private static final String USER_NAME = "user";
 
     @Rule
     public final TestName m_name = new TestName();
@@ -107,6 +108,7 @@ public class TestTaskManager {
     @Before
     public void setup() {
         m_database = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        m_database.getUsers().add(USER_NAME);
         m_procedure = m_database.getProcedures().add(PROCEDURE_NAME);
 
         m_authSystem = mock(AuthSystem.class);
@@ -575,6 +577,25 @@ public class TestTaskManager {
     }
 
     /*
+     * Test that validation of username works
+     */
+    @Test
+    public void testInvalidUser() throws Exception {
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+
+        // Create user to test
+        m_database.getUsers().add(m_name.getMethodName());
+
+        // Test user created
+        task.setUser(m_name.getMethodName());
+        assertTrue(validateTask(task).isValid());
+
+        // Test invalid user
+        task.setUser("fakeUser");
+        assertFalse(validateTask(task).isValid());
+    }
+
+    /*
      * Test starting the manager in paused mode and then unpause and pause
      */
     @Test
@@ -709,7 +730,7 @@ public class TestTaskManager {
         task.setEnabled(true);
         task.setName(name);
         task.setScope(scope);
-        task.setUser("user");
+        task.setUser(USER_NAME);
         task.setOnerror("ABORT");
         return task;
     }
@@ -784,7 +805,7 @@ public class TestTaskManager {
     }
 
     private TaskValidationResult validateTask(Task task) {
-        return TaskManager.validateTask(task, null, getClass().getClassLoader());
+        return TaskManager.validateTask(task, m_database, getClass().getClassLoader());
     }
 
     public static class TestActionScheduler implements ActionScheduler {
