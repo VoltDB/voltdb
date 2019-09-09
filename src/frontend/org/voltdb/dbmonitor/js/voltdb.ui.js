@@ -1199,18 +1199,28 @@ var loadPage = function (serverName, portid) {
             }
         });
         
-        voltDbRenderer.getExportTableInformation(function(exporterDetails){
+        voltDbRenderer.getExportTableInformation(function(exporterDetails, deploymentDetails){
             if(!$.isEmptyObject(exporterDetails)){
+                const exportConfigs = deploymentDetails["export"]["configuration"];
                 Object.keys(exporterDetails["TUPLE_COUNT"]).forEach(key => {
+                    var type = "";
+                    const target = exporterDetails["TARGET"][key];
+                    for (let i = 0; i < exportConfigs.length; i++) {
+                        if (exportConfigs[i]["target"].toUpperCase() === target) {
+                            type = exportConfigs[i]["type"];
+                            break;
+                        }
+                    }
                     var tupleCountDetails = exporterDetails["TUPLE_COUNT"];
                     
                     if($('#'+key).length == 0 && key != "TIMESTAMP"){
                         var newRow = '<tr id=' + key + '>' + 
                         '<td>' + key + 
                         '</td><td>' + exporterDetails["TARGET"][key] +
+                        '</td><td>' + type +
                         '</td><td>' + 0 +
                         '</td><td>' + exporterDetails["TUPLE_PENDING"][key] +
-                        '</td></tr>';         
+                        '</td></tr>';
                         $('#exportTable').append(newRow);
                     }
                     
@@ -1224,8 +1234,8 @@ var loadPage = function (serverName, portid) {
                         }
                     }
                     
-                    $('#'+key+' td:nth-child(3)').html(tupleCountDetails[key]);
-                    $('#'+key+' td:nth-child(4)').html(exporterDetails["TUPLE_PENDING"][key]);
+                    $('#'+key+' td:nth-child(4)').html(tupleCountDetails[key]);
+                    $('#'+key+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key]);
                     
                     if(exporterDetails["ACTIVE"][key] == "FALSE"){
                         $('#'+key).css('color', 'red');

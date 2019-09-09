@@ -1388,7 +1388,8 @@
                                         <tr >
                                             <th>Source</th>
                                             <th>Target</th>
-                                            <th>Thoroughput</th>
+                                            <th>Type</th>
+                                            <th>Throughput (Tuples/sec)</th>
                                             <th>Pending</th>
                                         </tr>
                                     </thead>
@@ -1420,7 +1421,7 @@
                         </div>
                         <div id="chartQueuedForExport" class="chart right">
                             <div class="chartHeader" id="chartQueuedHeaderForExport">
-                                <h1>Queued (Tuples/sec)<span class="activeServerName" title=""></span>
+                                <h1>Pending (Tuples/sec)<span class="activeServerName" title=""></span>
                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "queued-data" }, "queued");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                 </h1>
