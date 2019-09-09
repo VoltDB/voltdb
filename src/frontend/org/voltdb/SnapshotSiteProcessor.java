@@ -696,14 +696,12 @@ public class SnapshotSiteProcessor {
                                 }
                             }
 
-                            if (snapshotSucceeded) {
-                                Runnable r = null;
-                                while ((r = m_tasksOnSnapshotCompletion.poll()) != null) {
-                                    try {
-                                        r.run();
-                                    } catch (Exception e) {
-                                        SNAP_LOG.error("Error running snapshot completion task", e);
-                                    }
+                            Runnable r = null;
+                            while ((r = m_tasksOnSnapshotCompletion.poll()) != null) {
+                                try {
+                                    r.run();
+                                } catch (Exception e) {
+                                    SNAP_LOG.error("Error running snapshot completion task", e);
                                 }
                             }
                         } finally {

@@ -45,6 +45,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
     private final AtomicInteger m_expectedEOFs;
 
     volatile Exception m_lastException = null;
+    private volatile boolean m_stop;
 
     public StreamSnapshotAckReceiver(Mailbox mb)
     {
@@ -57,6 +58,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_msgFactory = msgFactory;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
+        m_stop = false;
     }
 
     public void setCallback(long targetId, AckCallback callback) {
@@ -64,8 +66,8 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_callbacks.put(targetId, callback);
     }
 
-    public void sendPoisonPill(long targetId) {
-        m_mb.deliver(m_msgFactory.makePoisonPillMessage(targetId));
+    public void forceStop() {
+        m_stop = true;
     }
 
     @Override
@@ -75,14 +77,16 @@ public class StreamSnapshotAckReceiver implements Runnable {
         }
 
         try {
-            while (true) {
+            while (!m_stop) {
                 if (rejoinLog.isTraceEnabled()) {
                     rejoinLog.trace("Blocking on receiving mailbox");
                 }
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
                 if (msg == null) {
-                    rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
-                                   " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
+                    if (!m_stop) {
+                        rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
+                                       " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
+                    }
                     continue;
                 }
 
@@ -100,16 +104,10 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
                 AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));
                 if (ackCallback == null) {
-                    // Elastic coordinator or snapshot site processor may send extra EOS to
-                    // ensure thread is properly terminated, don't panic.
-                    if (!m_msgFactory.isAckEOS(msg)) {
-                        rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
-                                        " in stream snapshot ack message");
-                    }
+                    rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
+                                    " in stream snapshot ack message");
                     continue;
-                }
-
-                if (m_msgFactory.getAckBlockIndex(msg) != -1) {
+                } else if (m_msgFactory.getAckBlockIndex(msg) != -1) {
                     ackCallback.receiveAck(m_msgFactory.getAckBlockIndex(msg));
                 }
 
