@@ -195,6 +195,22 @@
       <xs:attribute name="frequency" type="xs:int" default="60"/>
   </xs:complexType>
 
+  <xs:complexType name="flushIntervalType">
+      <xs:all>
+          <xs:element name="dr" minOccurs="0" maxOccurs="1">
+             <xs:complexType>
+                <xs:attribute name="interval" type="xs:int" default="1000"/>
+             </xs:complexType>
+          </xs:element>
+          <xs:element name="export" minOccurs="0" maxOccurs="1">
+             <xs:complexType>
+                <xs:attribute name="interval" type="xs:int" default="4000"/>
+             </xs:complexType>
+          </xs:element>
+      </xs:all>
+      <xs:attribute name="minimum" type="xs:int" default="1000"/>
+  </xs:complexType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -219,12 +235,13 @@
                 <xs:attribute name="timeout" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
-         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
+        <xs:element name="procedure" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="loginfo" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
+        <xs:element name="flushInterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
     </xs:all>
   </xs:complexType>
 
@@ -451,16 +468,16 @@
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="id" type="clusterIdType"/>
-    <xs:attribute name="listen" type="xs:boolean" default="true" />
+    <xs:attribute name="listen" type="xs:boolean" default="true"/>
     <xs:attribute name="port" type="xs:int" default="5555"/>
-    <xs:attribute name="flushInterval" default="1000">
+    <xs:attribute name="flushInterval">
         <xs:simpleType>
             <xs:restriction base="xs:int">
                 <xs:minInclusive value="20"/>
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
-    <xs:attribute name="role" type="drRoleType" default="master" />
+    <xs:attribute name="role" type="drRoleType" default="master"/>
   </xs:complexType>
 
   <!-- DR cluster role -->

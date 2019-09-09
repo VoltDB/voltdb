@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
@@ -33,6 +34,7 @@ import org.voltdb.rejoin.TaskLog;
 public class TickProducer extends SiteTasker implements Runnable
 {
     private final SiteTaskerQueue m_taskQueue;
+    private ScheduledFuture<?> m_scheduledTick;
     private final long m_procedureLogThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
@@ -40,6 +42,7 @@ public class TickProducer extends SiteTasker implements Runnable
     private final long m_siteId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
+    private long m_scheduledTickInterval = 1000;
 
     private static String TICK_MESSAGE = " A process (procedure, fragment, or operational task) is taking a long time "
             + "-- over %d seconds -- and blocking the queue for site %d (%s) "
@@ -59,16 +62,29 @@ public class TickProducer extends SiteTasker implements Runnable
                                 .getProcedure()
                                 .getLoginfo();
         m_siteId = siteId;
+        m_scheduledTickInterval = VoltDB.instance()
+                .getCatalogContext()
+                .getDeployment()
+                .getSystemsettings()
+                .getFlushInterval().getMinimum();
+
+        m_scheduledTick = VoltDB.instance().schedulePriorityWork(
+                this,
+                m_scheduledTickInterval,
+                m_scheduledTickInterval,
+                TimeUnit.MILLISECONDS);
     }
 
-    // start schedules a 1 second tick.
-    public void start()
-    {
-        VoltDB.instance().schedulePriorityWork(
-                this,
-                1,
-                1,
-                TimeUnit.SECONDS);
+    public void changeTickInterval(long newInterval) {
+        if (newInterval != m_scheduledTickInterval) {
+            m_scheduledTick.cancel(false);
+            m_scheduledTick = VoltDB.instance().schedulePriorityWork(
+                    this,
+                    Math.min(m_scheduledTickInterval, newInterval),
+                    newInterval,
+                    TimeUnit.MILLISECONDS);
+            m_scheduledTickInterval = newInterval;
+        }
     }
 
     // Runnable.run() schedules execution

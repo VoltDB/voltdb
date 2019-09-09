@@ -120,6 +120,7 @@ struct UserDefinedFunctionInfo {
 using UniqueTempTableResult = std::unique_ptr<AbstractTempTable, TempTableTupleDeleter>;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+
 extern int32_t s_exportFlushTimeout;
 
 
@@ -136,10 +137,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
         VoltDBEngine(Topend* topend = nullptr, LogProxy* logProxy = new StdoutLogProxy());
 
-        void initialize(int32_t clusterIndex, int64_t siteId, int32_t partitionId, int32_t sitesPerHost,
-                int32_t hostId, std::string const& hostname, int32_t drClusterId,
-                int32_t defaultDrBufferSize, int64_t tempTableMemoryLimit, bool createDrReplicatedStream,
-                int32_t compactionThreshold = 95, int32_t exportFlushTimeout = 4*1000);
+        void initialize(int32_t clusterIndex,
+                        int64_t siteId,
+                        int32_t partitionId,
+                        int32_t sitesPerHost,
+                        int32_t hostId,
+                        std::string const& hostname,
+                        int32_t drClusterId,
+                        int32_t defaultDrBufferSize,
+                        int64_t tempTableMemoryLimit,
+                        bool isLowestSiteId,
+                        int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
         // ------------------------------------------------------------------

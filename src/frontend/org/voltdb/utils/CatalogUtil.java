@@ -122,6 +122,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
@@ -196,7 +197,8 @@ public abstract class CatalogUtil {
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
-    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile(
+            "\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -301,7 +303,8 @@ public abstract class CatalogUtil {
         // Read the raw build info bytes.
         byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
         if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+            throw new IOException("Catalog build information not found - please build your application " +
+                    "using the current version of VoltDB.");
         }
 
         // Convert the bytes to a string and split by lines.
@@ -340,7 +343,8 @@ public abstract class CatalogUtil {
         // Read the raw auto generated ddl bytes.
         byte[] ddlBytes = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         if (ddlBytes == null) {
-            throw new IOException("Auto generated schema DDL not found - please make sure the database is initialized with valid schema.");
+            throw new IOException("Auto generated schema DDL not found - please make sure the database is " +
+                    "initialized with valid schema.");
         }
         String ddl = new String(ddlBytes, StandardCharsets.UTF_8);
         return ddl.trim();
@@ -376,7 +380,8 @@ public abstract class CatalogUtil {
 
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
         if (!jarfile.containsKey(CATALOG_FILENAME)) {
-            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
+            throw new IOException("Database catalog not found - please build your application " +
+                    "using the current version of VoltDB.");
         }
 
         return jarfile;
@@ -546,7 +551,8 @@ public abstract class CatalogUtil {
      * @param sortFieldName The name of the field to sort on.
      * @param result An output list of catalog items, sorted on the specified field.
      */
-    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
+    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items,
+            String sortFieldName, List<T> result) {
         assert (items != null);
         assert (sortFieldName != null);
 
@@ -583,7 +589,8 @@ public abstract class CatalogUtil {
             }
         }
         if (catalog_constraint == null) {
-            throw new Exception("ERROR: Table '" + catalogTable.getTypeName() + "' does not have a PRIMARY KEY constraint");
+            throw new Exception("ERROR: Table '" + catalogTable.getTypeName() +
+                    "' does not have a PRIMARY KEY constraint");
         }
 
         // And then grab the index that it is using
@@ -867,7 +874,8 @@ public abstract class CatalogUtil {
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
-     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
+     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying
+     *        only deployment xml.
      * @return String containing any errors parsing/validating the deployment. NULL on success.
      */
     public static String compileDeployment(Catalog catalog,
@@ -878,10 +886,11 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
+            Cluster catCluster = getCluster(catalog);
 
             // add our hacky Deployment to the catalog
-            if (getCluster(catalog).getDeployment().get("deployment") == null) {
-                getCluster(catalog).getDeployment().add("deployment");
+            if (catCluster.getDeployment().get("deployment") == null) {
+                catCluster.getDeployment().add("deployment");
             }
 
             // set the cluster info
@@ -903,8 +912,30 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
+            DrType drType = deployment.getDr();
+            Integer drFlushInterval = drType == null ? null : drType.getFlushInterval();
+            if (drFlushInterval == null) {
+                drFlushInterval = deployment.getSystemsettings().getFlushInterval().getDr().getInterval();
+            }
+            if (drFlushInterval < catCluster.getGlobalflushinterval()) {
+                hostLog.warn("DR flush interval (" + drFlushInterval + "ms) in the configuration " +
+                        "is smaller than the global minimum (" + catCluster.getGlobalflushinterval() + "ms)");
+            }
+            if (drFlushInterval <= 0) {
+                throw new RuntimeException("DR Flush Interval must be greater than zero");
+            }
 
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), drFlushInterval, isPlaceHolderCatalog);
+
+            int exportFlushInterval = deployment.getSystemsettings().getFlushInterval().getExport().getInterval();
+            catCluster.setExportflushinterval(exportFlushInterval);
+            if (exportFlushInterval < catCluster.getGlobalflushinterval()) {
+                hostLog.warn("Export flush interval (" + exportFlushInterval + "ms) in the configuration " +
+                        "is smaller than the global minimum (" + catCluster.getGlobalflushinterval() + "ms)");
+            }
+            if (exportFlushInterval <= 0) {
+                throw new RuntimeException("Export Flush Interval must be greater than zero");
+            }
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
                 setImportInfo(catalog, deployment.getImport());
@@ -1182,6 +1213,17 @@ public abstract class CatalogUtil {
             mem = new ResourceMonitorType.Memorylimit();
             rm.setMemorylimit(mem);
         }
+        FlushIntervalType fi = ss.getFlushInterval();
+        if (fi == null) {
+            fi = new FlushIntervalType();
+            ss.setFlushInterval(fi);
+        }
+        if (fi.getExport() == null) {
+            fi.setExport(new FlushIntervalType.Export());
+        }
+        if (fi.getDr() == null) {
+            fi.setDr(new FlushIntervalType.Dr());
+        }
     }
 
     /**
@@ -1254,7 +1296,8 @@ public abstract class CatalogUtil {
     private static void validateDeployment(Catalog catalog, DeploymentType deployment) {
         if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
             if (deployment.getUsers() == null) {
-                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                String msg = "Cannot enable security without defining at least one user in " +
+                        "the built-in ADMINISTRATOR role in the deployment file.";
                 throw new RuntimeException(msg);
             }
 
@@ -1273,7 +1316,8 @@ public abstract class CatalogUtil {
             }
 
             if (!foundAdminUser) {
-                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                String msg = "Cannot enable security without defining at least one user in " +
+                        "the built-in ADMINISTRATOR role in the deployment file.";
                 throw new RuntimeException(msg);
             }
         }
@@ -1332,6 +1376,10 @@ public abstract class CatalogUtil {
         setSystemSettings(deployment, catDeploy);
 
         catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
+        catCluster.setGlobalflushinterval(deployment.getSystemsettings().getFlushInterval().getMinimum());
+        if (catCluster.getGlobalflushinterval() <= 0) {
+            throw new RuntimeException("SystemSettings FlushInterval Minimum must be greater than zero");
+        }
 
         // copy schema modification behavior from xml to catalog
         if (cluster.getSchema() != null) {
@@ -1499,7 +1547,8 @@ public abstract class CatalogUtil {
                         m_moduleProps.put(ImportDataProcessor.KAFKA10_PROCEDURES, procedures);
                         m_moduleProps.put(ImportDataProcessor.KAFKA10_FORMATTERS, formatters);
                         RealVoltDB db = (RealVoltDB)VoltDB.instance();
-                        m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_HOST_COUNT, Integer.toString(db.getHostCount()));
+                        m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_HOST_COUNT,
+                                Integer.toString(db.getHostCount()));
 
                         for (String topic : topicList) {
                             if (procedure != null && !procedure.trim().isEmpty()) {
@@ -1561,12 +1610,15 @@ public abstract class CatalogUtil {
         //into the properties. Also merge the topics list.
         @SuppressWarnings("unchecked")
         public void mergeProperties(Properties props) {
-            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            Map<String, String> procedures = (Map<String, String>)
+                    m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
             Map<String, String> newProcedures = (Map<String, String>) props.get(ImportDataProcessor.KAFKA10_PROCEDURES);
             procedures.putAll(newProcedures);
 
-            Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.KAFKA10_FORMATTERS);
-            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) props.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            Map<String, FormatterBuilder> formatters =
+                    (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            Map<String, FormatterBuilder> newFormatters =
+                    (Map<String, FormatterBuilder>) props.get(ImportDataProcessor.KAFKA10_FORMATTERS);
             formatters.putAll(newFormatters);
 
             //merge topics
@@ -1586,12 +1638,14 @@ public abstract class CatalogUtil {
             if (catProc == null) {
                 catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
             }
-            String msg = "Importer " + configName + " procedure %s is missing. will disable this importer until the procedure becomes available.";
+            String msg = "Importer " + configName + " procedure %s is missing. will disable this importer " +
+                    "until the procedure becomes available.";
             if( catProc == null) {
                 importLog.info(String.format(msg, procedure));
                 return false;
             }
-            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            Map<String, String> procedures = (Map<String, String>)
+                    m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
             if (procedures == null) {
                 return true;
             }
@@ -1625,7 +1679,8 @@ public abstract class CatalogUtil {
             try {
                 String bundlelocation = System.getProperty(VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
                 if (bundlelocation == null || bundlelocation.trim().length() == 0) {
-                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().
+                            getLocation().toURI().getPath();
                     hostLog.info("Module base is: " + rpath + "/../bundles/");
                     String bpath = (new File(rpath)).getParent() + "/../bundles/" + bundleUrl;
                     is = new FileInputStream(new File(bpath));
@@ -1671,11 +1726,12 @@ public abstract class CatalogUtil {
     /**
      * Build Importer configuration optionally log deprecation or any other messages.
      * @param importConfiguration deployment configuration.
-     * @param validation if we are validating configuration log any deprecation messages. This avoids double logging of deprecated
-     *  or any other messages we would introduce in here.
+     * @param validation if we are validating configuration log any deprecation messages. This
+     *        avoids double logging of deprecated or any other messages we would introduce in here.
      * @return
      */
-    private static ImportConfiguration buildImportProcessorConfiguration(ImportConfigurationType importConfiguration, boolean validation) {
+    private static ImportConfiguration buildImportProcessorConfiguration(ImportConfigurationType importConfiguration,
+            boolean validation) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1800,7 +1856,8 @@ public abstract class CatalogUtil {
             if (rowLengthLimit > 0) {
                 for (ConnectorTableInfo catTableinfo : catconn.getTableinfo()) {
                     Table tableref = catTableinfo.getTable();
-                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ? 0 : EXPORT_INTERNAL_FIELD_Length;
+                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ?
+                            0 : EXPORT_INTERNAL_FIELD_Length;
                     for (Column catColumn: tableref.getColumns()) {
                         rowLength += catColumn.getSize();
                     }
@@ -1810,8 +1867,9 @@ public abstract class CatalogUtil {
                                 ". But the export table " + tableref.getTypeName() +
                                 " has estimated row length " + rowLength +
                                 ".");
-                        throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
-                                ", exceeding configurated limitation " + rowLengthLimit + ".");
+                        throw new RuntimeException("Export table " + tableref.getTypeName() +
+                                " row length is " + rowLength + ", exceeding configurated limitation " +
+                                rowLengthLimit + ".");
                     }
                 }
             }
@@ -1834,12 +1892,14 @@ public abstract class CatalogUtil {
                 hostLog.info("Export configuration for export target " + targetName + " is present and is " +
                              "configured to be disabled. Export target " + targetName + " will be disabled.");
             } else {
-                hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
+                hostLog.info("Export target " + targetName + " is configured and enabled with type=" +
+                        exportConfiguration.getType());
                 if (exportConfiguration.getProperty() != null) {
                     hostLog.info("Export target " + targetName + " configuration properties are: ");
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
-                            hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+                            hostLog.info("Export Configuration Property NAME=" + configProp.getName() +
+                                    " VALUE=" + configProp.getValue());
                         }
                     }
                 }
@@ -1902,7 +1962,8 @@ public abstract class CatalogUtil {
                 }
             }
             if (groupidToTopics.containsKey(groupid)) {
-                // Under this group id, we first union the set of already-stored topics with the set of newly-seen topics.
+                // Under this group id, we first union the set of already-stored topics with the set
+                // of newly-seen topics.
                 HashSet<String> union = new HashSet<>(groupidToTopics.get(groupid));
                 union.addAll(topics);
                 if (union.size() == (topics.size() + groupidToTopics.get(groupid).size())) {
@@ -1912,7 +1973,8 @@ public abstract class CatalogUtil {
                     // already-stored topic set, those two sets must overlap with each other, which means that
                     // there must be two configurations having the same group id and overlapping sets of topics.
                     // Thus, we throw the RuntimeException.
-                    throw new RuntimeException("Invalid import configuration. Two Kafka entries have the same groupid and topic.");
+                    throw new RuntimeException("Invalid import configuration. Two Kafka entries have the " +
+                            "same groupid and topic.");
                 }
             } else {
                 groupidToTopics.put(groupid, topics);
@@ -1962,8 +2024,8 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * aggregate Kafka10 importer configurations.One importer per brokers and kafka group. Formatters and stored procedures
-     * can vary by topics.
+     * aggregate Kafka10 importer configurations.One importer per brokers and kafka group.
+     * Formatters and stored procedures can vary by topics.
      */
     private static void mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> processorConfig) {
         if (processorConfig.isEmpty()) {
@@ -2130,7 +2192,8 @@ public abstract class CatalogUtil {
      */
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
-        if (paths == null || paths.getVoltdbroot() == null || VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()) == null) {
+        if (paths == null || paths.getVoltdbroot() == null ||
+                VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()) == null) {
             voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
@@ -2313,7 +2376,8 @@ public abstract class CatalogUtil {
                 // if one user has invalid password, give a warn.
                 hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file.");
                 // throw exception disable user with invalid masked password
-                throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
+                throw new RuntimeException("User \"" + user.getName() +
+                        "\" has invalid masked password in deployment file");
             }
             org.voltdb.catalog.User catUser = db.getUsers().get(user.getName());
             if (catUser == null) {
@@ -2391,7 +2455,8 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType, boolean isPlaceHolderCatalog) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType,
+            int drFlushInterval, boolean isPlaceHolderCatalog) {
         int clusterId;
         Cluster cluster = getCluster(catalog);
         final Database db = cluster.getDatabases().get("database");
@@ -2419,7 +2484,7 @@ public abstract class CatalogUtil {
                 throw new RuntimeException("Detected two conflicting cluster ids in deployment file, "
                         + "setting cluster id in DR tag is deprecated, please remove");
             }
-            cluster.setDrflushinterval(dr.getFlushInterval());
+            cluster.setDrflushinterval(drFlushInterval);
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
@@ -2846,8 +2911,8 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return if given proc is durable if its a sysproc SystemProcedureCatalog is consulted. All non sys procs are all
-     * durable.
+     * Return if given proc is durable if its a sysproc SystemProcedureCatalog is consulted.
+     * All non sys procs are all durable.
      *
      * @param procName
      * @return true if proc is durable for non sys procs return true (durable)
