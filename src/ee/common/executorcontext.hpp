@@ -31,6 +31,7 @@
 #include <vector>
 #include <stack>
 #include <map>
+#include <memory>
 
 namespace voltdb {
 
@@ -491,18 +492,19 @@ class ExecutorContext {
 };
 
 struct EngineLocals : public PoolLocals {
-    inline EngineLocals() = default;
+    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
     inline explicit EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
     inline explicit EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
-    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
+    {}
 
-    inline EngineLocals& operator=(EngineLocals const& rhs) {
-        PoolLocals::operator=(rhs);
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
         context = rhs.context;
         return *this;
     }
 
-    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    ExecutorContext* context;
 };
 }
 
