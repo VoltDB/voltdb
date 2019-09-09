@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef INDEXKEY_H
-#define INDEXKEY_H
+#pragma once
 
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
@@ -64,8 +63,7 @@ namespace voltdb {
  */
 template<typename signedType, int64_t typeMaxValue>
 inline static signedType convertUnsignedValueToSignedValue(uint64_t value) {
-    int64_t retval = static_cast<int64_t>(value);
-    retval -= typeMaxValue + 1;
+    int64_t retval = static_cast<int64_t>(value) - (typeMaxValue + 1);
     return static_cast<signedType>(retval);
 }
 
@@ -93,7 +91,6 @@ inline int64_t convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(uint64_t v
  */
 template<int64_t typeMaxValue, typename signedValueType, typename unsignedValueType>
 inline static unsignedValueType convertSignedValueToUnsignedValue(signedValueType value) {
-
     return static_cast<unsignedValueType>(value + typeMaxValue + 1);
 }
 
@@ -124,14 +121,17 @@ template <std::size_t keySize> struct IntsHasher;
  *  The minimum number of uint64_ts necessary to pack all the integers is used.
  */
 template <std::size_t keySize>
-struct IntsKey
-{
-    typedef IntsEqualityChecker<keySize> KeyEqualityChecker;
-    typedef IntsComparator<keySize> KeyComparator;
-    typedef IntsHasher<keySize> KeyHasher;
+struct IntsKey {
+    using KeyEqualityChecker = IntsEqualityChecker<keySize>;
+    using KeyComparator = IntsComparator<keySize> ;
+    using KeyHasher = IntsHasher<keySize>;
 
-    static inline bool keyDependsOnTupleAddress() { return false; }
-    static inline bool keyUsesNonInlinedMemory() { return false; }
+    static inline bool keyDependsOnTupleAddress() {
+        return false;
+    }
+    static inline bool keyUsesNonInlinedMemory() {
+        return false;
+    }
 
     /*
      * Take a value that is part of the key (already converted to a uint64_t) and inserts it into the
@@ -194,32 +194,29 @@ struct IntsKey
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         const int columnCount = keySchema->columnCount();
+        uint64_t keyValue;
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
-                case voltdb::ValueType::tBIGINT: {
-                const uint64_t keyValue = extractKeyValue<uint64_t>(keyOffset, intraKeyOffset);
-                buffer << convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(keyValue) << ",";
-                break;
-            }
-                case voltdb::ValueType::tINTEGER: {
-                const uint64_t keyValue = extractKeyValue<uint32_t>(keyOffset, intraKeyOffset);
-                buffer << convertUnsignedValueToSignedValue< int32_t, INT32_MAX>(keyValue) << ",";
-                break;
-            }
-                case voltdb::ValueType::tSMALLINT: {
-                const uint64_t keyValue = extractKeyValue<uint16_t>(keyOffset, intraKeyOffset);
-                buffer << convertUnsignedValueToSignedValue< int16_t, INT16_MAX>(keyValue) << ",";
-                break;
-            }
-                case voltdb::ValueType::tTINYINT: {
-                const uint64_t keyValue = extractKeyValue<uint8_t>(keyOffset, intraKeyOffset);
-                buffer << static_cast<int64_t>(convertUnsignedValueToSignedValue< int8_t, INT8_MAX>(keyValue)) << ",";
-                break;
-            }
-            default:
-                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys [%s]",
-                                    getTypeName(keySchema->columnType(ii)).c_str());
-                break;
+                case voltdb::ValueType::tBIGINT:
+                    keyValue = extractKeyValue<uint64_t>(keyOffset, intraKeyOffset);
+                    buffer << convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(keyValue) << ",";
+                    break;
+                case voltdb::ValueType::tINTEGER:
+                    keyValue = extractKeyValue<uint32_t>(keyOffset, intraKeyOffset);
+                    buffer << convertUnsignedValueToSignedValue< int32_t, INT32_MAX>(keyValue) << ",";
+                    break;
+                case voltdb::ValueType::tSMALLINT:
+                    keyValue = extractKeyValue<uint16_t>(keyOffset, intraKeyOffset);
+                    buffer << convertUnsignedValueToSignedValue< int16_t, INT16_MAX>(keyValue) << ",";
+                    break;
+                case voltdb::ValueType::tTINYINT:
+                    keyValue = extractKeyValue<uint8_t>(keyOffset, intraKeyOffset);
+                    buffer << static_cast<int64_t>(convertUnsignedValueToSignedValue< int8_t, INT8_MAX>(keyValue)) << ",";
+                    break;
+                default:
+                    throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys [%s]",
+                            getTypeName(keySchema->columnType(ii)).c_str());
+                    break;
             }
         }
         return std::string(buffer.str());
@@ -238,40 +235,43 @@ struct IntsKey
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
-                case voltdb::ValueType::tBIGINT: {
-                const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(ii));
-                const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
-                insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tINTEGER: {
-                const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(ii));
-                const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
-                insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tSMALLINT: {
-                const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(ii));
-                const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
-                insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tTINYINT: {
-                const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(ii));
-                const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
-                insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-            default:
-                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)", getTypeName(keySchema->columnType(ii)).c_str());
-                break;
+                case voltdb::ValueType::tBIGINT:
+                    {
+                        const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(ii));
+                        const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
+                        insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
+                        break;
+                    }
+                case voltdb::ValueType::tINTEGER:
+                    {
+                        const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(ii));
+                        const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
+                        insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
+                        break;
+                    }
+                case voltdb::ValueType::tSMALLINT:
+                    {
+                        const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(ii));
+                        const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
+                        insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
+                        break;
+                    }
+                case voltdb::ValueType::tTINYINT:
+                    {
+                        const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(ii));
+                        const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
+                        insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
+                        break;
+                    }
+                default:
+                    throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)",
+                            getTypeName(keySchema->columnType(ii)).c_str());
+                    break;
             }
         }
     }
 
-    IntsKey(const TableTuple *tuple,
-            const std::vector<int> &indices,
-            const std::vector<AbstractExpression*> &indexed_expressions,
+    IntsKey(const TableTuple *tuple, const std::vector<int> &indices, const std::vector<AbstractExpression*> &indexed_expressions,
             const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
@@ -310,38 +310,42 @@ struct IntsKey
                     break;
                 }
             }
-            return;
-        }
-        for (int ii = 0; ii < columnCount; ii++) {
-            switch(keySchema->columnType(ii)) {
-                case voltdb::ValueType::tBIGINT: {
-                const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(indices[ii]));
-                const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
-                insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tINTEGER: {
-                const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(indices[ii]));
-                const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
-                insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tSMALLINT: {
-                const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(indices[ii]));
-                const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
-                insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-                case voltdb::ValueType::tTINYINT: {
-                const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(indices[ii]));
-                const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
-                insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
-                break;
-            }
-            default:
-                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
-                                    getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
-                break;
+        } else {
+            for (int ii = 0; ii < columnCount; ii++) {
+                switch(keySchema->columnType(ii)) {
+                    case voltdb::ValueType::tBIGINT:
+                        {
+                            const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(indices[ii]));
+                            const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
+                            insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
+                            break;
+                        }
+                    case voltdb::ValueType::tINTEGER:
+                        {
+                            const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(indices[ii]));
+                            const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
+                            insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
+                            break;
+                        }
+                    case voltdb::ValueType::tSMALLINT:
+                        {
+                            const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(indices[ii]));
+                            const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
+                            insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
+                            break;
+                        }
+                    case voltdb::ValueType::tTINYINT:
+                        {
+                            const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(indices[ii]));
+                            const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
+                            insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
+                            break;
+                        }
+                    default:
+                        throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
+                                getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
+                        break;
+                }
             }
         }
     }
@@ -354,8 +358,7 @@ struct IntsKey
  * Required by CompactingMap keyed by IntsKey<>
  */
 template <std::size_t keySize>
-struct IntsComparator
-{
+struct IntsComparator {
     IntsComparator(const TupleSchema *unused_keySchema) : m_keySchema(unused_keySchema) {}
 
     inline int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
@@ -366,8 +369,11 @@ struct IntsComparator
         for (unsigned int ii = 0; ii < keySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
             const uint64_t *rvalue = &rhs.data[ii];
-            if (*lvalue < *rvalue)  return -1;
-            else if (*lvalue > *rvalue) return 1;
+            if (*lvalue < *rvalue) {
+                return -1;
+            } else if (*lvalue > *rvalue) {
+                return 1;
+            }
         }
         return 0;
     }
@@ -391,10 +397,8 @@ protected:
  * Required by CompactingHashTable keyed by IntsKey<>
  */
 template <std::size_t keySize>
-struct IntsEqualityChecker
-{
+struct IntsEqualityChecker {
     IntsEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
-
     inline bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         for (unsigned int ii = 0; ii < keySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
@@ -414,12 +418,10 @@ private:
  * Required by CompactingHashTable keyed by IntsKey<>
  */
 template <std::size_t keySize>
-struct IntsHasher
-{
+struct IntsHasher {
     IntsHasher(const TupleSchema *unused_keySchema) {}
 
-    inline size_t operator()(IntsKey<keySize> const& p) const
-    {
+    inline size_t operator()(IntsKey<keySize> const& p) const {
         size_t seed = 0;
         for (int ii = 0; ii < keySize; ii++) {
             boost::hash_combine(seed, p.data[ii]);
@@ -437,14 +439,17 @@ template <std::size_t keySize> struct GenericHasher;
  * Using TableTuple to store columns.
  */
 template <std::size_t keySize>
-struct GenericKey
-{
-    typedef GenericEqualityChecker<keySize> KeyEqualityChecker;
-    typedef GenericComparator<keySize> KeyComparator;
-    typedef GenericHasher<keySize> KeyHasher;
+struct GenericKey {
+    using KeyEqualityChecker = GenericEqualityChecker<keySize>;
+    using KeyComparator = GenericComparator<keySize>;
+    using KeyHasher = GenericHasher<keySize>;
 
-    static inline bool keyDependsOnTupleAddress() { return false; }
-    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
+    static inline bool keyDependsOnTupleAddress() {
+        return false;
+    }
+    static inline bool keyUsesNonInlinedMemory() {
+        return true; // maybe
+    }
 
     GenericKey() {
         ::memset(data, 0, keySize * sizeof(char));
@@ -456,7 +461,7 @@ struct GenericKey
     }
 
     GenericKey(const TableTuple *tuple, const std::vector<int> &indices,
-               const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
+            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
         vassert(tuple);
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
@@ -466,10 +471,10 @@ struct GenericKey
                 AbstractExpression* ae = indexed_expressions[ii];
                 keyTuple.setNValue(ii, ae->eval(tuple, NULL));
             }
-            return;
-        } // else take advantage of columns-only optimization
-        for (int ii = 0; ii < columnCount; ++ii) {
-            keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
+        } else {    // take advantage of columns-only optimization
+            for (int ii = 0; ii < columnCount; ++ii) {
+                keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
+            }
         }
     }
 
@@ -487,22 +492,18 @@ struct GenericKey
  * its ability to persist the indexed expression values using pooled storage.
  */
 template <std::size_t keySize>
-struct GenericPersistentKey : public GenericKey<keySize>
-{
+struct GenericPersistentKey : public GenericKey<keySize> {
     // These keys Compare and Hash as GenericKeys
-    GenericPersistentKey() : m_keySchema(NULL) {}
+    GenericPersistentKey() = default;
 
-    GenericPersistentKey(const TableTuple *tuple) : GenericKey<keySize>(tuple)
-        , m_keySchema(NULL) // This is just an ephemeral search key -- it doesn't need to persist.
-    { }
+         // This is just an ephemeral search key -- it doesn't need to persist.
+    GenericPersistentKey(const TableTuple *tuple) : GenericKey<keySize>(tuple) { }
 
     GenericPersistentKey(const TableTuple *tuple, const std::vector<int> &notUsedIndices,
                          const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
         // Not bothering to delegate to the full-blown GenericKey constructor,
         // since in some ways the special case processing here is simpler.
-        : GenericKey<keySize>()
-        , m_keySchema(keySchema)
-    {
+        : GenericKey<keySize>(), m_keySchema(keySchema) {
         vassert(tuple);
         // Assume that there are indexed expressions.
         // Columns-only indexes don't use GenericPersistentKey
@@ -535,17 +536,15 @@ struct GenericPersistentKey : public GenericKey<keySize>
     // That would effectively corrupt the map entry when the local variable goes out of scope
     // and/or prevent the in-map key from properly freeing its referenced objects when it got
     // deleted from the map.
-    GenericPersistentKey( const GenericPersistentKey& other )
+    GenericPersistentKey(const GenericPersistentKey& other)
         : GenericKey<keySize>() // Copying the inherited member explicitly.
-        , m_keySchema(other.m_keySchema)
-    {
+        , m_keySchema(other.m_keySchema) {
         ::memcpy(this->data, other.data, keySize);
         // Only one key, this, can own the tuple and its objects.
         const_cast<GenericPersistentKey&>(other).m_keySchema = NULL;
     }
 
-    const GenericPersistentKey& operator=( const GenericPersistentKey& other )
-    {
+    const GenericPersistentKey& operator=(const GenericPersistentKey& other) {
         // To avoid leaking data, "*this" and "other" -- typically a temp -- actually SWAP state
         // so that data memory management becomes a simple matter of running the expected
         // destructors.  If overwriting a full-blown actively-in-use persistent key,
@@ -573,21 +572,19 @@ struct GenericPersistentKey : public GenericKey<keySize>
         } else {
             // *this was ephemeral, so other must become ephemeral.
             // The state of its data on exit does not matter.
-            writableOther.m_keySchema = NULL;
+            writableOther.m_keySchema = nullptr;
 
             ::memcpy(this->data, other.data, keySize);
         }
         return *this;
     }
 
-    ~GenericPersistentKey()
-    {
-        if (m_keySchema == NULL) {
-            return;
+    ~GenericPersistentKey() {
+        if (m_keySchema != nullptr) {
+            TableTuple keyTuple(m_keySchema);
+            keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
+            keyTuple.freeObjectColumns();
         }
-        TableTuple keyTuple(m_keySchema);
-        keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
-        keyTuple.freeObjectColumns();
     }
 
 private:
@@ -596,12 +593,11 @@ private:
     // or it has been "demoted" in the process of shuffling keys around
     // in the map, passing its memory management responsibilities
     // to another key, so no reclaim is required.
-    const TupleSchema *m_keySchema;
+    const TupleSchema *m_keySchema = nullptr;
 };
 
 template <std::size_t keySize>
-struct GenericNullAsMaxComparator
-{
+struct GenericNullAsMaxComparator {
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
@@ -626,8 +622,7 @@ private:
  * Required by CompactingMap keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericComparator
-{
+struct GenericComparator {
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
@@ -656,8 +651,7 @@ protected:
  * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericEqualityChecker
-{
+struct GenericEqualityChecker {
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
@@ -675,14 +669,12 @@ private:
  * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericHasher
-{
+struct GenericHasher {
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericHasher(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     /** Generate a 64-bit number for the key value */
-    inline size_t operator()(GenericKey<keySize> const &p) const
-    {
+    inline size_t operator()(GenericKey<keySize> const &p) const {
         TableTuple pTuple(m_keySchema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
         return pTuple.hashCode();
     }
@@ -714,27 +706,23 @@ struct TupleKeyComparator;
  * probably very wide keys one column at a time by initializing and
  * comparing nvalues.
  */
-struct TupleKey
-{
+struct TupleKey {
     // typedef TupleKeyEqualityChecker KeyEqualityChecker; // Required by (future?) support for CompactingHash...
-    typedef TupleKeyComparator KeyComparator;
+    using KeyComparator = TupleKeyComparator;
     // typedef TupleKeyHasher KeyHasher; // Required by (future?) support for CompactingHash...
 
-    inline TupleKey() {
-        m_columnIndices = NULL;
-        m_indexedExprs = NULL;
-        m_keyTuple = NULL;
-        m_keyTupleSchema = NULL;
-    }
+    TupleKey() = default;
 
-    static inline bool keyDependsOnTupleAddress() { return true; }
-    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
+    static inline bool keyDependsOnTupleAddress() {
+        return true;
+    }
+    static inline bool keyUsesNonInlinedMemory() {
+        return true; // maybe
+    }
 
     // Set a key from a key-schema tuple.
     TupleKey(const TableTuple *tuple) {
         vassert(tuple);
-        m_columnIndices = NULL;
-        m_indexedExprs = NULL;
         m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
     }
@@ -776,32 +764,28 @@ struct TupleKey
 protected:
     // TableIndex owns these vectors which are used to extract key values from a persistent tuple
     // - both are NULL for an ephemeral key
-    const std::vector<int> *m_columnIndices;
-    const std::vector<AbstractExpression*> *m_indexedExprs;
+    const std::vector<int> *m_columnIndices = nullptr;
+    const std::vector<AbstractExpression*> *m_indexedExprs = nullptr;
 
     // Pointer to a persistent tuple in the non-ephemeral case.
-    const void *m_keyTuple;
-    const TupleSchema *m_keyTupleSchema;
+    const void *m_keyTuple = nullptr;
+    const TupleSchema *m_keyTupleSchema = nullptr;
 };
 
-struct TupleKeyNullAsMaxComparator
-{
+struct TupleKeyNullAsMaxComparator {
     TupleKeyNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     // return -1/0/1 if lhs </==/> rhs
-    inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
-        TableTuple lhTuple = lhs.getTupleForComparison();
-        TableTuple rhTuple = rhs.getTupleForComparison();
-        NValue lhValue, rhValue;
-
-        const int columnCount = m_keySchema->columnCount();
-        for (int ii=0; ii < columnCount; ++ii) {
-            lhValue = lhs.indexedValue(lhTuple, ii);
-            rhValue = rhs.indexedValue(rhTuple, ii);
-
+    int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
+        TableTuple const lhTuple = lhs.getTupleForComparison();
+        TableTuple const rhTuple = rhs.getTupleForComparison();
+        for (int ii = 0; ii < m_keySchema->columnCount(); ++ii) {
+            NValue lhValue = lhs.indexedValue(lhTuple, ii);
+            NValue rhValue = rhs.indexedValue(rhTuple, ii);
             int comparison = lhValue.compareNullAsMax(rhValue);
-
-            if (comparison != VALUE_COMPARE_EQUAL) return comparison;
+            if (comparison != VALUE_COMPARE_EQUAL) {
+                return comparison;
+            }
         }
         return VALUE_COMPARE_EQUAL;
     }
@@ -818,24 +802,20 @@ private:
 /**
  * Required by CompactingMap keyed by TupleKey
  */
-struct TupleKeyComparator
-{
+struct TupleKeyComparator {
     TupleKeyComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     // return -1/0/1 if lhs </==/> rhs
     inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
-        TableTuple lhTuple = lhs.getTupleForComparison();
-        TableTuple rhTuple = rhs.getTupleForComparison();
-        NValue lhValue, rhValue;
-
-        const int columnCount = m_keySchema->columnCount();
-        for (int ii=0; ii < columnCount; ++ii) {
-            lhValue = lhs.indexedValue(lhTuple, ii);
-            rhValue = rhs.indexedValue(rhTuple, ii);
-
+        TableTuple const lhTuple = lhs.getTupleForComparison();
+        TableTuple const rhTuple = rhs.getTupleForComparison();
+        for (int ii = 0; ii < m_keySchema->columnCount(); ++ii) {
+            NValue lhValue = lhs.indexedValue(lhTuple, ii);
+            NValue rhValue = rhs.indexedValue(rhTuple, ii);
             int comparison = lhValue.compare(rhValue);
-
-            if (comparison != VALUE_COMPARE_EQUAL) return comparison;
+            if (comparison != VALUE_COMPARE_EQUAL) {
+                return comparison;
+            }
         }
         return VALUE_COMPARE_EQUAL;
     }
@@ -856,10 +836,13 @@ protected:
 static inline int comparePointer(const void *lhs, const void *rhs) {
     const uintptr_t l = reinterpret_cast<const uintptr_t>(lhs);
     const uintptr_t r = reinterpret_cast<const uintptr_t>(rhs);
-
-    if (l == r) return 0;
-    else if (l < r) return -1;
-    else return 1;
+    if (l == r) {
+        return 0;
+    } else if (l < r) {
+        return -1;
+    } else {
+        return 1;
+    }
 }
 
 template <typename KeyType> struct ComparatorWithPointer;
@@ -867,25 +850,28 @@ template <typename KeyType> struct NullAsMaxComparatorWithPointer;
 
 template <typename KeyType>
 struct KeyWithPointer : public KeyType {
-    typedef ComparatorWithPointer<KeyType> KeyComparator;
+    using KeyComparator = ComparatorWithPointer<KeyType>;
     friend struct ComparatorWithPointer<KeyType>;
     friend struct NullAsMaxComparatorWithPointer<KeyType>;
 
-    KeyWithPointer() : KeyType(), m_keyTuple(NULL) {}
+    KeyWithPointer() = default;
 
-    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple), m_keyTuple(NULL) {}
+    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple) {}
 
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
-                   const std::vector<AbstractExpression*> &indexed_expressions,
-                   const TupleSchema *keySchema)
+            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
         : KeyType(tuple, indices, indexed_expressions, keySchema) {
         m_keyTuple = tuple->address();
     }
 
     static inline bool keyDependsOnTupleAddress() { return true; }
 
-    const void * const& getValue() const { return m_keyTuple;}
-    void setValue(const void * const &value) { m_keyTuple = value; }
+    const void * const& getValue() const {
+        return m_keyTuple;
+    }
+    void setValue(const void * const &value) {
+        m_keyTuple = value;
+    }
     const void *setPointerValue(const void *value) {
         const void *rv = m_keyTuple;
         m_keyTuple = value;
@@ -893,12 +879,12 @@ struct KeyWithPointer : public KeyType {
     }
 
 private:
-    const void* m_keyTuple;
+    const void* m_keyTuple = nullptr;
 };
 
 template <>
 struct KeyWithPointer<TupleKey> : public TupleKey {
-    typedef ComparatorWithPointer<TupleKey> KeyComparator;
+    using KeyComparator = ComparatorWithPointer<TupleKey>;
     friend struct ComparatorWithPointer<TupleKey>;
     friend struct NullAsMaxComparatorWithPointer<TupleKey>;
 
@@ -911,8 +897,12 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
                    const TupleSchema *unused_keySchema)
         : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
 
-    const void * const& getValue() const { return m_keyTuple; }
-    void setValue(const void * const &value) { m_keyTuple = value; }
+    const void * const& getValue() const {
+        return m_keyTuple;
+    }
+    void setValue(const void * const &value) {
+        m_keyTuple = value;
+    }
     const void *setPointerValue(const void * &value) {
         const void *rv = m_keyTuple;
         m_keyTuple = value;
@@ -922,14 +912,12 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
 
 template <typename KeyType>
 struct NullAsMaxComparatorWithPointer : public KeyType::KeyComparator {
-    NullAsMaxComparatorWithPointer(const TupleSchema *keySchema)
-            : KeyType::KeyComparator(keySchema) {}
+    NullAsMaxComparatorWithPointer(const TupleSchema *keySchema) : KeyType::KeyComparator(keySchema) {}
 
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
         int rv = KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
     }
-
     // Do a comparison, but don't compare pointers to tuple storage.
     int compareWithoutPointer(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
         return KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
@@ -959,19 +947,21 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 
 // overload template
 template <typename KeyType>
-inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) { k.setValue(v); }
+inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) {
+    k.setValue(v);
+}
 
 // PointerKeyValuePair is the entry type for multimaps that implement
 // non-unique indexes, to speed up deletion of entries.  When rows are
 // deleted, they are deleted by a pointer to the tuple.  In order to
 // find all the rows that need to be deleted quickly, the pointer to
 // the tuple is the last component of the key.
-template < typename KeyType, typename DataType = const void*>
+template <typename KeyType, typename DataType = const void*>
 class PointerKeyValuePair {
 public:
     // in order to be consistent with std::pair
-    typedef KeyWithPointer<KeyType> first_type;
-    typedef DataType second_type;
+    using first_type = KeyWithPointer<KeyType>;
+    using second_type = DataType;
 
     // the caller has to make sure the key has already contained the value
     // the signatures are to be consist with the general template
@@ -979,24 +969,32 @@ public:
     // TODO: For safety, post-assert that (value == k.getValue()).
     PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
 
-    const first_type& getKey() const { return k; }
-    const second_type& getValue() const { return k.getValue(); }
-    void setKey(const first_type &key) { k = key; }
-    void setValue(const second_type &value) { k.setValue(value); }
+    const first_type& getKey() const {
+        return k;
+    }
+    const second_type& getValue() const {
+        return k.getValue();
+    }
+    void setKey(const first_type &key) {
+        k = key;
+    }
+    void setValue(const second_type &value) {
+        k.setValue(value);
+    }
     // TODO: Optimize to take advantage of how k/key contain both
     //       the "key proper" AND the value, so k.setValue should be redundant?
     //       For safety, post-assert that (value == k.getValue()).
-    void setKeyValuePair(const first_type &key, const second_type &value)
-    { k = key; k.setValue(value); }
+    void setKeyValuePair(const first_type &key, const second_type &value) {
+        k = key;
+        k.setValue(value);
+    }
 
     // set the tuple pointer to the new value, and return the old value
     const void *setPointerValue(const void *value) {
         return k.setPointerValue(value);
     }
-
 private:
     first_type k;
 };
 
 }
-#endif // INDEXKEY_H
