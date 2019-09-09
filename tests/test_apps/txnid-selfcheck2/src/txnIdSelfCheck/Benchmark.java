@@ -169,7 +169,7 @@ public class Benchmark {
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> enabledThreads = null;
 
-        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt".split(",")));
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt,partTasklt,replTasklt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -563,6 +563,8 @@ public class Benchmark {
     TTLLoader replNDlt = null;
     TTLLoader partttlMigratelt = null;
     TTLLoader replttlMigratelt = null;
+    TaskLoader replTasklt = null;
+    TaskLoader partTasklt = null;
 
     /**
      * Core benchmark code.
