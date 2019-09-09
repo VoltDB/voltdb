@@ -809,8 +809,16 @@ public class TestTaskManager {
     }
 
     public static class TestActionScheduler implements ActionScheduler {
+        private boolean setScopeIdCalled = false;
+
+        @Override
+        public void setScopeId(TaskScope scope, int id) {
+            setScopeIdCalled = true;
+        }
+
         @Override
         public DelayedAction getFirstDelayedAction() {
+            assertTrue(setScopeIdCalled);
             s_firstActionSchedulerCallCount.getAndIncrement();
             return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
