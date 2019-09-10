@@ -66,9 +66,7 @@ class AbstractExpression;
  * Parameter for constructing TableIndex. TupleSchema, then key schema
  */
 struct TableIndexScheme {
-    TableIndexScheme() {
-        tupleSchema = NULL;
-    }
+    TableIndexScheme() = default;
 
     TableIndexScheme(const std::string &a_name,
                      TableIndexType a_type,
@@ -106,48 +104,15 @@ struct TableIndexScheme {
       type(a_type),
       columnIndices(a_columnIndices),
       indexedExpressions(a_indexedExpressions),
-      predicate(NULL),
       allColumnIndices(a_columnIndices),
       unique(a_unique),
       countable(a_countable),
       migrating(migrating),
-      expressionsAsText(),
-      predicateAsText(),
-      tupleSchema(a_tupleSchema)
-    {
-    }
+      tupleSchema(a_tupleSchema) { }
 
-    TableIndexScheme(const TableIndexScheme& other) :
-      name(other.name),
-      type(other.type),
-      columnIndices(other.columnIndices),
-      indexedExpressions(other.indexedExpressions),
-      predicate(other.predicate),
-      allColumnIndices(other.allColumnIndices),
-      unique(other.unique),
-      countable(other.countable),
-      migrating(other.migrating),
-      expressionsAsText(other.expressionsAsText),
-      predicateAsText(other.predicateAsText),
-      tupleSchema(other.tupleSchema)
-    {}
+    TableIndexScheme(const TableIndexScheme&) = default;
 
-    TableIndexScheme& operator=(const TableIndexScheme& other)
-    {
-        name = other.name;
-        type = other.type;
-        columnIndices = other.columnIndices;
-        indexedExpressions = other.indexedExpressions;
-        predicate = other.predicate;
-        allColumnIndices = other.allColumnIndices;
-        unique = other.unique;
-        countable = other.countable;
-        migrating = other.migrating;
-        expressionsAsText = other.expressionsAsText;
-        predicateAsText = other.predicateAsText;
-        tupleSchema = other.tupleSchema;
-        return *this;
-    }
+    TableIndexScheme& operator=(const TableIndexScheme& other) = default;
 
     static const std::vector<TableIndexScheme> noOptionalIndices() {
         return std::vector<TableIndexScheme>();
@@ -159,29 +124,27 @@ struct TableIndexScheme {
     TableIndexType type;
     std::vector<int32_t> columnIndices;
     std::vector<AbstractExpression*> indexedExpressions;
-    AbstractExpression* predicate;
+    AbstractExpression* predicate = nullptr;
     // For partial indexes this vector contains index columns indicies plus
     // columns that are part of the index predicate
     std::vector<int32_t> allColumnIndices;
     bool unique;
     bool countable;
     bool migrating;
-    std::string expressionsAsText;
-    std::string predicateAsText;
-    const TupleSchema *tupleSchema;
+    std::string expressionsAsText{};
+    std::string predicateAsText{};
+    const TupleSchema *tupleSchema = nullptr;
 };
 
 struct IndexCursor {
 public:
     IndexCursor(const TupleSchema * schema) :
-        m_forward(true), m_match(schema)
-    {
+        m_forward(true), m_match(schema) {
         memset(m_keyIter, 0, sizeof(m_keyIter));
         memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
     }
 
-    ~IndexCursor() {
-    };
+    ~IndexCursor() {}
 
     // iteration stuff
     bool m_forward;  // for tree index ONLY
@@ -217,13 +180,39 @@ public:
  *
  * @see TableIndexFactory
  */
-class TableIndex
-{
+class TableIndex {
     friend class TableIndexFactory;
+protected:
+    TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 
+    TableIndexScheme m_scheme;
+    const TupleSchema * const m_keySchema;
+    const std::string m_id;
+
+    // counters
+    int m_inserts;
+    int m_deletes;
+    int m_updates;
+
+    // stats
+    IndexStats m_stats;
+
+    // Index specific implementations
+    virtual void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) = 0;
+    virtual bool deleteEntryDo(const TableTuple *tuple) = 0;
+    virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+    virtual bool existsDo(const TableTuple* values) const = 0;
+    virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
+private:
+    // This should always/only be required for unique key indexes used for primary keys.
+    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
+        throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
+    }
+
+    ThreadLocalPool m_tlPool;
 public:
     virtual ~TableIndex();
-
     /**
      * adds passed value as an index entry linked to given tuple
      */
@@ -238,8 +227,7 @@ public:
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
-                                 const TableTuple &originalTuple);
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple);
 
     /**
      * Does the key use out-of-line strings or binary data?
@@ -415,7 +403,7 @@ public:
      * Return TRUE if the index has a predicate.
      */
     bool isPartialIndex() const {
-        return getPredicate() != NULL;
+        return getPredicate() != nullptr;
     }
 
     virtual bool hasKey(const TableTuple *searchKey) const = 0;
@@ -431,8 +419,7 @@ public:
      * @Return great than rank value as "m_entries.size() + 1"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const
-    {
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const {
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
     }
     /**
@@ -535,40 +522,6 @@ public:
     const TupleSchema *getTupleSchema() const {
         return m_scheme.tupleSchema;
     }
-
-protected:
-
-    TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
-
-    TableIndexScheme m_scheme;
-    const TupleSchema * const m_keySchema;
-    const std::string m_id;
-
-    // counters
-    int m_inserts;
-    int m_deletes;
-    int m_updates;
-
-    // stats
-    IndexStats m_stats;
-
-protected:
-    // Index specific implementations
-    virtual void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) = 0;
-    virtual bool deleteEntryDo(const TableTuple *tuple) = 0;
-    virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
-                                         const TableTuple &originalTuple) = 0;
-    virtual bool existsDo(const TableTuple* values) const = 0;
-    virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
-
-private:
-
-    // This should always/only be required for unique key indexes used for primary keys.
-    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
-        throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
-    }
-
-    ThreadLocalPool m_tlPool;
 };
 
 }

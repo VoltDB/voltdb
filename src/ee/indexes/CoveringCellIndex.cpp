@@ -61,13 +61,15 @@ static const int MIN_CELL_LEVEL = 0;  // entire cube face
 static const int MAX_CELL_LEVEL = 16; //
 static const int CELL_LEVEL_MOD = 2;  // every other level
 
-static void getCovering(const Polygon &poly, std::vector<S2CellId> *coveringCells) {
+static std::vector<S2CellId> getCovering(const Polygon& poly) {
+    std::vector<S2CellId> coveringCells;
     S2RegionCoverer coverer;
     coverer.set_min_level(MIN_CELL_LEVEL);
     coverer.set_max_level(MAX_CELL_LEVEL);
     coverer.set_max_cells(CoveringCellIndex::MAX_CELL_COUNT);
     coverer.set_level_mod(CELL_LEVEL_MOD);
-    coverer.GetCovering(poly, coveringCells);
+    coverer.GetCovering(poly, &coveringCells);
+    return coveringCells;
 }
 
 
@@ -79,16 +81,15 @@ static CoveringCellIndex::CellKeyType setKeyFromCellId(uint64_t cellId, const Ta
     int keyOffset = 0;
     int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
     key.insertKeyValue<uint64_t>(keyOffset, intraKeyOffset, cellId);
-    if (tuple != NULL) {
+    if (tuple != nullptr) {
         key.setValue(tuple->address());
     }
-
     return key;
 }
 
 
 static CoveringCellIndex::CellKeyType setKeyFromCellId(uint64_t cellId) {
-    return setKeyFromCellId(cellId, NULL);
+    return setKeyFromCellId(cellId, nullptr);
 }
 
 
@@ -110,17 +111,17 @@ static uint64_t extractCellId(const CoveringCellIndex::CellKeyType &key) {
 
 static void* extractTupleAddress(const CoveringCellIndex::TupleKeyType &key) {
     int keyOffset = 0;
-    int intraKeyOffset = static_cast<int>(sizeof(void*) - 1);
+    int intraKeyOffset = sizeof(void*) - 1;
     return reinterpret_cast<void*>(key.extractKeyValue<uint64_t>(keyOffset, intraKeyOffset));
 }
 
 
 static CoveringCellIndex::CellMapIterator& getIterFromCursor(IndexCursor& cursor) {
-    return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&(cursor.m_keyIter[0]));
+    return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&cursor.m_keyIter[0]);
 }
 
 static CoveringCellIndex::CellMapIterator& getEndIterFromCursor(IndexCursor& cursor) {
-    return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&(cursor.m_keyEndIter[0]));
+    return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&cursor.m_keyEndIter[0]);
 }
 
 
@@ -130,25 +131,22 @@ bool CoveringCellIndex::getPolygonFromTuple(const TableTuple *tuple, Polygon *po
         const GeographyValue gv = ValuePeeker::peekGeographyValue(nval);
         poly->initFromGeography(gv);
         return true;
+    } else {
+        return false;
     }
-
-    return false;
 }
 
 
-void CoveringCellIndex::addEntryDo(const TableTuple *tuple,
-                                   TableTuple *conflictTuple)
-{
+void CoveringCellIndex::addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
     Polygon poly;
     if (! getPolygonFromTuple(tuple, &poly)) {
         // Null polygons are not indexed.
         return;
     }
 
-    std::vector<S2CellId> covering;
-    getCovering(poly, &covering);
+    std::vector<S2CellId> covering = getCovering(poly);
 
-    BOOST_FOREACH(S2CellId &cell, covering) {
+    for(S2CellId &cell : covering) {
         m_cellEntries.insert(setKeyFromCellId(cell.id(), tuple), tuple->address());
     }
 
@@ -157,18 +155,14 @@ void CoveringCellIndex::addEntryDo(const TableTuple *tuple,
     for (int i = 0; i < MAX_CELL_COUNT; ++i) {
         if (i < covering.size()) {
             cells[i] = covering[i].id();
-        }
-        else {
+        } else {
             cells[i] = S2CellId::Sentinel().id();
         }
     }
-
     m_tupleEntries.insert(setKeyFromTuple(tuple), cells);
 }
 
-bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey,
-                                           IndexCursor &cursor) const
-{
+bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const {
     cursor.m_forward = true;
 
     GeographyPointValue pt = ValuePeeker::peekGeographyPointValue(searchKey->getNValue(0));
@@ -198,17 +192,15 @@ bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey,
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
             return true;
         }
-
         // If no match, we'll try the next level.
     }
 
     // If we get here there were no matches in any level.
-    cursor.m_match.move(NULL);
+    cursor.m_match.move(nullptr);
     return false;
 }
 
-TableTuple CoveringCellIndex::nextValueAtKey(IndexCursor& cursor) const
-{
+TableTuple CoveringCellIndex::nextValueAtKey(IndexCursor& cursor) const {
     if (cursor.m_match.isNullTuple()) {
         return cursor.m_match;
     }
@@ -229,7 +221,7 @@ TableTuple CoveringCellIndex::nextValueAtKey(IndexCursor& cursor) const
 
         if (nextLevel < MIN_CELL_LEVEL) {
             // No more matches.
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return retval;
         }
         cell = cell.parent(nextLevel);
@@ -257,7 +249,7 @@ bool CoveringCellIndex::deleteEntryDo(const TableTuple *tuple) {
         return false;
     }
 
-    BOOST_FOREACH(uint64_t cell, it.value()) {
+    for(uint64_t cell : it.value()) {
         if (cell == S2CellId::Sentinel().id())
             break;
 
@@ -270,8 +262,8 @@ bool CoveringCellIndex::deleteEntryDo(const TableTuple *tuple) {
     return true;
 }
 
-bool CoveringCellIndex::replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
-                                                  const TableTuple &originalTuple) {
+bool CoveringCellIndex::replaceEntryNoKeyChangeDo(
+        const TableTuple &destinationTuple, const TableTuple &originalTuple) {
     NValue nval = destinationTuple.getNValue(m_columnIndex);
     if (nval.isNull()) {
         // null polygons are not in the index, so success is doing nothing.
@@ -313,17 +305,11 @@ bool CoveringCellIndex::checkForIndexChangeDo(const TableTuple *lhs, const Table
     if (lhsNval.isNull() && rhsNval.isNull()) {
         // Both values are null.
         return false;
+    } else {
+        GeographyValue lhsGv = ValuePeeker::peekGeographyValue(lhsNval);
+        GeographyValue rhsGv = ValuePeeker::peekGeographyValue(rhsNval);
+        return lhsGv.data() != rhsGv.data();
     }
-
-    GeographyValue lhsGv = ValuePeeker::peekGeographyValue(lhsNval);
-    GeographyValue rhsGv = ValuePeeker::peekGeographyValue(rhsNval);
-
-    if (lhsGv.data() == rhsGv.data()) {
-        // different tuples but same geography.
-        return false;
-    }
-
-    return true;
 }
 
 
@@ -358,8 +344,9 @@ bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string
                 if (i == 0) {
                     *reasonInvalid = "Should have at least one valid cell";
                     return false;
+                } else {
+                    break;
                 }
-                break;
             }
 
             tuple.move(tupleAddress);
@@ -407,8 +394,7 @@ bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string
         if (tupleMapIt.isEnd()) {
             *reasonInvalid = "Did not find tuple from cell map in tuple map";
             return false;
-        }
-        else {
+        } else {
             TupleValueType cells = tupleMapIt.value();
             bool foundCell = false;
             for (int i = 0; i < MAX_CELL_COUNT; ++i) {
@@ -423,7 +409,6 @@ bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string
                 return false;
             }
         }
-
         cellMapIt.moveNext();
     }
 
@@ -456,18 +441,13 @@ CoveringCellIndex::StatsForTest CoveringCellIndex::getStatsForTest(PersistentTab
         tuple.move(extractTupleAddress(polyIt.key()));
         Polygon poly;
         getPolygonFromTuple(&tuple, &poly);
-
         double polyArea = RADIUS_SQ_M * poly.GetArea();
         stats.polygonsArea += polyArea;
-
         polyIt.moveNext();
     }
-
     return stats;
 }
 
-CoveringCellIndex::~CoveringCellIndex()
-{
-}
+CoveringCellIndex::~CoveringCellIndex() { }
 
 } // end namespace voltdb

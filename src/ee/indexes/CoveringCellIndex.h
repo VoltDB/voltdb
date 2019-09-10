@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COVERINGCELLINDEX_H
-#define COVERINGCELLINDEX_H
+#pragma once
 
 #include <array>
 
@@ -62,38 +61,50 @@ class PersistentTable;
  * expensive.)
  */
 class CoveringCellIndex : public TableIndex {
- public:
-
+public:
     /** The largest number of cells in a polygon's cell covering */
     static const int MAX_CELL_COUNT = S2RegionCoverer::kDefaultMaxCells; // 8
 
     /** Type names for the cell map */
-    typedef PointerKeyValuePair<IntsKey<1> > CellMapEntry;
-    typedef CellMapEntry::first_type CellKeyType;
-    typedef CellKeyType::KeyComparator CellKeyComparator;
-    typedef CompactingMap<CellMapEntry, CellKeyComparator> CellMapType;
-    typedef CellMapType::iterator CellMapIterator;
-    typedef std::pair<CellMapIterator, CellMapIterator> CellMapRange;
+    using CellMapEntry = PointerKeyValuePair<IntsKey<1>>;
+    using CellKeyType = CellMapEntry::first_type;
+    using CellKeyComparator = CellKeyType::KeyComparator;
+    using CellMapType = CompactingMap<CellMapEntry, CellKeyComparator>;
+    using CellMapIterator = CellMapType::iterator;
+    using CellMapRange = std::pair<CellMapIterator, CellMapIterator>;
 
     /** Type names for the tuple map */
-    typedef NormalKeyValuePair<IntsKey<1>, std::array<uint64_t, MAX_CELL_COUNT>> TupleMapEntry;
-    typedef TupleMapEntry::first_type TupleKeyType;
-    typedef TupleMapEntry::second_type TupleValueType;
-    typedef TupleKeyType::KeyComparator TupleKeyComparator;
-    typedef CompactingMap<TupleMapEntry, TupleKeyComparator> TupleMapType;
-    typedef TupleMapType::iterator TupleMapIterator;
-    typedef std::pair<TupleMapIterator, TupleMapIterator> TupleMapRange;
+    using TupleMapEntry = NormalKeyValuePair<IntsKey<1>, std::array<uint64_t, MAX_CELL_COUNT>>;
+    using TupleKeyType = TupleMapEntry::first_type;
+    using TupleValueType = TupleMapEntry::second_type;
+    using TupleKeyComparator = TupleKeyType::KeyComparator;
+    using TupleMapType = CompactingMap<TupleMapEntry, TupleKeyComparator>;
+    using TupleMapIterator = TupleMapType::iterator;
+    using TupleMapRange = std::pair<TupleMapIterator, TupleMapIterator>;
+private:
+    /** a map from cell ID to tuple address */
+    CellMapType m_cellEntries;
+
+    /** a map from tuple address to cell ID */
+    TupleMapType m_tupleEntries;
+
+    /** The index of the GEOGRAPHY column that is indexed  */
+    int32_t m_columnIndex;
+    /**
+     * Given a tuple from the indexed table, extract the polygon from it.
+     */
+    bool getPolygonFromTuple(const TableTuple *tuple, Polygon* poly) const;
+public:
+
 
     /**
      * This constructor is the same as for the other index types.
      */
-    CoveringCellIndex(const TupleSchema *keySchema,
-                      const TableIndexScheme &scheme)
-        : TableIndex(keySchema, scheme)
+    CoveringCellIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+        TableIndex(keySchema, scheme)
         , m_cellEntries(false, CellKeyComparator(keySchema))
-        , m_tupleEntries(true, TupleKeyComparator(NULL))
-        , m_columnIndex(scheme.columnIndices[0])
-    {
+        , m_tupleEntries(true, TupleKeyComparator(nullptr))
+        , m_columnIndex(scheme.columnIndices[0]) {
         vassert(scheme.columnIndices.size() == 1);
     }
 
@@ -113,8 +124,7 @@ class CoveringCellIndex : public TableIndex {
      * Given a search key tuple (always one field of type
      * GEOGRAPHY_POINT), move the cursor to the first containing cell.
      */
-    virtual bool moveToCoveringCell(const TableTuple* searchKey,
-                                    IndexCursor &cursor) const;
+    virtual bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const;
 
     /**
      * Given a scan that has begun with a call to moveToCoveringCell,
@@ -158,7 +168,7 @@ class CoveringCellIndex : public TableIndex {
      */
     virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         throwFatalException("Invoked moveToKey on index %s which is unsupported on geospatial indexes",
-                            getName().c_str());
+                getName().c_str());
     }
 
     /**
@@ -167,7 +177,7 @@ class CoveringCellIndex : public TableIndex {
      */
     virtual bool moveToKeyByTuple(const TableTuple* searchTuple, IndexCursor &cursor) const {
         throwFatalException("Invoked moveToKeyByTuple on index %s which is unsupported on geospatial indexes",
-                            getName().c_str());
+                getName().c_str());
     }
 
     /**
@@ -175,26 +185,18 @@ class CoveringCellIndex : public TableIndex {
      */
     virtual bool hasKey(const TableTuple *searchKey) const {
         throwFatalException("Invoked hasKey on index %s which is unsupported on geospatial indexes",
-                            getName().c_str());
+                getName().c_str());
     }
 
     /**
      * A structure used to report stats about this index for testing.
      */
     struct StatsForTest {
-        int32_t numPolygons;
-        int32_t numCells;
-
-        double polygonsArea;
-        double cellsArea;
-
-        StatsForTest()
-        : numPolygons(0)
-        , numCells(0)
-        , polygonsArea(0.0)
-        , cellsArea(0.0)
-        {
-        }
+        int32_t numPolygons = 0;
+        int32_t numCells = 0;
+        double polygonsArea = 0;
+        double cellsArea = 0;
+        StatsForTest() = default;
     };
 
     /**
@@ -229,31 +231,14 @@ class CoveringCellIndex : public TableIndex {
      */
     virtual bool existsDo(const TableTuple* values) const {
         throwFatalException("Invoked method exists on index %s which is unsupported on geospatial indexes",
-                            getName().c_str());
+                getName().c_str());
     }
 
     /**
      * Used when rows are updated to check if an index change is needed.
      */
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const;
-
- private:
-
-    /**
-     * Given a tuple from the indexed table, extract the polygon from it.
-     */
-    bool getPolygonFromTuple(const TableTuple *tuple, Polygon* poly) const;
-
-    /** a map from cell ID to tuple address */
-    CellMapType m_cellEntries;
-
-    /** a map from tuple address to cell ID */
-    TupleMapType m_tupleEntries;
-
-    /** The index of the GEOGRAPHY column that is indexed  */
-    int32_t m_columnIndex;
 };
 
 } // end namespace voltdb
 
-#endif

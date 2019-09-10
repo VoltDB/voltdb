@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COMPACTINGHASHMULTIMAPINDEX_H_
-#define COMPACTINGHASHMULTIMAPINDEX_H_
+#pragma once
 
 #include <iostream>
 #include <common/debuglog.h>
@@ -59,12 +58,16 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType>
-class CompactingHashMultiMapIndex : public TableIndex
-{
-    typedef typename KeyType::KeyEqualityChecker KeyEqualityChecker;
-    typedef typename KeyType::KeyHasher KeyHasher;
-    typedef CompactingHashTable<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
-    typedef typename MapType::iterator MapIterator;
+class CompactingHashMultiMapIndex : public TableIndex {
+    using KeyEqualityChecker = typename KeyType::KeyEqualityChecker;
+    using KeyHasher = typename KeyType::KeyHasher;
+    using MapType = CompactingHashTable<KeyType, const void*, KeyHasher, KeyEqualityChecker>;
+    using MapIterator = typename MapType::iterator;
+
+    MapType m_entries;
+    // comparison stuff
+    KeyEqualityChecker m_eq;
+
 
     ~CompactingHashMultiMapIndex() {};
 
@@ -72,51 +75,53 @@ class CompactingHashMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
-    {
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
         ++m_inserts;
         m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntryDo(const TableTuple *tuple)
-    {
+    bool deleteEntryDo(const TableTuple *tuple) {
         ++m_deletes;
         MapIterator iter = findTuple(*tuple);
         if (iter.isEnd()) {
             return false;
+        } else {
+            return m_entries.erase(iter);
         }
-        return m_entries.erase(iter);
     }
 
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
-    {
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) {
         vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
             if ( ! CompactingHashMultiMapIndex::deleteEntry(&originalTuple)) {
                 return false;
+            } else {
+                CompactingHashMultiMapIndex::addEntry(&destinationTuple, nullptr);
+                return true;
             }
-            CompactingHashMultiMapIndex::addEntry(&destinationTuple, NULL);
-            return true;
         }
 
         MapIterator mapiter = findTuple(originalTuple);
         if (mapiter.isEnd()) {
             return false;
+        } else {
+            mapiter.setValue(destinationTuple.address());
+            m_updates++;
+            return true;
         }
-        mapiter.setValue(destinationTuple.address());
-        m_updates++;
-        return true;
     }
 
-    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const {
+        return KeyType::keyUsesNonInlinedMemory();
+    }
 
     bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const {
-        return !(m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs)));
+        return ! m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
     bool existsDo(const TableTuple *persistentTuple) const {
@@ -127,11 +132,12 @@ class CompactingHashMultiMapIndex : public TableIndex
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
-        return true;
     }
 
     bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
@@ -140,9 +146,10 @@ class CompactingHashMultiMapIndex : public TableIndex
         if (mapIter.isEnd()) {
             cursor.m_match.move(NULL);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
-        return true;
    }
 
     TableTuple nextValueAtKey(IndexCursor& cursor) const {
@@ -165,46 +172,36 @@ class CompactingHashMultiMapIndex : public TableIndex
         return ! findKey(searchKey).isEnd();
     }
 
-    size_t getSize() const { return m_entries.size(); }
+    size_t getSize() const {
+        return m_entries.size();
+    }
 
-    int64_t getMemoryEstimate() const
-    {
+    int64_t getMemoryEstimate() const {
         return m_entries.bytesAllocated();
     }
 
-    std::string getTypeName() const { return "CompactingHashMultiMapIndex"; };
+    std::string getTypeName() const {
+        return "CompactingHashMultiMapIndex";
+    }
 
     // Non-virtual (so "really-private") helper methods.
-    MapIterator findKey(const TableTuple *searchKey) const
-    {
+    MapIterator findKey(const TableTuple *searchKey) const {
         return m_entries.find(KeyType(searchKey));
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple) const
-    {
+    MapIterator findTuple(const TableTuple &originalTuple) const {
         return m_entries.find(setKeyFromTuple(&originalTuple), originalTuple.address());
     }
 
-    const KeyType setKeyFromTuple(const TableTuple *tuple) const
-    {
-        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
-        return result;
+    const KeyType setKeyFromTuple(const TableTuple *tuple) const {
+        return KeyType(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
     }
-
-    MapType m_entries;
-
-    // comparison stuff
-   KeyEqualityChecker m_eq;
-
 public:
     CompactingHashMultiMapIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
         m_entries(false, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
-        m_eq(keySchema)
-    {}
-
+        m_eq(keySchema) {}
 };
 
 }
 
-#endif // COMPACTINGHASHMULTIMAPINDEX_H_

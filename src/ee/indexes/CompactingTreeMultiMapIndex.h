@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COMPACTINGTREEMULTIMAPINDEX_H_
-#define COMPACTINGTREEMULTIMAPINDEX_H_
+#pragma once
 
 #include <iostream>
 #include <common/debuglog.h>
@@ -59,23 +58,26 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyValuePair, bool hasRank>
-class CompactingTreeMultiMapIndex : public TableIndex
-{
-    typedef typename KeyValuePair::first_type KeyType;
-    typedef typename KeyType::KeyComparator KeyComparator;
-    typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
-    typedef typename MapType::iterator MapIterator;
-    typedef std::pair<MapIterator, MapIterator> MapRange;
+class CompactingTreeMultiMapIndex : public TableIndex {
+    using KeyType = typename KeyValuePair::first_type;
+    using KeyComparator = typename KeyType::KeyComparator;
+    using MapType = CompactingMap<KeyValuePair, KeyComparator, hasRank>;
+    using MapIterator = typename MapType::iterator;
+    using MapRange = std::pair<MapIterator, MapIterator>;
+
+    MapType m_entries;
+    // comparison stuff
+    KeyComparator m_cmp;
 
 
-    ~CompactingTreeMultiMapIndex() {};
+    ~CompactingTreeMultiMapIndex() {}
 
     static MapIterator& castToIter(IndexCursor& cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
+        return *reinterpret_cast<MapIterator*>(cursor.m_keyIter);
     }
 
     static MapIterator& castToEndIter(IndexCursor& cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor.m_keyEndIter);
+        return *reinterpret_cast<MapIterator*>(cursor.m_keyEndIter);
     }
 
     void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
@@ -88,39 +90,39 @@ class CompactingTreeMultiMapIndex : public TableIndex
         MapIterator iter = findTuple(*tuple);
         if (iter.isEnd()) {
             return false;
+        } else {
+            return m_entries.erase(iter);
         }
-        return m_entries.erase(iter);
     }
 
     /**
      * Update in place an index entry with a new tuple address
      * (e.g., due to table compaction)
      */
-    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
-    {
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) {
         vassert(originalTuple.address() != destinationTuple.address());
         // The KeyType will always depend on tuple address, excpet for CompactingTreeMultiIndexTest.
-        if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
+        if (! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
+        } else {
+            CompactingTreeMultiMapIndex::addEntry(&destinationTuple, nullptr);
+            return true;
         }
-        CompactingTreeMultiMapIndex::addEntry(&destinationTuple, NULL);
-        return true;
     }
 
-    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const {
+        return KeyType::keyUsesNonInlinedMemory();
+    }
 
-    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const
-    {
+    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const {
         return 0 != m_cmp(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool existsDo(const TableTuple *persistentTuple) const
-    {
+    bool existsDo(const TableTuple *persistentTuple) const {
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
-    {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         cursor.m_forward = true;
         MapRange iter_pair = m_entries.equalRange(KeyType(searchKey));
 
@@ -133,14 +135,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (mapIter.equals(mapEndIter)) {
             cursor.m_match.move(NULL);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
-
-        return true;
     }
 
-    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
-    {
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
         cursor.m_forward = true;
         MapRange iter_pair = m_entries.equalRange(setKeyFromTuple(persistentTuple));
 
@@ -153,30 +154,26 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (mapIter.equals(mapEndIter)) {
             cursor.m_match.move(NULL);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
-
-        return true;
     }
 
-    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const
-    {
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const {
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
-    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
-    {
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.upperBound(KeyType(searchKey));
-
         return mapIter.isEnd();
     }
 
-    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
-    {
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         // do moveToKeyOrGreater()
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.lowerBound(KeyType(searchKey));
@@ -228,8 +225,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     }
 
     // only be called after moveToGreaterThanKey() for LTE case
-    void moveToBeforePriorEntry(IndexCursor& cursor) const
-    {
+    void moveToBeforePriorEntry(IndexCursor& cursor) const {
         vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
@@ -246,8 +242,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         mapIter.movePrev();
     }
 
-    void moveToPriorEntry(IndexCursor& cursor) const
-    {
+    void moveToPriorEntry(IndexCursor& cursor) const {
         vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
@@ -259,8 +254,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         }
     }
 
-    void moveToEnd(bool begin, IndexCursor& cursor) const
-    {
+    void moveToEnd(bool begin, IndexCursor& cursor) const {
         cursor.m_forward = begin;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -270,8 +264,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
             mapIter = m_entries.rbegin();
     }
 
-    TableTuple nextValue(IndexCursor& cursor) const
-    {
+    TableTuple nextValue(IndexCursor& cursor) const {
         TableTuple retval(getTupleSchema());
         MapIterator &mapIter = castToIter(cursor);
 
@@ -283,12 +276,10 @@ class CompactingTreeMultiMapIndex : public TableIndex
                 mapIter.movePrev();
             }
         }
-
         return retval;
     }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor) const
-    {
+    TableTuple nextValueAtKey(IndexCursor& cursor) const {
         if (cursor.m_match.isNullTuple()) {
             return cursor.m_match;
         }
@@ -305,8 +296,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return retval;
     }
 
-    bool advanceToNextKey(IndexCursor& cursor) const
-    {
+    bool advanceToNextKey(IndexCursor& cursor) const {
         MapIterator &mapEndIter = castToEndIter(cursor);
         if (mapEndIter.isEnd()) {
             return false;
@@ -321,13 +311,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (mapIter.isEnd()) {
             cursor.m_match.move(NULL);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
-        return true;
     }
 
-    bool hasKey(const TableTuple *searchKey) const
-    {
+    bool hasKey(const TableTuple *searchKey) const {
         return ! findKey(searchKey).isEnd();
     }
 
@@ -343,8 +333,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
         if (mapIter.isEnd()) {
             return m_entries.size() + 1;
-        }
-        if (isUpper) {
+        } else if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
             return m_entries.rankLower(mapIter.key());
@@ -387,20 +376,21 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (mapConstIter.isEnd()) {
             cursor.m_match.move(NULL);
             return false;
+        } else {
+            cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+            return true;
         }
-        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
-        return true;
     }
 
-    size_t getSize() const { return m_entries.size(); }
+    size_t getSize() const {
+        return m_entries.size();
+    }
 
-    int64_t getMemoryEstimate() const
-    {
+    int64_t getMemoryEstimate() const {
         return m_entries.bytesAllocated();
     }
 
-    std::string debug() const
-    {
+    std::string debug() const {
         std::ostringstream buffer;
         buffer << TableIndex::debug() << std::endl;
         MapIterator iter = m_entries.begin();
@@ -414,7 +404,9 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return (ret);
     }
 
-    std::string getTypeName() const { return "CompactingTreeMultiMapIndex"; };
+    std::string getTypeName() const {
+        return "CompactingTreeMultiMapIndex";
+    }
 
     MapIterator findKey(const TableTuple *searchKey) const {
         KeyType tempKey(searchKey);
@@ -423,8 +415,9 @@ class CompactingTreeMultiMapIndex : public TableIndex
         setPointerValue(tempKey, MAXPOINTER);
         if (m_cmp(rvKey, tempKey) <= 0) {
             return rv;
+        } else {
+            return MapIterator();
         }
-        return MapIterator();
     }
 
     MapIterator findTuple(const TableTuple &originalTuple) const {
@@ -444,25 +437,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return MapIterator();
     }
 
-    const KeyType setKeyFromTuple(const TableTuple *tuple) const
-    {
-        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
-        return result;
+    const KeyType setKeyFromTuple(const TableTuple *tuple) const {
+        return KeyType(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
     }
-
-    MapType m_entries;
-
-    // comparison stuff
-    KeyComparator m_cmp;
-
 public:
     CompactingTreeMultiMapIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
-        TableIndex(keySchema, scheme),
-        m_entries(false, KeyComparator(keySchema)),
-        m_cmp(keySchema)
-    {}
+        TableIndex(keySchema, scheme), m_entries(false, KeyComparator(keySchema)), m_cmp(keySchema) {}
 };
 
 }
 
-#endif // COMPACTINGTREEMULTIMAPINDEX_H_

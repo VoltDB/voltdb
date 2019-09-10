@@ -56,11 +56,16 @@
 
 namespace voltdb {
 
-class TableIndexPicker
-{
+class TableIndexPicker {
+    const TableIndexScheme &m_scheme;
+    const TupleSchema *m_keySchema;
+    const int m_keySize;
+    bool m_intsOnly;
+    bool m_inlinesOrColumnsOnly;
+    TableIndexType m_type;
+
     template <class TKeyType>
-    TableIndex *getInstanceForKeyType() const
-    {
+    TableIndex *getInstanceForKeyType() const {
         if (m_scheme.unique) {
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
@@ -81,12 +86,10 @@ class TableIndexPicker
     }
 
     template <std::size_t KeySize>
-    TableIndex *getInstanceIfKeyFits()
-    {
+    TableIndex *getInstanceIfKeyFits() {
         if (m_keySize > KeySize) {
             return NULL;
-        }
-        if (m_intsOnly) {
+        } else if (m_intsOnly) {
             // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
             // the number of 8-byte uint64's required to store KeySize packed bytes.
             return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
@@ -105,13 +108,13 @@ class TableIndexPicker
         // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
             return getInstanceForKeyType<GenericKey<KeySize> >();
+        } else {
+            return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
         }
-        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
     }
 
     template <int ColCount>
-    TableIndex *getInstanceForHashedGenericColumns() const
-    {
+    TableIndex *getInstanceForHashedGenericColumns() const {
         if (m_scheme.unique) {
             return new CompactingHashUniqueIndex<GenericKey<ColCount> >(m_keySchema, m_scheme);
         } else {
@@ -119,11 +122,13 @@ class TableIndexPicker
         }
     }
 
-
 public:
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, bool inlinesOrColumnsOnly,
+            const TableIndexScheme &scheme) :
+        m_scheme(scheme), m_keySchema(keySchema), m_keySize(keySchema->tupleLength()),
+        m_intsOnly(intsOnly), m_inlinesOrColumnsOnly(inlinesOrColumnsOnly), m_type(scheme.type) {}
 
-    TableIndex *getInstance()
-    {
+    TableIndex *getInstance() {
         TableIndex *result;
 /*
         if ((!m_intsOnly) && (m_type == HASH_TABLE_INDEX)) {
@@ -141,20 +146,15 @@ public:
 
         if ((result = getInstanceIfKeyFits<4>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<8>())) {
+        } else if ((result = getInstanceIfKeyFits<8>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<12>())) {
+        } else if ((result = getInstanceIfKeyFits<12>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<16>())) {
+        } else if ((result = getInstanceIfKeyFits<16>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<24>())) {
+        } else if ((result = getInstanceIfKeyFits<24>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<32>())) {
+        } else if ((result = getInstanceIfKeyFits<32>())) {
             return result;
         }
 
@@ -164,17 +164,13 @@ public:
 
         if ((result = getInstanceIfKeyFits<48>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<64>())) {
+        } else if ((result = getInstanceIfKeyFits<64>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<96>())) {
+        } else if ((result = getInstanceIfKeyFits<96>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<128>())) {
+        } else if ((result = getInstanceIfKeyFits<128>())) {
             return result;
-        }
-        if ((result = getInstanceIfKeyFits<256>())) {
+        } else if ((result = getInstanceIfKeyFits<256>())) {
             return result;
         }
 
@@ -184,31 +180,12 @@ public:
             } else {
                 return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
             }
-        }
-        if (m_scheme.countable) {
+        } else if (m_scheme.countable) {
             return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
         } else {
             return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
         }
     }
-
-    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, bool inlinesOrColumnsOnly,
-                     const TableIndexScheme &scheme) :
-        m_scheme(scheme),
-        m_keySchema(keySchema),
-        m_keySize(keySchema->tupleLength()),
-        m_intsOnly(intsOnly),
-        m_inlinesOrColumnsOnly(inlinesOrColumnsOnly),
-        m_type(scheme.type)
-    {}
-
-private:
-    const TableIndexScheme &m_scheme;
-    const TupleSchema *m_keySchema;
-    const int m_keySize;
-    bool m_intsOnly;
-    bool m_inlinesOrColumnsOnly;
-    TableIndexType m_type;
 };
 
 static CoveringCellIndex* getCoveringCellIndexInstance(const TableIndexScheme &scheme) {
@@ -296,8 +273,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     return retval;
 }
 
-TableIndex *TableIndexFactory::cloneEmptyTreeIndex(const TableIndex& pkey_index)
-{
+TableIndex *TableIndexFactory::cloneEmptyTreeIndex(const TableIndex& pkey_index) {
     return pkey_index.cloneEmptyNonCountingTreeIndex();
 }
 

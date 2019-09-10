@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TABLEINDEXFACTORY_H_
-#define TABLEINDEXFACTORY_H_
+#pragma once
 
 #include <string>
 #include <vector>
@@ -63,4 +62,3 @@ public:
 
 }
 
-#endif // TABLEINDEXFACTORY_H_
