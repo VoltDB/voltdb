@@ -116,12 +116,12 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -895,11 +895,8 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
-<<<<<<< HEAD
             validateThreadPoolsConfiguration(deployment.getThreadpools());
-=======
             Cluster catCluster = getCluster(catalog);
->>>>>>> master
 
             // add our hacky Deployment to the catalog
             if (catCluster.getDeployment().get("deployment") == null) {
@@ -1843,13 +1840,8 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param threadPoolsType
      */
-<<<<<<< HEAD
     private static void setExportInfo(Catalog catalog, ExportType exportType, ThreadPoolsType threadPoolsType) {
-        final Cluster cluster = catalog.getClusters().get("cluster");
-=======
-    private static void setExportInfo(Catalog catalog, ExportType exportType) {
         final Cluster cluster = getCluster(catalog);
->>>>>>> master
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
@@ -3403,7 +3395,6 @@ public abstract class CatalogUtil {
         return new VoltTable.ColumnInfo(column.getTypeName(), VoltType.get((byte) column.getType()));
     }
 
-<<<<<<< HEAD
     /**
      * Check if the thread pool name set in the export target configuration exists
      * @param exportConfiguration
@@ -3442,13 +3433,13 @@ public abstract class CatalogUtil {
                 throw new DeploymentCheckException(msg);
             }
         }
-=======
+    }
+
     public static Cluster getCluster(Catalog catalog) {
         return catalog.getClusters().get("cluster");
     }
 
     public static Database getDatabase(Catalog catalog) {
         return getCluster(catalog).getDatabases().get("database");
->>>>>>> master
     }
 }
