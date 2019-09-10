@@ -38,7 +38,7 @@ import org.voltdb.catalog.Procedure;
 public final class TaskHelper {
     private final VoltLogger m_logger;
     private final UnaryOperator<String> m_generateLogMessage;
-    private final String m_scope;
+    private final TaskScope m_scope;
     private final Function<String, Procedure> m_procedureGetter;
 
     private static Function<String, Procedure> createProcedureFunction(Database database) {
@@ -50,16 +50,16 @@ public final class TaskHelper {
         return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
     }
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope, Database database) {
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, TaskScope scope, Database database) {
         this(logger, generateLogMessage, scope, createProcedureFunction(database));
     }
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, TaskScope scope,
             ClientInterface clientInterface) {
         this(logger, generateLogMessage, scope, clientInterface::getProcedureFromName);
     }
 
-    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
+    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, TaskScope scope,
             Function<String, Procedure> procedureGetter) {
         m_logger = logger;
         m_generateLogMessage = generateLogMessage;
