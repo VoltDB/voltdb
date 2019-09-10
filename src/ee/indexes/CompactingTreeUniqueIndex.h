@@ -76,7 +76,8 @@ class CompactingTreeUniqueIndex : public TableIndex {
     }
 
     bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+        notImplemented("moveToCoveringCell");
+        return {};
     }
 
     void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) override {
@@ -389,7 +390,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
         return buffer.str();
     }
 
-    std::string getTypeName() const override {
+    char const* getTypeName() const override {
         return "CompactingTreeUniqueIndex";
     };
 

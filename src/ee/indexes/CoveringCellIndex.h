@@ -99,66 +99,71 @@ private:
         throwFatalException("Primary key index discovered to be non-unique.");
     }
 
-    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    void moveToKeyOrGreater(const TableTuple*, IndexCursor&) const override {
+        notImplemented("moveToKeyOrGreater");
     }
 
-    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    bool moveToGreaterThanKey(const TableTuple*, IndexCursor&) const override {
+        notImplemented("moveToGreaterThanKey");
+        return false;
     }
 
-    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    void moveToLessThanKey(const TableTuple*, IndexCursor&) const override {
+        notImplemented("moveToLessThanKey");
     }
 
-    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
+    void moveToKeyOrLess(TableTuple*, IndexCursor&) const override {
+        notImplemented("moveToKeyOrLess");
     }
 
-    void moveToBeforePriorEntry(IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    void moveToBeforePriorEntry(IndexCursor&) const override {
+        notImplemented("moveToBeforePriorEntry");
     }
 
-    void moveToPriorEntry(IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
+    void moveToPriorEntry(IndexCursor&) const override {
+        notImplemented("moveToPriorEntry");
     }
 
-    void moveToEnd(bool begin, IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    void moveToEnd(bool, IndexCursor&) const override {
+        notImplemented("moveToEnd");
     }
 
-    TableTuple nextValue(IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    TableTuple nextValue(IndexCursor&) const override {
+        notImplemented("nextValue");
+        return {};
     }
 
-    bool advanceToNextKey(IndexCursor& cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    bool advanceToNextKey(IndexCursor&) const override {
+        notImplemented("advanceToNextKey");
+        return {};
     }
 
-    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const override {
-        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
+    TableTuple uniqueMatchingTuple(const TableTuple &) const override {
+        notImplemented("uniqueMatchingTuple");
+        return {};
     }
 
-    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    int64_t getCounterGET(const TableTuple*, bool, IndexCursor&) const override {
+        notImplemented("getCounterGET");
+        return {};
     }
 
-    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    int64_t getCounterLET(const TableTuple*, bool, IndexCursor&) const override {
+        notImplemented("getCounterLET");
+        return {};
     }
 
-    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const override {
-        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
+    bool moveToRankTuple(int64_t, bool, IndexCursor&) const override {
+        notImplemented("moveToRankTuple");
+        return {};
     }
 public:
     /**
      * This constructor is the same as for the other index types.
      */
     CoveringCellIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
-        TableIndex(keySchema, scheme)
-        , m_cellEntries(false, CellKeyComparator(keySchema))
-        , m_tupleEntries(true, TupleKeyComparator(nullptr))
-        , m_columnIndex(scheme.columnIndices[0]) {
+        TableIndex(keySchema, scheme), m_cellEntries(false, CellKeyComparator(keySchema)),
+        m_tupleEntries(true, TupleKeyComparator(nullptr)), m_columnIndex(scheme.columnIndices[0]) {
         vassert(scheme.columnIndices.size() == 1);
     }
 
@@ -207,7 +212,7 @@ public:
     /**
      * The name of this type of index
      */
-    std::string getTypeName() const override {
+    char const* getTypeName() const override {
         return "CoveringCellIndex";
     }
 

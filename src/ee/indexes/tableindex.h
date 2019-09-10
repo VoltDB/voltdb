@@ -204,6 +204,11 @@ protected:
                                          const TableTuple &originalTuple) = 0;
     virtual bool existsDo(const TableTuple* values) const = 0;
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
+
+    void notImplemented(char const* method) const {
+        throwFatalException("Invoked method %s on %s which has no implementation",
+                method, getTypeName());
+    }
 private:
     // This should always/only be required for unique key indexes used for primary keys.
     virtual TableIndex *cloneEmptyNonCountingTreeIndex() const = 0;
@@ -361,17 +366,17 @@ public:
      * We might have to make a different class in future for maximizing
      * performance of UniqueIndex.
      */
-    inline bool isUniqueIndex() const {
+    bool isUniqueIndex() const {
         return m_scheme.unique;
     }
     /**
      * Same as isUniqueIndex...
      */
-    inline bool isCountableIndex() const {
+    bool isCountableIndex() const {
         return m_scheme.countable;
     }
 
-    inline bool isMigratingIndex() const {
+    bool isMigratingIndex() const {
        return m_scheme.migrating;
     }
 
@@ -478,7 +483,7 @@ public:
     }
 
     virtual std::string debug() const;
-    virtual std::string getTypeName() const = 0;
+    virtual char const* getTypeName() const = 0;
 
     virtual void ensureCapacity(uint32_t capacity) {}
 

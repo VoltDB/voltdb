@@ -81,15 +81,18 @@ class CompactingTreeMultiMapIndex : public TableIndex {
     }
 
     TableIndex* cloneEmptyNonCountingTreeIndex() const override {
-        throwFatalException("Primary key index discovered to be non-unique.");
+        notImplemented("cloneEmptyNonCountingTreeIndex");
+        return {};
     }
 
     bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const override {
-        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+        notImplemented("moveToCoveringCell");
+        return {};
     }
 
     TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const override {
-        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
+        notImplemented("uniqueMatchingTuple");
+        return {};
     }
 
     void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) override {
@@ -416,7 +419,7 @@ class CompactingTreeMultiMapIndex : public TableIndex {
         return (ret);
     }
 
-    std::string getTypeName() const override {
+    char const* getTypeName() const override {
         return "CompactingTreeMultiMapIndex";
     }
 

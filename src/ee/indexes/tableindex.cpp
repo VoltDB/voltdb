@@ -76,7 +76,7 @@ TableIndexScheme::TableIndexScheme(
       expressionsAsText(a_expressionsAsText),
       predicateAsText(a_predicateAsText),
       tupleSchema(a_tupleSchema) {
-        if (predicate != NULL) {
+        if (predicate != nullptr) {
             // Collect predicate column indicies
             ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
         }
@@ -90,8 +90,8 @@ void TableIndexScheme::setMigrate() {
    if (predicate == nullptr) {
       predicate = hiddenColumnExpr;
    } else {
-      predicate = ExpressionUtil::conjunctionFactory(ExpressionType::EXPRESSION_TYPE_CONJUNCTION_AND,
-            hiddenColumnExpr, predicate);
+      predicate = ExpressionUtil::conjunctionFactory(
+              ExpressionType::EXPRESSION_TYPE_CONJUNCTION_AND, hiddenColumnExpr, predicate);
    }
    // NOTE: we are not updating JSON expressions for the predicate, which
    // involves work on rapidjson (that we may deprecate soon), and serialization
@@ -102,21 +102,14 @@ void TableIndexScheme::setMigrate() {
       // INTEGER type).
       allColumnIndices.emplace_back(hiddenColumnIndex);
    }
-
 }
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
-    m_scheme(scheme),
-    m_keySchema(keySchema),
+    m_scheme(scheme), m_keySchema(keySchema),
     m_id(TableCatalogDelegate::getIndexIdString(scheme)),
 
     // initialize all the counters to zero
-    m_inserts(0),
-    m_deletes(0),
-    m_updates(0),
-
-    m_stats(this)
-{}
+    m_inserts(0), m_deletes(0), m_updates(0), m_stats(this) {}
 
 TableIndex::~TableIndex()
 {
