@@ -459,5 +459,23 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
 PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
 PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
+PARTITION PROCEDURE NIBDPTableInsert ON TABLE nibdp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDRTableInsert;
+CREATE PROCEDURE deleteSomeP AS DELETE FROM taskp WHERE ts < DATEADD(SECOND, ?, NOW);
+PARTITION PROCEDURE deleteSomeP ON TABLE taskp COLUMN p;
+CREATE PROCEDURE deleteSomeR AS DELETE FROM taskr WHERE ts < DATEADD(SECOND, ?, NOW);
+
+
+-- functions
+CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
+CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
+CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
+
+-- tasks
+CREATE TASK taskDeleteP ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeP WITH (-100) ON ERROR LOG;
+CREATE TASK taskDeleteR ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeR WITH (-100) ON ERROR LOG;
+
 
 END_OF_BATCH

@@ -452,7 +452,7 @@ CREATE TABLE taskp
 , id         bigint             NOT NULL
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
+, CONSTRAINT PK_id_taskp PRIMARY KEY (p,id)
 );
 PARTITION TABLE taskp ON COLUMN p;
 
@@ -463,7 +463,7 @@ CREATE TABLE taskr
 , id         bigint             NOT NULL
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
+, CONSTRAINT PK_id_taskr PRIMARY KEY (p,id)
 );
 
 
@@ -545,8 +545,8 @@ CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Big
 CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
 CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
 
+END_OF_BATCH
 -- tasks
 CREATE TASK taskDeleteP ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeP WITH (-100) ON ERROR LOG;
 CREATE TASK taskDeleteR ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeR WITH (-100) ON ERROR LOG;
 
-END_OF_BATCH

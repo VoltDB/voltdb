@@ -63,13 +63,12 @@ public class TaskLoader extends BenchmarkThread {
 	long TASKDELAY = 10; // seconds
 
 	TaskLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits,
-			int partitionCount, String type) {
+			int partitionCount) {
 		setName("TaskLoader-" + tableName);
 		this.client = client;
 		this.tableName = tableName;
 		this.targetCount = targetCount;
 		this.rowSize = rowSize;
-		// this.type = type;
 		this.batchSize = batchSize;
 		m_permits = permits;
 		this.partitionCount = partitionCount;
@@ -148,10 +147,12 @@ public class TaskLoader extends BenchmarkThread {
 					}
 					if (response.getStatus() == ClientResponse.SUCCESS) {
 						long unDeletedRows = response.getResults()[0].asScalarLong();
-						Object rows_left = (type == "TTL") ? stats.get("ROWS_LEFT") : stats.get("TUPLE_PENDING");
+						log.info("+++ " + tableName + " rows: " + unDeletedRows);
+						// Object rows_left = (type == "TTL") ? stats.get("ROWS_LEFT") :
+						// stats.get("TUPLE_PENDING");
 						log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted/migrated:"
 								+ unDeletedRows);
-						log.info("Stats Rows behind from being deleted/migrated:" + rows_left);
+						// log.info("Stats Rows behind from being deleted/migrated:" + rows_left);
 						long currentRemainingRows = rowsLoaded.get() - remainingRows;
 						if (currentRemainingRows == totalDeleted && totalDeleted > 0) {
 							// nothing deleted in last round
