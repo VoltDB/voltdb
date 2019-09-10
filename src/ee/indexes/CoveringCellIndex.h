@@ -94,9 +94,63 @@ private:
      * Given a tuple from the indexed table, extract the polygon from it.
      */
     bool getPolygonFromTuple(const TableTuple *tuple, Polygon* poly) const;
+
+    TableIndex* cloneEmptyNonCountingTreeIndex() const override {
+        throwFatalException("Primary key index discovered to be non-unique.");
+    }
+
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    }
+
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    }
+
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    }
+
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
+    }
+
+    void moveToBeforePriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    }
+
+    void moveToPriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
+    }
+
+    void moveToEnd(bool begin, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+
+    TableTuple nextValue(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    }
+
+    bool advanceToNextKey(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    }
+
+    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const override {
+        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
+    }
+
+    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+
+    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
+    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
+    }
 public:
-
-
     /**
      * This constructor is the same as for the other index types.
      */
@@ -116,7 +170,7 @@ public:
     /**
      * All keys are fixed size.
      */
-    virtual bool keyUsesNonInlinedMemory() const {
+    bool keyUsesNonInlinedMemory() const override {
         return false;
     }
 
@@ -124,21 +178,21 @@ public:
      * Given a search key tuple (always one field of type
      * GEOGRAPHY_POINT), move the cursor to the first containing cell.
      */
-    virtual bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const;
+    bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const override;
 
     /**
      * Given a scan that has begun with a call to moveToCoveringCell,
      * returns a tuple containing a polygon that may contain the point
      * in the search key.
      */
-    virtual TableTuple nextValueAtKey(IndexCursor& cursor) const;
+    TableTuple nextValueAtKey(IndexCursor& cursor) const override;
 
     /**
      * Return the number of polygons that are indexed.
      * (Excludes rows in the table with null polygons.
      */
-    virtual size_t getSize() const {
-        return static_cast<size_t>(m_tupleEntries.size());
+    size_t getSize() const override {
+        return m_tupleEntries.size();
     }
 
     /**
@@ -146,14 +200,14 @@ public:
      * seems to be dependent on the number of blocks that
      * CompactingMap has allocated?
      */
-    virtual int64_t getMemoryEstimate() const {
+    int64_t getMemoryEstimate() const override {
         return m_tupleEntries.bytesAllocated() + m_cellEntries.bytesAllocated();
     }
 
     /**
      * The name of this type of index
      */
-    virtual std::string getTypeName() const {
+    std::string getTypeName() const override {
         return "CoveringCellIndex";
     }
 
@@ -166,7 +220,7 @@ public:
     /**
      * Used for equality search.  Not supported for this kind of index.
      */
-    virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
         throwFatalException("Invoked moveToKey on index %s which is unsupported on geospatial indexes",
                 getName().c_str());
     }
@@ -175,7 +229,7 @@ public:
      * Used for resolving conflicts with unique indexes when applying
      * binary log data.  Unneeded here.
      */
-    virtual bool moveToKeyByTuple(const TableTuple* searchTuple, IndexCursor &cursor) const {
+    bool moveToKeyByTuple(const TableTuple* searchTuple, IndexCursor &cursor) const override {
         throwFatalException("Invoked moveToKeyByTuple on index %s which is unsupported on geospatial indexes",
                 getName().c_str());
     }
@@ -183,7 +237,7 @@ public:
     /**
      * Used by index count executor.  This doesn't really make sense for this kind of index.
      */
-    virtual bool hasKey(const TableTuple *searchKey) const {
+    bool hasKey(const TableTuple *searchKey) const override {
         throwFatalException("Invoked hasKey on index %s which is unsupported on geospatial indexes",
                 getName().c_str());
     }
@@ -210,26 +264,25 @@ public:
      * Invoked by superclass.  These indexes are not unique so
      * conflict tuple is not used.
      */
-    virtual void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple);
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) override;
 
     /**
      * Invoked by superclass.  Removes the tuple with the give data
      * address from the index.
      */
-    virtual bool deleteEntryDo(const TableTuple *tuple);
+    bool deleteEntryDo(const TableTuple *tuple) override;
 
     /**
      * This method is invoked when compacting the table.  The index
      * keys stay the same, but the tuple addresses change.
      */
-    virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
-                                           const TableTuple &originalTuple);
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) override;
 
     /**
      * Used to detect if there are UNIQUE constraint conflicts.
      * Unneeded for this type of index.
      */
-    virtual bool existsDo(const TableTuple* values) const {
+    bool existsDo(const TableTuple* values) const override {
         throwFatalException("Invoked method exists on index %s which is unsupported on geospatial indexes",
                 getName().c_str());
     }
@@ -237,7 +290,7 @@ public:
     /**
      * Used when rows are updated to check if an index change is needed.
      */
-    virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const;
+    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const override;
 };
 
 } // end namespace voltdb

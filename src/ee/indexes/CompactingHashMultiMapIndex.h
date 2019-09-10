@@ -68,19 +68,78 @@ class CompactingHashMultiMapIndex : public TableIndex {
     // comparison stuff
     KeyEqualityChecker m_eq;
 
-
     ~CompactingHashMultiMapIndex() {};
 
     static MapIterator& castToIter(IndexCursor& cursor) {
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
+    TableIndex* cloneEmptyNonCountingTreeIndex() const override {
+        throwFatalException("Primary key index discovered to be non-unique.");
+    }
+
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    }
+
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    }
+
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    }
+
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
+    }
+
+    bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+    }
+
+    void moveToBeforePriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    }
+
+    void moveToPriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
+    }
+
+    void moveToEnd(bool begin, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+
+    TableTuple nextValue(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    }
+
+    bool advanceToNextKey(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    }
+
+    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const override {
+        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
+    }
+
+    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+
+    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
+    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
+    }
+
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) override {
         ++m_inserts;
         m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntryDo(const TableTuple *tuple) {
+    bool deleteEntryDo(const TableTuple *tuple) override {
         ++m_deletes;
         MapIterator iter = findTuple(*tuple);
         if (iter.isEnd()) {
@@ -93,7 +152,7 @@ class CompactingHashMultiMapIndex : public TableIndex {
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) {
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) override {
         vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
@@ -116,19 +175,19 @@ class CompactingHashMultiMapIndex : public TableIndex {
         }
     }
 
-    bool keyUsesNonInlinedMemory() const {
+    bool keyUsesNonInlinedMemory() const override {
         return KeyType::keyUsesNonInlinedMemory();
     }
 
-    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const {
+    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const override {
         return ! m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool existsDo(const TableTuple *persistentTuple) const {
+    bool existsDo(const TableTuple *persistentTuple) const override {
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
         if (mapIter.isEnd()) {
@@ -140,7 +199,7 @@ class CompactingHashMultiMapIndex : public TableIndex {
         }
     }
 
-    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const override {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
         if (mapIter.isEnd()) {
@@ -152,7 +211,7 @@ class CompactingHashMultiMapIndex : public TableIndex {
         }
    }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor) const {
+    TableTuple nextValueAtKey(IndexCursor& cursor) const override {
         if (cursor.m_match.isNullTuple()) {
             return cursor.m_match;
         }
@@ -168,19 +227,19 @@ class CompactingHashMultiMapIndex : public TableIndex {
         return retval;
     }
 
-    bool hasKey(const TableTuple *searchKey) const {
+    bool hasKey(const TableTuple *searchKey) const override {
         return ! findKey(searchKey).isEnd();
     }
 
-    size_t getSize() const {
+    size_t getSize() const override {
         return m_entries.size();
     }
 
-    int64_t getMemoryEstimate() const {
+    int64_t getMemoryEstimate() const override {
         return m_entries.bytesAllocated();
     }
 
-    std::string getTypeName() const {
+    std::string getTypeName() const override {
         return "CompactingHashMultiMapIndex";
     }
 

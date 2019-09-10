@@ -206,9 +206,7 @@ protected:
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
 private:
     // This should always/only be required for unique key indexes used for primary keys.
-    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
-        throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
-    }
+    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const = 0;
 
     ThreadLocalPool m_tlPool;
 public:
@@ -281,9 +279,7 @@ public:
      *      data, but chosen values for this index.  So, searchKey has
      *      to contain values in this index's entry order.
      */
-    virtual void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
-    };
+    virtual void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
     /**
      * This method moves to the first tuple greater than given key.
@@ -293,30 +289,18 @@ public:
      *      data, but chosen values for this index.  So, searchKey has
      *      to contain values in this index's entry order.
      */
-    virtual bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
-    };
+    virtual bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
-    virtual void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
-    };
+    virtual void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
     // move the cursor to the first tuple less than or equal to the given key.
-    virtual void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
-    };
+    virtual void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
-    virtual bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
-    }
+    virtual bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const = 0;
 
-    virtual void moveToBeforePriorEntry(IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
-    }
+    virtual void moveToBeforePriorEntry(IndexCursor& cursor) const = 0;
 
-    virtual void moveToPriorEntry(IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
-    }
+    virtual void moveToPriorEntry(IndexCursor& cursor) const = 0;
 
     /**
      * This method moves to the beginning or the end of the indexes.
@@ -324,9 +308,7 @@ public:
      *
      * @see begin true to move to the beginning, false to the end.
      */
-    virtual void moveToEnd(bool begin, IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
-    }
+    virtual void moveToEnd(bool begin, IndexCursor& cursor) const = 0;
 
     /**
      * sets the tuple to point the entry found by
@@ -336,9 +318,7 @@ public:
      * @return true if any entry to return, false if reached the end
      * of this index.
      */
-    virtual TableTuple nextValue(IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
-    };
+    virtual TableTuple nextValue(IndexCursor& cursor) const = 0;
 
     /**
      * sets the tuple to point the entry found by moveToKey().  calls
@@ -363,16 +343,12 @@ public:
      *
      * @return true if any entry to return, false if not.
      */
-    virtual bool advanceToNextKey(IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
-    };
+    virtual bool advanceToNextKey(IndexCursor& cursor) const = 0;
 
     /** retrieves from a primary key index the persistent tuple
      *  matching the given temp tuple.  The tuple's schema should be
      *  the table's schema, not the index's key schema.  */
-    virtual TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const {
-        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
-    };
+    virtual TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const = 0;
 
     /**
      * @return true if lhs is different from rhs in this index, which
@@ -419,9 +395,8 @@ public:
      * @Return great than rank value as "m_entries.size() + 1"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
-    }
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const = 0;
+
     /**
      * This function only supports countable tree index. It returns the counter value
      * equal or less than the serarchKey. It will return the rank with the searchKey
@@ -433,9 +408,7 @@ public:
      * @Return less than rank value as "m_entries.size()"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
-    }
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const = 0;
 
     // dense rank value tuple look up
 
@@ -451,9 +424,7 @@ public:
      * @param cursor IndexCursor object
      * @return true if it finds tuple with the dense rank value, otherwise false
      */
-    virtual bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const {
-        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
-    }
+    virtual bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const = 0;
 
     virtual size_t getSize() const = 0;
 

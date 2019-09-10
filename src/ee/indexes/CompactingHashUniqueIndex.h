@@ -74,7 +74,59 @@ class CompactingHashUniqueIndex : public TableIndex {
         return *reinterpret_cast<MapIterator*>(cursor.m_keyIter);
     }
 
-    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    }
+
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    }
+
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    }
+
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
+    }
+
+    bool moveToCoveringCell(const TableTuple* searchKey, IndexCursor &cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+    }
+
+    void moveToBeforePriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    }
+
+    void moveToPriorEntry(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
+    }
+
+    void moveToEnd(bool begin, IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+
+    TableTuple nextValue(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    }
+
+    bool advanceToNextKey(IndexCursor& cursor) const override {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    }
+
+    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+
+    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
+    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const override {
+        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
+    }
+
+    void addEntryDo(const TableTuple* tuple, TableTuple* conflictTuple) override {
         ++m_inserts;
         const void* const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
         if (conflictEntry != NULL && conflictTuple != NULL) {
@@ -82,7 +134,7 @@ class CompactingHashUniqueIndex : public TableIndex {
         }
     }
 
-    bool deleteEntryDo(const TableTuple *tuple) {
+    bool deleteEntryDo(const TableTuple* tuple) override {
         ++m_deletes;
         return m_entries.erase(setKeyFromTuple(tuple));
     }
@@ -90,7 +142,7 @@ class CompactingHashUniqueIndex : public TableIndex {
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple) {
+    bool replaceEntryNoKeyChangeDo(const TableTuple& destinationTuple, const TableTuple& originalTuple) override {
         vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
@@ -114,17 +166,19 @@ class CompactingHashUniqueIndex : public TableIndex {
         }
     }
 
-    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const override {
+        return KeyType::keyUsesNonInlinedMemory();
+    }
 
-    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const {
+    bool checkForIndexChangeDo(const TableTuple* lhs, const TableTuple* rhs) const override {
         return ! m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool existsDo(const TableTuple *persistentTuple) const {
+    bool existsDo(const TableTuple *persistentTuple) const override {
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
+    bool moveToKey(const TableTuple* searchKey, IndexCursor &cursor) const override {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
 
@@ -137,7 +191,7 @@ class CompactingHashUniqueIndex : public TableIndex {
         }
     }
 
-    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
+    bool moveToKeyByTuple(const TableTuple* persistentTuple, IndexCursor& cursor) const override {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
 
@@ -150,13 +204,13 @@ class CompactingHashUniqueIndex : public TableIndex {
         }
     }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor) const {
+    TableTuple nextValueAtKey(IndexCursor& cursor) const override {
         TableTuple retval = cursor.m_match;
         cursor.m_match.move(NULL);
         return retval;
     }
 
-    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const {
+    TableTuple uniqueMatchingTuple(const TableTuple& searchTuple) const override {
         TableTuple retval(getTupleSchema());
         const MapIterator keyIter = findTuple(searchTuple);
         if ( ! keyIter.isEnd()) {
@@ -165,23 +219,23 @@ class CompactingHashUniqueIndex : public TableIndex {
         return retval;
     }
 
-    bool hasKey(const TableTuple *searchKey) const {
+    bool hasKey(const TableTuple* searchKey) const override {
         return ! findKey(searchKey).isEnd();
     }
 
-    size_t getSize() const {
+    size_t getSize() const override {
         return m_entries.size();
     }
 
-    int64_t getMemoryEstimate() const {
+    int64_t getMemoryEstimate() const override {
         return m_entries.bytesAllocated();
     }
 
-    std::string getTypeName() const {
+    std::string getTypeName() const override {
         return "CompactingHashUniqueIndex";
     }
 
-    TableIndex *cloneEmptyNonCountingTreeIndex() const {
+    TableIndex* cloneEmptyNonCountingTreeIndex() const override {
         return new CompactingTreeUniqueIndex<NormalKeyValuePair<KeyType, void const *>, false>(
                 TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
     }
@@ -196,13 +250,11 @@ class CompactingHashUniqueIndex : public TableIndex {
     }
 
     const KeyType setKeyFromTuple(const TableTuple *tuple) const {
-        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
-        return result;
+        return KeyType(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
     }
 public:
     CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
-        TableIndex(keySchema, scheme),
-        m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
+        TableIndex(keySchema, scheme), m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
         m_eq(keySchema) {}
 };
 
