@@ -63,7 +63,7 @@ public class PlannerTestCase extends TestCase {
     }
 
     PlannerTestCase(PlannerType plannerType) {
-        super();
+        super("PlannerTestCase");
         m_plannerType = plannerType;
     }
     /**
@@ -111,7 +111,7 @@ public class PlannerTestCase extends TestCase {
         CompiledPlan cp = null;
         try {
             cp = m_aide.compileAdHocPlan(m_plannerType, sql, detMode);
-            assertTrue(cp != null);
+            assertNotNull(cp);
         }
         catch (Exception ex) {
             ex.printStackTrace();

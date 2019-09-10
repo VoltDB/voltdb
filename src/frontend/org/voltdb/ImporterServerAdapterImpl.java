@@ -17,12 +17,12 @@
 
 package org.voltdb;
 
+import java.util.function.Predicate;
+
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.ImporterServerAdapter;
 import org.voltdb.importer.ImporterStatsCollector;
-
-import java.util.function.Function;
 
 /**
  * Implementation that uses the server internal classes to execute procedures and
@@ -43,7 +43,8 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     }
 
     @Override
-    public boolean callProcedure(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback procCallback, String proc, Object... fieldList) {
+    public boolean callProcedure(AbstractImporter importer, Predicate<Integer> backPressurePredicate,
+            ProcedureCallback procCallback, String proc, Object... fieldList) {
         return getInternalConnectionHandler()
                 .callProcedure(importer, backPressurePredicate, m_statsCollector, procCallback, proc, fieldList);
     }

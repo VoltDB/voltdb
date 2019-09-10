@@ -95,14 +95,16 @@ public abstract class ProcedureCompiler {
         Field[] fields = procClass.getDeclaredFields();
         for (Field f : fields) {
             // skip non SQL fields
-            if (f.getType() != SQLStmt.class)
+            if (f.getType() != SQLStmt.class) {
                 continue;
+            }
 
             int modifiers = f.getModifiers();
 
             // skip private fields if asked (usually a superclass)
-            if (Modifier.isPrivate(modifiers) && (!withPrivate))
+            if (Modifier.isPrivate(modifiers) && (!withPrivate)) {
                 continue;
+            }
 
             // don't allow non-final SQLStmts
             if (Modifier.isFinal(modifiers) == false) {
@@ -111,10 +113,11 @@ public abstract class ProcedureCompiler {
                     msg = "Superclass " + procClass.getSimpleName() + " of procedure " +
                           procName + " contains a non-final SQLStmt field.";
                 }
-                if (compiler != null)
+                if (compiler != null) {
                     throw compiler.new VoltCompilerException(msg);
-                else
+                } else {
                     new VoltLogger("HOST").warn(msg);
+                }
             }
 
             f.setAccessible(true);
@@ -138,8 +141,9 @@ public abstract class ProcedureCompiler {
         if (superClass != null) {
             Map<String, SQLStmt> superStmts = getValidSQLStmts(compiler, procName, superClass, procInstance, false);
             for (Entry<String, SQLStmt> e : superStmts.entrySet()) {
-                if (retval.containsKey(e.getKey()) == false)
+                if (retval.containsKey(e.getKey()) == false) {
                     retval.put(e.getKey(), e.getValue());
+                }
             }
         }
 
@@ -240,7 +244,9 @@ public abstract class ProcedureCompiler {
         // Determine if the procedure is read-only or read-write by checking if the procedure contains any write SQL statements.
         boolean readWrite = false;
         for (Object field : fields.values()) {
-            if (!(field instanceof SQLStmt)) continue;
+            if (!(field instanceof SQLStmt)) {
+                continue;
+            }
             SQLStmt stmt = (SQLStmt)field;
             QueryType qtype = QueryType.getFromSQL(stmt.getText());
             if (!qtype.isReadOnly()) {
@@ -254,7 +260,9 @@ public abstract class ProcedureCompiler {
         final DeterminismMode detMode = readWrite ? DeterminismMode.SAFER : DeterminismMode.FASTER;
 
         for (Entry<String, Object> entry : fields.entrySet()) {
-            if (!(entry.getValue() instanceof SQLStmt)) continue;
+            if (!(entry.getValue() instanceof SQLStmt)) {
+                continue;
+            }
 
             String stmtName = entry.getKey();
             SQLStmt stmt = (SQLStmt)entry.getValue();
@@ -385,9 +393,9 @@ public abstract class ProcedureCompiler {
             if (cls.isArray()) {
                 param.setIsarray(true);
                 cls = cls.getComponentType();
-            }
-            else
+            } else {
                 param.setIsarray(false);
+            }
 
             if ((cls == Float.class) || (cls == float.class)) {
                 String msg = "Procedure: " + shortName + " has a parameter with type: ";
@@ -429,6 +437,10 @@ public abstract class ProcedureCompiler {
         }
 
         setCatalogProcedurePartitionInfo(compiler, db, procedure, partitionData);
+        if (procedure.getPartitionparameter() == -1) {
+            return;
+        }
+
         if (procedure.getPartitionparameter() >= paramTypes.length) {
             String msg = "Partition parameter is not a valid parameter for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
@@ -443,8 +455,9 @@ public abstract class ProcedureCompiler {
         };
         boolean found = false;
         for (Class<?> candidate : validPartitionClzzes) {
-            if (partitionType == candidate)
+            if (partitionType == candidate) {
                 found = true;
+            }
         }
         if (!found) {
             String msg = "Partition parameter must be a String or Number for procedure: " + procedure.getClassname();
@@ -630,9 +643,9 @@ public abstract class ProcedureCompiler {
             if (cls.isArray()) {
                 param.setIsarray(true);
                 cls = cls.getComponentType();
-            }
-            else
+            } else {
                 param.setIsarray(false);
+            }
 
             // boxed types are not supported parameters at this time
             if ((cls == Long.class) || (cls == Integer.class) || (cls == Short.class) ||
@@ -755,7 +768,9 @@ public abstract class ProcedureCompiler {
 
         for (String curStmt : stmts) {
             // Skip processing 'END' statement in multi-statement procedures
-            if (curStmt.equalsIgnoreCase("end")) continue;
+            if (curStmt.equalsIgnoreCase("end")) {
+                continue;
+            }
 
             // ENG-14487 truncate statement is not allowed for single partitioned procedures.
             if (info.isSinglePartition() && curStmt.toUpperCase().startsWith("TRUNCATE")) {
@@ -802,54 +817,48 @@ public abstract class ProcedureCompiler {
                     + "for procedure: " + procedure.getClassname());
         }
 
-        int paramCount = procedure.getParameters().size();
         boolean twoPartitionTxn = info.isTwoPartitionProcedure();
         procedure.setSinglepartition(info.isSinglePartition());
 
         if (info.isSinglePartition() || twoPartitionTxn) {
             setCatalogProcedurePartitionInfo(compiler, db, procedure, info);
-            if (procedure.getPartitionparameter() >= paramCount) {
-                String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
-                throw compiler.new VoltCompilerException(msg);
-            }
             // TODO: The planner does not currently validate that a single-statement plan declared as single-partition correctly uses
             // the designated parameter as a partitioning filter, maybe some day.
             // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
             // or if the partition key was determined to be some other hard-coded constant (expression?) it might display a warning
             // message that the passed parameter is assumed to be equal to that constant (expression).
-        } else {
-            if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
-                if (statementPartitionExpression != null) {
-                    // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
-                    String tableName = "tableName", partitionColumnName = "partitionColumnName";
-                    try {
-                        assert(partitioning.getFullColumnName() != null);
-                        String array[] = partitioning.getFullColumnName().split("\\.");
-                        tableName = array[0];
-                        partitionColumnName = array[1];
-                    } catch(Exception ex) {
-                    }
-
-                    if (statementPartitionExpression instanceof ParameterValueExpression) {
-                        paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
-                    } else {
-                        String valueDescription = null;
-                        Object partitionValue = partitioning.getInferredPartitioningValue();
-                        if (partitionValue == null) {
-                            // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                            valueDescription = "of " + statementPartitionExpression.explain("");
-                        } else {
-                            valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
-                        }
-                        msg += "adding a parameter to be passed the value " + valueDescription + " and ";
-                    }
-                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
-                            partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
-                            "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
-                    compiler.addWarn(msg);
+        } else if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
+            AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
+            if (statementPartitionExpression != null) {
+                // The planner has uncovered an overlooked opportunity to run the statement SP.
+                String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
+                String tableName = "tableName", partitionColumnName = "partitionColumnName";
+                try {
+                    assert(partitioning.getFullColumnName() != null);
+                    String array[] = partitioning.getFullColumnName().split("\\.");
+                    tableName = array[0];
+                    partitionColumnName = array[1];
+                } catch(Exception ex) {
                 }
+
+                int paramCount = procedure.getParameters().size();
+                if (statementPartitionExpression instanceof ParameterValueExpression) {
+                    paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
+                } else {
+                    String valueDescription = null;
+                    Object partitionValue = partitioning.getInferredPartitioningValue();
+                    if (partitionValue == null) {
+                        // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
+                        valueDescription = "of " + statementPartitionExpression.explain("");
+                    } else {
+                        valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
+                    }
+                    msg += "adding a parameter to be passed the value " + valueDescription + " and ";
+                }
+                msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
+                        partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
+                        "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+                compiler.addWarn(msg);
             }
         }
 
@@ -860,14 +869,20 @@ public abstract class ProcedureCompiler {
     }
 
     static class ParititonDataReturnType {
-        Table partitionTable = null;
-        Column partitionColumn = null;
-        int partitionParamIndex = -1;
+        final Table partitionTable;
+        final Column partitionColumn;
+        final int partitionParamIndex;
 
         public ParititonDataReturnType(Table table, Column col, int paramIndex) {
             partitionTable = table;
             partitionColumn = col;
             partitionParamIndex = paramIndex;
+        }
+
+        public ParititonDataReturnType() {
+            partitionTable = null;
+            partitionColumn = null;
+            partitionParamIndex = -1;
         }
     }
 
@@ -896,6 +911,11 @@ public abstract class ProcedureCompiler {
 
     static public ParititonDataReturnType resolvePartitionData(VoltCompiler compiler, Database db, Procedure procedure,
             String tableName, String columnName, String paramIndexString) throws VoltCompilerException {
+        if (tableName == null) {
+            // Partitioned procedure which does not use a parameter
+            return new ParititonDataReturnType();
+        }
+
         // check parameter index range
         int paramIndex = Integer.parseInt(paramIndexString);
         int paramCount = procedure.getParameters().size();

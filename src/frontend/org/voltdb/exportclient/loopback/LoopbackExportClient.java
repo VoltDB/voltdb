@@ -34,7 +34,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.aeonbits.owner.Accessible;
 import org.aeonbits.owner.ConfigFactory;
@@ -52,6 +52,7 @@ import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.CSVWriterDecoder;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -59,7 +60,6 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import org.voltdb.exportclient.ExportRow;
 
 public class LoopbackExportClient extends ExportClientBase {
 
@@ -144,7 +144,7 @@ public class LoopbackExportClient extends ExportClientBase {
         private final ListeningExecutorService m_es;
         private final AuthUser m_user;
         private final InternalConnectionHandler m_invoker;
-        private final Function<Integer, Boolean> m_shouldContinue;
+        private final Predicate<Integer> m_shouldContinue;
 
         private BitSet m_failed = new BitSet(0);
         private BitSet m_resubmit = new BitSet(0);

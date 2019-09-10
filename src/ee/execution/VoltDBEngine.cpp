@@ -158,7 +158,8 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(lo
 }
 
 void
-VoltDBEngine::initialize(int32_t clusterIndex,
+VoltDBEngine::initialize(
+        int32_t clusterIndex,
         int64_t siteId,
         int32_t partitionId,
         int32_t sitesPerHost,
@@ -168,16 +169,13 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         int32_t defaultDrBufferSize,
         int64_t tempTableMemoryLimit,
         bool isLowestSiteId,
-        int32_t compactionThreshold,
-        int32_t exportFlushTimeout) {
+        int32_t compactionThreshold) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_isLowestSite = isLowestSiteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
-    vassert(exportFlushTimeout > 0);
-    s_exportFlushTimeout = exportFlushTimeout;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -932,6 +930,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
+    s_exportFlushTimeout = catalogCluster->exportFlushInterval();
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
@@ -1643,11 +1642,14 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
     // Set DR flag based on current catalog state
     auto catalogCluster = m_catalog->clusters().get("cluster");
     m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
+    assert(catalogCluster->drFlushInterval() > 0);
     m_executorContext->drStream()->setFlushInterval(catalogCluster->drFlushInterval());
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
+    s_exportFlushTimeout = catalogCluster->exportFlushInterval();
+    assert(s_exportFlushTimeout > 0);
 
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");

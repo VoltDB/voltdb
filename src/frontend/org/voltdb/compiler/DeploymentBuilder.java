@@ -35,6 +35,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
@@ -381,6 +382,10 @@ public class DeploymentBuilder {
         Temptables temptables = factory.createSystemSettingsTypeTemptables();
         temptables.setMaxsize(m_maxTempTableMemory);
         systemSettingType.setTemptables(temptables);
+        FlushIntervalType fi = factory.createFlushIntervalType();
+        fi.setDr(new FlushIntervalType.Dr());
+        fi.setExport(new FlushIntervalType.Export());
+        systemSettingType.setFlushInterval(fi);
         if (m_snapshotPriority != null) {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
             snapshot.setPriority(m_snapshotPriority);

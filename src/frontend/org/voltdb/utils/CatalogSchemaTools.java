@@ -543,14 +543,15 @@ public abstract class CatalogSchemaTools {
                 partitionClause.append("\n");
             }
             partitionClause.append(spacer);
-            partitionClause.append(String.format(
-                    "PARTITION ON TABLE %s COLUMN %s",
-                    proc.getPartitiontable().getTypeName(),
-                    proc.getPartitioncolumn().getTypeName() ));
-            if (proc.getPartitionparameter() != 0) {
-                partitionClause.append(String.format(
-                        " PARAMETER %s",
-                        String.valueOf(proc.getPartitionparameter()) ));
+            if (proc.getPartitiontable() == null) {
+                partitionClause.append("PARTITIONED");
+            } else {
+                partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
+                        .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());
+
+                if (proc.getPartitionparameter() != 0) {
+                    partitionClause.append(" PARAMETER ").append(proc.getPartitionparameter());
+                }
             }
 
             // For the second partition clause in 2p txn

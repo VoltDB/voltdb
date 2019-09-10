@@ -30,7 +30,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.Level;
@@ -130,7 +130,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 // just restarting the transaction here? Why? Safe?
                 createTransaction(
                         m_kattrs,
-                        m_task.getProcName(),
                         m_proc, m_cb,
                         m_statsCollector,
                         m_task,
@@ -167,7 +166,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     public boolean createTransaction(final InternalAdapterTaskAttributes kattrs,
-            final String procName,
             final Procedure catProc,
             final ProcedureCallback proccb,
             final InternalConnectionStatsCollector statsCollector,
@@ -175,7 +173,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final AuthSystem.AuthUser user,
             final int[] partitions,
             final boolean ntPriority,
-            final Function<Integer, Boolean> backPressurePredicate) {
+            final Predicate<Integer> backPressurePredicate) {
 
         int primaryPartition = ((partitions == null) || (partitions.length > 1)) ? MpInitiator.MP_INIT_PID : partitions[0];
 
@@ -189,7 +187,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     if (m_permits.tryAcquire(BACK_PRESSURE_WAIT_TIME, MILLISECONDS)) {
                         break;
                     }
-                } while (backPressurePredicate.apply(primaryPartition));
+                } while (backPressurePredicate.test(primaryPartition));
             } catch (InterruptedException e) {}
         }
 
@@ -209,7 +207,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
-                            kattrs, catProc, task, procName, partitions, proccb, statsCollector, user, handle);
+                            kattrs, catProc, task, catProc.getTypeName(), partitions, proccb, statsCollector, user,
+                            handle);
 
                     m_callbacks.put(handle, cb);
 

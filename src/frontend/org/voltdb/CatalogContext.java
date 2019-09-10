@@ -203,7 +203,7 @@ public class CatalogContext {
 
         if (procedures != null) {
             for (Procedure proc : procedures) {
-                if (proc.getSinglepartition()) {
+                if (proc.getSinglepartition() && proc.getPartitiontable() != null) {
                     ProcedurePartitionInfo ppi =
                             new ProcedurePartitionInfo(VoltType.get((byte)proc.getPartitioncolumn().getType()),
                                                        proc.getPartitionparameter());
