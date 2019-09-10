@@ -277,7 +277,7 @@ public class TaskLoader extends BenchmarkThread {
 				}
 				currentRowCount = nextRowCount;
 				log.info("TaskLoader " + tableName.toUpperCase() + " current count: " + currentRowCount
-						+ " total inserted rows:" + rowsLoaded.get());
+						+ " total inserted rows: " + rowsLoaded.get());
 				log.info("TaskLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully");
 			} catch (Exception e) {
 				if (e instanceof InterruptedIOException && !m_shouldContinue.get()) {
@@ -301,8 +301,11 @@ public class TaskLoader extends BenchmarkThread {
 				} catch (Exception ex) {
 				}
 				rowRemaining = monitor.getRemainingRowCount(tableName);
-				retries--;
-				if (retries == 0 && rowRemaining != 0) {
+				log.info("+++ Waiting for table to drain. Retry " + retries + ", rows remaining: " + rowRemaining);
+				if (rowRemaining == 0) {
+					break;
+				}
+				if (--retries == 0) {
 					Benchmark.hardStop(
 							"Delete task hasn't finished on table '" + tableName + "' after " + retries + "retries");
 				}
