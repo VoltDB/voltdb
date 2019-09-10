@@ -29,7 +29,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -78,6 +77,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
+import org.voltdb.task.TaskManager.TaskValidationResult;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -114,9 +114,9 @@ public class TestTaskManager {
         m_internalConnectionHandler = mock(InternalConnectionHandler.class);
 
         m_response = when(mock(ClientResponse.class).getStatus()).thenReturn(ClientResponse.SUCCESS).getMock();
-        when(m_internalConnectionHandler.callProcedure(any(), eq(false), anyInt(), any(), eq(PROCEDURE_NAME), any()))
-                .then(m -> {
-                    ((ProcedureCallback) m.getArgument(3)).clientCallback(m_response);
+        when(m_internalConnectionHandler.callProcedure(any(), any(), eq(false), any(), eq(m_procedure), any(),
+                eq(false), any())).then(m -> {
+                    ((ProcedureCallback) m.getArgument(5)).clientCallback(m_response);
                     return true;
                 });
 
@@ -187,16 +187,11 @@ public class TestTaskManager {
      */
     @Test
     public void partitionScheduleCreateDrop() throws Exception {
-        TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
-
         Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
-        m_procedure.setPartitionparameter(0);
-        Column column = new Column();
-        column.setType(VoltType.INTEGER.getValue());
-        m_procedure.setPartitioncolumn(column);
+        m_procedure.setPartitionparameter(-1);
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -212,7 +207,7 @@ public class TestTaskManager {
                 s_postRunActionSchedulerCallCount.get() > 0);
 
         demotedPartitionsSync(0, 4);
-        assertCountsAfterScheduleCanceled(2, false);
+        assertCountsAfterScheduleCanceled(2);
 
         int previousCount = s_postRunActionSchedulerCallCount.get();
         promotedPartitionsSync(0);
@@ -256,14 +251,14 @@ public class TestTaskManager {
     public void schedulerWithBadParameters() throws Exception {
         Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
 
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.getSchedulerparameters().get("0").setParameter("NAN");
         task.getSchedulerparameters().get("2").setParameter("7894");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionScheduler.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
     }
 
     /*
@@ -513,17 +508,17 @@ public class TestTaskManager {
     public void testValidateParameters() throws Exception {
         Task task = createSchedulerTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
 
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertTrue(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionSchedulerValidateParamsWithHelper.class.getName());
-        assertTrue(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertTrue(validateTask(task).isValid());
 
         // Parameter fails validation
         task.getSchedulerparameters().get("0").setParameter("FAIL");
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
 
         task.setSchedulerclass(TestActionSchedulerValidateParams.class.getName());
-        assertFalse(m_taskManager.validateTask(task, getClass().getClassLoader()).isValid());
+        assertFalse(validateTask(task).isValid());
     }
 
     /*
@@ -541,7 +536,7 @@ public class TestTaskManager {
         assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
                 s_postRunActionSchedulerCallCount.get() > 0);
 
-        dropScheduleAndAssertCounts(1, true);
+        dropScheduleAndAssertCounts(1);
     }
 
     /*
@@ -569,44 +564,37 @@ public class TestTaskManager {
 
         int procedureCalls = previousCount/2;
 
-        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
 
         verify(m_clientInterface, atLeast(procedureCalls)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(procedureCalls + 1)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {
-        dropScheduleAndAssertCounts(1, false);
+        dropScheduleAndAssertCounts(1);
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        dropScheduleAndAssertCounts(startCount, false);
-    }
-
-    private void dropScheduleAndAssertCounts(int startCount, boolean procedureValidated) throws Exception {
         validateStats();
         processUpdateSync();
-        assertCountsAfterScheduleCanceled(startCount, procedureValidated);
+        assertCountsAfterScheduleCanceled(startCount);
     }
 
-    private void assertCountsAfterScheduleCanceled(int startCount, boolean procedureValidated)
+    private void assertCountsAfterScheduleCanceled(int startCount)
             throws InterruptedException {
         int previousCount = s_postRunActionSchedulerCallCount.get();
         Thread.sleep(10);
         assertEquals(startCount, s_firstActionSchedulerCallCount.get());
         assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
 
-        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), any(), eq(false),
+                any(), eq(m_procedure), any(), eq(false), any());
 
-        if (procedureValidated) {
-            previousCount += startCount;
-        }
         verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
@@ -721,6 +709,10 @@ public class TestTaskManager {
         assertTrue(totalActionSchedulerInvocations >= totalProcedureInvocations);
         assertTrue(totalActionSchedulerInvocations <= s_firstActionSchedulerCallCount.get()
                 + s_postRunActionSchedulerCallCount.get());
+    }
+
+    private TaskValidationResult validateTask(Task task) {
+        return TaskManager.validateTask(task, null, getClass().getClassLoader());
     }
 
     public static class TestActionScheduler implements ActionScheduler {

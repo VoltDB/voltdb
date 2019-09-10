@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.Scanner;
 import org.hsqldb_voltpatches.Tokens;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Task;
@@ -64,13 +63,6 @@ public class CreateTask extends StatementProcessor {
 
         Task task = tasks.add(name);
         configureTask(task, matcher, ddlStatement.newDdl);
-
-        TaskManager.TaskValidationResult result = VoltDB.instance().getTaskManager()
-                .validateTask(task, m_classLoader);
-        if (!result.isValid()) {
-            tasks.delete(name);
-            throw m_compiler.new VoltCompilerException(result.getErrorMessage());
-        }
         return true;
     }
 

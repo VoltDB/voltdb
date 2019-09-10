@@ -53,6 +53,7 @@ import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
+import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -319,6 +320,7 @@ public class VoltProjectBuilder {
     private Integer m_resourceCheckInterval = null;
     private Map<FeatureNameType, String> m_featureDiskLimits;
     private Map<FeatureNameType, String> m_snmpFeatureDiskLimits;
+    private FlushIntervalType m_flushIntervals = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -711,6 +713,18 @@ public class VoltProjectBuilder {
 
     public void setHeartbeatTimeoutSeconds(int seconds) {
         m_heartbeatTimeout = seconds;
+    }
+
+    public void setFlushIntervals(int minimumInterval, int drFlushInterval, int exportFlushInterval) {
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory = new org.voltdb.compiler.deploymentfile.ObjectFactory();
+        m_flushIntervals = factory.createFlushIntervalType();
+        m_flushIntervals.setMinimum(minimumInterval);
+        FlushIntervalType.Dr drFlush = new FlushIntervalType.Dr();
+        drFlush.setInterval(drFlushInterval);
+        m_flushIntervals.setDr(drFlush);
+        FlushIntervalType.Export exportFlush = new FlushIntervalType.Export();
+        exportFlush.setInterval(exportFlushInterval);
+        m_flushIntervals.setExport(exportFlush);
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
@@ -1359,6 +1373,10 @@ public class VoltProjectBuilder {
             procedure.setLoginfo(m_procedureLogThreshold);
             systemSettingType.setProcedure(procedure);
         }
+
+        // <flushIntervals>
+        systemSettingType.setFlushInterval(m_flushIntervals);
+
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();

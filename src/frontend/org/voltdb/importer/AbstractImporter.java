@@ -18,7 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -53,7 +53,7 @@ public abstract class AbstractImporter
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
-    private final Function<Integer, Boolean> m_backPressurePredicate = (x) -> shouldRun();
+    private final Predicate<Integer> m_backPressurePredicate = (x) -> shouldRun();
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());

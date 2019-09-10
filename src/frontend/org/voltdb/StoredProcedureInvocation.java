@@ -72,6 +72,7 @@ public class StoredProcedureInvocation implements JSONString {
 
     private int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
     private boolean m_allPartition = false;
+    private int m_partitionDestination = -1;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -92,6 +93,7 @@ public class StoredProcedureInvocation implements JSONString {
 
         copy.m_batchTimeout = m_batchTimeout;
         copy.m_allPartition = m_allPartition;
+        copy.m_partitionDestination = m_partitionDestination;
 
         return copy;
     }
@@ -177,12 +179,28 @@ public class StoredProcedureInvocation implements JSONString {
         m_batchTimeout = timeout;
     }
 
+    /**
+     * @deprecated Use {@link #setPartitionDestination(int)} to set an explicit partition
+     */
+    @Deprecated
     public void setAllPartition(boolean allPartition) {
         m_allPartition = allPartition;
     }
 
     public boolean getAllPartition() {
-        return m_allPartition;
+        return m_allPartition || hasPartitionDestination();
+    }
+
+    public void setPartitionDestination(int partitionId) {
+        m_partitionDestination = partitionId;
+    }
+
+    public boolean hasPartitionDestination() {
+        return m_partitionDestination != -1;
+    }
+
+    public int getPartitionDestination() {
+        return m_partitionDestination;
     }
 
     /** Read into an serialized parameter buffer to extract a single parameter */
@@ -191,7 +209,7 @@ public class StoredProcedureInvocation implements JSONString {
             if (serializedParams != null) {
                 return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate());
             } else {
-                return params.get().getParam(partitionIndex);
+                return getParams().getParam(partitionIndex);
             }
         }
         catch (Exception ex) {
@@ -213,8 +231,17 @@ public class StoredProcedureInvocation implements JSONString {
         // get extension sizes - if not present, size is 0 for each
         // 6 is one byte for ext type, one for size, and 4 for integer value
         int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
-        // 2 is one byte for ext type, one for size
-        int allPartitionExtensionSize = m_allPartition ? 2 : 0;
+
+        int allPartitionExtensionSize = 0;
+        int partitionDestinationSize = 0;
+        // Either set allPartition or partitionDestination both are not needed
+        if (m_partitionDestination == -1) {
+            // 2 is one byte for ext type, one for size
+            allPartitionExtensionSize = m_allPartition ? 2 : 0;
+        } else {
+            // 6 is one byte for ext type, one for size, and 4 for integer value
+            partitionDestinationSize = 6;
+        }
 
         // compute the size
         int size =
@@ -222,7 +249,7 @@ public class StoredProcedureInvocation implements JSONString {
                 4 + getProcNameBytes().length + // procname
                 8 + // client handle
                 1 + // extension count
-                batchExtensionSize + allPartitionExtensionSize;
+                        batchExtensionSize + allPartitionExtensionSize + partitionDestinationSize;
         return size;
     }
 
@@ -324,15 +351,24 @@ public class StoredProcedureInvocation implements JSONString {
 
         // there are two possible extensions, count which apply
         byte extensionCount = 0;
-        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
-        if (m_allPartition) ++extensionCount;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            ++extensionCount;
+        }
+        if (hasPartitionDestination()) {
+            ++extensionCount;
+        } else if (m_allPartition) {
+            ++extensionCount;
+        }
+
         // write the count as one byte
         buf.put(extensionCount);
         // write any extensions that apply
         if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
             ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, m_batchTimeout);
         }
-        if (m_allPartition) {
+        if (hasPartitionDestination()) {
+            ProcedureInvocationExtensions.writePartitionDestinationWithTypeByte(buf, m_partitionDestination);
+        } else if (m_allPartition) {
             ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
         }
 
@@ -408,6 +444,7 @@ public class StoredProcedureInvocation implements JSONString {
         // set these to defaults so old versions don't worry about them
         m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
         m_allPartition = false;
+        m_partitionDestination = -1;
 
         switch (type) {
             case ORIGINAL:
@@ -490,6 +527,10 @@ public class StoredProcedureInvocation implements JSONString {
                 // note this always returns true as it's just a flag
                 m_allPartition = ProcedureInvocationExtensions.readAllPartition(buf);
                 break;
+            case ProcedureInvocationExtensions.PARTITION_DESTINATION:
+                m_partitionDestination = ProcedureInvocationExtensions.readPartitionDestination(buf);
+                m_allPartition = true;
+                break;
             default:
                 ProcedureInvocationExtensions.skipUnknownExtension(buf);
                 break;
@@ -515,12 +556,13 @@ public class StoredProcedureInvocation implements JSONString {
     public String toString() {
         String retval = type.name() + " Invocation: " + procName + "(";
         ParameterSet params = getParams();
-        if (params != null)
+        if (params != null) {
             for (Object o : params.toArray()) {
                 retval += String.valueOf(o) + ", ";
             }
-        else
+        } else {
             retval += "null";
+        }
         retval += ")";
         retval += " type=" + String.valueOf(type);
         retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(m_batchTimeout);
@@ -552,7 +594,6 @@ public class StoredProcedureInvocation implements JSONString {
 
     @Override
     public String toJSONString() {
-        params.run();
         JSONStringer js = new JSONStringer();
         try {
             js.object();
@@ -562,7 +603,7 @@ public class StoredProcedureInvocation implements JSONString {
             // got a large binary payload and this is annoying for testing
             // also users shouldn't ever directly call it
             if (!procName.startsWith("@ApplyBinaryLog")) {
-                js.key("parameters").value(params.get());
+                js.key("parameters").value(getParams());
             }
             js.endObject();
         }

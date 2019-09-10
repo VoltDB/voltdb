@@ -391,7 +391,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 }
                 System.out.println("Passed but not ready to declare victory.");
             }
-            Thread.sleep(5000);
+            Thread.sleep(1000);
         }
         System.out.println("Passed is: " + passed);
         // System.out.println(stats);
@@ -447,7 +447,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 passed = true;
                 break;
             }
-            Thread.sleep(5000);
+            Thread.sleep(1000);
         }
         System.out.println("Passed is: " + passed);
         // System.out.println(stats);

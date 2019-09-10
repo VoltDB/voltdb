@@ -53,20 +53,15 @@ import org.voltdb.ClientInterface;
 import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsAgent;
-import org.voltdb.TheHashinator;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.ProcParameter;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
-import org.voltdb.client.BatchTimeoutOverrideType;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.iv2.MpInitiator;
@@ -109,7 +104,7 @@ public final class TaskManager {
     private boolean m_started = false;
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
-            ClientInterface.SCHEDULER_MANAGER_CID, getClass().getSimpleName());
+            ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
 
     // Global configuration values
     volatile long m_minDelayNs = 0;
@@ -368,23 +363,42 @@ public final class TaskManager {
     }
 
     /**
+     * Validate that all tasks present in {@code database} have valid classes and parameters defined.
+     *
+     * @param database    {@link Database} to be validated
+     * @param classLoader {@link ClassLoader} to use to load referenced classes
+     * @return An error message or {@code null} if no errors were found
+     */
+    public static String validateTasks(Database database, ClassLoader classLoader) {
+        TaskValidationErrors errors = new TaskValidationErrors();
+        for (Task task : database.getTasks()) {
+            errors.addErrorMessage(validateTask(task, database, classLoader).getErrorMessage());
+        }
+        return errors.getErrorMessage();
+    }
+
+    /**
      * Create a factory supplier for instances of {@link ActionScheduler} as defined by the provided {@link Task}. If an
      * instance of {@link SchedulerFactory} cannot be constructed using the provided configuration the returned
      * {@link TaskValidationResult} will have an appropriate error message.
+     * <p>
+     * If {@code database} is null this method will return a {@link TaskValidationResult} or an error message. However
+     * if {@code database} is not null the returned {@link TaskValidationResult} will only ever have an error message.
      *
      * @param definition  {@link Task} defining the configuration of the schedule
+     * @param database    {@link Database} instance used to validate procedures. May be {@link null}
      * @param classLoader {@link ClassLoader} to use when loading the classes in {@code definition}
      * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
      */
-    public TaskValidationResult validateTask(Task definition, ClassLoader classLoader) {
-
+    static TaskValidationResult validateTask(Task definition, Database database, ClassLoader classLoader) {
         String schedulerClassName = definition.getSchedulerclass();
         SchedulerFactory factory;
         if (!StringUtils.isBlank(schedulerClassName)) {
             // Construct scheduler from the provided class
             try {
                 Pair<String, InitializableFactory<ActionScheduler>> result = createFactory(definition,
-                        ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), classLoader);
+                        ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), database,
+                        classLoader);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -409,7 +423,7 @@ public final class TaskManager {
             try {
                 Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition,
                         ActionGenerator.class, actionGeneratorClass, definition.getActiongeneratorparameters(),
-                        classLoader);
+                        database, classLoader);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -423,7 +437,7 @@ public final class TaskManager {
             try {
                 Pair<String, InitializableFactory<ActionSchedule>> result = createFactory(definition,
                         ActionSchedule.class, actionScheduleClass, definition.getScheduleparameters(),
-                        classLoader);
+                        database, classLoader);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -434,7 +448,8 @@ public final class TaskManager {
                         String.format("Could not load and construct class: %s", actionScheduleClass), e);
             }
 
-            factory = new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory);
+            factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory)
+                    : null;
         }
 
         return new TaskValidationResult(factory);
@@ -449,14 +464,15 @@ public final class TaskManager {
      * @param interfaceClass        Class of the interface which {@code className} should implement
      * @param className             Name of class the factory should construct
      * @param initializerParameters Parameters which are to be passed to constructed instance
+     * @param database              {@link Database} instance used to validate procedures. May be {@link null}
      * @param classLoader           {@link ClassLoader} to use to find the class instance of {@code className}
      * @return A {@link Pair} of an errorMessage or {@link InitializableFactory}
      * @throws NoSuchAlgorithmException
      */
     @SuppressWarnings("unchecked")
-    private <T extends Initializable> Pair<String, InitializableFactory<T>> createFactory(Task definition,
+    private static <T extends Initializable> Pair<String, InitializableFactory<T>> createFactory(Task definition,
             Class<T> interfaceClass, String className, CatalogMap<TaskParameter> initializerParameters,
-            ClassLoader classLoader) throws NoSuchAlgorithmException {
+            Database database, ClassLoader classLoader) throws NoSuchAlgorithmException {
         Class<?> initializableClass;
         try {
             initializableClass = classLoader.loadClass(className);
@@ -536,10 +552,17 @@ public final class TaskManager {
                 }
             }
 
-            String parameterErrors = validateInitializeParameters(definition, initMethod, parameters, takesHelper);
+            String parameterErrors = validateInitializeParameters(definition, initMethod, parameters, takesHelper,
+                    database);
             if (parameterErrors != null) {
-                return Pair.of("Error validating scheduler parameters: " + parameterErrors, null);
+                return Pair.of("Error validating parameters for task " + definition.getName() + ": " + parameterErrors,
+                        null);
             }
+        }
+
+        if (database != null) {
+            // Don't bother with the factory since database is only passed in for pure validation
+            return Pair.of(null, null);
         }
 
         byte[] hash = null;
@@ -584,7 +607,7 @@ public final class TaskManager {
                     future.get();
                 }
             } catch (Exception e) {
-                log.error(generateLogMessage("NONE", "Unexected exception encountered"), e);
+                log.error(generateLogMessage("NONE", "Unexpected exception encountered"), e);
             }
         }, MoreExecutors.newDirectExecutorService());
         return future;
@@ -644,7 +667,7 @@ public final class TaskManager {
                         "Applying schedule configuration: " + toString()));
             }
             TaskHandler handler = m_handlers.remove(procedureSchedule.getName());
-            TaskValidationResult result = validateTask(procedureSchedule, classLoader);
+            TaskValidationResult result = validateTask(procedureSchedule, null, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
@@ -731,10 +754,11 @@ public final class TaskManager {
      * @param initMethod  initialize {@link Method} instance for the {@link Initializable}
      * @param parameters  that are going to be passed to the constructor
      * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
+     * @param database    {@link Database} instance used to validate procedures. May be {@link null}
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private String validateInitializeParameters(Task definition, Method initMethod, Object[] parameters,
-            boolean takesHelper) {
+    private static String validateInitializeParameters(Task definition, Method initMethod, Object[] parameters,
+            boolean takesHelper, Database database) {
         Class<?> schedulerClass = initMethod.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
@@ -766,7 +790,7 @@ public final class TaskManager {
 
             if (takesHelper) {
                 validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
-                        definition.getScope(), m_clientInterface);
+                        definition.getScope(), database);
             }
 
             try {
@@ -803,9 +827,10 @@ public final class TaskManager {
                 return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
-            if (procedure.getPartitionparameter() != 0) {
+            if (procedure.getPartitionparameter() != -1) {
                 return String.format(
-                        "Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
+                        "Procedure %s must be a work procedure which is not partitioned on a table. "
+                                + "Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
@@ -820,7 +845,7 @@ public final class TaskManager {
      * configuration in {@link Task} is valid and all referenced classes can be constructed and initialized. If any are
      * not valid then an error message and potential exception are contained within this result describing the problem.
      */
-    public static final class TaskValidationResult {
+    static final class TaskValidationResult {
         final String m_errorMessage;
         final Exception m_exception;
         final SchedulerFactory m_factory;
@@ -1161,8 +1186,8 @@ public final class TaskManager {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("Starting schedule"));
             }
-            m_scheduler = m_handler.constructScheduler(
-                    new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
+            m_scheduler = m_handler
+                    .constructScheduler(new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
             if (m_stats == null) {
                 m_stats = TaskStatsSource.create(m_handler.getName(), getScope(), getSiteId());
                 m_stats.register(m_statsAgent);
@@ -1267,10 +1292,11 @@ public final class TaskManager {
                 return;
             }
 
-            Object[] procedureParameters = getProcedureParameters(procedure);
-            if (procedureParameters == null) {
-                return;
-            }
+            StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+            invocation.setProcName(m_scheduledAction.getProcedure());
+            invocation.setParams(m_scheduledAction.getRawProcedureParameters());
+
+            modifyInvocation(procedure, invocation);
 
             String userName = m_handler.getUser();
             AuthUser user = getUser(userName);
@@ -1281,13 +1307,12 @@ public final class TaskManager {
 
             if (log.isTraceEnabled()) {
                 log.trace(generateLogMessage("Executing procedure " + m_scheduledAction.getProcedure() + ' '
-                        + Arrays.toString(procedureParameters)));
+                        + invocation.getParams()));
             }
 
             m_scheduledAction.setStarted();
-            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(user, false,
-                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_scheduledAction.getProcedure(),
-                    procedureParameters)) {
+            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(null, user, false, invocation,
+                    procedure, this::handleResponse, false, null)) {
                 errorOccurred("Could not call procedure %s", m_scheduledAction.getProcedure());
             }
         }
@@ -1372,15 +1397,12 @@ public final class TaskManager {
         }
 
         /**
-         * Generate the parameters to pass to the procedure during execution
+         * Method which can be overridden to modify the {@code invocation} prior to the transacation being created
          *
-         * @param procedure being executed
-         * @return Parameters to use with the procedure to execute or {@code null} if there was an error generating the
-         *         parameters
+         * @param procedure  {@link Procedure} which is to be invoked
+         * @param invocation {@link StoredProcedureInvocation} describing how to invoke the procedure
          */
-        Object[] getProcedureParameters(Procedure procedure) {
-            return m_scheduledAction.getRawProcedureParameters();
-        }
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {}
 
         /**
          * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if
@@ -1556,51 +1578,11 @@ public final class TaskManager {
             m_partition = partition;
         }
 
-        /**
-         * Behaves like run {@link Client#callAllPartitionProcedure(String, Object...)} where the first argument to the
-         * procedure is just there to route the procedure call to the desired partition.
-         */
         @Override
-        Object[] getProcedureParameters(Procedure procedure) {
-            if (!procedure.getSinglepartition()) {
-                return super.getProcedureParameters(procedure);
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {
+            if (procedure.getSinglepartition() && procedure.getPartitionparameter() == -1) {
+                invocation.setPartitionDestination(m_partition);
             }
-
-            Object[] baseParams = super.getProcedureParameters(procedure);
-            CatalogMap<ProcParameter> procParams = procedure.getParameters();
-            if (procParams == null
-                    || !(procParams.size() == baseParams.length + 1 && procedure.getPartitionparameter() == 0)) {
-                return baseParams;
-            }
-
-            Object[] partitionedParams = new Object[baseParams.length + 1];
-
-            VoltType keyType = VoltType.get((byte) procedure.getPartitioncolumn().getType());
-            // BIGINT isn't supported so just use the INTEGER keys since they are compatible
-            VoltTable keys = TheHashinator.getPartitionKeys(keyType == VoltType.BIGINT ? VoltType.INTEGER : keyType);
-            if (keys == null) {
-                errorOccurred("Unsupported partition key type %s for procedure %s", keyType, procedure.getTypeName());
-                return null;
-            }
-
-            VoltTable copy = PrivateVoltTableFactory.createVoltTableFromBuffer(keys.getBuffer(), true);
-
-            // Find the key for partition destination
-            copy.resetRowPosition();
-            while (copy.advanceRow()) {
-                if (m_partition == copy.getLong(0)) {
-                    partitionedParams[0] = copy.get(1, keyType);
-                    break;
-                }
-            }
-
-            if (partitionedParams[0] == null) {
-                errorOccurred("Unable to find a key for partition %d", m_partition);
-                return null;
-            }
-
-            System.arraycopy(baseParams, 0, partitionedParams, 1, baseParams.length);
-            return partitionedParams;
         }
 
         @Override

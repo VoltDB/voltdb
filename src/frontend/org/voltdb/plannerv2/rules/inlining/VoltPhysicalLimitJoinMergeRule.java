@@ -30,17 +30,17 @@ public class VoltPhysicalLimitJoinMergeRule extends RelOptRule {
 
     public static final RelOptRule INSTANCE_LIMIT_JOIN =
             new VoltPhysicalLimitJoinMergeRule(operand(VoltPhysicalLimit.class,
-                    operand(VoltPhysicalJoin.class, any())));
+                    operand(VoltPhysicalJoin.class, any())), "VoltPhysicalLimitJoinMergeRule:LIMIT_JOIN");
     public static final RelOptRule INSTANCE_LIMIT_CALC_JOIN =
             new VoltPhysicalLimitJoinMergeRule(operand(VoltPhysicalLimit.class,
-                    operand(VoltPhysicalCalc.class, operand(VoltPhysicalJoin.class, any()))));
+                    operand(VoltPhysicalCalc.class, operand(VoltPhysicalJoin.class, any()))), "VoltPhysicalLimitJoinMergeRule:LIMIT_CALC_JOIN");
 
     /**
      * Transform  VoltDBPLimit / AbstractVoltDBPJoin into AbstractVoltDBPJoin with Limit
      * Transform  VoltDBPLimit / Calc / AbstractVoltDBPJoin to Calc / AbstractVoltDBPJoin with Limit
      */
-    private VoltPhysicalLimitJoinMergeRule(RelOptRuleOperand operand) {
-        super(operand);
+    private VoltPhysicalLimitJoinMergeRule(RelOptRuleOperand operand, String desc) {
+        super(operand, desc);
     }
 
     @Override

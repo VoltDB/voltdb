@@ -17,13 +17,17 @@
 
 package org.voltdb.task;
 
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientInterface;
+import org.voltdb.DefaultProcedureManager;
+import org.voltdb.InvocationDispatcher;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 
@@ -35,14 +39,32 @@ public final class TaskHelper {
     private final VoltLogger m_logger;
     private final UnaryOperator<String> m_generateLogMessage;
     private final String m_scope;
-    private final ClientInterface m_clientInterface;
+    private final Function<String, Procedure> m_procedureGetter;
+
+    private static Function<String, Procedure> createProcedureFunction(Database database) {
+        if (database == null) {
+            return null;
+        }
+        DefaultProcedureManager defaultProcedureManager = new DefaultProcedureManager(database);
+        CatalogMap<Procedure> procedures = database.getProcedures();
+        return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
+    }
+
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope, Database database) {
+        this(logger, generateLogMessage, scope, createProcedureFunction(database));
+    }
 
     TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
             ClientInterface clientInterface) {
+        this(logger, generateLogMessage, scope, clientInterface::getProcedureFromName);
+    }
+
+    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
+            Function<String, Procedure> procedureGetter) {
         m_logger = logger;
         m_generateLogMessage = generateLogMessage;
         m_scope = scope;
-        m_clientInterface = clientInterface;
+        m_procedureGetter = procedureGetter;
     }
 
     /**
@@ -141,7 +163,10 @@ public final class TaskHelper {
      */
     public void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope,
             String procedureName, Object[] parameters) {
-        Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
+        if (m_procedureGetter == null) {
+            return;
+        }
+        Procedure procedure = m_procedureGetter.apply(procedureName);
         if (procedure == null) {
             errors.addErrorMessage("Procedure does not exist: " + procedureName);
             return;

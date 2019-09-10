@@ -429,7 +429,12 @@ public class DDLCompiler {
                 processVoltDBStatements(db, whichProcs, stmt);
             } else {        // ENG-17075: Until Calcite can handle all DDL statements,
                 // this could throw SqlParserException, that gets printed and transformed into FallbackException.
-                ddls.append(DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler));
+                final String s = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
+                if (s == null) {
+                    processVoltDBStatements(db, whichProcs, stmt);
+                } else {
+                    ddls.append(s);
+                }
             }
             stmt = getNextStatement(reader, m_compiler, stmt.endLineNo, newDdl);
             isBatch = true;
