@@ -38,6 +38,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
+import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -851,7 +852,7 @@ public class JdbcDatabaseMetaDataGenerator
             results.addRow(task.getName(), task.getSchedulerclass(), getParamsString(task.getSchedulerparameters()),
                     task.getActiongeneratorclass(), getParamsString(task.getActiongeneratorparameters()),
                     task.getScheduleclass(), getParamsString(task.getScheduleparameters()), task.getOnerror(),
-                    task.getScope(), task.getUser(), Boolean.toString(task.getEnabled()));
+                    TaskScope.translateIdToName(task.getScope()), task.getUser(), Boolean.toString(task.getEnabled()));
 
         }
         return results;
