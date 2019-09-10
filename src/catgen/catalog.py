@@ -47,6 +47,7 @@ def javatypify( x ):
     if x == 'string': return 'String'
     elif x == 'int': return 'int'
     elif x == 'bool': return 'boolean'
+    elif x == 'byte': return 'byte'
     elif x[-1] == '*': return 'CatalogMap<%s>' % x.rstrip('*')
     elif x[-1] == '?': return x.rstrip('?')
     else: raise Exception( 'bad type: ' + x )
@@ -55,6 +56,7 @@ def javaobjectify( x ):
     if x == 'string': return 'String'
     elif x == 'int': return 'Integer'
     elif x == 'bool': return 'Boolean'
+    elif x == 'byte': return 'Byte'
     elif x[-1] == '*': return 'CatalogMap<%s>' % x.rstrip('*')
     elif x[-1] == '?': return x.rstrip('?')
     else: raise Exception( 'bad type: ' + x )
@@ -207,6 +209,9 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
             elif ftype == "int":
                 write(             '            assert(value != null);' )
                 write( interp(     '            m_$fname = Integer.parseInt(value);', locals() ) )
+            elif ftype == "byte":
+                write(             '            assert(value != null);' )
+                write( interp(     '            m_$fname = Byte.parseByte(value);', locals() ) )
             elif ftype == "boolean":
                 write(             '            assert(value != null);' )
                 write( interp(     '            m_$fname = Boolean.parseBoolean(value);', locals() ) )
@@ -233,7 +238,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
             for field in cls.fields:
                 ftype = javatypify( field.type )
                 fname = field.name
-                if ftype in ["int", "boolean", "String"]:
+                if ftype in ["int", "boolean", "String", "byte"]:
                     write( interp( '        other.m_$fname = m_$fname;', locals() ) )
                 elif field.type[-1] == '?':
                     write( interp( '        other.m_$fname.setUnresolved(m_$fname.getPath());', locals() ) )
@@ -260,7 +265,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name
-            if ftype in ["int", "boolean"]:
+            if ftype in ["int", "boolean", "byte"]:
                 write( interp( '        if (m_$fname != other.m_$fname) return false;', locals() ) )
             else:
                 write( interp( '        if ((m_$fname == null) != (other.m_$fname == null)) return false;', locals() ) )
@@ -281,6 +286,7 @@ def cpptypify( x ):
     if x == 'string': return 'std::string'
     elif x == 'int': return 'int32_t'
     elif x == 'bool': return 'bool'
+    elif x == 'byte': return 'int8_t'
     elif x[-1] == '*': return 'CatalogMap<%s>' % x.rstrip('*')
     elif x[-1] == '?': return 'CatalogType*'
     else: raise Exception( 'bad type: ' + x )
