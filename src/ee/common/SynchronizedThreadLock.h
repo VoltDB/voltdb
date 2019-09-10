@@ -64,8 +64,8 @@ class SynchronizedThreadLock {
 #endif
     static bool s_holdingReplicatedTableLock;
     static std::mutex s_sharedEngineMutex;
-    static std::condition_variable s_sharedEngineCondition;
-    static std::condition_variable s_wakeLowestEngineCondition;
+    static pthread_cond_t s_sharedEngineCondition;
+    static pthread_cond_t s_wakeLowestEngineCondition;
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
     static EngineLocals s_mpEngine;
