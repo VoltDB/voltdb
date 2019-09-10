@@ -32,9 +32,13 @@ import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
 public class ExportSequenceNumberTracker implements DeferredSerialization {
+    // using Long.MAX_VALUE throws IllegalStateException in Range.java.
+    public static final long INFINITE_SEQNO = Long.MAX_VALUE - 1;
+    public static final long MIN_SEQNO = 1L;
+
     protected RangeSet<Long> m_map;
     // Is the first sequence a sentinel? Sentinel doesn't count into the total sequence size of tracker.
-    private boolean m_hasSentinel = false;
+    protected boolean m_hasSentinel = false;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -56,7 +60,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * @param range
      * @return Start of the range
      */
-    private static long start(Range<Long> range) {
+    protected static long start(Range<Long> range) {
         if (range.lowerBoundType() == BoundType.OPEN) {
             return DiscreteDomain.longs().next(range.lowerEndpoint());
         } else {
@@ -70,7 +74,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * @param range
      * @return End of the range
      */
-    private static long end(Range<Long> range) {
+    protected static long end(Range<Long> range) {
         if (range.upperBoundType() == BoundType.OPEN) {
             return DiscreteDomain.longs().previous(range.upperEndpoint());
         } else {
@@ -84,6 +88,18 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
 
     public ExportSequenceNumberTracker(ExportSequenceNumberTracker other) {
         m_map = TreeRangeSet.create(other.m_map);
+    }
+
+    public ExportSequenceNumberTracker(ByteBuffer buf) throws IOException {
+
+        m_map = TreeRangeSet.create();
+        int count = buf.getInt();
+        for (int i = 0; i < count; i++) {
+            long start = buf.getLong();
+            long end = buf.getLong();
+            append(start, end);
+        }
+        m_hasSentinel = buf.get() == 1;
     }
 
     public int size() {
@@ -408,20 +424,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             tracker.append(start(entry), end(entry));
         }
         tracker.m_hasSentinel = m_hasSentinel;
-        return tracker;
-    }
-
-    public static ExportSequenceNumberTracker deserialize(ByteBuffer buf) throws IOException {
-
-        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
-
-        int count = buf.getInt();
-        for (int i = 0; i < count; i++) {
-            long start = buf.getLong();
-            long end = buf.getLong();
-            tracker.append(start, end);
-        }
-        tracker.m_hasSentinel = buf.get() == 1;
         return tracker;
     }
 }
