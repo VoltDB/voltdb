@@ -5253,11 +5253,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public void notifyOfShutdown() {
-        Set<Integer> liveHosts = m_messenger.getLiveHostIds();
-        liveHosts.remove(m_messenger.getHostId());
-        FaultMessage msg = new FaultMessage(m_messenger.getHostId(), m_messenger.getHostId());
-        for (int hostId : liveHosts) {
-            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
+        if (m_messenger != null) {
+            Set<Integer> liveHosts = m_messenger.getLiveHostIds();
+            liveHosts.remove(m_messenger.getHostId());
+            FaultMessage msg = new FaultMessage(m_messenger.getHostId(), m_messenger.getHostId());
+            for (int hostId : liveHosts) {
+                m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
+            }
         }
     }
 }

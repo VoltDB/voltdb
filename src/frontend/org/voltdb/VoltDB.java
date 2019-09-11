@@ -1236,7 +1236,9 @@ public class VoltDB {
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean logFatal) {
 
-        singleton.notifyOfShutdown();
+        if (singleton != null) {
+            singleton.notifyOfShutdown();
+        }
         if (exitAfterMessage) {
             System.err.println(errMsg);
             VoltDB.exit(-1);
