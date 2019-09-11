@@ -257,6 +257,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         // Test that partition schedules fail over
         getCluster(0).killSingleHost(1);
 
+        // Give the system some time to complete the failover
+        Thread.sleep(500);
+
         table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
