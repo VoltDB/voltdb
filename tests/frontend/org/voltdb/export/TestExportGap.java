@@ -41,6 +41,8 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 
+import com.google_voltpatches.common.collect.Lists;
+
 /**
  *
  */
@@ -59,6 +61,7 @@ public class TestExportGap extends ExportLocalClusterBase {
     private Client m_client;
     private int m_count = 10;
     private int m_batch = 100;
+    String m_logPattern = "fills gap";
 
     @Rule
     public final TestName m_name = new TestName();
@@ -81,13 +84,26 @@ public class TestExportGap extends ExportLocalClusterBase {
         m_cluster.setHasLocalServer(false);
         m_cluster.overrideAnyRequestForValgrind();
         assertTrue(m_cluster.compile(m_builder));
-        m_cluster.startUp(true);
 
+        // Set up log message pattern
+        List<String> patterns = Lists.newArrayList();
+        patterns.add(m_logPattern);
+        m_cluster.setLogSearchPatterns(patterns);
+
+        // Start cluster and socket listener
+        m_cluster.startUp(true);
         startListener();
 
-        // TODO: verifier should be created based on socket exporter settings
+        /*
+         * Create a verifier but do not require exact verification because
+         * the verifier sockets may receive rows out of order, due to the fact that
+         * SocketExporter acknowledges rows when written on the sending socket,
+         * not when received on the destination host.
+         */
         m_verifier = new ExportTestExpectedData(m_serverSockets,
-                false /*is replicated stream? */, true, kfactor + 1);
+                false  /*is replicated stream? */,
+                false, /* not exact verification */
+                kfactor + 1);
     }
 
     @Test(timeout = 90_000)
@@ -169,6 +185,10 @@ public class TestExportGap extends ExportLocalClusterBase {
         List<String> list = new ArrayList<>(1);
         list.add("s1");
         TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
+
+        // Verify both hosts have "fills gap" messages
+        assertTrue(m_cluster.verifyLogMessage(0, m_logPattern));
+        assertTrue(m_cluster.verifyLogMessage(1, m_logPattern));
 
         // I noticed there were a small number of rows missing intermittently.
         // HACK The more rows inserted, the more we need to wait for the sockets to drain?
