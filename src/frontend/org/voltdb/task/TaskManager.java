@@ -839,7 +839,18 @@ public final class TaskManager {
      * @param procedure {@link Procedure} instance to validate
      * @return {@code null} if procedure is valid for scope otherwise a detailed error message will be returned
      */
-    static String isProcedureValidForScope(TaskScope scope, Procedure procedure) {
+    static String isProcedureValidForScope(TaskScope scope, Procedure procedure, boolean restrictProcedureByScope) {
+        if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
+                && procedure.getPartitionparameter() == -1) {
+            return String.format(
+                    "Procedure %s is a work procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
+                    procedure.getTypeName(), scope.name().toLowerCase());
+        }
+
+        if (!restrictProcedureByScope) {
+            return null;
+        }
+
         switch (scope) {
         case DATABASE:
             break;
@@ -901,7 +912,7 @@ public final class TaskManager {
          * @return {@code true} if the scheduler and parameters which were tested are valid
          */
         public boolean isValid() {
-            return m_factory != null;
+            return m_errorMessage == null;
         }
 
         /**
@@ -1477,12 +1488,10 @@ public final class TaskManager {
                 return null;
             }
 
-            if (m_scheduler.restrictProcedureByScope()) {
-                String error = isProcedureValidForScope(getScope(), procedure);
-                if (error != null) {
-                    errorOccurred(error);
-                    return null;
-                }
+            String error = isProcedureValidForScope(getScope(), procedure, m_scheduler.restrictProcedureByScope());
+            if (error != null) {
+                errorOccurred(error);
+                return null;
             }
 
             return procedure;
