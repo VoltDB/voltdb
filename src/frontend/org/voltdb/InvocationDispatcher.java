@@ -403,6 +403,11 @@ public final class InvocationDispatcher {
                                  "and must not be a system procedure.",
                         task.clientHandle);
             }
+        } else if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                    "Procedure " + catProc.getTypeName() + " is a work procedure and needs to invoked appropriatly. "
+                            + "The Client.callAllPartitionProcedure method should be used.",
+                    task.clientHandle);
         }
 
         if (catProc.getSystemproc()) {
