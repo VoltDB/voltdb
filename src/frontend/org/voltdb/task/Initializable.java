@@ -57,16 +57,4 @@ public interface Initializable {
     default Collection<String> getDependencies() {
         return null;
     }
-
-    /**
-     * Set the scope and the ID for the scope in which this instance is running. This method will be invoked after
-     * {@code initialize} is invoked and prior to any other methods being invoked.
-     * <p>
-     * If {@code scope} is {@link TaskScope#PARTITIONS} {@code id} will be a partition ID. If {@code scope} is
-     * {@link TaskScope#HOSTS} {@code id} will be a host ID. Otherwise {@code id} will be {@code -1}
-     *
-     * @param scope {@link TaskScope} in which this instance is running
-     * @param id    sub ID for the scope in which this instance is running
-     */
-    default void setScopeId(TaskScope scope, int id) {}
 }
