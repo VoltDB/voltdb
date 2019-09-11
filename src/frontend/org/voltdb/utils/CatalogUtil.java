@@ -1823,25 +1823,23 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> targetList = new ArrayList<>();
+        Set<String> targetSet = new HashSet<>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            String targetName = exportConfiguration.getTarget();
+            // target name is case insensitive
+            String targetName = exportConfiguration.getTarget().toUpperCase();
             if (connectorEnabled) {
                 m_exportEnabled = true;
-                if (targetList.contains(targetName)) {
+                if (!targetSet.add(targetName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
                             targetName + ".");
-                }
-                else {
-                    targetList.add(targetName);
                 }
             }
 
             Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().getIgnoreCase(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     hostLog.info("Export configuration enabled and provided for export target " + targetName
