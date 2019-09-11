@@ -251,55 +251,6 @@ public class ExportManager
         generation.becomeLeader(partitionId);
     }
 
-//    /**
-//     * Indicate to associated {@link ExportGeneration}s to become
-//     * masters for the given partition id
-//     * @param partitionId
-//     */
-//    synchronized public void takeMastership(int partitionId) {
-//        m_masterOfPartitions.add(partitionId);
-//        ExportGeneration generation = m_generation.get();
-//        if (generation == null) {
-//            return;
-//        }
-//        generation.takeMastership(partitionId);
-//    }
-//
-//    /**
-//     * Indicate local partition became the SPI Leader
-//     * still waiting for old leader (ack) to trigger take over mastership
-//     * @param partitionId
-//     */
-//    synchronized public void prepareAcceptMastership(int partitionId) {
-//        // can't acquire mastership twice for the same partition id
-//        if (!m_masterOfPartitions.add(partitionId)) {
-//            return;
-//        }
-//        if (exportLog.isDebugEnabled()) {
-//            exportLog.debug("Export streams on local partition " + partitionId + " will become master.");
-//        }
-//    }
-//
-//    /**
-//     * Indicate to associated {@link ExportGeneration}s to
-//     * prepare give up mastership for the given partition id to hostId
-//     * @param partitionId
-//     */
-//    synchronized public void prepareTransferMastership(int partitionId, int hostId) {
-//        // remove mastership for partition id, so when failure happen during the mastership transfer
-//        // this node can be elected as new master again.
-//        m_masterOfPartitions.remove(partitionId);
-//
-//        if (exportLog.isDebugEnabled()) {
-//            exportLog.debug("Export stream masters on " + partitionId + " are going to migrate away");
-//        }
-//        ExportGeneration generation = m_generation.get();
-//        if (generation == null) {
-//            return;
-//        }
-//        generation.prepareTransferMastership(partitionId, hostId);
-//    }
-
     /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
