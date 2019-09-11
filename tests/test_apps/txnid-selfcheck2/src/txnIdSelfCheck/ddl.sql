@@ -163,7 +163,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target partitioned_target
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -201,7 +201,7 @@ CREATE TABLE ex_partview_shadow (
 );
 PARTITION TABLE ex_partview_shadow ON COLUMN cid;
 
-CREATE STREAM replicated_export export to target default
+CREATE STREAM replicated_export export to target replicated_target
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -423,7 +423,7 @@ CREATE TABLE importbr
 );
 
 -- TTL with migrate to stream -- partitioned
-CREATE TABLE ttlmigratep MIGRATE TO TARGET abc1
+CREATE TABLE ttlmigratep MIGRATE TO TARGET ttlmigratep_target
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
@@ -435,7 +435,7 @@ PARTITION TABLE ttlmigratep ON COLUMN p;
 CREATE INDEX ttlmigrateidxp ON ttlmigratep(ts) WHERE NOT MIGRATING;
 
 -- TTL with migrate to stream -- replicated
-CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
+CREATE TABLE ttlmigrater MIGRATE TO TARGET ttlmigrater_target
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
