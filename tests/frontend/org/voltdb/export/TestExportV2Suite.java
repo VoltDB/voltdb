@@ -106,7 +106,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        String[] targets = {"custom"};
+        String[] targets = {"S_ALLOW_NULLS"};
         ClientResponse r = client.callProcedure("@ExportControl", "S_ALLOW_NULLS", targets, "release");
         assert(r.getStatus() == ClientResponse.SUCCESS);
         assert(r.getResults()[0].getRowCount() == 0);
