@@ -177,12 +177,10 @@ public final class TaskHelper {
             return;
         }
 
-        if (restrictProcedureByScope) {
-            String error = TaskManager.isProcedureValidForScope(m_scope, procedure);
-            if (error != null) {
-                errors.addErrorMessage(error);
-                return;
-            }
+        String error = TaskManager.isProcedureValidForScope(m_scope, procedure, restrictProcedureByScope);
+        if (error != null) {
+            errors.addErrorMessage(error);
+            return;
         }
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();

@@ -662,6 +662,21 @@ public class TestTaskManager {
         validateStats(5);
     }
 
+    @Test
+    public void mustExecuteWorkProcsOnPartitions() throws Exception {
+        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 10, 100);
+        m_procedure.setSinglepartition(true);
+        m_procedure.setPartitionparameter(-1);
+
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.HOSTS.getId());
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.PARTITIONS.getId());
+        assertTrue(validateTask(task).isValid());
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
