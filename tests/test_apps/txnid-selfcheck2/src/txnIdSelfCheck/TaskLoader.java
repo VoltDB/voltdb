@@ -78,6 +78,7 @@ public class TaskLoader extends BenchmarkThread {
 	}
 
 	void shutdown() {
+	    log.info("+++ In TaskLoader shutdown method");
 		m_shouldContinue.set(false);
 		log.info("TaskLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: "
 				+ rowsLoaded.get() + " deletes remaining: " + deletesRemaining);
@@ -294,21 +295,25 @@ public class TaskLoader extends BenchmarkThread {
 		log.info("TaskLoader completed for table " + tableName + " rows inserted: " + rowsLoaded.get());
 		long rowRemaining = monitor.getRemainingRowCount(tableName);
 		if (!diedEarly) {
-			int retries = 12;
+		    final int TWELVE = 12;
+			int retries = TWELVE;
 			while (rowRemaining != 0) {
-				try {
-					Thread.sleep(3000);
-				} catch (Exception ex) {
-				}
 				rowRemaining = monitor.getRemainingRowCount(tableName);
 				log.info("+++ Waiting for table to drain. Retry " + retries + ", rows remaining: " + rowRemaining);
+
 				if (rowRemaining == 0) {
 					break;
 				}
-				if (--retries == 0) {
+				try {
+                    Thread.sleep(3000);
+                } catch (Exception ex) {
+                }
+				retries -= 1;
+				if (retries == 0) {
 					Benchmark.hardStop(
-							"Delete task hasn't finished on table '" + tableName + "' after " + retries + "retries");
+							"Delete task hasn't finished on table '" + tableName + "' after " + TWELVE + " retries");
 				}
+
 			}
 		}
 		log.info("TaskLoader completed for table " + tableName + " rows remaining to be deleted:" + rowRemaining);
