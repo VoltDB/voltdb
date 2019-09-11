@@ -23,20 +23,20 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
 /**
- * A base class for local mailboxes that always uses hostMessenger.send
+ * A base class for local mailboxes that always uses m_messenger.send
  * and requires custom implementation of deliver.
  */
 public abstract class LocalMailbox implements Mailbox {
 
-    private final HostMessenger hostMessenger;
+    protected final HostMessenger m_messenger;
     private long hsId;
 
-    public LocalMailbox(HostMessenger hostMessenger) {
-        this(hostMessenger, Long.MIN_VALUE);
+    public LocalMailbox(HostMessenger messenger) {
+        this(messenger, Long.MIN_VALUE);
     }
 
-    public LocalMailbox(HostMessenger hostMessenger, long hsId) {
-        this.hostMessenger = hostMessenger;
+    public LocalMailbox(HostMessenger messenger, long hsId) {
+        this.m_messenger = messenger;
         this.hsId = hsId;
     }
 
@@ -45,7 +45,7 @@ public abstract class LocalMailbox implements Mailbox {
     {
         assert(message != null);
         message.m_sourceHSId = this.hsId;
-        hostMessenger.send(hsId, message);
+        m_messenger.send(hsId, message);
     }
 
     @Override
@@ -54,7 +54,7 @@ public abstract class LocalMailbox implements Mailbox {
         assert(message != null);
         assert(hsIds != null);
         message.m_sourceHSId = this.hsId;
-        hostMessenger.send(hsIds, message);
+        m_messenger.send(hsIds, message);
     }
 
     @Override

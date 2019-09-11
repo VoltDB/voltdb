@@ -163,6 +163,7 @@ public class ForeignHost {
         m_hasMultiConnections = true;
     }
 
+    @SuppressWarnings("deprecation")
     synchronized void close()
     {
         if (!m_isUp) {

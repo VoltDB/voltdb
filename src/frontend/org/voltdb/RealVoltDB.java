@@ -104,6 +104,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
@@ -4256,6 +4257,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
+                notifyOfShutdown();
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
                 shutdownInitiators();
                 m_isRunning = false;
@@ -5247,6 +5249,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public TaskManager getTaskManager() {
         return m_taskManager;
+    }
+
+    @Override
+    public void notifyOfShutdown() {
+        Set<Integer> liveHosts = m_messenger.getLiveHostIds();
+        liveHosts.remove(m_messenger.getHostId());
+        FaultMessage msg = new FaultMessage(m_messenger.getHostId(), m_messenger.getHostId());
+        for (int hostId : liveHosts) {
+            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
+        }
     }
 }
 
