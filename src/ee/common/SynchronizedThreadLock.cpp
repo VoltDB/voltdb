@@ -33,8 +33,8 @@ namespace voltdb {
 
 // Initialized when executor context is created.
 std::mutex SynchronizedThreadLock::s_sharedEngineMutex{};
-pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition;
-pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
+pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition = PTHREAD_COND_INITIALIZER;
+pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition = PTHREAD_COND_INITIALIZER;
 
 // The Global Countdown Latch is critical to correctly coordinating between engine threads
 // when replicated tables are updated. Therefore we use SITES_PER_HOST as a constant that
@@ -78,8 +78,6 @@ void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
 void SynchronizedThreadLock::create() {
     vassert(s_SITES_PER_HOST == -1);
     s_SITES_PER_HOST = 0;
-    pthread_cond_init(&s_sharedEngineCondition, 0);
-    pthread_cond_init(&s_wakeLowestEngineCondition, 0);
 }
 
 void SynchronizedThreadLock::destroy() {
@@ -190,8 +188,7 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
             if (--s_globalTxnStartCountdownLatch != 0) {
                 // NOTE: using std::condition_variable::wait()
                 // methods would hang TestImportSuite. So we have
-                // to use pthread_ methods. Using
-                // std::condition_variable only for its RAII.
+                // to use pthread_ methods.
                 pthread_cond_wait(&s_wakeLowestEngineCondition,
                         s_sharedEngineMutex.native_handle());
             }
