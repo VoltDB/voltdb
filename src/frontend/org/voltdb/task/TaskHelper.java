@@ -187,20 +187,6 @@ public final class TaskHelper {
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
 
-        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
-            if (procedure.getPartitionparameter() != 0) {
-                errors.addErrorMessage(String.format(
-                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
-                        procedureName));
-                return;
-            }
-
-            Object[] newParameters = new Object[parameters.length + 1];
-            newParameters[0] = 0;
-            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
-            parameters = newParameters;
-        }
-
         if (parameterTypes.size() != parameters.length) {
             errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,
                     procedure.getParameters().size(), parameters.length));
