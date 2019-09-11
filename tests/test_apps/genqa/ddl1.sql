@@ -572,20 +572,12 @@ CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table_jdbc COLUMN row
 -- CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 
-END_OF_BATCH
-
 -- lookup table for export metadata operations
 CREATE TABLE export_op_type
 (
   OP_NAME    VARCHAR(32)
 , OP_NUM     TINYINT
 );
-
-INSERT INTO export_op_type VALUES('INSERT', 1);
-INSERT INTO export_op_type VALUES('DELETE', 2);
-INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
-INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
-INSERT INTO export_op_type VALUES('MIGRATION', 5);
 
 -- Grouping view over Partitioned Data Export Op Codes
 CREATE VIEW partitioned_table_group_ops
@@ -603,3 +595,12 @@ CREATE PROCEDURE export_op_summary AS
     SELECT export_op_type.op_name as OPERATION, partitioned_table_group_ops.record_count AS TOT_COUNT
     FROM  partitioned_table_group_ops, export_op_type
     WHERE export_op_type.op_num = partitioned_table_group_ops.VOLT_EXPORT_OPERATION;
+
+END_OF_BATCH
+
+-- following SQL can't be in a batch, so initialize this convenience table after the batch is complete.
+INSERT INTO export_op_type VALUES('INSERT', 1);
+INSERT INTO export_op_type VALUES('DELETE', 2);
+INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
+INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
+INSERT INTO export_op_type VALUES('MIGRATION', 5);
