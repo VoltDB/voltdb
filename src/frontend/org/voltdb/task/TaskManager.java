@@ -53,21 +53,15 @@ import org.voltdb.ClientInterface;
 import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsAgent;
-import org.voltdb.TheHashinator;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
-import org.voltdb.client.BatchTimeoutOverrideType;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.iv2.MpInitiator;
@@ -107,7 +101,7 @@ public final class TaskManager {
     private Map<String, TaskHandler> m_handlers = Collections.emptyMap();
     private volatile boolean m_leader = false;
     private AuthSystem m_authSystem;
-    private boolean m_started = false;
+    volatile ManagerState m_managerState = ManagerState.SHUTDOWN;
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
             ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
@@ -208,9 +202,9 @@ public final class TaskManager {
      * @param context {@link CatalogContext} instance
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> start(CatalogContext context) {
+    public ListenableFuture<?> start(CatalogContext context, boolean paused) {
         return start(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
-                context.getCatalogJar().getLoader());
+                context.getCatalogJar().getLoader(), paused);
     }
 
     /**
@@ -225,9 +219,9 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
-            ClassLoader classLoader) {
+            ClassLoader classLoader, boolean paused) {
         return execute(() -> {
-            m_started = true;
+            m_managerState = paused ? ManagerState.PAUSED : ManagerState.RUNNING;
 
             // Create a dummy stats source so something is always reported
             TaskStatsSource.createDummy().register(m_statsAgent);
@@ -293,6 +287,24 @@ public final class TaskManager {
                 () -> processCatalogInline(configuration, tasks, authSystem, classLoader, classesUpdated));
     }
 
+    public ListenableFuture<?> setPaused(boolean paused) {
+        return execute(() -> {
+            if (m_managerState == ManagerState.SHUTDOWN || (m_managerState == ManagerState.PAUSED) == paused) {
+                if (log.isDebugEnabled()) {
+                    log.debug("MANAGER: Ignoring setting of paused to " + paused + "because in state " + m_managerState);
+                }
+                return;
+            }
+
+            m_managerState = paused ? ManagerState.PAUSED : ManagerState.RUNNING;
+            log.info("MANAGER: Updated state to " + m_managerState);
+            for (TaskHandler handler : m_handlers.values()) {
+                handler.updatePaused();
+                handler.start();
+            }
+        });
+    }
+
     /**
      * Notify the manager that some local partitions have been promoted to leader. Any PARTITION schedules will be
      * asynchronously started for these partitions.
@@ -305,7 +317,7 @@ public final class TaskManager {
             log.debug("MANAGER: Promoting partition: " + partitionId);
         }
         return execute(() -> {
-            if (m_locallyLedPartitions.add(partitionId)) {
+            if (m_locallyLedPartitions.add(partitionId) && m_managerState != ManagerState.SHUTDOWN) {
                 updatePartitionedThreadPoolSize();
                 for (TaskHandler sd : m_handlers.values()) {
                     sd.promotedPartition(partitionId);
@@ -344,6 +356,7 @@ public final class TaskManager {
     }
 
     private int calculatePartitionedThreadPoolSize() {
+
         return DoubleMath.roundToInt(m_locallyLedPartitions.size() / 2.0, RoundingMode.UP);
     }
 
@@ -356,7 +369,7 @@ public final class TaskManager {
         try {
             return m_managerExecutor.submit(() -> {
                 m_managerExecutor.shutdown();
-                m_started = false;
+                m_managerState = ManagerState.SHUTDOWN;
                 Map<String, TaskHandler> handlers = m_handlers;
                 m_handlers = Collections.emptyMap();
                 handlers.values().stream().forEach(TaskHandler::cancel);
@@ -397,6 +410,14 @@ public final class TaskManager {
      * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
      */
     static TaskValidationResult validateTask(Task definition, Database database, ClassLoader classLoader) {
+        if (database != null) {
+            String user = definition.getUser();
+            if (user != null && database.getUsers().get(user) == null) {
+                return new TaskValidationResult(
+                        String.format("%s: User does not exist: %s", definition.getName(), user));
+            }
+        }
+
         String schedulerClassName = definition.getSchedulerclass();
         SchedulerFactory factory;
         if (!StringUtils.isBlank(schedulerClassName)) {
@@ -411,8 +432,8 @@ public final class TaskManager {
                 }
                 factory = new SchedulerFactoryImpl(result.getSecond());
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", schedulerClassName), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), schedulerClassName), e);
             }
         } else {
             // Construct the scheduler by combining a generator with a schedule
@@ -420,8 +441,8 @@ public final class TaskManager {
             String actionScheduleClass = definition.getScheduleclass();
 
             if (StringUtils.isBlank(actionGeneratorClass) || StringUtils.isBlank(actionScheduleClass)) {
-                return new TaskValidationResult(
-                        "If an ActionScheduler is not defined then both an ActionGenerator and ActionSchedule must be defined.");
+                return new TaskValidationResult(definition.getName()
+                        + ": If an ActionScheduler is not defined then both an ActionGenerator and ActionSchedule must be defined.");
             }
 
             InitializableFactory<ActionGenerator> actionGeneratorFactory;
@@ -436,8 +457,8 @@ public final class TaskManager {
                 }
                 actionGeneratorFactory = result.getSecond();
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", actionGeneratorClass), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), actionGeneratorClass), e);
             }
 
             try {
@@ -450,8 +471,8 @@ public final class TaskManager {
                 }
                 actionScheduleFactory = result.getSecond();
             } catch (Exception e) {
-                return new TaskValidationResult(
-                        String.format("Could not load and construct class: %s", actionScheduleClass), e);
+                return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
+                        definition.getName(), actionScheduleClass), e);
             }
 
             factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory)
@@ -630,7 +651,7 @@ public final class TaskManager {
      */
     private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
             ClassLoader classLoader, boolean classesUpdated) {
-        if (!m_started) {
+        if (m_managerState == ManagerState.SHUTDOWN) {
             return;
         }
 
@@ -663,31 +684,31 @@ public final class TaskManager {
         boolean hasNonPartitionedSchedule = false;
         boolean hasPartitionedSchedule = false;
 
-        for (Task procedureSchedule : tasks) {
+        for (Task task : tasks) {
             if (log.isDebugEnabled()) {
-                ToStringHelper toString = MoreObjects.toStringHelper(procedureSchedule);
-                for (String field : procedureSchedule.getFields()) {
-                    toString.add(field, procedureSchedule.getField(field));
+                ToStringHelper toString = MoreObjects.toStringHelper(task);
+                for (String field : task.getFields()) {
+                    toString.add(field, task.getField(field));
                 }
-                log.debug(generateLogMessage(procedureSchedule.getName(),
+                log.debug(generateLogMessage(task.getName(),
                         "Applying schedule configuration: " + toString()));
             }
-            TaskHandler handler = m_handlers.remove(procedureSchedule.getName());
-            TaskValidationResult result = validateTask(procedureSchedule, null, classLoader);
+            TaskHandler handler = m_handlers.remove(task.getName());
+            TaskValidationResult result = validateTask(task, null, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
-                if (handler.isSameSchedule(procedureSchedule, result.m_factory, classesUpdated)) {
+                if (handler.isSameSchedule(task, result.m_factory, classesUpdated)) {
                     if (log.isDebugEnabled()) {
-                        log.debug(generateLogMessage(procedureSchedule.getName(),
+                        log.debug(generateLogMessage(task.getName(),
                                 "Schedule is running and does not need to be restarted"));
                     }
-                    newHandlers.put(procedureSchedule.getName(), handler);
-                    handler.updateDefinition(procedureSchedule);
+                    newHandlers.put(task.getName(), handler);
+                    handler.updateDefinition(task);
                     if (frequencyChanged) {
                         handler.setMaxRunFrequency(m_maxRunFrequency);
                     }
-                    if (SCOPE_PARTITIONS.equalsIgnoreCase(procedureSchedule.getScope())) {
+                    if (SCOPE_PARTITIONS.equalsIgnoreCase(task.getScope())) {
                         hasPartitionedSchedule = true;
                     } else {
                         hasNonPartitionedSchedule = true;
@@ -695,43 +716,42 @@ public final class TaskManager {
                     continue;
                 }
                 if (log.isDebugEnabled()) {
-                    log.debug(generateLogMessage(procedureSchedule.getName(),
+                    log.debug(generateLogMessage(task.getName(),
                             "Schedule is running and needs to be restarted"));
                 }
                 handler.cancel();
             }
 
-            String scope = procedureSchedule.getScope();
-            if (procedureSchedule.getEnabled() && (m_leader || !SCOPE_DATABASE.equals(scope))) {
+            String scope = task.getScope();
+            if (m_leader || !SCOPE_DATABASE.equals(scope)) {
                 if (!result.isValid()) {
-                    log.warn(generateLogMessage(procedureSchedule.getName(), result.getErrorMessage()),
+                    log.warn(generateLogMessage(task.getName(), result.getErrorMessage()),
                             result.getException());
                     continue;
                 }
 
                 if (log.isDebugEnabled()) {
-                    log.debug(generateLogMessage(procedureSchedule.getName(),
-                            "Creating handler for scope: " + procedureSchedule.getScope()));
+                    log.debug(generateLogMessage(task.getName(), "Creating handler for scope: " + task.getScope()));
                 }
 
                 TaskHandler definition;
                 switch (scope) {
                 case SCOPE_HOSTS:
                 case SCOPE_DATABASE:
-                    definition = new SingleTaskHandler(procedureSchedule, scope, result.m_factory,
+                    definition = new SingleTaskHandler(task, scope, result.m_factory,
                             m_singleExecutor.getExecutor());
                     hasNonPartitionedSchedule = true;
                     break;
                 case SCOPE_PARTITIONS:
-                    definition = new PartitionedTaskHandler(procedureSchedule, result.m_factory,
+                    definition = new PartitionedTaskHandler(task, result.m_factory,
                             m_partitionedExecutor.getExecutor());
                     m_locallyLedPartitions.forEach(definition::promotedPartition);
                     hasPartitionedSchedule = true;
                     break;
                 default:
-                    throw new IllegalArgumentException("Unsupported run location: " + procedureSchedule.getScope());
+                    throw new IllegalArgumentException("Unsupported run location: " + task.getScope());
                 }
-                newHandlers.put(procedureSchedule.getName(), definition);
+                newHandlers.put(task.getName(), definition);
             }
         }
 
@@ -833,9 +853,10 @@ public final class TaskManager {
                 return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
-            if (procedure.getPartitionparameter() != 0) {
+            if (procedure.getPartitionparameter() != -1) {
                 return String.format(
-                        "Procedure %s partition parameter is not the first parameter. Cannot be scheduled on a partition.",
+                        "Procedure %s must be a work procedure which is not partitioned on a table. "
+                                + "Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
@@ -843,6 +864,10 @@ public final class TaskManager {
             throw new IllegalArgumentException("Unknown scope: " + scope);
         }
         return null;
+    }
+
+    private enum ManagerState {
+        SHUTDOWN, RUNNING, PAUSED
     }
 
     /**
@@ -897,7 +922,7 @@ public final class TaskManager {
      * Base class for wrapping a single scheduler configuration.
      */
     private abstract class TaskHandler {
-        private final Task m_definition;
+        final Task m_definition;
         private final SchedulerFactory m_factory;
 
         TaskHandler(Task definition, SchedulerFactory factory) {
@@ -929,28 +954,10 @@ public final class TaskManager {
                     && Objects.equals(m_definition.getScheduleparameters(), definition.getScheduleparameters());
         }
 
-        String getName() {
-            return m_definition.getName();
-        }
-
-        String getUser() {
-            return m_definition.getUser();
-        }
-
-        String getOnError() {
-            return m_definition.getOnerror();
-        }
-
         /**
          * Start executing this configured scheduler
          */
-        final void start() {
-            if (m_definition.getEnabled()) {
-                startImpl();
-            }
-        }
-
-        abstract void startImpl();
+        abstract void start();
 
         @Override
         public String toString() {
@@ -980,6 +987,8 @@ public final class TaskManager {
             m_definition.setEnabled(newDefintion.getEnabled());
             m_definition.setOnerror(newDefintion.getOnerror());
         }
+
+        abstract void updatePaused();
 
         /**
          * Notify this scheduler configuration of partitions which were locally demoted from leader
@@ -1030,7 +1039,12 @@ public final class TaskManager {
         @Override
         void updateDefinition(Task newDefintion) {
             super.updateDefinition(newDefintion);
-            m_wrapper.setEnabled(newDefintion.getEnabled());
+            m_wrapper.evaluateState(newDefintion.getEnabled());
+        }
+
+        @Override
+        void updatePaused() {
+            m_wrapper.evaluateState(m_definition.getEnabled());
         }
 
         @Override
@@ -1040,7 +1054,7 @@ public final class TaskManager {
         void demotedPartition(int partitionId) {}
 
         @Override
-        void startImpl() {
+        void start() {
             m_wrapper.start();
         }
 
@@ -1057,7 +1071,6 @@ public final class TaskManager {
     private class PartitionedTaskHandler extends TaskHandler {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
         private final ListeningScheduledExecutorService m_executor;
-        private boolean m_handlerStarted = false;
 
         PartitionedTaskHandler(Task definition, SchedulerFactory factory, ListeningScheduledExecutorService executor) {
             super(definition, factory);
@@ -1077,10 +1090,15 @@ public final class TaskManager {
             super.updateDefinition(newDefintion);
             boolean enabled = newDefintion.getEnabled();
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
-                wrapper.setEnabled(enabled);
+                wrapper.evaluateState(enabled);
             }
-            if (!enabled) {
-                m_handlerStarted = false;
+        }
+
+        @Override
+        void updatePaused() {
+            boolean enabled = m_definition.getEnabled();
+            for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
+                wrapper.evaluateState(enabled);
             }
         }
 
@@ -1088,12 +1106,8 @@ public final class TaskManager {
         void promotedPartition(int partitionId) {
             assert !m_wrappers.containsKey(partitionId);
             PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
-
             m_wrappers.put(partitionId, wrapper);
-
-            if (m_handlerStarted) {
-                wrapper.start();
-            }
+            wrapper.start();
         }
 
         @Override
@@ -1106,13 +1120,9 @@ public final class TaskManager {
         }
 
         @Override
-        void startImpl() {
-            if (!m_handlerStarted) {
-                m_handlerStarted = true;
-
-                for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
-                    wrapper.start();
-                }
+        void start() {
+            for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
+                wrapper.start();
             }
         }
 
@@ -1129,17 +1139,42 @@ public final class TaskManager {
      */
     private enum SchedulerWrapperState {
         /** Scheduler wrapper initialized but not started yet */
-        INITIALIZED,
+        INITIALIZED(false),
         /** Scheduler is currently active and running */
-        RUNNING,
+        RUNNING(false),
         /** Scheduler has encountered an unrecoverable error and exited */
-        ERROR,
+        ERROR(true),
         /** Scheduler has exited gracefully */
-        EXITED,
+        EXITED(true),
         /** Scheduler was cancelled by the manager either because of shutdown or configuration modification */
-        CANCELED,
+        CANCELED(true),
         /** Scheduler was disabled by the user */
-        DISABLED;
+        DISABLED(false, true),
+        /** System is in paused mode and all tasks are paused */
+        PAUSED(false, true);
+
+        private final boolean m_shutdown;
+        private final boolean m_temporary;
+
+        private SchedulerWrapperState(boolean shutdown) {
+            this(shutdown, false);
+        }
+
+        private SchedulerWrapperState(boolean shutdown, boolean temporary) {
+            m_shutdown = shutdown;
+            m_temporary = temporary;
+        }
+
+        boolean isShutdown() {
+            return m_shutdown;
+        }
+
+        /**
+         * @return {@code true} if this is a temporary state which can transition back to initialized
+         */
+        boolean isTemporary() {
+            return m_temporary;
+        }
     }
 
     /**
@@ -1165,7 +1200,7 @@ public final class TaskManager {
         private final ListeningScheduledExecutorService m_executor;
         private ActionScheduler m_scheduler;
         private Future<?> m_scheduledFuture;
-        private volatile SchedulerWrapperState m_state = SchedulerWrapperState.INITIALIZED;
+        private volatile SchedulerWrapperState m_wrapperState = SchedulerWrapperState.INITIALIZED;
         private TaskStatsSource m_stats;
         private UnsynchronizedRateLimiter m_rateLimiter;
 
@@ -1181,25 +1216,39 @@ public final class TaskManager {
          * Start running the scheduler
          */
         synchronized void start() {
-            if (m_state != SchedulerWrapperState.INITIALIZED) {
+            if (m_wrapperState != SchedulerWrapperState.INITIALIZED) {
                 if (log.isTraceEnabled()) {
-                    log.trace(generateLogMessage("Ignoring start on already initialized schedule"));
+                    log.trace(generateLogMessage("Ignoring start on schedule in state: " + m_wrapperState));
                 }
                 return;
             }
 
-            if (log.isDebugEnabled()) {
-                log.debug(generateLogMessage("Starting schedule"));
-            }
-            m_scheduler = m_handler
-                    .constructScheduler(new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
             if (m_stats == null) {
-                m_stats = TaskStatsSource.create(m_handler.getName(), getScope(), getSiteId());
+                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getSiteId());
                 m_stats.register(m_statsAgent);
             }
+
+            SchedulerWrapperState state;
+            if (m_handler.m_definition.getEnabled()) {
+                state = m_managerState == ManagerState.PAUSED ? SchedulerWrapperState.PAUSED
+                        : SchedulerWrapperState.RUNNING;
+            } else {
+                state = SchedulerWrapperState.DISABLED;
+            }
+
+            setState(state);
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Starting schedule in state " + m_wrapperState));
+            }
+
             setMaxRunFrequency(m_maxRunFrequency);
-            setState(SchedulerWrapperState.RUNNING);
-            submitHandleNextRun();
+
+            if (m_wrapperState == SchedulerWrapperState.RUNNING) {
+                m_scheduler = m_handler.constructScheduler(
+                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
+                submitHandleNextRun();
+            }
         }
 
         /**
@@ -1211,7 +1260,7 @@ public final class TaskManager {
         private void handleNextRun() {
             ActionScheduler scheduler;
             synchronized (this) {
-                if (m_state != SchedulerWrapperState.RUNNING) {
+                if (m_wrapperState != SchedulerWrapperState.RUNNING) {
                     return;
                 }
                 scheduler = m_scheduler;
@@ -1245,7 +1294,7 @@ public final class TaskManager {
             }
 
             synchronized (this) {
-                if (m_state != SchedulerWrapperState.RUNNING) {
+                if (m_wrapperState != SchedulerWrapperState.RUNNING) {
                     return;
                 }
 
@@ -1297,12 +1346,13 @@ public final class TaskManager {
                 return;
             }
 
-            Object[] procedureParameters = getProcedureParameters(procedure);
-            if (procedureParameters == null) {
-                return;
-            }
+            StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+            invocation.setProcName(m_scheduledAction.getProcedure());
+            invocation.setParams(m_scheduledAction.getRawProcedureParameters());
 
-            String userName = m_handler.getUser();
+            modifyInvocation(procedure, invocation);
+
+            String userName = m_handler.m_definition.getUser();
             AuthUser user = getUser(userName);
             if (user == null) {
                 errorOccurred("User %s does not exist", userName);
@@ -1311,19 +1361,18 @@ public final class TaskManager {
 
             if (log.isTraceEnabled()) {
                 log.trace(generateLogMessage("Executing procedure " + m_scheduledAction.getProcedure() + ' '
-                        + Arrays.toString(procedureParameters)));
+                        + invocation.getParams()));
             }
 
             m_scheduledAction.setStarted();
-            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(user, false,
-                    BatchTimeoutOverrideType.NO_TIMEOUT, this::handleResponse, m_scheduledAction.getProcedure(),
-                    procedureParameters)) {
+            if (!m_clientInterface.getInternalConnectionHandler().callProcedure(null, user, false, invocation,
+                    procedure, this::handleResponse, false, null)) {
                 errorOccurred("Could not call procedure %s", m_scheduledAction.getProcedure());
             }
         }
 
         private synchronized void handleResponse(ClientResponse response) {
-            if (m_state != SchedulerWrapperState.RUNNING) {
+            if (m_wrapperState != SchedulerWrapperState.RUNNING) {
                 return;
             }
 
@@ -1332,7 +1381,7 @@ public final class TaskManager {
             m_stats.addProcedureCall(m_scheduledAction.getExecutionTime(), m_scheduledAction.getWaitTime(), failed);
 
             if (failed) {
-                String onError = m_handler.getOnError();
+                String onError = m_handler.m_definition.getOnerror();
 
                 boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
                 if (!isIgnore || log.isDebugEnabled()) {
@@ -1379,13 +1428,17 @@ public final class TaskManager {
             m_stats.deregister(m_statsAgent);
         }
 
-        synchronized void setEnabled(boolean enabled) {
-            if (enabled) {
-                if (m_state == SchedulerWrapperState.DISABLED) {
-                    setState(SchedulerWrapperState.INITIALIZED);
+        synchronized void evaluateState(boolean enabled) {
+            if (!enabled) {
+                if (m_wrapperState != SchedulerWrapperState.DISABLED) {
+                    shutdown(SchedulerWrapperState.DISABLED);
                 }
-            } else if (m_state != SchedulerWrapperState.DISABLED) {
-                shutdown(SchedulerWrapperState.DISABLED);
+            } else if (m_managerState == ManagerState.PAUSED) {
+                if (m_wrapperState == SchedulerWrapperState.RUNNING) {
+                    shutdown(SchedulerWrapperState.PAUSED);
+                }
+            } else if (m_wrapperState.isTemporary()) {
+                setState(SchedulerWrapperState.INITIALIZED);
             }
         }
 
@@ -1402,15 +1455,12 @@ public final class TaskManager {
         }
 
         /**
-         * Generate the parameters to pass to the procedure during execution
+         * Method which can be overridden to modify the {@code invocation} prior to the transacation being created
          *
-         * @param procedure being executed
-         * @return Parameters to use with the procedure to execute or {@code null} if there was an error generating the
-         *         parameters
+         * @param procedure  {@link Procedure} which is to be invoked
+         * @param invocation {@link StoredProcedureInvocation} describing how to invoke the procedure
          */
-        Object[] getProcedureParameters(Procedure procedure) {
-            return m_scheduledAction.getRawProcedureParameters();
-        }
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {}
 
         /**
          * @return The {@link Procedure} definition for the procedure in {@link #m_scheduledAction} or {@code null} if
@@ -1492,8 +1542,7 @@ public final class TaskManager {
         }
 
         private synchronized void shutdown(SchedulerWrapperState state) {
-            if (!(m_state == SchedulerWrapperState.INITIALIZED || m_state == SchedulerWrapperState.RUNNING
-                    || state == SchedulerWrapperState.DISABLED)) {
+            if (m_wrapperState.isShutdown()) {
                 return;
             }
             setState(state);
@@ -1531,8 +1580,8 @@ public final class TaskManager {
         abstract int getSiteId();
 
         private void setState(SchedulerWrapperState state) {
-            m_state = state;
-            m_stats.setState(m_state.name());
+            m_wrapperState = state;
+            m_stats.setState(m_wrapperState.name());
         }
     }
 
@@ -1586,56 +1635,16 @@ public final class TaskManager {
             m_partition = partition;
         }
 
-        /**
-         * Behaves like run {@link Client#callAllPartitionProcedure(String, Object...)} where the first argument to the
-         * procedure is just there to route the procedure call to the desired partition.
-         */
         @Override
-        Object[] getProcedureParameters(Procedure procedure) {
-            if (!procedure.getSinglepartition()) {
-                return super.getProcedureParameters(procedure);
+        void modifyInvocation(Procedure procedure, StoredProcedureInvocation invocation) {
+            if (procedure.getSinglepartition() && procedure.getPartitionparameter() == -1) {
+                invocation.setPartitionDestination(m_partition);
             }
-
-            Object[] baseParams = super.getProcedureParameters(procedure);
-            CatalogMap<ProcParameter> procParams = procedure.getParameters();
-            if (procParams == null
-                    || !(procParams.size() == baseParams.length + 1 && procedure.getPartitionparameter() == 0)) {
-                return baseParams;
-            }
-
-            Object[] partitionedParams = new Object[baseParams.length + 1];
-
-            VoltType keyType = VoltType.get((byte) procedure.getPartitioncolumn().getType());
-            // BIGINT isn't supported so just use the INTEGER keys since they are compatible
-            VoltTable keys = TheHashinator.getPartitionKeys(keyType == VoltType.BIGINT ? VoltType.INTEGER : keyType);
-            if (keys == null) {
-                errorOccurred("Unsupported partition key type %s for procedure %s", keyType, procedure.getTypeName());
-                return null;
-            }
-
-            VoltTable copy = PrivateVoltTableFactory.createVoltTableFromBuffer(keys.getBuffer(), true);
-
-            // Find the key for partition destination
-            copy.resetRowPosition();
-            while (copy.advanceRow()) {
-                if (m_partition == copy.getLong(0)) {
-                    partitionedParams[0] = copy.get(1, keyType);
-                    break;
-                }
-            }
-
-            if (partitionedParams[0] == null) {
-                errorOccurred("Unable to find a key for partition %d", m_partition);
-                return null;
-            }
-
-            System.arraycopy(baseParams, 0, partitionedParams, 1, baseParams.length);
-            return partitionedParams;
         }
 
         @Override
         String generateLogMessage(String body) {
-            return TaskManager.generateLogMessage(m_handler.getName() + " P" + m_partition, body);
+            return TaskManager.generateLogMessage(m_handler.m_definition.getName() + " P" + m_partition, body);
         }
 
         @Override

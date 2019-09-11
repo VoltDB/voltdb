@@ -29,7 +29,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -90,6 +89,7 @@ public class TestTaskManager {
     static AtomicInteger s_postRunActionSchedulerCallCount = new AtomicInteger();
 
     private static final String PROCEDURE_NAME = "SomeProcedure";
+    private static final String USER_NAME = "user";
 
     @Rule
     public final TestName m_name = new TestName();
@@ -103,10 +103,12 @@ public class TestTaskManager {
     private StatsAgent m_statsAgent = new StatsAgent();
     private TaskSettingsType m_schedulesConfig = new TaskSettingsType();
     private ClientResponse m_response;
+    private int m_taskNumber = 0;
 
     @Before
     public void setup() {
         m_database = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        m_database.getUsers().add(USER_NAME);
         m_procedure = m_database.getProcedures().add(PROCEDURE_NAME);
 
         m_authSystem = mock(AuthSystem.class);
@@ -115,9 +117,9 @@ public class TestTaskManager {
         m_internalConnectionHandler = mock(InternalConnectionHandler.class);
 
         m_response = when(mock(ClientResponse.class).getStatus()).thenReturn(ClientResponse.SUCCESS).getMock();
-        when(m_internalConnectionHandler.callProcedure(any(), eq(false), anyInt(), any(), eq(PROCEDURE_NAME), any()))
-                .then(m -> {
-                    ((ProcedureCallback) m.getArgument(3)).clientCallback(m_response);
+        when(m_internalConnectionHandler.callProcedure(any(), any(), eq(false), any(), eq(m_procedure), any(),
+                eq(false), any())).then(m -> {
+                    ((ProcedureCallback) m.getArgument(5)).clientCallback(m_response);
                     return true;
                 });
 
@@ -142,7 +144,7 @@ public class TestTaskManager {
      */
     @Test
     public void systemScheduleCreateDrop() throws Exception {
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -165,7 +167,7 @@ public class TestTaskManager {
      */
     @Test
     public void hostScheduleCreateDrop() throws Exception {
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_HOSTS);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_HOSTS);
 
         m_procedure.setTransactional(false);
 
@@ -188,16 +190,11 @@ public class TestTaskManager {
      */
     @Test
     public void partitionScheduleCreateDrop() throws Exception {
-        TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
-
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
-        m_procedure.setPartitionparameter(0);
-        Column column = new Column();
-        column.setType(VoltType.INTEGER.getValue());
-        m_procedure.setPartitioncolumn(column);
+        m_procedure.setPartitionparameter(-1);
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -232,7 +229,7 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithParameters() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "AFFA47");
+        Task task = createTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "AFFA47");
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -255,7 +252,7 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithBadParameters() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
+        Task task = createTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
 
         assertFalse(validateTask(task).isValid());
 
@@ -274,8 +271,8 @@ public class TestTaskManager {
     public void shutdownWithSchedulesActive() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        Task task1 = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask(m_name.getMethodName() + "_p", TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task2 = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -297,7 +294,7 @@ public class TestTaskManager {
      */
     @Test
     public void rerunActionScheduler() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE, 5);
+        Task task = createTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE, 5);
 
         startSync(task);
         promoteToLeaderSync(task);
@@ -313,7 +310,7 @@ public class TestTaskManager {
      */
     @Test
     public void disableReenableActionScheduler() throws Exception {
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
 
         startSync();
         promoteToLeaderSync(task);
@@ -323,7 +320,7 @@ public class TestTaskManager {
         task.setEnabled(false);
         processUpdateSync(task);
         Thread.sleep(5);
-        validateStats("DISABLED", null);
+        validateStats(1, "DISABLED", null);
 
         task.setEnabled(true);
         processUpdateSync(task);
@@ -336,7 +333,7 @@ public class TestTaskManager {
      */
     @Test
     public void partitionPromotionAndDisabledSchedules() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_PARTITIONS, 5);
+        Task task = createTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_PARTITIONS, 5);
 
         startSync(task);
 
@@ -345,7 +342,7 @@ public class TestTaskManager {
 
         promotedPartitionsSync(0, 1);
 
-        assertEquals(0, getScheduleStats().getRowCount());
+        assertEquals(2, getScheduleStats().getRowCount());
 
         task.setEnabled(true);
         processUpdateSync(task);
@@ -359,7 +356,7 @@ public class TestTaskManager {
         processUpdateSync(task);
 
         promotedPartitionsSync(4, 5);
-        assertEquals(4, getScheduleStats().getRowCount());
+        assertEquals(6, getScheduleStats().getRowCount());
 
         task.setEnabled(true);
         processUpdateSync(task);
@@ -379,7 +376,7 @@ public class TestTaskManager {
     @Test
     public void minDelay() throws Exception {
         m_schedulesConfig.setMinDelayMs(10000);
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
@@ -393,7 +390,7 @@ public class TestTaskManager {
     @Test
     public void maxRunFrequency() throws Exception {
         m_schedulesConfig.setMaxRunFrequency(1.0);
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
@@ -485,7 +482,7 @@ public class TestTaskManager {
     @Test
     public void changeOnErrorWhileRunning() throws Exception {
         when(m_response.getStatus()).thenReturn(ClientResponse.USER_ABORT);
-        Task task = createSchedulerTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
         m_procedure.setSinglepartition(true);
         task.setOnerror("IGNORE");
 
@@ -498,13 +495,13 @@ public class TestTaskManager {
         assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
                 s_postRunActionSchedulerCallCount.get() > 0);
 
-        validateStats("RUNNING", r -> assertNull(r.getString("SCHEDULER_STATUS")));
+        validateStats(6, "RUNNING", r -> assertNull(r.getString("SCHEDULER_STATUS")));
 
         task.setOnerror("ABORT");
         processUpdateSync(task);
         Thread.sleep(5);
 
-        validateStats("ERROR", r -> assertTrue(r.getString("SCHEDULER_STATUS").startsWith("Procedure ")));
+        validateStats(6, "ERROR", r -> assertTrue(r.getString("SCHEDULER_STATUS").startsWith("Procedure ")));
     }
 
     /*
@@ -512,7 +509,7 @@ public class TestTaskManager {
      */
     @Test
     public void testValidateParameters() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
+        Task task = createTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
 
         assertTrue(validateTask(task).isValid());
 
@@ -532,7 +529,7 @@ public class TestTaskManager {
      */
     @Test
     public void testCustomSchedule() throws Exception {
-        Task task = createSchedulerTask(TestActionSchedule.class, TaskManager.SCOPE_DATABASE, 50, 250);
+        Task task = createTask(TestActionSchedule.class, TaskManager.SCOPE_DATABASE, 50, 250);
 
         startSync();
         promoteToLeaderSync(task);
@@ -550,7 +547,7 @@ public class TestTaskManager {
      */
     @Test
     public void testCustomGenerator() throws Exception {
-        Task task = createSchedulerTask(TestActionGenerator.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionGenerator.class, TaskManager.SCOPE_DATABASE);
 
         startSync();
         promoteToLeaderSync(task);
@@ -559,7 +556,7 @@ public class TestTaskManager {
         assertEquals(1, s_firstActionSchedulerCallCount.get());
         assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
                 s_postRunActionSchedulerCallCount.get() > 0);
-        validateStats();
+        validateStats(1);
         processUpdateSync();
 
         // Same as assertCountsAfterScheduleCanceled(1) except only 1/2 the calls are to the procedure
@@ -570,13 +567,99 @@ public class TestTaskManager {
 
         int procedureCalls = previousCount/2;
 
-        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(procedureCalls)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(procedureCalls + 1)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
 
         verify(m_clientInterface, atLeast(procedureCalls)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(procedureCalls + 1)).getProcedureFromName(eq(PROCEDURE_NAME));
+    }
+
+    /*
+     * Test that validation of username works
+     */
+    @Test
+    public void testInvalidUser() throws Exception {
+        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+
+        // Create user to test
+        m_database.getUsers().add(m_name.getMethodName());
+
+        // Test user created
+        task.setUser(m_name.getMethodName());
+        assertTrue(validateTask(task).isValid());
+
+        // Test invalid user
+        task.setUser("fakeUser");
+        assertFalse(validateTask(task).isValid());
+    }
+
+    /*
+     * Test starting the manager in paused mode and then unpause and pause
+     */
+    @Test
+    public void pausedMode() throws Exception {
+        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task2 = createTask(TestActionScheduler.class,
+                TaskManager.SCOPE_PARTITIONS);
+
+        startSync(true, task1, task2);
+
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        validateStats(0);
+
+        promoteToLeaderSync(task1, task2);
+        validateStats(1, "PAUSED", null);
+
+        promotedPartitionsSync(0, 1, 2, 3);
+        validateStats(5, "PAUSED", null);
+
+        // Make sure a paused task can be set to running
+        m_taskManager.setPaused(false).get();
+        validateStats(5);
+
+        // Make sure a running task can be paused
+        m_taskManager.setPaused(true).get();
+        validateStats(5, "PAUSED", null);
+
+        // Make sure a paused task can be disabled
+        task1.setEnabled(false);
+        task2.setEnabled(false);
+        processUpdateSync(task1, task2);
+        validateStats(5, "DISABLED", null);
+
+        // DISABLED task should stay disabled
+        m_taskManager.setPaused(false).get();
+        validateStats(5, "DISABLED", null);
+    }
+
+    /*
+     * Test stats when a manager starts with disabled tasks
+     */
+    @Test
+    public void disabledTasks() throws Exception {
+        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task2 = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+
+        // Start manager with all tasks disabled
+        task1.setEnabled(false);
+        task2.setEnabled(false);
+
+        startSync(task1, task2);
+        validateStats(0);
+
+        promoteToLeaderSync(task1, task2);
+        validateStats(1, "DISABLED", null);
+
+        promotedPartitionsSync(0, 1, 2, 3);
+        validateStats(5, "DISABLED", null);
+
+        // Enable tasks
+        task1.setEnabled(true);
+        task2.setEnabled(true);
+        processUpdateSync(task1, task2);
+        validateStats(5);
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {
@@ -584,7 +667,7 @@ public class TestTaskManager {
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        validateStats();
+        validateStats(1);
         processUpdateSync();
         assertCountsAfterScheduleCanceled(startCount);
     }
@@ -596,21 +679,20 @@ public class TestTaskManager {
         assertEquals(startCount, s_firstActionSchedulerCallCount.get());
         assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
 
-        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), eq(false), anyInt(), any(),
-                eq(PROCEDURE_NAME), any());
-        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), eq(false),
-                anyInt(), any(), eq(PROCEDURE_NAME), any());
+        verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), any(), eq(false), any(),
+                eq(m_procedure), any(), eq(false), any());
+        verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), any(), eq(false),
+                any(), eq(m_procedure), any(), eq(false), any());
 
         verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
-    private Task createSchedulerTask(Class<? extends Initializable> clazz, String scope, Object... params) {
-        return createTask(m_name.getMethodName(), clazz, scope, params);
+    private Task createTask(Class<? extends Initializable> clazz, String scope, Object... params) {
+        return createTask(m_name.getMethodName() + m_taskNumber++, clazz, scope, params);
     }
 
-    private Task createTask(String name, Class<? extends Initializable> clazz, String scope,
-            Object... params) {
+    private Task createTask(String name, Class<? extends Initializable> clazz, String scope, Object... params) {
         Task task = initializeTask(name, scope);
 
         if (ActionScheduler.class.isAssignableFrom(clazz)) {
@@ -648,13 +730,17 @@ public class TestTaskManager {
         task.setEnabled(true);
         task.setName(name);
         task.setScope(scope);
-        task.setUser("user");
+        task.setUser(USER_NAME);
         task.setOnerror("ABORT");
         return task;
     }
 
     private void startSync(Task... tasks) throws InterruptedException, ExecutionException {
-        m_taskManager.start(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, getClass().getClassLoader())
+        startSync(false, tasks);
+    }
+
+    private void startSync(boolean paused, Task... tasks) throws InterruptedException, ExecutionException {
+        m_taskManager.start(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, getClass().getClassLoader(), paused)
                 .get();
     }
 
@@ -695,14 +781,15 @@ public class TestTaskManager {
         return m_statsAgent.getStatsAggregate(StatsSelector.TASK, false, System.currentTimeMillis());
     }
 
-    private void validateStats() {
-        validateStats("RUNNING", null);
+    private void validateStats(int statsCount) {
+        validateStats(statsCount, "RUNNING", null);
     }
 
-    private void validateStats(String state, Consumer<VoltTableRow> validator) {
+    private void validateStats(int statsCount, String state, Consumer<VoltTableRow> validator) {
         VoltTable table = getScheduleStats();
         long totalActionSchedulerInvocations = 0;
         long totalProcedureInvocations = 0;
+        assertEquals(statsCount, table.getRowCount());
         while (table.advanceRow()) {
             if (validator != null) {
                 validator.accept(table);
@@ -718,7 +805,7 @@ public class TestTaskManager {
     }
 
     private TaskValidationResult validateTask(Task task) {
-        return TaskManager.validateTask(task, null, getClass().getClassLoader());
+        return TaskManager.validateTask(task, m_database, getClass().getClassLoader());
     }
 
     public static class TestActionScheduler implements ActionScheduler {

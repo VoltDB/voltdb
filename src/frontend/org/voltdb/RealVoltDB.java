@@ -1713,9 +1713,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
 
-            // TODO determine if this is actually a good place for this
-            m_taskManager.start(m_catalogContext);
-
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
@@ -4453,12 +4450,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             {
                 m_config.m_isPaused = true;
                 m_statusTracker.set(NodeState.PAUSED);
+                m_taskManager.setPaused(true);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = false;
                 m_statusTracker.set(NodeState.UP);
+                m_taskManager.setPaused(false);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -4640,6 +4639,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+
+        m_taskManager.start(m_catalogContext, m_mode == OperationMode.PAUSED);
 
         if (m_elasticService != null) {
             try {
