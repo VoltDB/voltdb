@@ -817,7 +817,7 @@ public final class TaskManager {
 
             if (takesHelper) {
                 validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
-                        scope, database);
+                        definition.getName(), scope, database);
             }
 
             try {
@@ -998,8 +998,8 @@ public final class TaskManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        ActionScheduler constructScheduler(TaskHelper helper, TaskScope scope, int id) {
-            return m_factory.construct(helper, scope, id);
+        ActionScheduler constructScheduler(TaskHelper helper) {
+            return m_factory.construct(helper);
         }
 
         String generateLogMessage(String body) {
@@ -1247,8 +1247,8 @@ public final class TaskManager {
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
-                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface), getScope(),
-                        getScopeId());
+                        new TaskHelper(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
+                                getScopeId(), m_clientInterface));
                 submitHandleNextRun();
             }
         }
@@ -1669,11 +1669,9 @@ public final class TaskManager {
     private interface SchedulerFactory {
         /**
          * @param helper which can be passed to the constructed classes
-         * @param scope  {@link TaskScope} in which this instance will run
-         * @param id     for the {@code scope} in which this instance will run
          * @return New instance of an {@link ActionScheduler}
          */
-        ActionScheduler construct(TaskHelper helper, TaskScope scope, int id);
+        ActionScheduler construct(TaskHelper helper);
 
         /**
          * Compare the hashes of the classes used to construct the {@link ActionScheduler} returned by this factory and
@@ -1708,7 +1706,7 @@ public final class TaskManager {
             this.m_classHash = classHash;
         }
 
-        public T construct(TaskHelper helper, TaskScope scope, int id) {
+        public T construct(TaskHelper helper) {
             try {
                 T instance = m_constructor.newInstance();
                 if (m_initMethod != null) {
@@ -1717,7 +1715,6 @@ public final class TaskManager {
                     }
                     m_initMethod.invoke(instance, m_parameters);
                 }
-                instance.setScopeId(scope, id);
                 if (m_classDeps == null) {
                     m_classDeps = instance.getDependencies();
                 }
@@ -1772,8 +1769,8 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
-            return m_factory.construct(helper, scope, id);
+        public ActionScheduler construct(TaskHelper helper) {
+            return m_factory.construct(helper);
         }
 
         @Override
@@ -1800,9 +1797,9 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
-            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper, scope, id),
-                    m_actionScheduleFactory.construct(helper, scope, id));
+        public ActionScheduler construct(TaskHelper helper) {
+            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper),
+                    m_actionScheduleFactory.construct(helper));
         }
 
         @Override
