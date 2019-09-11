@@ -494,6 +494,11 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testThreeWayFullJoinWithAmbiguousColumnFail() {
+        m_tester.sql("select PK from R3 full join R4  using(PK) full join R5 using(PK) ")
+                .transform("");
+    }
+
     public void testSubqueriesJoin() {
         m_tester.sql("select t1.v, t2.v "
                 + "from "

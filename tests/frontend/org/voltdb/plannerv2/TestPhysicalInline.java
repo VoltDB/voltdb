@@ -23,12 +23,7 @@
 
 package org.voltdb.plannerv2;
 
-import com.google_voltpatches.common.collect.Lists;
-import org.voltcore.utils.Pair;
 import org.voltdb.plannerv2.rules.PlannerRules;
-
-import java.util.Collection;
-import java.util.Optional;
 
 public class TestPhysicalInline extends Plannerv2TestCase {
 
