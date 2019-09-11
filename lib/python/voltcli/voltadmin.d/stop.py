@@ -84,10 +84,6 @@ def stop(runner):
             runner.info('Completing partition leader migration away from host %d: %s' % (thost.id, thost.hostname))
             checkstats.check_partition_leaders_on_host(runner,thost.id)
             runner.info('All partition leaders have been migrated.')
-            # monitor export master transfer
-            runner.info('Completing export master transfer away from host %d: %s' % (thost.id, thost.hostname))
-            checkstats.check_export_mastership_on_host(runner,thost.id)
-            runner.info('All export masters have been transferred')
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
              runner.error(proex.message)
