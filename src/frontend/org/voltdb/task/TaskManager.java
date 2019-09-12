@@ -843,7 +843,7 @@ public final class TaskManager {
         if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
                 && procedure.getPartitionparameter() == -1) {
             return String.format(
-                    "Procedure %s is a work procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
+                    "Procedure %s is a directed procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
                     procedure.getTypeName(), scope.name().toLowerCase());
         }
 
@@ -861,14 +861,8 @@ public final class TaskManager {
             }
             break;
         case PARTITIONS:
-            if (!procedure.getSinglepartition()) {
-                return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
-                        procedure.getTypeName());
-            }
-            if (procedure.getPartitionparameter() != -1) {
-                return String.format(
-                        "Procedure %s must be a work procedure which is not partitioned on a table. "
-                                + "Cannot be scheduled on a partition.",
+            if (!procedure.getSinglepartition() && procedure.getPartitionparameter() != -1) {
+                return String.format("Procedure %s must be a directed procedure. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
