@@ -35,7 +35,7 @@ import org.voltdb.task.CronSchedule;
 import org.voltdb.task.DelaySchedule;
 import org.voltdb.task.IntervalSchedule;
 import org.voltdb.task.SingleProcGenerator;
-import org.voltdb.task.TaskManager;
+import org.voltdb.task.TaskScope;
 
 import com.google_voltpatches.common.base.MoreObjects;
 
@@ -69,8 +69,8 @@ public class CreateTask extends StatementProcessor {
     private Task configureTask(Task task, Matcher matcher, boolean newDdl)
             throws VoltCompilerException {
         task.setName(matcher.group("name"));
-        task.setScope(
-                MoreObjects.firstNonNull(matcher.group("scope"), TaskManager.SCOPE_DEFAULT).toUpperCase());
+        String scopeString = matcher.group("scope");
+        task.setScope(TaskScope.fromName(scopeString).getId());
         if (matcher.group("class") != null) {
             task.setSchedulerclass(matcher.group("class"));
             fillOutParams(task.getSchedulerparameters(), matcher.group("parameters"), 0);

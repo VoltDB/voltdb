@@ -600,6 +600,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/task/ActionType.java" />
             <include name="src/frontend/org/voltdb/task/Initializable.java" />
             <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/TaskScope.java" />
             <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
         </fileset>
     </javadoc>

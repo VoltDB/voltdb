@@ -1435,7 +1435,7 @@ public final class InvocationDispatcher {
                 } else {
                     throw new RuntimeException("Procedure " + procedure.getTypeName()
                             + " is a work procedure and needs to invoked appropriatly. "
-                            + "In the client callAllPartitionProcedure should be used.");
+                            + "The Client.callAllPartitionProcedure method should be used.");
                 }
             }
             // break out the Hashinator and calculate the appropriate partition
