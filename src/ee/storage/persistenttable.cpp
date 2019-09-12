@@ -1936,7 +1936,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
-    if (isTableWithMigrate(m_tableType)) {
+    if (isTableWithMigrate(m_tableType) && !originalTuple.isPendingDelete()) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
