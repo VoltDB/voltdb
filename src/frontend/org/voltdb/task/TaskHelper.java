@@ -38,7 +38,9 @@ import org.voltdb.catalog.Procedure;
 public final class TaskHelper {
     private final VoltLogger m_logger;
     private final UnaryOperator<String> m_generateLogMessage;
-    private final String m_scope;
+    private final String m_taskName;
+    private final TaskScope m_scope;
+    private final int m_scopeId;
     private final Function<String, Procedure> m_procedureGetter;
 
     private static Function<String, Procedure> createProcedureFunction(Database database) {
@@ -50,21 +52,50 @@ public final class TaskHelper {
         return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
     }
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope, Database database) {
-        this(logger, generateLogMessage, scope, createProcedureFunction(database));
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            Database database) {
+        this(logger, generateLogMessage, taskName, scope, -1, createProcedureFunction(database));
     }
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
-            ClientInterface clientInterface) {
-        this(logger, generateLogMessage, scope, clientInterface::getProcedureFromName);
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            int scopeId, ClientInterface clientInterface) {
+        this(logger, generateLogMessage, taskName, scope, scopeId, clientInterface::getProcedureFromName);
     }
 
-    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
-            Function<String, Procedure> procedureGetter) {
+    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            int scopeId, Function<String, Procedure> procedureGetter) {
         m_logger = logger;
         m_generateLogMessage = generateLogMessage;
+        m_taskName = taskName;
         m_scope = scope;
+        m_scopeId = scopeId;
         m_procedureGetter = procedureGetter;
+    }
+
+    /**
+     * @return The name of the task
+     */
+    public String getTaaskName() {
+        return m_taskName;
+    }
+
+    /**
+     * @return The scope in which the task will be executing
+     */
+    public TaskScope getTaskScepe() {
+        return m_scope;
+    }
+
+    /**
+     * Returns the ID of the scope when this helper is passed to an {@code instantiate} method otherwise {@code -1}
+     * <p>
+     * If {@code scope} is {@link TaskScope#PARTITIONS} {@code id} will be a partition ID. If {@code scope} is
+     * {@link TaskScope#HOSTS} {@code id} will be a host ID. Otherwise {@code id} will be {@code -1}
+     *
+     * @return The ID of the scope
+     */
+    public int getScopeId() {
+        return m_scopeId;
     }
 
     /**
@@ -177,29 +208,13 @@ public final class TaskHelper {
             return;
         }
 
-        if (restrictProcedureByScope) {
-            String error = TaskManager.isProcedureValidForScope(m_scope, procedure);
-            if (error != null) {
-                errors.addErrorMessage(error);
-                return;
-            }
+        String error = TaskManager.isProcedureValidForScope(m_scope, procedure, restrictProcedureByScope);
+        if (error != null) {
+            errors.addErrorMessage(error);
+            return;
         }
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
-
-        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
-            if (procedure.getPartitionparameter() != 0) {
-                errors.addErrorMessage(String.format(
-                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
-                        procedureName));
-                return;
-            }
-
-            Object[] newParameters = new Object[parameters.length + 1];
-            newParameters[0] = 0;
-            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
-            parameters = newParameters;
-        }
 
         if (parameterTypes.size() != parameters.length) {
             errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,

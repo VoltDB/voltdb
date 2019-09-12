@@ -1384,7 +1384,7 @@ public class VoltProjectBuilder {
         }
 
         // <flushIntervals>
-        systemSettingType.setFlushInterval(m_flushIntervals);
+        systemSettingType.setFlushinterval(m_flushIntervals);
 
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);

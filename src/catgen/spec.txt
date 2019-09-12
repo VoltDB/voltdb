@@ -336,7 +336,7 @@ begin Task javaonly "Defined tasks which run on a schedule"
   TaskParameter* actionGeneratorParameters  "The set of parameters to the action generator"
   string scheduleClass                      "Class which defines the action schedule"
   TaskParameter* scheduleParameters         "The set of parameters to the action schedule"
-  string scope                              "Where this task should be executed"
+  byte scope                                "Where this task should be executed"
   string onError                            "How procedure errors should be hanlded"
   string user                               "User to be used when executing procedures"
 end

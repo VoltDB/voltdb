@@ -73,7 +73,7 @@ public class TaskStatsSource extends StatsSource {
     private static List<ColumnAs> s_procedursConvert;
 
     private final String m_name;
-    private final String m_scope;
+    private final TaskScope m_scope;
     private final int m_partitionId;
 
     private String m_state;
@@ -171,11 +171,11 @@ public class TaskStatsSource extends StatsSource {
         return new TaskStatsSource(null, null, -1);
     }
 
-    static TaskStatsSource create(String name, String scope, int partitionId) {
+    static TaskStatsSource create(String name, TaskScope scope, int partitionId) {
         return new TaskStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId);
     }
 
-    private TaskStatsSource(String name, String scope, int partitionId) {
+    private TaskStatsSource(String name, TaskScope scope, int partitionId) {
         super(false);
         m_name = name;
         m_scope = scope;
@@ -211,7 +211,7 @@ public class TaskStatsSource extends StatsSource {
         // Header state info
         rowValues[column++] = m_name;
         rowValues[column++] = m_state;
-        rowValues[column++] = m_scope;
+        rowValues[column++] = m_scope.name();
         rowValues[column++] = m_partitionId;
 
         // Scheduler stats
