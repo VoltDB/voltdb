@@ -925,7 +925,7 @@ public abstract class CatalogUtil {
             DrType drType = deployment.getDr();
             Integer drFlushInterval = drType == null ? null : drType.getFlushInterval();
             if (drFlushInterval == null) {
-                drFlushInterval = deployment.getSystemsettings().getFlushInterval().getDr().getInterval();
+                drFlushInterval = deployment.getSystemsettings().getFlushinterval().getDr().getInterval();
             }
             if (drFlushInterval < catCluster.getGlobalflushinterval()) {
                 hostLog.warn("DR flush interval (" + drFlushInterval + "ms) in the configuration " +
@@ -937,7 +937,7 @@ public abstract class CatalogUtil {
 
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), drFlushInterval, isPlaceHolderCatalog);
 
-            int exportFlushInterval = deployment.getSystemsettings().getFlushInterval().getExport().getInterval();
+            int exportFlushInterval = deployment.getSystemsettings().getFlushinterval().getExport().getInterval();
             catCluster.setExportflushinterval(exportFlushInterval);
             if (exportFlushInterval < catCluster.getGlobalflushinterval()) {
                 hostLog.warn("Export flush interval (" + exportFlushInterval + "ms) in the configuration " +
@@ -1223,10 +1223,10 @@ public abstract class CatalogUtil {
             mem = new ResourceMonitorType.Memorylimit();
             rm.setMemorylimit(mem);
         }
-        FlushIntervalType fi = ss.getFlushInterval();
+        FlushIntervalType fi = ss.getFlushinterval();
         if (fi == null) {
             fi = new FlushIntervalType();
-            ss.setFlushInterval(fi);
+            ss.setFlushinterval(fi);
         }
         if (fi.getExport() == null) {
             fi.setExport(new FlushIntervalType.Export());
@@ -1387,7 +1387,7 @@ public abstract class CatalogUtil {
         setThreadPools(deployment, catDeploy);
 
         catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
-        catCluster.setGlobalflushinterval(deployment.getSystemsettings().getFlushInterval().getMinimum());
+        catCluster.setGlobalflushinterval(deployment.getSystemsettings().getFlushinterval().getMinimum());
         if (catCluster.getGlobalflushinterval() <= 0) {
             throw new RuntimeException("SystemSettings FlushInterval Minimum must be greater than zero");
         }

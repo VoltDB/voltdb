@@ -385,7 +385,7 @@ public class DeploymentBuilder {
         FlushIntervalType fi = factory.createFlushIntervalType();
         fi.setDr(new FlushIntervalType.Dr());
         fi.setExport(new FlushIntervalType.Export());
-        systemSettingType.setFlushInterval(fi);
+        systemSettingType.setFlushinterval(fi);
         if (m_snapshotPriority != null) {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
             snapshot.setPriority(m_snapshotPriority);
