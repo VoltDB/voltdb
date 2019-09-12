@@ -691,7 +691,7 @@ public final class TaskManager {
                     toString.add(field, task.getField(field));
                 }
                 log.debug(generateLogMessage(task.getName(),
-                        "Applying schedule configuration: " + toString()));
+                        "Applying schedule configuration: " + toString.toString()));
             }
             TaskHandler handler = m_handlers.remove(task.getName());
             TaskScope scope = TaskScope.fromId(task.getScope());
