@@ -126,4 +126,4 @@ if __name__ == '__main__':
                          """)
     else:
         with open(sys.argv[1], 'r') as fd:
-            datagen.failwith('\n'.join(garnish(compact(strip(fd.readlines())), int(sys.argv[2]))), 0)
+            print('\n'.join(garnish(compact(strip(fd.readlines())), int(sys.argv[2]))))

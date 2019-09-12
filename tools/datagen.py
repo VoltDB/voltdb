@@ -9,16 +9,16 @@
 
 import re, string, sys, random
 
-def rand_char(len):
+def rand_char(len, src=string.ascii_letters + string.digits):
     """
     Generate random characther of given maximum length.
     """
     # No escape needed inside the generated content.
     return "'%s'" % \
-            (''.join(random.choice(string.ascii_letters + string.digits) for _ in range(random.randint(1, len))))
+            (''.join(random.choice(src) for _ in range(random.randint(1, len))))
 
 def failwith(msg, retcode=2):
-    print(msg)
+    sys.stderr.write('datagen error: %s' % msg)
     sys.exit(retcode)
 
 # constants for regex
@@ -37,7 +37,9 @@ COLUMN_TYPES = {
     'FLOAT' : lambda _ : lambda:random.uniform(-9999, 9999),
     'DECIMAL' : lambda width : lambda:random.randint(-10**(width-1), 10**(width-1)),       #  ignore precision
     'VARCHAR' : lambda width : lambda:rand_char(width),
-    'VARBINARY' : lambda width : lambda:"CAST(%s AS VARBINARY(%d))" % (rand_char(width), width),
+    'VARBINARY' : lambda _ : lambda:failwith('VARBINARY unsupported'),
+    # TODO: this is buggy; what Volt allows as VARBINARY is also limiting (and undocumented?).
+    #"CAST(%s AS VARBINARY(%d))" % (rand_char(width, string.hexdigits), width),
     'TIMESTAMP': lambda _ :lambda:'TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, CURRENT_TIMESTAMP())%+d)' % random.randint(-9999, 9999),
     'GEOGRAPHY': lambda _ :lambda:failwith('GEOGRAPHY unsupported'),
     'GEOGRAPHY_POINT': lambda  _ :lambda:failwith('GEOGRAPHY_POINT unsupported'),
