@@ -1253,7 +1253,7 @@ public class SQLParser extends SQLPatternFactory
      *  (5) PARTITION clause: table name 2
      *  (6) PARTITION clause: column name 2
      *  (7) PARTITION clause: parameter number 2
-     *  (8) PARTITIONED clause for work procedures
+     *  (8) DIRECTED clause for directed procedures
      */
     private static SQLPatternPart makeInnerProcedureModifierClausePattern(boolean captureTokens)
     {
@@ -1290,7 +1290,7 @@ public class SQLParser extends SQLPatternFactory
                         )
                      )
                 ),
-                SPF.group(captureTokens, SPF.token("partitioned"))
+                SPF.group(captureTokens, SPF.token("directed"))
             );
     }
 

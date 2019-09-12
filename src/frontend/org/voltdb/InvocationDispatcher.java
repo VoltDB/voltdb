@@ -373,9 +373,9 @@ public final class InvocationDispatcher {
                     || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)
                     || catProc.getSystemproc()) {
                 return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
-                        "Invalid procedure for " + (task.getAllPartition() ? "all-partition" : "work procedure")
-                                + " execution. Targeted procedure must be partitioned, "
-                                + "must be partitioned on the first parameter or none, "
+                        "Invalid procedure for all-partition execution. "
+                                + "Targeted procedure must be partitioned on the first parameter "
+                                + "or be a directed procedure, "
                                 + "and must not be a system procedure.",
                         task.clientHandle);
             }
@@ -405,7 +405,8 @@ public final class InvocationDispatcher {
             }
         } else if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
-                    "Procedure " + catProc.getTypeName() + " is a work procedure and needs to invoked appropriatly. "
+                    "Procedure " + catProc.getTypeName()
+                            + " is a work procedure and needs to be invoked appropriately. "
                             + "The Client.callAllPartitionProcedure method should be used.",
                     task.clientHandle);
         }
@@ -1439,7 +1440,7 @@ public final class InvocationDispatcher {
                     return new int[] { task.getPartitionDestination() };
                 } else {
                     throw new RuntimeException("Procedure " + procedure.getTypeName()
-                            + " is a work procedure and needs to invoked appropriatly. "
+                            + " is a directed procedure and needs to invoked appropriately. "
                             + "The Client.callAllPartitionProcedure method should be used.");
                 }
             }
