@@ -25,6 +25,12 @@ end
 begin Deployment javaonly         "Run-time deployment settings"
   int kfactor                     "The required k-safety factor"
   Systemsettings* systemsettings  "Values from the systemsettings element"
+  ThreadPool* threadPools         "The Thread Pool configuration"
+end
+
+begin ThreadPool javaonly         "Thread Pool configuration"
+  string name                     "The name of the thread pool"
+  int size                        "The size of the thread pool"
 end
 
 begin Systemsettings javaonly "Container for deployment systemsettings element"
@@ -70,6 +76,7 @@ end
 
 begin Connector                 "Export connector"
   string loaderclass            "The class name of the connector"
+  string threadpoolname         "The name of the thread pool"
   bool enabled                  "Is the connector enabled"
   ConnectorTableInfo* tableInfo "Per table configuration"
   ConnectorProperty* config     "Connector configuration properties"
@@ -329,7 +336,7 @@ begin Task javaonly "Defined tasks which run on a schedule"
   TaskParameter* actionGeneratorParameters  "The set of parameters to the action generator"
   string scheduleClass                      "Class which defines the action schedule"
   TaskParameter* scheduleParameters         "The set of parameters to the action schedule"
-  string scope                              "Where this task should be executed"
+  byte scope                                "Where this task should be executed"
   string onError                            "How procedure errors should be hanlded"
   string user                               "User to be used when executing procedures"
 end

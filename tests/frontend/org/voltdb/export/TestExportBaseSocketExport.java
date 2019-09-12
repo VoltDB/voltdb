@@ -58,10 +58,10 @@ import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertAllowNulls;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertFromTableSelectSP;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertNoNulls;
+import org.voltdb_testprocs.regressionsuites.exportprocs.ExportRollbackInsertNoNulls;
 import org.voltdb_testprocs.regressionsuites.exportprocs.InsertAddedStream;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertLoopback;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertNoNulls;
-import org.voltdb_testprocs.regressionsuites.exportprocs.ExportRollbackInsertNoNulls;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -75,12 +75,14 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static int m_portCount = 5001;
     protected static VoltProjectBuilder project;
     protected static List<String> m_streamNames = new ArrayList<>();
+    protected static boolean m_verbose = false;
 
     public static class ServerListener extends Thread {
 
         private ServerSocket ssocket;
         private int m_port;
         private boolean m_close;
+
         private final List<ClientConnectionHandler> m_clients = Collections
                 .synchronizedList(new ArrayList<ClientConnectionHandler>());
         // m_seenIds store for occurrence
@@ -171,6 +173,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             @Override
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
+                final long thid = Thread.currentThread().getId();
                 try {
                     while (true) {
                         BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
@@ -195,10 +198,16 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                                 if (!Arrays.equals(m_data.get(i), parts)) {
                                     // also log the inconsistency here
                                     m_data.put(i, parts);
+                                    if (m_verbose) {
+                                        System.out.println(thid + "-Inconsistent " + i + ": " + line);
+                                    }
                                 }
                             } else {
                                 m_data.put(i, parts);
                                 m_queue.offer(i);
+                                if (m_verbose) {
+                                    System.out.println(thid + "-Consistent " + i + ": " + line);
+                                }
                             }
                         }
                         m_clientSocket.close();
@@ -517,6 +526,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         super(s);
     }
 
+    @Override
     public void setUp() throws Exception {
         super.setUp();
         m_streamNames = new ArrayList<>();

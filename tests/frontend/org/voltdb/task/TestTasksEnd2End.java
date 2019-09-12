@@ -24,6 +24,7 @@
 package org.voltdb.task;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -41,6 +42,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.tasktest.CustomTestActionGenerator;
+import org.voltdb.tasktest.CustomTestActionScheduler;
+import org.voltdb.utils.MiscUtils;
 
 public class TestTasksEnd2End extends LocalClustersTestBase {
     private static final String s_userName = "TestUser";
@@ -112,9 +116,13 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         String schedule2 = getMethodName() + "_2";
         String schedule3 = getMethodName() + "_3";
 
-        String summaryFormat = "CREATE TASK %s ON SCHEDULE %s PROCEDURE @AdHoc WITH ('INSERT INTO " + summaryTable
-                + " SELECT NOW, %d, COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
-                + getTableName(0, TableType.REPLICATED) + ";') ON ERROR IGNORE;";
+        client.callProcedure("@AdHoc",
+                "CREATE PROCEDURE " + getMethodName() + " AS INSERT INTO " + summaryTable
+                        + " SELECT NOW, CAST(? AS INT), COUNT(*), SUM(CAST(key as DECIMAL)), SUM(CAST(value AS DECIMAL)) FROM "
+                        + getTableName(0, TableType.REPLICATED) + ';');
+
+        String summaryFormat = "CREATE TASK %s ON SCHEDULE %s PROCEDURE " + getMethodName()
+                + " WITH (%d) ON ERROR IGNORE;";
 
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule1, "delay 50 MILLISECONDS", 1));
         client.callProcedure("@AdHoc", String.format(summaryFormat, schedule2, "CRON * * * * * *", 2));
@@ -249,6 +257,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         // Test that partition schedules fail over
         getCluster(0).killSingleHost(1);
 
+        // Give the system some time to complete the failover
+        Thread.sleep(500);
+
         table = getTaskStats(client);
         assertEquals(6, table.getRowCount());
         while (table.advanceRow()) {
@@ -272,6 +283,9 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
     }
 
+    /*
+     * Test that a custom scheduler can be provided in the DDL
+     */
     @Test
     public void customScheduler() throws Exception {
         Client client = getClient(0);
@@ -335,6 +349,53 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
             getCluster(0).updateCatalog(m_builder);
             fail("Should have failed to update the catalog since the user is in use");
         } catch (ProcCallException e) {}
+    }
+
+    /*
+     * Test that limitations are enforced in community and not in pro
+     */
+    @Test
+    public void communityLimitations() throws Exception {
+        Client client = getClient(0);
+
+        // Test ability to use system procedures
+        try {
+            client.callProcedure("@AdHoc",
+                    "CREATE TASK " + getMethodName()
+                            + " ON SCHEDULE DELAY 5 SECONDS PROCEDURE @AdHoc WITH ('SELECT * FROM "
+                            + getTableName(0, TableType.REPLICATED) + ";');");
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("System procedures are not allowed in tasks"));
+        }
+
+        // Test ability to use custom action generator
+        try {
+            client.callProcedure("@AdHoc", "CREATE TASK " + getMethodName()
+                    + " ON SCHEDULE DELAY 5 SECONDS PROCEDURE FROM CLASS " + CustomTestActionGenerator.class.getName()
+                    + ';');
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Custom action generator class not allowed in tasks"));
+        }
+
+        // Test ability to use custom action scheduler
+        try {
+            client.callProcedure("@AdHoc", "CREATE TASK " + getMethodName()
+                    + " FROM CLASS " + CustomTestActionScheduler.class.getName() + ';');
+            assertTrue(MiscUtils.isPro());
+            client.callProcedure("@AdHoc", "DROP TASK " + getMethodName() + ';');
+        } catch (ProcCallException e) {
+            assertFalse(MiscUtils.isPro());
+            String status = e.getClientResponse().getStatusString();
+            assertTrue(status, status.contains("Custom action scheduler class not allowed in tasks"));
+        }
     }
 
     private static VoltTable getTaskStats(Client client)

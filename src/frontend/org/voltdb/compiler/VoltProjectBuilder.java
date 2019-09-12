@@ -757,6 +757,11 @@ public class VoltProjectBuilder {
         m_ilImportConnectors.add(importConnector);
     }
 
+    // Use this to update deployment with new or modified export targets
+    public void clearExports() {
+        m_exportConfigs.clear();
+    }
+
     public void addExport(boolean enabled) {
         addExport(enabled, null, null);
     }
@@ -1379,7 +1384,7 @@ public class VoltProjectBuilder {
         }
 
         // <flushIntervals>
-        systemSettingType.setFlushInterval(m_flushIntervals);
+        systemSettingType.setFlushinterval(m_flushIntervals);
 
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);

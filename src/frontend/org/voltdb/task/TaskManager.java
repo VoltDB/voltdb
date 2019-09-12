@@ -92,11 +92,7 @@ import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
  */
 public final class TaskManager {
     static final VoltLogger log = new VoltLogger("TASK");
-    static final String SCOPE_DATABASE = "DATABASE";
-    static final String SCOPE_HOSTS = "HOSTS";
-    static final String SCOPE_PARTITIONS = "PARTITIONS";
     static final String HASH_ALGO = "SHA-512";
-    public static final String SCOPE_DEFAULT = SCOPE_DATABASE;
 
     private Map<String, TaskHandler> m_handlers = Collections.emptyMap();
     private volatile boolean m_leader = false;
@@ -391,7 +387,8 @@ public final class TaskManager {
     public static String validateTasks(Database database, ClassLoader classLoader) {
         TaskValidationErrors errors = new TaskValidationErrors();
         for (Task task : database.getTasks()) {
-            errors.addErrorMessage(validateTask(task, database, classLoader).getErrorMessage());
+            errors.addErrorMessage(
+                    validateTask(task, TaskScope.fromId(task.getScope()), database, classLoader).getErrorMessage());
         }
         return errors.getErrorMessage();
     }
@@ -405,11 +402,13 @@ public final class TaskManager {
      * if {@code database} is not null the returned {@link TaskValidationResult} will only ever have an error message.
      *
      * @param definition  {@link Task} defining the configuration of the schedule
+     * @param scope       {@link TaskScope} for {@code definition}
      * @param database    {@link Database} instance used to validate procedures. May be {@link null}
      * @param classLoader {@link ClassLoader} to use when loading the classes in {@code definition}
      * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
      */
-    static TaskValidationResult validateTask(Task definition, Database database, ClassLoader classLoader) {
+    static TaskValidationResult validateTask(Task definition, TaskScope scope, Database database,
+            ClassLoader classLoader) {
         if (database != null) {
             String user = definition.getUser();
             if (user != null && database.getUsers().get(user) == null) {
@@ -423,7 +422,7 @@ public final class TaskManager {
         if (!StringUtils.isBlank(schedulerClassName)) {
             // Construct scheduler from the provided class
             try {
-                Pair<String, InitializableFactory<ActionScheduler>> result = createFactory(definition,
+                Pair<String, InitializableFactory<ActionScheduler>> result = createFactory(definition, scope,
                         ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), database,
                         classLoader);
                 String errorMessage = result.getFirst();
@@ -448,7 +447,7 @@ public final class TaskManager {
             InitializableFactory<ActionGenerator> actionGeneratorFactory;
             InitializableFactory<ActionSchedule> actionScheduleFactory;
             try {
-                Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition,
+                Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition, scope,
                         ActionGenerator.class, actionGeneratorClass, definition.getActiongeneratorparameters(),
                         database, classLoader);
                 String errorMessage = result.getFirst();
@@ -462,7 +461,7 @@ public final class TaskManager {
             }
 
             try {
-                Pair<String, InitializableFactory<ActionSchedule>> result = createFactory(definition,
+                Pair<String, InitializableFactory<ActionSchedule>> result = createFactory(definition, scope,
                         ActionSchedule.class, actionScheduleClass, definition.getScheduleparameters(),
                         database, classLoader);
                 String errorMessage = result.getFirst();
@@ -488,6 +487,7 @@ public final class TaskManager {
      *
      * @param <T>                   Type of class the factory will create
      * @param definition            {@link Task} which this factory is associated with
+     * @param scope                 {@link TaskScope} for {@code definition}
      * @param interfaceClass        Class of the interface which {@code className} should implement
      * @param className             Name of class the factory should construct
      * @param initializerParameters Parameters which are to be passed to constructed instance
@@ -498,7 +498,7 @@ public final class TaskManager {
      */
     @SuppressWarnings("unchecked")
     private static <T extends Initializable> Pair<String, InitializableFactory<T>> createFactory(Task definition,
-            Class<T> interfaceClass, String className, CatalogMap<TaskParameter> initializerParameters,
+            TaskScope scope, Class<T> interfaceClass, String className, CatalogMap<TaskParameter> initializerParameters,
             Database database, ClassLoader classLoader) throws NoSuchAlgorithmException {
         Class<?> initializableClass;
         try {
@@ -579,8 +579,8 @@ public final class TaskManager {
                 }
             }
 
-            String parameterErrors = validateInitializeParameters(definition, initMethod, parameters, takesHelper,
-                    database);
+            String parameterErrors = validateInitializeParameters(definition, scope, initMethod, parameters,
+                    takesHelper, database);
             if (parameterErrors != null) {
                 return Pair.of("Error validating parameters for task " + definition.getName() + ": " + parameterErrors,
                         null);
@@ -694,7 +694,8 @@ public final class TaskManager {
                         "Applying schedule configuration: " + toString()));
             }
             TaskHandler handler = m_handlers.remove(task.getName());
-            TaskValidationResult result = validateTask(task, null, classLoader);
+            TaskScope scope = TaskScope.fromId(task.getScope());
+            TaskValidationResult result = validateTask(task, scope, null, classLoader);
 
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
@@ -708,7 +709,7 @@ public final class TaskManager {
                     if (frequencyChanged) {
                         handler.setMaxRunFrequency(m_maxRunFrequency);
                     }
-                    if (SCOPE_PARTITIONS.equalsIgnoreCase(task.getScope())) {
+                    if (scope == TaskScope.PARTITIONS) {
                         hasPartitionedSchedule = true;
                     } else {
                         hasNonPartitionedSchedule = true;
@@ -722,8 +723,7 @@ public final class TaskManager {
                 handler.cancel();
             }
 
-            String scope = task.getScope();
-            if (m_leader || !SCOPE_DATABASE.equals(scope)) {
+            if (m_leader || scope != TaskScope.DATABASE) {
                 if (!result.isValid()) {
                     log.warn(generateLogMessage(task.getName(), result.getErrorMessage()),
                             result.getException());
@@ -736,13 +736,13 @@ public final class TaskManager {
 
                 TaskHandler definition;
                 switch (scope) {
-                case SCOPE_HOSTS:
-                case SCOPE_DATABASE:
+                case HOSTS:
+                case DATABASE:
                     definition = new SingleTaskHandler(task, scope, result.m_factory,
                             m_singleExecutor.getExecutor());
                     hasNonPartitionedSchedule = true;
                     break;
-                case SCOPE_PARTITIONS:
+                case PARTITIONS:
                     definition = new PartitionedTaskHandler(task, result.m_factory,
                             m_partitionedExecutor.getExecutor());
                     m_locallyLedPartitions.forEach(definition::promotedPartition);
@@ -777,14 +777,15 @@ public final class TaskManager {
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
      * @param definition  Instance of {@link Task} defining the schedule
+     * @param scope       {@link TaskScope} for {@code definition}
      * @param initMethod  initialize {@link Method} instance for the {@link Initializable}
      * @param parameters  that are going to be passed to the constructor
      * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
      * @param database    {@link Database} instance used to validate procedures. May be {@link null}
      * @return error message if the parameters are not valid or {@code null} if they are
      */
-    private static String validateInitializeParameters(Task definition, Method initMethod, Object[] parameters,
-            boolean takesHelper, Database database) {
+    private static String validateInitializeParameters(Task definition, TaskScope scope, Method initMethod,
+            Object[] parameters, boolean takesHelper, Database database) {
         Class<?> schedulerClass = initMethod.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
@@ -816,7 +817,7 @@ public final class TaskManager {
 
             if (takesHelper) {
                 validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
-                        definition.getScope(), database);
+                        definition.getName(), scope, database);
             }
 
             try {
@@ -838,17 +839,28 @@ public final class TaskManager {
      * @param procedure {@link Procedure} instance to validate
      * @return {@code null} if procedure is valid for scope otherwise a detailed error message will be returned
      */
-    static String isProcedureValidForScope(String scope, Procedure procedure) {
+    static String isProcedureValidForScope(TaskScope scope, Procedure procedure, boolean restrictProcedureByScope) {
+        if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
+                && procedure.getPartitionparameter() == -1) {
+            return String.format(
+                    "Procedure %s is a work procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
+                    procedure.getTypeName(), scope.name().toLowerCase());
+        }
+
+        if (!restrictProcedureByScope) {
+            return null;
+        }
+
         switch (scope) {
-        case SCOPE_DATABASE:
+        case DATABASE:
             break;
-        case SCOPE_HOSTS:
+        case HOSTS:
             if (procedure.getTransactional()) {
                 return String.format("Procedure %s is a transactional procedure. Cannot be scheduled on a host.",
                         procedure.getTypeName());
             }
             break;
-        case SCOPE_PARTITIONS:
+        case PARTITIONS:
             if (!procedure.getSinglepartition()) {
                 return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
                         procedure.getTypeName());
@@ -900,7 +912,7 @@ public final class TaskManager {
          * @return {@code true} if the scheduler and parameters which were tested are valid
          */
         public boolean isValid() {
-            return m_factory != null;
+            return m_errorMessage == null;
         }
 
         /**
@@ -1015,15 +1027,15 @@ public final class TaskManager {
     private class SingleTaskHandler extends TaskHandler {
         private final SchedulerWrapper<? extends SingleTaskHandler> m_wrapper;
 
-        SingleTaskHandler(Task definition, String scope, SchedulerFactory factory,
+        SingleTaskHandler(Task definition, TaskScope scope, SchedulerFactory factory,
                 ListeningScheduledExecutorService executor) {
             super(definition, factory);
 
             switch (scope) {
-            case SCOPE_HOSTS:
+            case HOSTS:
                 m_wrapper = new HostSchedulerWrapper(this, executor);
                 break;
-            case SCOPE_DATABASE:
+            case DATABASE:
                 m_wrapper = new SystemSchedulerWrapper(this, executor);
                 break;
             default:
@@ -1224,7 +1236,7 @@ public final class TaskManager {
             }
 
             if (m_stats == null) {
-                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getSiteId());
+                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getScopeId());
                 m_stats.register(m_statsAgent);
             }
 
@@ -1246,7 +1258,8 @@ public final class TaskManager {
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
-                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface));
+                        new TaskHelper(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
+                                getScopeId(), m_clientInterface));
                 submitHandleNextRun();
             }
         }
@@ -1475,12 +1488,10 @@ public final class TaskManager {
                 return null;
             }
 
-            if (m_scheduler.restrictProcedureByScope()) {
-                String error = isProcedureValidForScope(getScope(), procedure);
-                if (error != null) {
-                    errorOccurred(error);
-                    return null;
-                }
+            String error = isProcedureValidForScope(getScope(), procedure, m_scheduler.restrictProcedureByScope());
+            if (error != null) {
+                errorOccurred(error);
+                return null;
             }
 
             return procedure;
@@ -1575,9 +1586,15 @@ public final class TaskManager {
             return m_handler.generateLogMessage(body);
         }
 
-        abstract String getScope();
+        /**
+         * @return The scope which this is running on
+         */
+        abstract TaskScope getScope();
 
-        abstract int getSiteId();
+        /**
+         * @return The ID of the scope which this running on
+         */
+        abstract int getScopeId();
 
         private void setState(SchedulerWrapperState state) {
             m_wrapperState = state;
@@ -1594,12 +1611,12 @@ public final class TaskManager {
         }
 
         @Override
-        String getScope() {
-            return SCOPE_DATABASE;
+        TaskScope getScope() {
+            return TaskScope.DATABASE;
         }
 
         @Override
-        int getSiteId() {
+        int getScopeId() {
             return -1;
         }
     }
@@ -1613,13 +1630,13 @@ public final class TaskManager {
         }
 
         @Override
-        String getScope() {
-            return SCOPE_HOSTS;
+        TaskScope getScope() {
+            return TaskScope.HOSTS;
         }
 
         @Override
-        int getSiteId() {
-            return -1;
+        int getScopeId() {
+            return m_hostId;
         }
     }
 
@@ -1648,12 +1665,12 @@ public final class TaskManager {
         }
 
         @Override
-        String getScope() {
-            return SCOPE_PARTITIONS;
+        TaskScope getScope() {
+            return TaskScope.PARTITIONS;
         }
 
         @Override
-        int getSiteId() {
+        int getScopeId() {
             return m_partition;
         }
     }
@@ -1700,17 +1717,17 @@ public final class TaskManager {
 
         public T construct(TaskHelper helper) {
             try {
-                T scheduler = m_constructor.newInstance();
+                T instance = m_constructor.newInstance();
                 if (m_initMethod != null) {
                     if (m_takesHelper) {
                         m_parameters[0] = helper;
                     }
-                    m_initMethod.invoke(scheduler, m_parameters);
+                    m_initMethod.invoke(instance, m_parameters);
                 }
                 if (m_classDeps == null) {
-                    m_classDeps = scheduler.getDependencies();
+                    m_classDeps = instance.getDependencies();
                 }
-                return scheduler;
+                return instance;
             } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
                 throw new IllegalArgumentException(e);
             }
