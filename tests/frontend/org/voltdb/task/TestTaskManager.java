@@ -417,7 +417,7 @@ public class TestTaskManager {
         promoteToLeaderSync();
         processUpdateSync(jarFile.getLoader(), false, task1, task2);
 
-        Thread.sleep(30);
+        Thread.sleep(100);
 
         VoltTable table = getScheduleStats();
         Map<String, Long> invocationCounts = new HashMap<>();
@@ -435,7 +435,6 @@ public class TestTaskManager {
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue("Count decreased for " + scheduleName,
                     invocationCounts.put(scheduleName, currentCount) < currentCount);
-            invocationCounts.put(scheduleName, currentCount);
         }
 
         Thread.sleep(5);
@@ -453,7 +452,7 @@ public class TestTaskManager {
                 assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
             } else {
                 assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
-                        previousCount * 3 / 2 > currentCount);
+                        previousCount > currentCount);
             }
         }
 
