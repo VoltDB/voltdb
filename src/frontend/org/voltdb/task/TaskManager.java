@@ -842,9 +842,8 @@ public final class TaskManager {
     static String isProcedureValidForScope(TaskScope scope, Procedure procedure, boolean restrictProcedureByScope) {
         if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
                 && procedure.getPartitionparameter() == -1) {
-            return String.format(
-                    "Procedure %s is a directed procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
-                    procedure.getTypeName(), scope.name().toLowerCase());
+            return String.format("Procedure %s is a directed procedure and must be run on PARTITIONS only.",
+                    procedure.getTypeName());
         }
 
         if (!restrictProcedureByScope) {
@@ -853,16 +852,22 @@ public final class TaskManager {
 
         switch (scope) {
         case DATABASE:
+            if (procedure.getSinglepartition()) {
+                return String.format(
+                        "Procedure %s is a single partition procedure, which cannot be scheduled on the database",
+                        procedure.getTypeName());
+            }
             break;
         case HOSTS:
             if (procedure.getTransactional()) {
-                return String.format("Procedure %s is a transactional procedure. Cannot be scheduled on a host.",
+                return String.format("Procedure %s is a transactional procedure, which cannot be scheduled on a host.",
                         procedure.getTypeName());
             }
             break;
         case PARTITIONS:
             if (!procedure.getSinglepartition() && procedure.getPartitionparameter() != -1) {
-                return String.format("Procedure %s must be a directed procedure. Cannot be scheduled on a partition.",
+                return String.format(
+                        "Procedure %s must be a directed procedure, which cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;
