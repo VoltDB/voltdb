@@ -527,8 +527,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
 CREATE PROCEDURE PARTITION ON TABLE nibdp COLUMN p FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDRTableInsert;
 
--- CREATE PROCEDURE deleteSomeP AS DELETE FROM taskp WHERE CAST(? AS INT) IS NOT NULL AND ts < DATEADD(SECOND, ?, NOW);
-CREATE PROCEDURE deleteSomeP PARTITIONED AS DELETE FROM taskp WHERE ts < DATEADD(SECOND, ?, NOW);
+-- procedures used by the scheduled TASKs defined below
+CREATE PROCEDURE deleteSomeP DIRECTED AS DELETE FROM taskp WHERE ts < DATEADD(SECOND, ?, NOW);
 CREATE PROCEDURE deleteSomeR AS DELETE FROM taskr WHERE ts < DATEADD(SECOND, ?, NOW);
 
 -- functions
