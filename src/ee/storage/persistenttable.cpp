@@ -1384,6 +1384,13 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
 
         ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
+
+        // The delete-pending tuple may be swapped in the compaction. Reset the hidden column to avoid
+        // migrating index swap.
+        if (isTableWithMigrate(m_tableType)) {
+            uint16_t migrateColumnIndex = getMigrateColumnIndex();
+            target.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        }
         return;
     }
 
@@ -1937,9 +1944,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
         }
     }
 
-    // When a tuple is in pending-delete state, the tuple has been deleted from migrating index:m_migratingRows.
-    // Migrating index swap is not needed.
-    if (!originalTuple.isPendingDelete() && isTableWithMigrate(m_tableType)) {
+    if (isTableWithMigrate(m_tableType)) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
