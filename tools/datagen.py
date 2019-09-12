@@ -15,7 +15,7 @@ def rand_char(len):
     """
     # No escape needed inside the generated content.
     return "'%s'" % \
-            (''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(random.randint(1, len))))
+            (''.join(random.choice(string.ascii_letters + string.digits) for _ in range(random.randint(1, len))))
 
 def failwith(msg, retcode=2):
     print(msg)

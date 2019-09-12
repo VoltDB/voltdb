@@ -1,4 +1,12 @@
 #! /usr/bin/python3
+
+# Simple datagen tool that garnish a DDL file to populate all tables created
+# Usage:
+# % tools/datagen.py ddl.sql 500
+# will generate 500 INSERT statements for each table created in the ddl.sql
+#
+# Useful for populating quick data into tables for customer issues.
+
 import datagen, itertools, re, sys
 
 # constants for regex
@@ -58,28 +66,64 @@ def compact(lines):
     """
     return ';\n'.join([re.sub(RE_LEADING_WS, '', line) for line in ' '.join(lines).split(';')]).split('\n')
 
-def apply_datagen(line, num_inserts):
+class StatefulDatagen():
     """
-    Check whether current statement line is CREATE TABLE statement.
-    If it is, append with given number of INSERT statements; otherwise return as is.
-    Assume that there is no leading ws in the line.
+    The datagen process needs to be stateful, because INSERT statement should only be inserted
+    after PARTITION statement, if there is any.
+    The actual place of insertion is right before each next CREATE TABLE statement, since some indexes also
+    require table to be empty at the time of creation...
     """
-    line_copy = [line]
-    l = list(re.split(RE_WS, line.upper()))
-    if len(l) > 2 and l[0] == 'CREATE' and l[1] == 'TABLE':
-        line_copy.extend(datagen.main(line, num_inserts).split('\n'))
-    return(line_copy)
+    def __init__(self, num_inserts):
+        self.current_table = None
+        self.current_create_table_stmt = None
+        self.buffered_statements = []
+        self.num_inserts = num_inserts
+
+    def __populate_table__(self):
+        if self.current_create_table_stmt is not None:
+            self.buffered_statements.extend(datagen.main(self.current_create_table_stmt, self.num_inserts).split('\n'))    # populate previous table
+
+    def produce(self):     # each object can only call produce() at most once
+        if self.buffered_statements is None:
+            failwith("StatefulDatagen.produce() already drained")
+        else:
+            self.__populate_table__()
+        return self.buffered_statements
+
+    def consume(self, line):
+        """
+        Check whether current statement line is CREATE TABLE statement.
+        If it is, append with given number of INSERT statements; otherwise return as is.
+        Assume that there is no leading ws in the line.
+        """
+        line_copy = [line]
+        l = list(re.split(RE_WS, line.upper()))
+        if len(l) > 2 and l[0] == 'CREATE' and l[1] == 'TABLE':
+            tablename = l[2]
+            if '(' in tablename:
+                tablename = l[0 : tablename.index('(')]
+            self.current_table = tablename
+            if self.current_create_table_stmt is not None:
+                self.__populate_table__()    # populate last table created
+            self.current_create_table_stmt = line
+        self.buffered_statements.append(line)
+
+def garnish(lines, num_inserts):
+    """
+    Garnish a list of lines of DDL statements that had been sanitized (comments/empty lines squeezed),
+    with given number of INSERT INTO tbl statements at appropriate locations.
+    """
+    gen = StatefulDatagen(num_inserts)
+    for line in lines:
+        gen.consume(line)
+    return gen.produce()
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         datagen.failwith("""
-                 Usage: data-gen-with-ddl.py example.ddl 50
-                 Will generate DDL mixed with INSERT statements, so that each table has 50 tuples in it.
-                 """)
+                         Usage: data-gen-with-ddl.py example.ddl 50
+                         Will generate DDL mixed with INSERT statements, each table created there would have 50 tuples.
+                         """)
     else:
-        num = int(sys.argv[2])
         with open(sys.argv[1], 'r') as fd:
-            datagen.failwith(
-                '\n'.join(list(itertools.chain.from_iterable(
-                    [apply_datagen(line, num) for line in compact(strip(fd.readlines()))]))),
-                0)
+            datagen.failwith('\n'.join(garnish(compact(strip(fd.readlines())), int(sys.argv[2]))), 0)
