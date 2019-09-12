@@ -243,7 +243,7 @@
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
-        <xs:element name="flushInterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
+        <xs:element name="flushinterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
     </xs:all>
   </xs:complexType>
 
