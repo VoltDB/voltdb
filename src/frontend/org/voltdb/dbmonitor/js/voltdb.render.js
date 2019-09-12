@@ -406,12 +406,16 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(importerDetails);
             });
         };
-        
+
         this.getExportTableInformation = function (onInformationLoaded) {
             var exportDetails = {};
+            var deploymentDetails = {};
+            VoltDBService.GetShortApiDeployment(function (connection) {
+                deploymentDetails = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+            });
             VoltDBService.GetExporterInformation(function (connection) {
                 getExportTableDetails(connection, exportDetails);
-                onInformationLoaded(exportDetails);
+                onInformationLoaded(exportDetails, deploymentDetails);
             });
         };
 

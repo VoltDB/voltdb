@@ -1199,19 +1199,45 @@ var loadPage = function (serverName, portid) {
             }
         });
         
-        voltDbRenderer.getExportTableInformation(function(exporterDetails){
+        voltDbRenderer.getExportTableInformation(function(exporterDetails, deploymentDetails){
             if(!$.isEmptyObject(exporterDetails)){
+                let dummyRow = $('#DUMMY_EXPORT_PLACE_HOLDER');
+                if(dummyRow.length) {
+                    // trick to make the table-sorter work for export table
+                    // seems if I build from an empty table, the table-sorter won't work
+                    // so put a dummy row first and remove it.
+                    dummyRow.remove();
+                }
+                // update to clean the cache
+                const exportTable = $("#exportTable");
+                exportTable.trigger("update")
+                    .trigger("sorton", [exportTable.get(0).config.sortList])
+                    .trigger("appendCache")
+                    .trigger("applyWidgets");
+
+                const exportConfigs = deploymentDetails["export"]["configuration"];
                 Object.keys(exporterDetails["TUPLE_COUNT"]).forEach(key => {
+                    var type = "";
+                    const target = exporterDetails["TARGET"][key];
+                    for (let i = 0; i < exportConfigs.length; i++) {
+                        if (exportConfigs[i]["target"].toUpperCase() === target) {
+                            type = exportConfigs[i]["type"];
+                            break;
+                        }
+                    }
                     var tupleCountDetails = exporterDetails["TUPLE_COUNT"];
-                    
+
                     if($('#'+key).length == 0 && key != "TIMESTAMP"){
-                        var newRow = '<tr id=' + key + '>' + 
-                        '<td>' + key + 
+                        var newRow = '<tr id=' + key + '>' +
+                        '<td>' + key +
                         '</td><td>' + exporterDetails["TARGET"][key] +
+                        '</td><td>' + type +
                         '</td><td>' + 0 +
                         '</td><td>' + exporterDetails["TUPLE_PENDING"][key] +
-                        '</td></tr>';         
-                        $('#exportTable').append(newRow);
+                        '</td></tr>';
+                        let $rowRef = $(newRow);
+                        $('#exportTable').append($rowRef)
+                            .trigger('addRows', [$rowRef, true]); // trigger addRows() to resort the table
                     }
                     
                     if(!previousTupleCount.hasOwnProperty(key)){
@@ -1224,8 +1250,8 @@ var loadPage = function (serverName, portid) {
                         }
                     }
                     
-                    $('#'+key+' td:nth-child(3)').html(tupleCountDetails[key]);
-                    $('#'+key+' td:nth-child(4)').html(exporterDetails["TUPLE_PENDING"][key]);
+                    $('#'+key+' td:nth-child(4)').html(tupleCountDetails[key]);
+                    $('#'+key+' td:nth-child(5)').html(exporterDetails["TUPLE_PENDING"][key]);
                     
                     if(exporterDetails["ACTIVE"][key] == "FALSE"){
                         $('#'+key).css('color', 'red');
