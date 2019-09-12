@@ -712,10 +712,10 @@ public class JDBCExportClient extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
-            if (rowinst.getOperation() != ROW_OPERATION.INSERT) {
+            if (rowinst.getOperation() != ROW_OPERATION.INSERT && rowinst.getOperation() != ROW_OPERATION.MIGRATE) {
                 if (rowinst.getOperation() != ROW_OPERATION.UPDATE_NEW || !m_supportsUpsert) {
                     if (!m_warnedOfUnsupportedOperation) {
-                        m_logger.warn("JDBC export skipped past a row with an operation type " +
+                        rateLimitedLogWarn(m_logger, "JDBC export skipped past a row with an operation type " +
                                 rowinst.getOperation().name() + " from stream " + rowinst.tableName);
                     }
                     return true;
