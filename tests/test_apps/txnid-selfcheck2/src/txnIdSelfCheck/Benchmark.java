@@ -850,6 +850,9 @@ public class Benchmark {
                         exitcode += reportDeadThread(ct);
                     }
                 }
+                log.debug("Call Task shutdown methods");
+                replTasklt.shutdown();
+                partTasklt.shutdown();
                 /*
                 replBiglt.shutdown();
                 partBiglt.shutdown();
