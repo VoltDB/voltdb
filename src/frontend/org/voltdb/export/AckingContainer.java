@@ -85,6 +85,7 @@ public class AckingContainer extends BBContainer {
     // Invoked from GuestProcessor after the container is delivered.
     public void discard() {
         checkDoubleFree();
+        internalDiscard(false);
         try {
             m_source.advance(m_lastSeqNo, m_startTime);
         } catch (RejectedExecutionException rej) {
@@ -92,8 +93,6 @@ public class AckingContainer extends BBContainer {
             if (EXPORT_LOG.isDebugEnabled()) {
                 EXPORT_LOG.debug("Acking export data task rejected, this should be harmless");
             }
-        } finally {
-            internalDiscard(false);
         }
     }
 

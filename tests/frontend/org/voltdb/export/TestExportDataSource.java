@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -179,6 +180,7 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
     public void testExportDataSource() throws Exception {
         System.out.println("Running testExportDataSource");
         String[] tables = {"TableName", "RepTableName"};
@@ -201,6 +203,7 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -290,6 +293,7 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -358,6 +362,122 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
+    public void testOutOfOrderDiscards() throws Exception{
+        System.out.println("Running testOutOfOrderDiscards");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
+            foo0.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, foo0, false);
+
+            AckingContainer cont0 = s.poll().get();
+            cont0.updateStartTime(System.currentTimeMillis());
+
+            // Push a buffer - should satisfy fut1
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 1, 2, foo1, false);
+
+            // Verify the pushed buffer can be got
+            AckingContainer cont1 = s.poll().get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            // Discard out of order
+            cont1.discard();
+            cont0.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    @Test
+    public void testOutOfOrderAck() throws Exception{
+        System.out.println("Running testOutOfOrderAck");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            // Push 4 buffers with seqNo [1 .. 4]
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, foo1, false);
+
+            ByteBuffer foo2 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 1, 2, foo2, false);
+
+            ByteBuffer foo3 = ByteBuffer.allocateDirect(buffSize);
+            foo3.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 1, 3, foo3, false);
+
+            ByteBuffer foo4 = ByteBuffer.allocateDirect(buffSize);
+            foo4.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(4, 1, 4, foo4, false);
+
+            // Poll the first buffer: creates a read-only copy and
+            // increments refcount on StreamBlock
+            AckingContainer cont1 = s.poll().get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            // Simulate a remote ack of the second buffer
+            // The log file should show:
+            // INFO  [main] EXPORT: Unable to release buffers to seqNo: 2, buffer [1, 1] is still in use
+            s.localAck(2);
+
+            // Verify we can poll past the ack point
+            AckingContainer cont3 = s.poll().get();
+            cont3.updateStartTime(System.currentTimeMillis());
+            assertEquals(3, cont3.m_lastSeqNo);
+
+            // Discard first polled buffers
+            cont1.discard();
+            cont3.discard();
+
+            // Verify we can poll the last buffer
+            AckingContainer cont4 = s.poll().get();
+            cont4.updateStartTime(System.currentTimeMillis());
+            assertEquals(4, cont4.m_lastSeqNo);
+
+            cont4.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    @Test
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -455,6 +575,7 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -530,6 +651,7 @@ public class TestExportDataSource extends TestCase {
     }
 
     // Test that gap release operates even when no further export rows are inserted
+    @Test
     public void testGapAutoRelease() throws Exception{
         System.out.println("Running testGapRelease");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -591,6 +713,7 @@ public class TestExportDataSource extends TestCase {
     }
 
     // Test that gap release operates even when no further export rows are inserted
+    @Test
     public void testGapNoAutoRelease() throws Exception{
         System.out.println("Running testGapNoAutoRelease");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -659,6 +782,7 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    @Test
     public void testPendingContainer() throws Exception{
         System.out.println("Running testPendingContainer");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");

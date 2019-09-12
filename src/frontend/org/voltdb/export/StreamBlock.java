@@ -79,7 +79,11 @@ public class StreamBlock {
         }
     }
 
-    long startSequenceNumber() {
+    public boolean canRelease() {
+        return m_refCount.get() == 1;
+    }
+
+    public long startSequenceNumber() {
         return m_startSequenceNumber;
     }
 
