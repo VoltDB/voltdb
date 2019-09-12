@@ -24,6 +24,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.messaging.FragmentTaskMessage;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -199,10 +200,17 @@ public class SystemProcedureCatalog {
         public final boolean transactional;
         // whether restartable
         public final boolean restartable;
+        // MP Durable and restartable yes
+        // MP not durable and restartable yes
+        // MP durable and not restartable no
+        // MP not durable and not restartable yes
 
         Config(String className, boolean singlePartition, boolean readOnly, boolean everySite, int partitionParam,
                 VoltType partitionParamType, boolean commercial, boolean terminatesReplication, boolean allowedInReplica,
                 boolean durable, boolean allowedInShutdown, boolean transactional, boolean restartable) {
+            Preconditions.checkArgument(!transactional || singlePartition || restartable || !durable,
+                    "Restartable but not durable MP System procedure %s has a risk of "
+                    + "corrupting commandlog therefore is disallowed", className);
             this.className = className;
             this.singlePartition = singlePartition;
             this.readOnly = readOnly;
@@ -386,7 +394,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.BalancePartitions",
                         false, false, false, 0, VoltType.INVALID,
                         true, false, false, true,
-                        false, true, false));
+                        false, true, true));
         builder.put("@UpdateCore",
                 new Config("org.voltdb.sysprocs.UpdateCore",
                         false, false, false, 0, VoltType.INVALID,
@@ -451,7 +459,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.LoadVoltTableMP",
                         false, false, false, 0, VoltType.INVALID,
                         true, false, true, true,
-                        false, true, false));
+                        false, true, true));
         builder.put("@ResetDR",
                 new Config("org.voltdb.sysprocs.ResetDR",
                         false, false, false, 0, VoltType.INVALID,
@@ -472,7 +480,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.UpdateSettings",
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, true,
-                        false, true, false));
+                        false, true, true));
         builder.put("@Ping",
                 new Config(null,
                         false, true,  false, 0, VoltType.INVALID,
@@ -572,7 +580,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.SwapTablesCore",
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, true,
-                        false, true, false));
+                        false, true, true));
         builder.put("@Trace",
                 new Config(null,
                         false, true,  false, 0, VoltType.INVALID,
