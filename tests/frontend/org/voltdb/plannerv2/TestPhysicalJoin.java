@@ -76,15 +76,15 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
     public void testMultiTableNLIJ() {
         m_tester.sql("SELECT R1.si, R2.bi, RI1.ti FROM R1 INNER JOIN R2 ON R1.i = R2.i "
                 + "INNER JOIN RI1 ON RI1.I = R1.I")
-                .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], BI=[$t5], TI=[$t3], split=[1])\n" +
-                        "  VoltPhysicalNestLoopJoin(condition=[=($0, $4)], joinType=[inner], split=[1])\n" +
-                        "    VoltPhysicalNestLoopIndexJoin(condition=[=($2, $0)], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], BI=[$t3], TI=[$t5], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($4, $0)], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                        "    VoltPhysicalNestLoopJoin(condition=[=($0, $2)], joinType=[inner], split=[1])\n" +
                         "      VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
                         "        VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "      VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
-                        "        VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n" +
-                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
-                        "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                        "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
+                        "        VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n")
                 .pass();
     }
 
@@ -203,5 +203,4 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
                         "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI2_IND1_ASCEQ0_0])\n")
                 .pass();
     }
-
 }

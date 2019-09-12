@@ -62,7 +62,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
 
     public static final RelOptRule INSTANCE_CALC_SSCAN = new VoltPNestLoopToIndexJoinRule(
             operand(VoltPhysicalNestLoopJoin.class,
-                    some(operand(/*RelNode*/VoltPhysicalCalc.class, any()),
+                    some(operand(RelNode.class, any()),
                             operand(VoltPhysicalCalc.class, operand(VoltPhysicalTableSequentialScan.class, none())))),
             "VoltPNestLoopToIndexJoin_Calc_SScan");
 
