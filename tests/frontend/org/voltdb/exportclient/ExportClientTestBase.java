@@ -26,9 +26,12 @@ package org.voltdb.exportclient;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.mockito.Mockito;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 
@@ -92,6 +95,9 @@ public class ExportClientTestBase {
     }
 
     protected void setup() {
+        ExportManagerInterface mockEM = Mockito.mock(ExportManagerInterface.class);
+        Mockito.when(mockEM.getExportMode()).thenReturn(ExportMode.BASIC);
+        ExportManagerInterface.setInstanceForTest(mockEM);
         vtable.clearRowData();
     }
 }

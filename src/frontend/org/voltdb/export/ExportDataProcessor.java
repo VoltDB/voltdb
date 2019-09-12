@@ -37,7 +37,7 @@ public interface ExportDataProcessor  {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
-    void setExportGeneration(ExportGeneration generation);
+    void setExportGeneration(Generation generation);
 
     /**
      * Get export client from processor, used by initializing export data source

@@ -152,7 +152,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -1930,7 +1930,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    ExportManager.instance().becomeLeader(spInitiator.getPartitionId());
+                    ExportManagerInterface.instance().becomeLeader(spInitiator.getPartitionId());
                 }
             }
         }
@@ -3714,7 +3714,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // shut down Export and its connectors.
-                ExportManager.instance().shutdown();
+                ExportManagerInterface.instance().shutdown();
 
                 // After sites are terminated, shutdown the DRProducer.
                 // The DRProducer is shared by all sites; don't kill it while any site is active.
@@ -3764,7 +3764,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
 
-                ExportManager.instance().shutdown();
                 m_computationService.shutdown();
                 m_computationService.awaitTermination(1, TimeUnit.DAYS);
                 m_computationService = null;
@@ -4007,7 +4006,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
+                ExportManagerInterface.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
                         requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic service throughput settings
@@ -4373,10 +4372,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // Allow export datasources to start consuming their binary deques safely
         // as at this juncture the initial truncation snapshot is already complete
-        ExportManager.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
+        ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
 
         // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-        ExportManager.instance().clientInterfaceStarted(m_clientInterface);
+        ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
 
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
@@ -4609,10 +4608,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
-            ExportManager.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
+            ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
 
             // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-            ExportManager.instance().clientInterfaceStarted(m_clientInterface);
+            ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData();
@@ -5030,8 +5029,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         int partitions = getLocalPartitionCount();
         int replicates = m_configuredReplicationFactor;
         int importPartitions = ImportManager.getPartitionsCount();
-        int exportTableCount = ExportManager.instance().getExportTablesCount();
-        int exportNonceCount = ExportManager.instance().getConnCount();
+        int exportTableCount = ExportManagerInterface.instance().getExportTablesCount();
+        int exportNonceCount = ExportManagerInterface.instance().getConnCount();
 
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
 
