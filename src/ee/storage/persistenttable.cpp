@@ -1936,7 +1936,10 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
-    if (isTableWithMigrate(m_tableType) && !originalTuple.isPendingDelete()) {
+
+    // When a tuple is in pending-delete state, the tuple has been deleted from migrating index:m_migratingRows.
+    // Migrating index swap is not needed.
+    if (!originalTuple.isPendingDelete() && isTableWithMigrate(m_tableType)) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
