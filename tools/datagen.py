@@ -19,7 +19,7 @@ def rand_char(len):
 
 def failwith(msg, retcode=2):
     print(msg)
-    sys.exit(2)
+    sys.exit(retcode)
 
 # constants for regex
 RE_WS = re.compile(' +')
@@ -54,7 +54,7 @@ def parse_table_field(field):
     elif ctype not in COLUMN_TYPES:
         failwith('Unknown column type parsed: %s' % ctype)
     else:
-        return COLUMN_TYPES[ctype](int(RE_COMMA_OR_RIGHT_PAREN.split(elms[1])[0]) if len(elms) > 1 else 0)
+        return COLUMN_TYPES[ctype](int(RE_COMMA_OR_RIGHT_PAREN.split(elms[1])[0]) if len(elms) > 1 else 64)
 
 def datagen(fn, number):
     return tuple(fn() for _ in range(number))
