@@ -662,6 +662,21 @@ public class TestTaskManager {
         validateStats(5);
     }
 
+    @Test
+    public void mustExecuteWorkProcsOnPartitions() throws Exception {
+        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 10, 100);
+        m_procedure.setSinglepartition(true);
+        m_procedure.setPartitionparameter(-1);
+
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.HOSTS.getId());
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.PARTITIONS.getId());
+        assertTrue(validateTask(task).isValid());
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -809,16 +824,8 @@ public class TestTaskManager {
     }
 
     public static class TestActionScheduler implements ActionScheduler {
-        private boolean setScopeIdCalled = false;
-
-        @Override
-        public void setScopeId(TaskScope scope, int id) {
-            setScopeIdCalled = true;
-        }
-
         @Override
         public DelayedAction getFirstDelayedAction() {
-            assertTrue(setScopeIdCalled);
             s_firstActionSchedulerCallCount.getAndIncrement();
             return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }

@@ -145,7 +145,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        public void sync() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
@@ -156,6 +156,12 @@ public class TestExportDataSource extends TestCase {
 
         @Override
         public void updateGenerationId(long genId) {
+        }
+
+        @Override
+        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+            // TODO Auto-generated method stub
+            return null;
         }
     }
 

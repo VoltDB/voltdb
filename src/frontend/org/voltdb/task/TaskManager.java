@@ -817,7 +817,7 @@ public final class TaskManager {
 
             if (takesHelper) {
                 validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
-                        scope, database);
+                        definition.getName(), scope, database);
             }
 
             try {
@@ -839,7 +839,18 @@ public final class TaskManager {
      * @param procedure {@link Procedure} instance to validate
      * @return {@code null} if procedure is valid for scope otherwise a detailed error message will be returned
      */
-    static String isProcedureValidForScope(TaskScope scope, Procedure procedure) {
+    static String isProcedureValidForScope(TaskScope scope, Procedure procedure, boolean restrictProcedureByScope) {
+        if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
+                && procedure.getPartitionparameter() == -1) {
+            return String.format(
+                    "Procedure %s is a work procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
+                    procedure.getTypeName(), scope.name().toLowerCase());
+        }
+
+        if (!restrictProcedureByScope) {
+            return null;
+        }
+
         switch (scope) {
         case DATABASE:
             break;
@@ -901,7 +912,7 @@ public final class TaskManager {
          * @return {@code true} if the scheduler and parameters which were tested are valid
          */
         public boolean isValid() {
-            return m_factory != null;
+            return m_errorMessage == null;
         }
 
         /**
@@ -998,8 +1009,8 @@ public final class TaskManager {
          */
         abstract void demotedPartition(int partitionId);
 
-        ActionScheduler constructScheduler(TaskHelper helper, TaskScope scope, int id) {
-            return m_factory.construct(helper, scope, id);
+        ActionScheduler constructScheduler(TaskHelper helper) {
+            return m_factory.construct(helper);
         }
 
         String generateLogMessage(String body) {
@@ -1247,8 +1258,8 @@ public final class TaskManager {
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
-                        new TaskHelper(log, this::generateLogMessage, getScope(), m_clientInterface), getScope(),
-                        getScopeId());
+                        new TaskHelper(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
+                                getScopeId(), m_clientInterface));
                 submitHandleNextRun();
             }
         }
@@ -1477,12 +1488,10 @@ public final class TaskManager {
                 return null;
             }
 
-            if (m_scheduler.restrictProcedureByScope()) {
-                String error = isProcedureValidForScope(getScope(), procedure);
-                if (error != null) {
-                    errorOccurred(error);
-                    return null;
-                }
+            String error = isProcedureValidForScope(getScope(), procedure, m_scheduler.restrictProcedureByScope());
+            if (error != null) {
+                errorOccurred(error);
+                return null;
             }
 
             return procedure;
@@ -1669,11 +1678,9 @@ public final class TaskManager {
     private interface SchedulerFactory {
         /**
          * @param helper which can be passed to the constructed classes
-         * @param scope  {@link TaskScope} in which this instance will run
-         * @param id     for the {@code scope} in which this instance will run
          * @return New instance of an {@link ActionScheduler}
          */
-        ActionScheduler construct(TaskHelper helper, TaskScope scope, int id);
+        ActionScheduler construct(TaskHelper helper);
 
         /**
          * Compare the hashes of the classes used to construct the {@link ActionScheduler} returned by this factory and
@@ -1708,7 +1715,7 @@ public final class TaskManager {
             this.m_classHash = classHash;
         }
 
-        public T construct(TaskHelper helper, TaskScope scope, int id) {
+        public T construct(TaskHelper helper) {
             try {
                 T instance = m_constructor.newInstance();
                 if (m_initMethod != null) {
@@ -1717,7 +1724,6 @@ public final class TaskManager {
                     }
                     m_initMethod.invoke(instance, m_parameters);
                 }
-                instance.setScopeId(scope, id);
                 if (m_classDeps == null) {
                     m_classDeps = instance.getDependencies();
                 }
@@ -1772,8 +1778,8 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
-            return m_factory.construct(helper, scope, id);
+        public ActionScheduler construct(TaskHelper helper) {
+            return m_factory.construct(helper);
         }
 
         @Override
@@ -1800,9 +1806,9 @@ public final class TaskManager {
         }
 
         @Override
-        public ActionScheduler construct(TaskHelper helper, TaskScope scope, int id) {
-            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper, scope, id),
-                    m_actionScheduleFactory.construct(helper, scope, id));
+        public ActionScheduler construct(TaskHelper helper) {
+            return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper),
+                    m_actionScheduleFactory.construct(helper));
         }
 
         @Override

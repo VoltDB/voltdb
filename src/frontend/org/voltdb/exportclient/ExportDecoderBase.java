@@ -51,6 +51,10 @@ public abstract class ExportDecoderBase {
     public static final int INTERNAL_FIELD_COUNT = ExportRow.INTERNAL_FIELD_COUNT;
     public static final int PARTITION_ID_INDEX = 3;
 
+    // Default executor service, using a thread terminating after 1s keepAlive
+    private static final ListeningExecutorService DEFAULT_EXECUTOR = CoreUtils.getCachedSingleThreadExecutor(
+            "Default Export Decoder thread", 1000);
+
     public static class RestartBlockException extends Exception {
         private static final long serialVersionUID = 1L;
         public final boolean requestBackoff;
@@ -263,7 +267,7 @@ public abstract class ExportDecoderBase {
     }
 
     public ListeningExecutorService getExecutor() {
-        return CoreUtils.LISTENINGSAMETHREADEXECUTOR;
+        return DEFAULT_EXECUTOR;
     }
 
     public int getPartition() {

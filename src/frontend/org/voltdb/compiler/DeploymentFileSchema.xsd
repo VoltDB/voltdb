@@ -42,6 +42,7 @@
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
+      <xs:element name="threadpools" minOccurs="0" maxOccurs="1" type="threadPoolsType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
@@ -50,6 +51,7 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
+      <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="tasks" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
     </xs:all>
   </xs:complexType>
@@ -241,7 +243,7 @@
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
-        <xs:element name="flushInterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
+        <xs:element name="flushinterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
     </xs:all>
   </xs:complexType>
 
@@ -361,11 +363,30 @@
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
+    <!-- <threadpools> -->
+    <xs:complexType name="threadPoolsType">
+        <xs:sequence>
+            <xs:element name="pool" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="name" type="xs:string" use="required"/>
+                    <xs:attribute name="size" type="threadPoolSize" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="threadPoolSize">
+        <xs:restriction base="xs:int">
+            <xs:minInclusive value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
   <!-- <export> -->
   <xs:complexType name="exportType">
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
+    <xs:attribute name="defaultpoolsize" type="threadPoolSize"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
@@ -376,6 +397,7 @@
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
+    <xs:attribute name="threadpool" type="xs:string" default=""/>
   </xs:complexType>
 
   <!-- <import> -->
@@ -523,6 +545,17 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name="featuresType">
+    <xs:sequence>
+        <xs:element name="feature" type="featureType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="featureType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="option" type="xs:string" use="required"/>
   </xs:complexType>
 
 </xs:schema>

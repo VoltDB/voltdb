@@ -33,6 +33,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExporterVersion;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -133,6 +134,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_sslExternal = m_sslExternal;
         cl.m_sslInternal = m_sslInternal;
         cl.m_placementGroup = m_placementGroup;
+        cl.m_exporterVersion = m_exporterVersion;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<>();
@@ -803,6 +805,13 @@ public class CommandLine extends VoltDB.Configuration
         if ( m_missingHostCount > 0) {
             cmdline.add("missing"); cmdline.add(Integer.toString(m_missingHostCount));
         }
+
+        if (m_exporterVersion == ExporterVersion.E2) {
+            cmdline.add("e2");
+        } else if (m_exporterVersion == ExporterVersion.E3) {
+            cmdline.add("e3");
+        }
+
         return cmdline;
     }
 
