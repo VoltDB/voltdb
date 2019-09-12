@@ -435,6 +435,7 @@ public class TestTaskManager {
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue("Count decreased for " + scheduleName,
                     invocationCounts.put(scheduleName, currentCount) < currentCount);
+            invocationCounts.put(scheduleName, currentCount);
         }
 
         Thread.sleep(5);
