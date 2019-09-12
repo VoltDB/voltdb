@@ -483,8 +483,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Release buffers
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
+            if (!sb.canRelease()) {
+                exportLog.info("Unable to release buffers to seqNo: " + releaseSeqNo
+                        + ", buffer [" + sb.startSequenceNumber() + ", "
+                        + sb.lastSequenceNumber() + "] is still in use");
+                break;
+            }
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
+                    assert sb.canRelease();
                     m_committedBuffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
