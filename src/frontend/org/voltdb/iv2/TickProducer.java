@@ -66,7 +66,7 @@ public class TickProducer extends SiteTasker implements Runnable
                 .getCatalogContext()
                 .getDeployment()
                 .getSystemsettings()
-                .getFlushInterval().getMinimum();
+                .getFlushinterval().getMinimum();
 
         m_scheduledTick = VoltDB.instance().schedulePriorityWork(
                 this,
