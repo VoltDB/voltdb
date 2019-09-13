@@ -979,7 +979,7 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
     BOOST_FOREACH(int func, funcs) {
         // test null values
         ASSERT_EQ(0, testBinary(func, 1, nullTimestamp, nullTimestamp, true));
-        ASSERT_EQ(0, testBinary(func, NValue::getNullValue(VALUE_TYPE_BIGINT),
+        ASSERT_EQ(0, testBinary(func, NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT),
                                 minValidTimestamp, nullTimestamp, true));
 
         ASSERT_EQ("success", testBinaryThrows(func, 1, minInt64, outOfRangeMessage));
@@ -1062,7 +1062,7 @@ TEST_F(FunctionTest, DateFunctionsToTimestamp) {
         1
     };
 
-    const NValue nullBigint = NValue::getNullValue(VALUE_TYPE_NULL);
+    const NValue nullBigint = NValue::getNullValue(ValueType::VALUE_TYPE_NULL);
 
     const std::string outOfRangeMessage = getInputOutOfRangeMessage("TO_TIMESTAMP");
     const std::string outputOutOfRangeMessage = getOutputOutOfRangeMessage("TO_TIMESTAMP");
@@ -1122,8 +1122,8 @@ TEST_F(FunctionTest, TestTimestampValidity)
                            True));
     // Test null input
     ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
-                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
-                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
+                           NValue::getNullValue(ValueType::VALUE_TYPE_TIMESTAMP),
+                           NValue::getNullValue(ValueType::VALUE_TYPE_TIMESTAMP),
                            True));
 }
 

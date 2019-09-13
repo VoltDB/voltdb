@@ -56,11 +56,11 @@ public:
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
 
-        m_tableSchemaTypes.push_back(VALUE_TYPE_TINYINT);
-        m_tableSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
-        m_tableSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
+        m_tableSchemaTypes.push_back(ValueType::VALUE_TYPE_TINYINT);
+        m_tableSchemaTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);
+        m_tableSchemaTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TINYINT));
         m_tableSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(100);
 

@@ -164,7 +164,7 @@ protected:
 
         // Add a null value
         tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(pk));
-        tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+        tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
         table->insertTuple(tempTuple);
 
         // Dump some stats about the index.
@@ -189,7 +189,7 @@ protected:
         int numDeleted = 0;
 
         StandAloneTupleStorage tableTuple(table->schema());
-        tableTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+        tableTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
 
         auto start = std::chrono::high_resolution_clock::now();
         std::chrono::microseconds usSpentDeleting = std::chrono::duration_cast<microseconds>(start - start);
@@ -382,10 +382,10 @@ protected:
         ValueType vt = ValuePeeker::peekValueType(nval);
         NValue wkt;
         switch (vt) {
-        case VALUE_TYPE_GEOGRAPHY:
+            case ValueType::VALUE_TYPE_GEOGRAPHY:
             wkt = nval.callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>();
             break;
-        case VALUE_TYPE_POINT:
+            case ValueType::VALUE_TYPE_POINT:
             wkt = nval.callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>();
             break;
         default:
@@ -408,10 +408,10 @@ private:
     // And the rest are VARBINARY(63)
     static TupleSchema* createTupleSchemaWithExtraCols(int numExtraCols) {
         TupleSchemaBuilder builder(2 + numExtraCols);
-        builder.setColumnAtIndex(PK_COL_INDEX, VALUE_TYPE_INTEGER);
-        builder.setColumnAtIndex(GEOG_COL_INDEX, VALUE_TYPE_GEOGRAPHY, 32767);
+        builder.setColumnAtIndex(PK_COL_INDEX, ValueType::VALUE_TYPE_INTEGER);
+        builder.setColumnAtIndex(GEOG_COL_INDEX, ValueType::VALUE_TYPE_GEOGRAPHY, 32767);
         for (int i = FIRST_EXTRA_COL_INDEX; i < 2 + numExtraCols; ++i) {
-            builder.setColumnAtIndex(i, VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
+            builder.setColumnAtIndex(i, ValueType::VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
         }
         return builder.build();
     }
@@ -528,7 +528,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
     table->insertTuple(tempTuple);
 
     tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(2));
-    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
 
     tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(3));
     tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((0 0, 5 0, 0 5, 0 0))"));
@@ -553,7 +553,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
 
     // Now try to delete a tuple.
     tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(3));
-    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
     TableTuple foundTuple = table->lookupTupleByValues(tempTuple);
     ASSERT_FALSE(foundTuple.isNullTuple());
     table->deleteTuple(foundTuple);
@@ -578,7 +578,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0, 1});
 
     // Searching for the null value should return nothing.
-    searchKey.tuple().setNValue(0, NValue::getNullValue(VALUE_TYPE_POINT));
+    searchKey.tuple().setNValue(0, NValue::getNullValue(ValueType::VALUE_TYPE_POINT));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), emptySet);
 
     // Make sure the index is still valid what with all these changes and all.
@@ -597,8 +597,8 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
     oldTuple.tuple().setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
     newTuple.tuple().setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
 
-    oldTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
-    newTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    oldTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
+    newTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY));
 
     // Both tuples are null, so no index update necessary
     EXPECT_FALSE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));

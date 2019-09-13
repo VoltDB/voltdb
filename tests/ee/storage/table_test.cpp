@@ -75,25 +75,27 @@ using namespace voltdb;
 #define NUM_OF_COLUMNS 9
 #define NUM_OF_TUPLES 5000
 
-ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_TINYINT,
-                                            VALUE_TYPE_SMALLINT,
-                                            VALUE_TYPE_INTEGER,
-                                            VALUE_TYPE_BIGINT,
-                                            VALUE_TYPE_DECIMAL,
-                                            VALUE_TYPE_DOUBLE,
-                                            VALUE_TYPE_TIMESTAMP,
-                                            VALUE_TYPE_VARCHAR,
-                                            VALUE_TYPE_VARBINARY };
+ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = {
+    ValueType::VALUE_TYPE_TINYINT,
+    ValueType::VALUE_TYPE_SMALLINT,
+    ValueType::VALUE_TYPE_INTEGER,
+    ValueType::VALUE_TYPE_BIGINT,
+    ValueType::VALUE_TYPE_DECIMAL,
+    ValueType::VALUE_TYPE_DOUBLE,
+    ValueType::VALUE_TYPE_TIMESTAMP,
+    ValueType::VALUE_TYPE_VARCHAR,
+    ValueType::VALUE_TYPE_VARBINARY
+};
 
 int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
     {
-        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),    // 1
-        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),   // 2
-        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),    // 4
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),     // 8
-        NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL),    // 16
-        NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE),     // 8
-        NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP),  // 8
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TINYINT),    // 1
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_SMALLINT),   // 2
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER),    // 4
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT),     // 8
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DECIMAL),    // 16
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DOUBLE),     // 8
+        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TIMESTAMP),  // 8
         10,    /* The test uses getRandomValue() to generate random value,
                   make sure the column size not conflict with the value it generates. */
         16     /* same as above */

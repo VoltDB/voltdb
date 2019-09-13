@@ -63,9 +63,9 @@ public:
 protected:
     void addParameters(int32_t valueA, double valueB, std::string valueC) {
         prepareParamsBufferForNextFragment();
-        addParameterToBuffer(voltdb::VALUE_TYPE_INTEGER, &valueA);
-        addParameterToBuffer(voltdb::VALUE_TYPE_DOUBLE,  &valueB);
-        addParameterToBuffer(voltdb::VALUE_TYPE_VARCHAR, valueC.c_str(), valueC.size());
+        addParameterToBuffer(voltdb::ValueType::VALUE_TYPE_INTEGER, &valueA);
+        addParameterToBuffer(voltdb::ValueType::VALUE_TYPE_DOUBLE,  &valueB);
+        addParameterToBuffer(voltdb::ValueType::VALUE_TYPE_VARCHAR, valueC.c_str(), valueC.size());
     }
 
     void validateRow(voltdb::TableTuple &tuple, int32_t valueA, double valueB, const char* valueC) {

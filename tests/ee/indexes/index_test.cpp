@@ -103,8 +103,8 @@ public:
         vector<boost::shared_ptr<const TableColumn> > columns;
         vector<string> columnNames(num_of_columns);
 
-        vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
-        vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        vector<ValueType> columnTypes(num_of_columns, ValueType::VALUE_TYPE_BIGINT);
+        vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
         vector<bool> columnAllowNull(num_of_columns, false);
 
         char buffer[32];
@@ -284,10 +284,10 @@ public:
         vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
-        vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
+        vector<ValueType> columnTypes(NUM_OF_COLUMNS, ValueType::VALUE_TYPE_BIGINT);
         vector<int32_t>
             columnLengths(NUM_OF_COLUMNS,
-                          NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+                          NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
         vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++)
         {
@@ -399,7 +399,7 @@ TEST_F(IndexTest, IntUnique) {
     vector<int> iu_column_indices;
     vector<ValueType> iu_column_types;
     iu_column_indices.push_back(3);
-    iu_column_types.push_back(VALUE_TYPE_BIGINT);
+    iu_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
 
     init("iu",
          BALANCED_TREE_INDEX,
@@ -418,7 +418,7 @@ TEST_F(IndexTest, IntMulti) {
     vector<int> im_column_indices;
     vector<ValueType> im_column_types;
     im_column_indices.push_back(3);
-    im_column_types.push_back(VALUE_TYPE_BIGINT);
+    im_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("im",
          BALANCED_TREE_INDEX,
          im_column_indices,
@@ -436,8 +436,8 @@ TEST_F(IndexTest, IntsUnique) {
     vector<ValueType> ixu_column_types;
     ixu_column_indices.push_back(4);
     ixu_column_indices.push_back(2);
-    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixu_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixu_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixu",
          BALANCED_TREE_INDEX,
          ixu_column_indices,
@@ -452,9 +452,9 @@ TEST_F(IndexTest, IntsUnique) {
     //EXPECT_EQ(62520, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
     vector<int32_t>
-        keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -598,8 +598,8 @@ TEST_F(IndexTest, IntsMulti) {
     vector<ValueType> ixm_column_types;
     ixm_column_indices.push_back(4);
     ixm_column_indices.push_back(2);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixm2",
          BALANCED_TREE_INDEX,
          ixm_column_indices,
@@ -613,9 +613,9 @@ TEST_F(IndexTest, IntsMulti) {
     //EXPECT_EQ(52000, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
     vector<int32_t>
-        keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -753,8 +753,8 @@ TEST_F(IndexTest, TupleKeyUnique) {
     // make a tuple with the index key schema
     int indexWidth = 40;
     vector<bool> keyColumnAllowNull(indexWidth, true);
-    vector<ValueType> keyColumnTypes(indexWidth, VALUE_TYPE_BIGINT);
-    vector<int32_t> keyColumnLengths(indexWidth, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<ValueType> keyColumnTypes(indexWidth, ValueType::VALUE_TYPE_BIGINT);
+    vector<int32_t> keyColumnLengths(indexWidth, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     TupleSchema *keySchema = TupleSchema::createTupleSchemaForTest(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
     TableTuple searchkey(keySchema);
     // provide storage for search key tuple
@@ -830,8 +830,8 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     vector<ValueType> ixu_column_types;
     ixu_column_indices.push_back(4);
     ixu_column_indices.push_back(2);
-    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixu_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixu_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixu",
             BALANCED_TREE_INDEX,
             ixu_column_indices,
@@ -844,9 +844,9 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
     vector<int32_t>
-    keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
             TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -920,8 +920,8 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     vector<ValueType> ixm_column_types;
     ixm_column_indices.push_back(4);
     ixm_column_indices.push_back(2);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixm2",
          BALANCED_TREE_INDEX,
          ixm_column_indices,
@@ -933,8 +933,8 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
+    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -1006,8 +1006,8 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     vector<ValueType> ixm_column_types;
     ixm_column_indices.push_back(4);
     ixm_column_indices.push_back(2);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixh1",
          HASH_TABLE_INDEX,
          ixm_column_indices,
@@ -1019,8 +1019,8 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
+    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -1062,8 +1062,8 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     vector<ValueType> ixm_column_types;
     ixm_column_indices.push_back(4);
     ixm_column_indices.push_back(2);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
-    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     init("ixh2",
          HASH_TABLE_INDEX,
          ixm_column_indices,
@@ -1075,8 +1075,8 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<ValueType> keyColumnTypes(2, ValueType::VALUE_TYPE_BIGINT);
+    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,

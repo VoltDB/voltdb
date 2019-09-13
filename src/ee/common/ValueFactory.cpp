@@ -23,54 +23,57 @@ NValue ValueFactory::getRandomValue(ValueType type,
                                     uint32_t maxLength,
                                     Pool* pool) {
     switch (type) {
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             return ValueFactory::getTinyIntValue(static_cast<int8_t>(rand() % 128));
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             return ValueFactory::getSmallIntValue(static_cast<int16_t>(rand() % 32768));
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
-        case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_BIGINT:
             return ValueFactory::getBigIntValue(rand());
-        case VALUE_TYPE_DECIMAL: {
-            char characters[29];
-            int i;
-            for (i = 0; i < 15; ++i) {
-                characters[i] = (char)(48 + (rand() % 10));
+        case ValueType::VALUE_TYPE_DECIMAL:
+            {
+                char characters[29];
+                int i;
+                for (i = 0; i < 15; ++i) {
+                    characters[i] = (char)(48 + (rand() % 10));
+                }
+                characters[i] = '.';
+                for (i = 16; i < 28; ++i) {
+                    characters[i] = (char)(48 + (rand() % 10));
+                }
+                characters[i] = '\0';
+                return ValueFactory::getDecimalValueFromString(std::string(characters));
             }
-            characters[i] = '.';
-            for (i = 16; i < 28; ++i) {
-                characters[i] = (char)(48 + (rand() % 10));
-            }
-            characters[i] = '\0';
-            return ValueFactory::getDecimalValueFromString(std::string(characters));
-        }
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / double((rand() % 10000) + 1));
-        case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % maxLength);
-            char characters[maxLength];
-            for (int ii = 0; ii < length; ii++) {
-                characters[ii] = char(32 + (rand() % 94)); //printable characters
+        case ValueType::VALUE_TYPE_VARCHAR:
+            {
+                int length = (rand() % maxLength);
+                char characters[maxLength];
+                for (int ii = 0; ii < length; ii++) {
+                    characters[ii] = char(32 + (rand() % 94)); //printable characters
+                }
+                characters[length] = '\0';
+                return ValueFactory::getStringValue(string(characters), pool);
             }
-            characters[length] = '\0';
-            return ValueFactory::getStringValue(string(characters), pool);
-        }
-        case VALUE_TYPE_VARBINARY: {
-            int length = (rand() % maxLength);
-            unsigned char bytes[maxLength];
-            for (int ii = 0; ii < length; ii++) {
-                bytes[ii] = static_cast<unsigned char>(rand() % 256);
+        case ValueType::VALUE_TYPE_VARBINARY:
+            {
+                int length = (rand() % maxLength);
+                unsigned char bytes[maxLength];
+                for (int ii = 0; ii < length; ii++) {
+                    bytes[ii] = static_cast<unsigned char>(rand() % 256);
+                }
+                bytes[length] = '\0';
+                return ValueFactory::getBinaryValue(bytes, length, pool);
             }
-            bytes[length] = '\0';
-            return ValueFactory::getBinaryValue(bytes, length, pool);
-        }
             break;
-        case VALUE_TYPE_ARRAY:
-        default: {
-            throwSerializableEEException("Attempted to get a random value of unsupported value type %d", type);
-        }
+        case ValueType::VALUE_TYPE_ARRAY:
+        default:
+            throwSerializableEEException("Attempted to get a random value of unsupported value type %s",
+                    getTypeName(type).c_str());
     }
 }
 

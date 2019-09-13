@@ -35,27 +35,27 @@ namespace voltdb {
 class ValuePeeker {
 public:
     static double peekDouble(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_DOUBLE);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_DOUBLE);
         return value.getDouble();
     }
 
     static int8_t peekTinyInt(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_TINYINT);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_TINYINT);
         return value.getTinyInt();
     }
 
     static int16_t peekSmallInt(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_SMALLINT);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_SMALLINT);
         return value.getSmallInt();
     }
 
     static int32_t peekInteger(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_INTEGER);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_INTEGER);
         return value.getInteger();
     }
 
     static bool peekBoolean(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_BOOLEAN);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_BOOLEAN);
         return value.getBoolean();
     }
 
@@ -67,12 +67,12 @@ public:
     }
 
     static int64_t peekBigInt(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_BIGINT);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_BIGINT);
         return value.getBigInt();
     }
 
     static int64_t peekTimestamp(const NValue& value) {
-        vassert(value.getValueType() == VALUE_TYPE_TIMESTAMP);
+        vassert(value.getValueType() == ValueType::VALUE_TYPE_TIMESTAMP);
         return value.getTimestamp();
     }
 
@@ -144,13 +144,13 @@ public:
     static const char* peekPointerToDataBytes(const NValue &value, int32_t *length) {
         ValueType vt = value.getValueType();
         switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_DECIMAL:
-        case VALUE_TYPE_BOOLEAN:
+            case ValueType::VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_BOOLEAN:
             *length = static_cast<int32_t>(NValue::getTupleStorageSize(vt));
             return value.m_data;
 

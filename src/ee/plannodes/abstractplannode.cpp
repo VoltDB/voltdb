@@ -215,7 +215,7 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColum
 
 TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema() {
     // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
-    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
+    vector<voltdb::ValueType> columnTypes(1, ValueType::VALUE_TYPE_BIGINT);
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
     vector<bool> columnInBytes(1, false);

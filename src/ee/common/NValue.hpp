@@ -553,34 +553,34 @@ class NValue {
         std::stringstream value;
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 // This cast keeps the tiny int from being confused for a char.
                 value << static_cast<int>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 value << getSmallInt();
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 value << getInteger();
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 value << getBigInt();
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 // Use the specific standard SQL formatting for float values,
                 // which the C/C++ format options don't quite support.
                 streamSQLFloatFormat(value, getDouble());
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 value << createStringFromDecimal();
                 break;
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 {
                     int32_t length;
                     const char* buf = getObject_withoutNull(length);
                     return std::string(buf, length);
                 }
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
                 {
                     int32_t length;
                     const char* buf = getObject_withoutNull(length);
@@ -591,11 +591,11 @@ class NValue {
                     catalog::Catalog::hexEncodeString(buf, scratch.get(), length);
                     return std::string(scratch.get(), length * 2);
                 }
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 streamTimestamp(value);
                 break;
             default:
-                throwCastSQLException(type, VALUE_TYPE_VARCHAR);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_VARCHAR);
         }
         return value.str();
     }
@@ -627,32 +627,32 @@ class NValue {
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
         switch (vta) {
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP:
-            rt = s_intPromotionTable[vtb];
-            break;
+            case ValueType::VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
+                rt = s_intPromotionTable[static_cast<int>(vtb)];
+                break;
 
-          case VALUE_TYPE_DECIMAL:
-            rt = s_decimalPromotionTable[vtb];
-            break;
+            case ValueType::VALUE_TYPE_DECIMAL:
+                rt = s_decimalPromotionTable[static_cast<int>(vtb)];
+                break;
 
-          case VALUE_TYPE_DOUBLE:
-            rt = s_doublePromotionTable[vtb];
-            break;
+            case ValueType::VALUE_TYPE_DOUBLE:
+                rt = s_doublePromotionTable[static_cast<int>(vtb)];
+                break;
 
-          // no valid promotion (currently) for these types
-          case VALUE_TYPE_ADDRESS:
-          case VALUE_TYPE_VARCHAR:
-          case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_BOOLEAN:
-          case VALUE_TYPE_INVALID:
-          case VALUE_TYPE_NULL:
-          default:
-            rt = VALUE_TYPE_INVALID;
-            break;
+                // no valid promotion (currently) for these types
+            case ValueType::VALUE_TYPE_ADDRESS:
+            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_BOOLEAN:
+            case ValueType::VALUE_TYPE_INVALID:
+            case ValueType::VALUE_TYPE_NULL:
+            default:
+                rt = ValueType::VALUE_TYPE_INVALID;
+                break;
         }
         // There ARE rare but legitimate runtime type check exceptions in SQL, so
         // unless/until those legitimate cases get re-routed to some other code path,
@@ -919,92 +919,93 @@ private:
 
     // getters
     const int8_t& getTinyInt() const {
-        vassert(getValueType() == VALUE_TYPE_TINYINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_TINYINT);
         return *reinterpret_cast<const int8_t*>(m_data);
     }
 
     int8_t& getTinyInt() {
-        vassert(getValueType() == VALUE_TYPE_TINYINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_TINYINT);
         return *reinterpret_cast<int8_t*>(m_data);
     }
 
     const int16_t& getSmallInt() const {
-        vassert(getValueType() == VALUE_TYPE_SMALLINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_SMALLINT);
         return *reinterpret_cast<const int16_t*>(m_data);
     }
 
     int16_t& getSmallInt() {
-        vassert(getValueType() == VALUE_TYPE_SMALLINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_SMALLINT);
         return *reinterpret_cast<int16_t*>(m_data);
     }
 
     const int32_t& getInteger() const {
-        vassert(getValueType() == VALUE_TYPE_INTEGER);
+        vassert(getValueType() == ValueType::VALUE_TYPE_INTEGER);
         return *reinterpret_cast<const int32_t*>(m_data);
     }
 
     int32_t& getInteger() {
-        vassert(getValueType() == VALUE_TYPE_INTEGER);
+        vassert(getValueType() == ValueType::VALUE_TYPE_INTEGER);
         return *reinterpret_cast<int32_t*>(m_data);
     }
 
     const int64_t& getBigInt() const {
-       vassert((getValueType() == VALUE_TYPE_BIGINT) || (getValueType() == VALUE_TYPE_TIMESTAMP) ||
-             (getValueType() == VALUE_TYPE_ADDRESS));
+       vassert(getValueType() == ValueType::VALUE_TYPE_BIGINT ||
+               getValueType() == ValueType::VALUE_TYPE_TIMESTAMP ||
+             getValueType() == ValueType::VALUE_TYPE_ADDRESS);
         return *reinterpret_cast<const int64_t*>(m_data);
     }
 
     int64_t& getBigInt() {
-        vassert((getValueType() == VALUE_TYPE_BIGINT) ||
-               (getValueType() == VALUE_TYPE_TIMESTAMP) ||
-               (getValueType() == VALUE_TYPE_ADDRESS));
+        vassert(getValueType() == ValueType::VALUE_TYPE_BIGINT ||
+               getValueType() == ValueType::VALUE_TYPE_TIMESTAMP ||
+               getValueType() == ValueType::VALUE_TYPE_ADDRESS);
         return *reinterpret_cast<int64_t*>(m_data);
     }
 
     const int64_t& getTimestamp() const {
-        vassert(getValueType() == VALUE_TYPE_TIMESTAMP);
+        vassert(getValueType() == ValueType::VALUE_TYPE_TIMESTAMP);
         return *reinterpret_cast<const int64_t*>(m_data);
     }
 
     int64_t& getTimestamp() {
-        vassert(getValueType() == VALUE_TYPE_TIMESTAMP);
+        vassert(getValueType() == ValueType::VALUE_TYPE_TIMESTAMP);
         return *reinterpret_cast<int64_t*>(m_data);
     }
 
     const double& getDouble() const {
-        vassert(getValueType() == VALUE_TYPE_DOUBLE);
+        vassert(getValueType() == ValueType::VALUE_TYPE_DOUBLE);
         return *reinterpret_cast<const double*>(m_data);
     }
 
     double& getDouble() {
-        vassert(getValueType() == VALUE_TYPE_DOUBLE);
+        vassert(getValueType() == ValueType::VALUE_TYPE_DOUBLE);
         return *reinterpret_cast<double*>(m_data);
     }
 
     const TTInt& getDecimal() const {
-        vassert(getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(getValueType() == ValueType::VALUE_TYPE_DECIMAL);
         const void* retval = reinterpret_cast<const void*>(m_data);
         return *reinterpret_cast<const TTInt*>(retval);
     }
 
     TTInt& getDecimal() {
-        vassert(getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(getValueType() == ValueType::VALUE_TYPE_DECIMAL);
         void* retval = reinterpret_cast<void*>(m_data);
         return *reinterpret_cast<TTInt*>(retval);
     }
 
     const bool& getBoolean() const {
-        vassert(getValueType() == VALUE_TYPE_BOOLEAN);
+        vassert(getValueType() == ValueType::VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<const bool*>(m_data);
     }
 
     bool& getBoolean() {
-        vassert(getValueType() == VALUE_TYPE_BOOLEAN);
+        vassert(getValueType() == ValueType::VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<bool*>(m_data);
     }
 
     GeographyPointValue& getGeographyPointValue() {
-        vassert(getValueType() == VALUE_TYPE_POINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_POINT);
         return *reinterpret_cast<GeographyPointValue*>(m_data);
     }
 
@@ -1013,12 +1014,12 @@ private:
         BOOST_STATIC_ASSERT_MSG(sizeof(GeographyPointValue) <= sizeof(m_data),
                                 "Size of Point is too large for NValue m_data");
 
-        vassert(getValueType() == VALUE_TYPE_POINT);
+        vassert(getValueType() == ValueType::VALUE_TYPE_POINT);
         return *reinterpret_cast<const GeographyPointValue*>(m_data);
     }
 
     const GeographyValue getGeographyValue() const {
-        vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+        vassert(getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
 
         if (isNull()) {
             return GeographyValue();
@@ -1033,14 +1034,13 @@ private:
 
     static void throwCastSQLException(const ValueType origType, const ValueType newType) {
         throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
-                "Type %s can't be cast as %s",
-                valueToString(origType).c_str(), valueToString(newType).c_str());
+                "Type %s can't be cast as %s", valueToString(origType).c_str(), valueToString(newType).c_str());
     }
 
     /** return the whole part of a TTInt*/
     static inline int64_t narrowDecimalToBigInt(TTInt &scaledValue) {
         if (scaledValue > NValue::s_maxInt64AsDecimal || scaledValue < NValue::s_minInt64AsDecimal) {
-            throwCastSQLValueOutOfRangeException<TTInt>(scaledValue, VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
+            throwCastSQLValueOutOfRangeException<TTInt>(scaledValue, ValueType::VALUE_TYPE_DECIMAL, ValueType::VALUE_TYPE_BIGINT);
         }
         TTInt whole(scaledValue);
         whole /= kMaxScaleFactor;
@@ -1062,20 +1062,20 @@ private:
        vassert(isNull() == false);
 
        const ValueType type = getValueType();
-       vassert(type != VALUE_TYPE_NULL);
+       vassert(type != ValueType::VALUE_TYPE_NULL);
        switch (type) {
-          case VALUE_TYPE_TINYINT:
+           case ValueType::VALUE_TYPE_TINYINT:
              return static_cast<int64_t>(getTinyInt());
-          case VALUE_TYPE_SMALLINT:
+           case ValueType::VALUE_TYPE_SMALLINT:
              return static_cast<int64_t>(getSmallInt());
-          case VALUE_TYPE_INTEGER:
+           case ValueType::VALUE_TYPE_INTEGER:
              return static_cast<int64_t>(getInteger());
-          case VALUE_TYPE_BIGINT:
+           case ValueType::VALUE_TYPE_BIGINT:
              return getBigInt();
-          case VALUE_TYPE_TIMESTAMP:
+           case ValueType::VALUE_TYPE_TIMESTAMP:
              return getTimestamp();
           default:
-             throwCastSQLException(type, VALUE_TYPE_BIGINT);
+             throwCastSQLException(type, ValueType::VALUE_TYPE_BIGINT);
              return 0; // NOT REACHED
        }
     }
@@ -1090,22 +1090,22 @@ private:
         const ValueType type = getValueType();
         int64_t value;
         switch (type) {
-            case VALUE_TYPE_NULL:
+            case ValueType::VALUE_TYPE_NULL:
                 return INT32_NULL;
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 return static_cast<int32_t>(getTinyInt());
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 return static_cast<int32_t>(getSmallInt());
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 return getInteger();
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 value = getBigInt();
                 if (value > (int64_t)INT32_MAX || value < (int64_t)VOLT_INT32_MIN) {
-                    throwCastSQLValueOutOfRangeException<int64_t>(value, VALUE_TYPE_BIGINT, VALUE_TYPE_INTEGER);
+                    throwCastSQLValueOutOfRangeException<int64_t>(value, ValueType::VALUE_TYPE_BIGINT, ValueType::VALUE_TYPE_INTEGER);
                 }
                 return static_cast<int32_t>(value);
             default:
-                throwCastSQLException(type, VALUE_TYPE_INTEGER);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_INTEGER);
                 return 0; // NOT REACHED
         }
     }
@@ -1114,23 +1114,23 @@ private:
         vassert(isNull() == false);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_NULL:
+            case ValueType::VALUE_TYPE_NULL:
                 return DOUBLE_MIN;
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 return static_cast<double>(getTinyInt());
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 return static_cast<double>(getSmallInt());
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 return static_cast<double>(getInteger());
-            case VALUE_TYPE_ADDRESS:
+            case ValueType::VALUE_TYPE_ADDRESS:
                 return static_cast<double>(getBigInt());
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 return static_cast<double>(getBigInt());
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 return static_cast<double>(getTimestamp());
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 return getDouble();
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = getDecimal();
                     // we only deal with the decimal number within int64_t range here
@@ -1139,10 +1139,10 @@ private:
                     return static_cast<double>(whole) +
                         (static_cast<double>(fractional)/static_cast<double>(kMaxScaleFactor));
                 }
-            case VALUE_TYPE_VARCHAR:
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_DOUBLE);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_DOUBLE);
                 return 0; // NOT REACHED
         }
     }
@@ -1151,20 +1151,20 @@ private:
         vassert(isNull() == false);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 {
                     int64_t value = castAsBigIntAndGetValue();
                     TTInt retval(value);
                     retval *= kMaxScaleFactor;
                     return retval;
                 }
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 return getDecimal();
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 {
                     int64_t intValue = castAsBigIntAndGetValue();
                     TTInt retval(intValue);
@@ -1177,10 +1177,10 @@ private:
                     retval += fracval;
                     return retval;
                 }
-            case VALUE_TYPE_VARCHAR:
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_DECIMAL);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_DECIMAL);
                 return 0; // NOT REACHED
         }
     }
@@ -1217,44 +1217,44 @@ private:
     NValue castAsBigInt() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_BIGINT);
+        NValue retval(ValueType::VALUE_TYPE_BIGINT);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getBigInt() = static_cast<int64_t>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.getBigInt() = static_cast<int64_t>(getSmallInt());
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 retval.getBigInt() = static_cast<int64_t>(getInteger());
                 break;
-            case VALUE_TYPE_ADDRESS:
+            case ValueType::VALUE_TYPE_ADDRESS:
                 retval.getBigInt() = getBigInt();
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 return *this;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.getBigInt() = getTimestamp();
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 if (getDouble() > (double)INT64_MAX || getDouble() < (double)VOLT_INT64_MIN) {
-                    throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
+                    throwCastSQLValueOutOfRangeException<double>(getDouble(), ValueType::VALUE_TYPE_DOUBLE, ValueType::VALUE_TYPE_BIGINT);
                 }
                 retval.getBigInt() = static_cast<int64_t>(getDouble());
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = getDecimal();
                     retval.getBigInt() = narrowDecimalToBigInt(scaledValue);
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 retval.getBigInt() = static_cast<int64_t>(getNumberFromString());
                 break;
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_BIGINT);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_BIGINT);
         }
         return retval;
     }
@@ -1262,25 +1262,25 @@ private:
     NValue castAsTimestamp() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_TIMESTAMP);
+        NValue retval(ValueType::VALUE_TYPE_TIMESTAMP);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getTimestamp() = static_cast<int64_t>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.getTimestamp() = static_cast<int64_t>(getSmallInt());
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 retval.getTimestamp() = static_cast<int64_t>(getInteger());
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 retval.getTimestamp() = getBigInt();
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.getTimestamp() = getTimestamp();
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 // TODO: Consider just eliminating this switch case to throw a cast exception,
                 // or explicitly throwing some other exception here.
                 // Direct cast of double to timestamp (implemented via intermediate cast to integer, here)
@@ -1289,11 +1289,11 @@ private:
                 // OR it might be a convenience for some obscure system-generated edge case?
 
                 if (getDouble() > (double)INT64_MAX || getDouble() < (double)VOLT_INT64_MIN) {
-                    throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
+                    throwCastSQLValueOutOfRangeException<double>(getDouble(), ValueType::VALUE_TYPE_DOUBLE, ValueType::VALUE_TYPE_BIGINT);
                 }
                 retval.getTimestamp() = static_cast<int64_t>(getDouble());
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     // TODO: Consider just eliminating this switch case to throw a cast exception,
                     // or explicitly throwing some other exception here.
@@ -1306,7 +1306,7 @@ private:
                     retval.getTimestamp() = narrowDecimalToBigInt(scaledValue);
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 {
                     int32_t length;
                     const char* buf = getObject_withoutNull(length);
@@ -1314,9 +1314,9 @@ private:
                     retval.getTimestamp() = parseTimestampString(value);
                     break;
                 }
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_TIMESTAMP);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_TIMESTAMP);
         }
         return retval;
     }
@@ -1324,47 +1324,47 @@ private:
     template <typename T>
     void narrowToInteger(const T value, ValueType sourceType) {
         if (value > (T)INT32_MAX || value < (T)VOLT_INT32_MIN) {
-            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_INTEGER);
+            throwCastSQLValueOutOfRangeException(value, sourceType, ValueType::VALUE_TYPE_INTEGER);
         }
         getInteger() = static_cast<int32_t>(value);
     }
 
     NValue castAsInteger() const {
-        NValue retval(VALUE_TYPE_INTEGER);
+        NValue retval(ValueType::VALUE_TYPE_INTEGER);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getInteger() = static_cast<int32_t>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.getInteger() = static_cast<int32_t>(getSmallInt());
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 return *this;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 retval.narrowToInteger(getBigInt(), type);
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.narrowToInteger(getTimestamp(), type);
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 retval.narrowToInteger(getDouble(), type);
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = getDecimal();
                     // get the whole part of the decimal
                     int64_t whole = narrowDecimalToBigInt(scaledValue);
                     // try to convert the whole part, which is a int64_t
-                    retval.narrowToInteger(whole, VALUE_TYPE_BIGINT);
+                    retval.narrowToInteger(whole, ValueType::VALUE_TYPE_BIGINT);
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 retval.narrowToInteger(getNumberFromString(), type);
                 break;
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_INTEGER);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_INTEGER);
         }
         return retval;
     }
@@ -1372,7 +1372,7 @@ private:
     template <typename T>
     void narrowToSmallInt(const T value, ValueType sourceType) {
         if (value > (T)INT16_MAX || value < (T)VOLT_INT16_MIN) {
-            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_SMALLINT);
+            throwCastSQLValueOutOfRangeException(value, sourceType, ValueType::VALUE_TYPE_SMALLINT);
         }
         getSmallInt() = static_cast<int16_t>(value);
     }
@@ -1380,40 +1380,40 @@ private:
     NValue castAsSmallInt() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_SMALLINT);
+        NValue retval(ValueType::VALUE_TYPE_SMALLINT);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getSmallInt() = static_cast<int16_t>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.getSmallInt() = getSmallInt();
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 retval.narrowToSmallInt(getInteger(), type);
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 retval.narrowToSmallInt(getBigInt(), type);
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.narrowToSmallInt(getTimestamp(), type);
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 retval.narrowToSmallInt(getDouble(), type);
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = getDecimal();
                     int64_t whole = narrowDecimalToBigInt(scaledValue);
-                    retval.narrowToSmallInt(whole, VALUE_TYPE_BIGINT);
+                    retval.narrowToSmallInt(whole, ValueType::VALUE_TYPE_BIGINT);
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 retval.narrowToSmallInt(getNumberFromString(), type);
                 break;
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_SMALLINT);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_SMALLINT);
         }
         return retval;
     }
@@ -1421,7 +1421,7 @@ private:
     template <typename T>
     void narrowToTinyInt(const T value, ValueType sourceType) {
         if (value > (T)INT8_MAX || value < (T)VOLT_INT8_MIN) {
-            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_TINYINT);
+            throwCastSQLValueOutOfRangeException(value, sourceType, ValueType::VALUE_TYPE_TINYINT);
         }
         getTinyInt() = static_cast<int8_t>(value);
     }
@@ -1429,40 +1429,40 @@ private:
     NValue castAsTinyInt() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_TINYINT);
+        NValue retval(ValueType::VALUE_TYPE_TINYINT);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getTinyInt() = getTinyInt();
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.narrowToTinyInt(getSmallInt(), type);
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 retval.narrowToTinyInt(getInteger(), type);
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 retval.narrowToTinyInt(getBigInt(), type);
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.narrowToTinyInt(getTimestamp(), type);
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 retval.narrowToTinyInt(getDouble(), type);
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = getDecimal();
                     int64_t whole = narrowDecimalToBigInt(scaledValue);
                     retval.narrowToTinyInt(whole, type);
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 retval.narrowToTinyInt(getNumberFromString(), type);
                 break;
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_TINYINT);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_TINYINT);
         }
         return retval;
     }
@@ -1470,36 +1470,36 @@ private:
     NValue castAsDouble() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_DOUBLE);
+        NValue retval(ValueType::VALUE_TYPE_DOUBLE);
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 retval.getDouble() = static_cast<double>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 retval.getDouble() = static_cast<double>(getSmallInt());
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 retval.getDouble() = static_cast<double>(getInteger());
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 retval.getDouble() = static_cast<double>(getBigInt());
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 retval.getDouble() = static_cast<double>(getTimestamp());
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 retval.getDouble() = getDouble();
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 retval.getDouble() = castAsDoubleAndGetValue();
                 break;
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 retval.getDouble() = getNumberFromString();
                 break;
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARBINARY:
             default:
-                throwCastSQLException(type, VALUE_TYPE_DOUBLE);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_DOUBLE);
         }
         return retval;
     }
@@ -1512,53 +1512,53 @@ private:
         std::stringstream value;
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 // This cast keeps the tiny int from being confused for a char.
                 value << static_cast<int>(getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 value << getSmallInt();
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 value << getInteger();
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 value << getBigInt();
                 break;
                 //case VALUE_TYPE_TIMESTAMP:
                 //TODO: The SQL standard wants an actual date literal rather than a numeric value, here. See ENG-4284.
                 //value << static_cast<double>(getTimestamp());
                 //break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 // Use the specific standard SQL formatting for float values,
                 // which the C/C++ format options don't quite support.
                 streamSQLFloatFormat(value, getDouble());
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 value << createStringFromDecimal();
                 break;
-            case VALUE_TYPE_VARCHAR:
-            case VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARBINARY:
                 {
                     // note: we allow binary conversion to strings to support
                     // byte[] as string parameters...
                     // In the future, it would be nice to check this is a decent string here...
-                    NValue retval(VALUE_TYPE_VARCHAR);
+                    NValue retval(ValueType::VALUE_TYPE_VARCHAR);
                     retval.setSourceInlined(getSourceInlined());
                     memcpy(retval.m_data, m_data, sizeof(m_data));
                     return retval;
                 }
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 streamTimestamp(value);
                 break;
-            case VALUE_TYPE_POINT:
+            case ValueType::VALUE_TYPE_POINT:
                 value << getGeographyPointValue().toWKT();
                 break;
-            case VALUE_TYPE_GEOGRAPHY:
+            case ValueType::VALUE_TYPE_GEOGRAPHY:
                 value << getGeographyValue().toWKT();
                 break;
             default:
-                throwCastSQLException(type, VALUE_TYPE_VARCHAR);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_VARCHAR);
         }
         return getTempStringValue(value.str().c_str(), value.str().length());
     }
@@ -1566,14 +1566,14 @@ private:
     NValue castAsBinary() const {
         vassert(isNull() == false);
 
-        NValue retval(VALUE_TYPE_VARBINARY);
+        NValue retval(ValueType::VALUE_TYPE_VARBINARY);
         const ValueType type = getValueType();
         switch (type) {
-        case VALUE_TYPE_VARBINARY:
-            memcpy(retval.m_data, m_data, sizeof(m_data));
-            break;
-        default:
-            throwCastSQLException(type, VALUE_TYPE_VARBINARY);
+            case ValueType::VALUE_TYPE_VARBINARY:
+                memcpy(retval.m_data, m_data, sizeof(m_data));
+                break;
+            default:
+                throwCastSQLException(type, ValueType::VALUE_TYPE_VARBINARY);
         }
         return retval;
     }
@@ -1586,26 +1586,26 @@ private:
 
     NValue castAsDecimal() const {
         vassert(isNull() == false);
-        NValue retval(VALUE_TYPE_DECIMAL);
+        NValue retval(ValueType::VALUE_TYPE_DECIMAL);
         const ValueType type = getValueType();
         if (isNull()) {
             retval.setNull();
             return retval;
         }
         switch (type) {
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_BIGINT:
                 {
                     int64_t rhsint = castAsBigIntAndGetValue();
                     retval.createDecimalFromInt(rhsint);
                     break;
                 }
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 ::memcpy(retval.m_data, m_data, sizeof(TTInt));
                 break;
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 {
                     const double& value = getDouble();
                     if (value >= s_gtMaxDecimalAsDouble || value <= s_ltMinDecimalAsDouble) {
@@ -1625,7 +1625,7 @@ private:
                     retval.getDecimal() = result;
                     break;
                 }
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
                 {
                     int32_t length;
                     const char* buf = getObject_withoutNull(length);
@@ -1634,44 +1634,44 @@ private:
                     break;
                 }
             default:
-                throwCastSQLException(type, VALUE_TYPE_DECIMAL);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_DECIMAL);
         }
         return retval;
     }
 
     NValue castAsGeography() const {
-        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        NValue retval(ValueType::VALUE_TYPE_GEOGRAPHY);
         if (isNull()) {
             retval.setNull();
             return retval;
         }
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_GEOGRAPHY:
+            case ValueType::VALUE_TYPE_GEOGRAPHY:
                 memcpy(retval.m_data, m_data, sizeof(m_data));
                 break;
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
             default:
-                throwCastSQLException(type, VALUE_TYPE_GEOGRAPHY);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_GEOGRAPHY);
         }
         return retval;
     }
 
     NValue castAsGeographyPoint() const {
 
-        NValue retval(VALUE_TYPE_POINT);
+        NValue retval(ValueType::VALUE_TYPE_POINT);
         if (isNull()) {
             retval.setNull();
             return retval;
         }
         const ValueType type = getValueType();
         switch (type) {
-            case VALUE_TYPE_POINT:
+            case ValueType::VALUE_TYPE_POINT:
                 memcpy(retval.m_data, m_data, sizeof(m_data));
                 break;
-            case VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARCHAR:
             default:
-                throwCastSQLException(type, VALUE_TYPE_POINT);
+                throwCastSQLException(type, ValueType::VALUE_TYPE_POINT);
         }
         return retval;
     }
@@ -1729,12 +1729,12 @@ private:
        }
 
        switch (type) {
-          case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_GEOGRAPHY:
+           case ValueType::VALUE_TYPE_VARBINARY:
+           case ValueType::VALUE_TYPE_GEOGRAPHY:
              if (objLength > maxLength) {
                 std::ostringstream oss;
                 oss <<  "The size " << objLength << " of the value exceeds the size of ";
-                if (type == VALUE_TYPE_VARBINARY) {
+                if (type == ValueType::VALUE_TYPE_VARBINARY) {
                    oss << "the VARBINARY(" << maxLength << ") column";
                    throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                          oss.str().c_str(), SQLException::TYPE_VAR_LENGTH_MISMATCH);
@@ -1744,7 +1744,7 @@ private:
                 }
              }
              break;
-          case VALUE_TYPE_VARCHAR:
+           case ValueType::VALUE_TYPE_VARCHAR:
              if (isInBytes) {
                 if (objLength > maxLength) {
                    std::string inputValue;
@@ -1813,12 +1813,12 @@ private:
     }
 
     int compareTinyInt (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_TINYINT);
+        vassert(m_valueType == ValueType::VALUE_TYPE_TINYINT);
 
         // get the right hand side as a bigint
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
             return compareDoubleValue(static_cast<double>(getTinyInt()), rhs.getDouble());
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+        } else if (rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getTinyInt()));
             lhsValue *= kMaxScaleFactor;
@@ -1832,12 +1832,12 @@ private:
     }
 
     int compareSmallInt (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_SMALLINT);
+        vassert(m_valueType == ValueType::VALUE_TYPE_SMALLINT);
 
         // get the right hand side as a bigint
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
             return compareDoubleValue(static_cast<double>(getSmallInt()), rhs.getDouble());
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+        } else if (rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getSmallInt()));
             lhsValue *= kMaxScaleFactor;
@@ -1851,12 +1851,12 @@ private:
     }
 
     int compareInteger (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_INTEGER);
+        vassert(m_valueType == ValueType::VALUE_TYPE_INTEGER);
 
         // get the right hand side as a bigint
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
             return compareDoubleValue(static_cast<double>(getInteger()), rhs.getDouble());
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+        } else if (rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getInteger()));
             lhsValue *= kMaxScaleFactor;
@@ -1870,12 +1870,12 @@ private:
     }
 
     int compareBigInt (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_BIGINT);
+        vassert(m_valueType == ValueType::VALUE_TYPE_BIGINT);
 
         // get the right hand side as a bigint
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
             return compareDoubleValue(static_cast<double>(getBigInt()), rhs.getDouble());
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+        } else if (rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getBigInt());
             lhsValue *= kMaxScaleFactor;
@@ -1889,10 +1889,10 @@ private:
 
 
     int compareBooleanValue (const NValue &rhs) const {
-        vassert(m_valueType == VALUE_TYPE_BOOLEAN);
+        vassert(m_valueType == ValueType::VALUE_TYPE_BOOLEAN);
 
         // get the right hand side as an integer.
-        if (rhs.getValueType() == VALUE_TYPE_BOOLEAN) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_BOOLEAN) {
             bool rhsValue = rhs.getBoolean();
             bool lhsValue = getBoolean();
             if (lhsValue == rhsValue) {
@@ -1914,12 +1914,12 @@ private:
     }
 
     int compareTimestamp (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_TIMESTAMP);
+        vassert(m_valueType == ValueType::VALUE_TYPE_TIMESTAMP);
 
         // get the right hand side as a bigint
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+        if (rhs.getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
             return compareDoubleValue(static_cast<double>(getTimestamp()), rhs.getDouble());
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+        } else if (rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getTimestamp());
             lhsValue *= kMaxScaleFactor;
@@ -1933,31 +1933,31 @@ private:
     }
 
     int compareDoubleValue (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_DOUBLE);
+        vassert(m_valueType == ValueType::VALUE_TYPE_DOUBLE);
 
         const double lhsValue = getDouble();
         double rhsValue;
 
         switch (rhs.getValueType()) {
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 rhsValue = rhs.getDouble();
                 break;
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 rhsValue = static_cast<double>(rhs.getTinyInt());
                 break;
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 rhsValue = static_cast<double>(rhs.getSmallInt());
                 break;
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 rhsValue = static_cast<double>(rhs.getInteger());
                 break;
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 rhsValue = static_cast<double>(rhs.getBigInt());
                 break;
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 rhsValue = static_cast<double>(rhs.getTimestamp());
                 break;
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 {
                     TTInt scaledValue = rhs.getDecimal();
                     TTInt whole(scaledValue);
@@ -1978,16 +1978,16 @@ private:
     }
 
     int compareStringValue (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_VARCHAR);
+        vassert(m_valueType == ValueType::VALUE_TYPE_VARCHAR);
 
         ValueType rhsType = rhs.getValueType();
-        if (rhsType != VALUE_TYPE_VARCHAR) {
+        if (rhsType != ValueType::VALUE_TYPE_VARCHAR) {
             throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
                     "Type %s cannot be cast for comparison to type %s",
                     valueToString(rhsType).c_str(), valueToString(m_valueType).c_str());
         }
 
-        vassert(m_valueType == VALUE_TYPE_VARCHAR);
+        vassert(m_valueType == ValueType::VALUE_TYPE_VARCHAR);
 
         int32_t leftLength;
         const char* left = getObject_withoutNull(leftLength);
@@ -2008,9 +2008,9 @@ private:
     }
 
     int compareBinaryValue (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_VARBINARY);
+        vassert(m_valueType == ValueType::VALUE_TYPE_VARBINARY);
 
-        if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
+        if (rhs.getValueType() != ValueType::VALUE_TYPE_VARBINARY) {
             throwSQLException(SQLException::data_exception_most_specific_type_mismatch,
                     "Type %s cannot be cast for comparison to type %s",
                     valueToString(rhs.getValueType()).c_str(), valueToString(m_valueType).c_str());
@@ -2037,11 +2037,11 @@ private:
     }
 
     int compareDecimalValue (const NValue& rhs) const {
-        vassert(m_valueType == VALUE_TYPE_DECIMAL);
+        vassert(m_valueType == ValueType::VALUE_TYPE_DECIMAL);
         switch (rhs.getValueType()) {
-            case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
                 return compareValue<TTInt>(getDecimal(), rhs.getDecimal());
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_DOUBLE:
                 {
                     const double rhsValue = rhs.getDouble();
                     TTInt scaledValue = getDecimal();
@@ -2055,31 +2055,31 @@ private:
                     return compareValue<double>(lhsValue, rhsValue);
                 }
                 // create the equivalent decimal value
-            case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
                 {
                     TTInt rhsValue(static_cast<int64_t>(rhs.getTinyInt()));
                     rhsValue *= kMaxScaleFactor;
                     return compareValue<TTInt>(getDecimal(), rhsValue);
                 }
-            case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
                 {
                     TTInt rhsValue(static_cast<int64_t>(rhs.getSmallInt()));
                     rhsValue *= kMaxScaleFactor;
                     return compareValue<TTInt>(getDecimal(), rhsValue);
                 }
-            case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
                 {
                     TTInt rhsValue(static_cast<int64_t>(rhs.getInteger()));
                     rhsValue *= kMaxScaleFactor;
                     return compareValue<TTInt>(getDecimal(), rhsValue);
                 }
-            case VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_BIGINT:
                 {
                     TTInt rhsValue(rhs.getBigInt());
                     rhsValue *= kMaxScaleFactor;
                     return compareValue<TTInt>(getDecimal(), rhsValue);
                 }
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
                 {
                     TTInt rhsValue(rhs.getTimestamp());
                     rhsValue *= kMaxScaleFactor;
@@ -2094,34 +2094,34 @@ private:
     }
 
     int comparePointValue (const NValue &rhs) const {
-        vassert(m_valueType == VALUE_TYPE_POINT);
+        vassert(m_valueType == ValueType::VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
-        case VALUE_TYPE_POINT:
-            return getGeographyPointValue().compareWith(rhs.getGeographyPointValue());
-        default:
-            std::ostringstream oss;
-            oss << "Type " << valueToString(rhs.getValueType())
-                << " cannot be cast for comparison to type "
-                << valueToString(getValueType());
-            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                               oss.str().c_str());
+            case ValueType::VALUE_TYPE_POINT:
+                return getGeographyPointValue().compareWith(rhs.getGeographyPointValue());
+            default:
+                std::ostringstream oss;
+                oss << "Type " << valueToString(rhs.getValueType())
+                    << " cannot be cast for comparison to type "
+                    << valueToString(getValueType());
+                throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                        oss.str().c_str());
         }
     }
 
     int compareGeographyValue (const NValue &rhs) const {
-        vassert(m_valueType == VALUE_TYPE_GEOGRAPHY);
+        vassert(m_valueType == ValueType::VALUE_TYPE_GEOGRAPHY);
         switch (rhs.getValueType()) {
-        case VALUE_TYPE_GEOGRAPHY:
-            return getGeographyValue().compareWith(rhs.getGeographyValue());
-        default:
-            std::ostringstream oss;
-            oss << "Type " << valueToString(rhs.getValueType())
-                << " cannot be cast for comparison to type "
-                << valueToString(getValueType());
-            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                               oss.str().c_str());
-            // Not reached
-            return 0;
+            case ValueType::VALUE_TYPE_GEOGRAPHY:
+                return getGeographyValue().compareWith(rhs.getGeographyValue());
+            default:
+                std::ostringstream oss;
+                oss << "Type " << valueToString(rhs.getValueType())
+                    << " cannot be cast for comparison to type "
+                    << valueToString(getValueType());
+                throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                        oss.str().c_str());
+                // Not reached
+                return 0;
         }
     }
 
@@ -2235,8 +2235,8 @@ private:
     static NValue opAddDecimals(const NValue& lhs, const NValue& rhs) {
         vassert(lhs.isNull() == false);
         vassert(rhs.isNull() == false);
-        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -2251,8 +2251,8 @@ private:
     static NValue opSubtractDecimals(const NValue& lhs, const NValue& rhs) {
         vassert(lhs.isNull() == false);
         vassert(rhs.isNull() == false);
-        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -2273,8 +2273,8 @@ private:
     static NValue opMultiplyDecimals(const NValue& lhs, const NValue& rhs) {
         vassert(lhs.isNull() == false);
         vassert(rhs.isNull() == false);
-        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
 
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
@@ -2307,8 +2307,8 @@ private:
     static NValue opDivideDecimals(const NValue& lhs, const NValue& rhs) {
         vassert(lhs.isNull() == false);
         vassert(rhs.isNull() == false);
-        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == ValueType::VALUE_TYPE_DECIMAL);
 
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
@@ -2330,7 +2330,7 @@ private:
     }
 
     static NValue getTinyIntValue(int8_t value) {
-        NValue retval(VALUE_TYPE_TINYINT);
+        NValue retval(ValueType::VALUE_TYPE_TINYINT);
         retval.getTinyInt() = value;
         if (value == INT8_NULL) {
             retval.tagAsNull();
@@ -2339,7 +2339,7 @@ private:
     }
 
     static NValue getSmallIntValue(int16_t value) {
-        NValue retval(VALUE_TYPE_SMALLINT);
+        NValue retval(ValueType::VALUE_TYPE_SMALLINT);
         retval.getSmallInt() = value;
         if (value == INT16_NULL) {
             retval.tagAsNull();
@@ -2348,7 +2348,7 @@ private:
     }
 
     static NValue getIntegerValue(int32_t value) {
-        NValue retval(VALUE_TYPE_INTEGER);
+        NValue retval(ValueType::VALUE_TYPE_INTEGER);
         retval.getInteger() = value;
         if (value == INT32_NULL) {
             retval.tagAsNull();
@@ -2357,7 +2357,7 @@ private:
     }
 
     static NValue getBigIntValue(int64_t value) {
-        NValue retval(VALUE_TYPE_BIGINT);
+        NValue retval(ValueType::VALUE_TYPE_BIGINT);
         retval.getBigInt() = value;
         if (value == INT64_NULL) {
             retval.tagAsNull();
@@ -2366,7 +2366,7 @@ private:
     }
 
     static NValue getTimestampValue(int64_t value) {
-        NValue retval(VALUE_TYPE_TIMESTAMP);
+        NValue retval(ValueType::VALUE_TYPE_TIMESTAMP);
         retval.getTimestamp() = value;
         if (value == INT64_NULL) {
             retval.tagAsNull();
@@ -2375,7 +2375,7 @@ private:
     }
 
     static NValue getDoubleValue(double value) {
-        NValue retval(VALUE_TYPE_DOUBLE);
+        NValue retval(ValueType::VALUE_TYPE_DOUBLE);
         retval.getDouble() = value;
         if (value <= DOUBLE_NULL) {
             retval.tagAsNull();
@@ -2384,19 +2384,19 @@ private:
     }
 
     static NValue getBooleanValue(bool value) {
-        NValue retval(VALUE_TYPE_BOOLEAN);
+        NValue retval(ValueType::VALUE_TYPE_BOOLEAN);
         retval.getBoolean() = value;
         return retval;
     }
 
     static NValue getDecimalValueFromString(const std::string &value) {
-        NValue retval(VALUE_TYPE_DECIMAL);
+        NValue retval(ValueType::VALUE_TYPE_DECIMAL);
         retval.createDecimalFromString(value);
         return retval;
     }
 
     static NValue getAllocatedArrayValueFromSizeAndType(size_t elementCount, ValueType elementType) {
-        NValue retval(VALUE_TYPE_ARRAY);
+        NValue retval(ValueType::VALUE_TYPE_ARRAY);
         retval.allocateANewNValueList(elementCount, elementType);
         return retval;
     }
@@ -2404,7 +2404,7 @@ private:
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
-        return getAllocatedValue(VALUE_TYPE_VARCHAR, value, size, getTempStringPool());
+        return getAllocatedValue(ValueType::VALUE_TYPE_VARCHAR, value, size, getTempStringPool());
     }
 
     static NValue getAllocatedValue(ValueType type, const char* value, size_t size, Pool* stringPool) {
@@ -2420,33 +2420,33 @@ private:
     }
 
     static NValue getNullStringValue() {
-        NValue retval(VALUE_TYPE_VARCHAR);
+        NValue retval(ValueType::VALUE_TYPE_VARCHAR);
         retval.tagAsNull();
         *reinterpret_cast<char**>(retval.m_data) = NULL;
         return retval;
     }
 
     static NValue getNullBinaryValue() {
-        NValue retval(VALUE_TYPE_VARBINARY);
+        NValue retval(ValueType::VALUE_TYPE_VARBINARY);
         retval.tagAsNull();
         *reinterpret_cast<char**>(retval.m_data) = NULL;
         return retval;
     }
 
     static NValue getNullValue() {
-        NValue retval(VALUE_TYPE_NULL);
+        NValue retval(ValueType::VALUE_TYPE_NULL);
         retval.tagAsNull();
         return retval;
     }
 
     static NValue getDecimalValue(TTInt value) {
-        NValue retval(VALUE_TYPE_DECIMAL);
+        NValue retval(ValueType::VALUE_TYPE_DECIMAL);
         retval.getDecimal() = value;
         return retval;
     }
 
     static NValue getAddressValue(void *address) {
-        NValue retval(VALUE_TYPE_ADDRESS);
+        NValue retval(ValueType::VALUE_TYPE_ADDRESS);
         *reinterpret_cast<void**>(retval.m_data) = address;
         return retval;
     }
@@ -2462,7 +2462,7 @@ private:
  */
 inline NValue::NValue() {
     ::memset(m_data, 0, 16);
-    setValueType(VALUE_TYPE_INVALID);
+    setValueType(ValueType::VALUE_TYPE_INVALID);
     setDefaultAttributes();
 }
 
@@ -2479,7 +2479,7 @@ inline NValue& NValue::operator=(const NValue& val) {
  * Retrieve a boolean NValue that is true
  */
 inline NValue NValue::getTrue() {
-    NValue retval(VALUE_TYPE_BOOLEAN);
+    NValue retval(ValueType::VALUE_TYPE_BOOLEAN);
     retval.getBoolean() = true;
     return retval;
 }
@@ -2488,7 +2488,7 @@ inline NValue NValue::getTrue() {
  * Retrieve a boolean NValue that is false
  */
 inline NValue NValue::getFalse() {
-    NValue retval(VALUE_TYPE_BOOLEAN);
+    NValue retval(ValueType::VALUE_TYPE_BOOLEAN);
     retval.getBoolean() = false;
     return retval;
 }
@@ -2518,7 +2518,7 @@ inline bool NValue::isFalse() const {
 }
 
 inline bool NValue::isBooleanNULL() const {
-    vassert(getValueType() == VALUE_TYPE_BOOLEAN);
+    vassert(getValueType() == ValueType::VALUE_TYPE_BOOLEAN);
     return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
 }
 
@@ -2529,18 +2529,18 @@ inline bool NValue::isBooleanNULL() const {
 inline void NValue::free() const {
    StringRef* sref;
    switch (getValueType()) {
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      case VALUE_TYPE_GEOGRAPHY:
-      case VALUE_TYPE_ARRAY:
-         vassert(!getSourceInlined());
-         sref = *reinterpret_cast<StringRef* const*>(m_data);
-         if (sref != NULL) {
-            StringRef::destroy(sref);
-         }
-         break;
-      default:
-         return;
+       case ValueType::VALUE_TYPE_VARCHAR:
+       case ValueType::VALUE_TYPE_VARBINARY:
+       case ValueType::VALUE_TYPE_GEOGRAPHY:
+       case ValueType::VALUE_TYPE_ARRAY:
+           vassert(!getSourceInlined());
+           sref = *reinterpret_cast<StringRef* const*>(m_data);
+           if (sref != NULL) {
+               StringRef::destroy(sref);
+           }
+           break;
+       default:
+           return;
    }
 }
 
@@ -2559,31 +2559,30 @@ inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObj
  */
 inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
     switch (type) {
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        return sizeof(int64_t);
-      case VALUE_TYPE_TINYINT:
-        return sizeof(int8_t);
-      case VALUE_TYPE_SMALLINT:
-        return sizeof(int16_t);
-      case VALUE_TYPE_INTEGER:
-        return sizeof(int32_t);
-      case VALUE_TYPE_DOUBLE:
-        return sizeof(double);
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      case VALUE_TYPE_GEOGRAPHY:
-        return sizeof(char*);
-      case VALUE_TYPE_DECIMAL:
-        return sizeof(TTInt);
-      case VALUE_TYPE_BOOLEAN:
-        return sizeof(bool);
-      case VALUE_TYPE_POINT:
-        return sizeof(GeographyPointValue);
-      default:
-          throwSerializableEEException(
-                  "NValue::getTupleStorageSize() unsupported type '%s'",
-                  getTypeName(type).c_str());
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+            return sizeof(int64_t);
+        case ValueType::VALUE_TYPE_TINYINT:
+            return sizeof(int8_t);
+        case ValueType::VALUE_TYPE_SMALLINT:
+            return sizeof(int16_t);
+        case ValueType::VALUE_TYPE_INTEGER:
+            return sizeof(int32_t);
+        case ValueType::VALUE_TYPE_DOUBLE:
+            return sizeof(double);
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
+            return sizeof(char*);
+        case ValueType::VALUE_TYPE_DECIMAL:
+            return sizeof(TTInt);
+        case ValueType::VALUE_TYPE_BOOLEAN:
+            return sizeof(bool);
+        case ValueType::VALUE_TYPE_POINT:
+            return sizeof(GeographyPointValue);
+        default:
+            throwSerializableEEException("NValue::getTupleStorageSize() unsupported type '%s'",
+                    getTypeName(type).c_str());
     }
 }
 
@@ -2619,35 +2618,33 @@ inline int NValue::compare_withoutNull(const NValue& rhs) const {
    vassert(isNull() == false && rhs.isNull() == false);
 
    switch (m_valueType) {
-       case VALUE_TYPE_VARCHAR:
+       case ValueType::VALUE_TYPE_VARCHAR:
            return compareStringValue(rhs);
-       case VALUE_TYPE_BIGINT:
+       case ValueType::VALUE_TYPE_BIGINT:
            return compareBigInt(rhs);
-       case VALUE_TYPE_INTEGER:
+       case ValueType::VALUE_TYPE_INTEGER:
            return compareInteger(rhs);
-       case VALUE_TYPE_SMALLINT:
+       case ValueType::VALUE_TYPE_SMALLINT:
            return compareSmallInt(rhs);
-       case VALUE_TYPE_TINYINT:
+       case ValueType::VALUE_TYPE_TINYINT:
            return compareTinyInt(rhs);
-       case VALUE_TYPE_TIMESTAMP:
+       case ValueType::VALUE_TYPE_TIMESTAMP:
            return compareTimestamp(rhs);
-       case VALUE_TYPE_DOUBLE:
+       case ValueType::VALUE_TYPE_DOUBLE:
            return compareDoubleValue(rhs);
-       case VALUE_TYPE_VARBINARY:
+       case ValueType::VALUE_TYPE_VARBINARY:
            return compareBinaryValue(rhs);
-       case VALUE_TYPE_DECIMAL:
+       case ValueType::VALUE_TYPE_DECIMAL:
            return compareDecimalValue(rhs);
-       case VALUE_TYPE_POINT:
+       case ValueType::VALUE_TYPE_POINT:
            return comparePointValue(rhs);
-       case VALUE_TYPE_GEOGRAPHY:
+       case ValueType::VALUE_TYPE_GEOGRAPHY:
            return compareGeographyValue(rhs);
-       case VALUE_TYPE_BOOLEAN:
+       case ValueType::VALUE_TYPE_BOOLEAN:
            return compareBooleanValue(rhs);
        default:
-           throwDynamicSQLException(
-                   "non comparable types lhs '%s' rhs '%s'",
-                   getValueTypeString().c_str(),
-                   rhs.getValueTypeString().c_str());
+           throwDynamicSQLException("non comparable types lhs '%s' rhs '%s'",
+                   getValueTypeString().c_str(), rhs.getValueTypeString().c_str());
    }
 }
 
@@ -2690,75 +2687,76 @@ inline int NValue::compareNullAsMax(const NValue& rhs) const {
 inline void NValue::setNull() {
    tagAsNull(); // This gets overwritten for DECIMAL and POINT -- but that's OK.
    switch (getValueType()) {
-      case VALUE_TYPE_BOOLEAN:
-         // HACK BOOL NULL
-         *reinterpret_cast<int8_t*>(m_data) = INT8_NULL;
-         break;
-      case VALUE_TYPE_NULL:
-      case VALUE_TYPE_INVALID:
-         return;
-      case VALUE_TYPE_TINYINT:
-         getTinyInt() = INT8_NULL;
-         break;
-      case VALUE_TYPE_SMALLINT:
-         getSmallInt() = INT16_NULL;
-         break;
-      case VALUE_TYPE_INTEGER:
-         getInteger() = INT32_NULL;
-         break;
-      case VALUE_TYPE_TIMESTAMP:
-         getTimestamp() = INT64_NULL;
-         break;
-      case VALUE_TYPE_BIGINT:
-         getBigInt() = INT64_NULL;
-         break;
-      case VALUE_TYPE_DOUBLE:
-         getDouble() = DOUBLE_MIN;
-         break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      case VALUE_TYPE_GEOGRAPHY:
-         *reinterpret_cast<void**>(m_data) = NULL;
-         break;
-      case VALUE_TYPE_DECIMAL:
-         getDecimal().SetMin();
-         break;
-      case VALUE_TYPE_POINT:
-         getGeographyPointValue() = GeographyPointValue();
-         break;
-      default:
-         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
+       case ValueType::VALUE_TYPE_BOOLEAN:
+           // HACK BOOL NULL
+           *reinterpret_cast<int8_t*>(m_data) = INT8_NULL;
+           break;
+       case ValueType::VALUE_TYPE_NULL:
+       case ValueType::VALUE_TYPE_INVALID:
+           return;
+       case ValueType::VALUE_TYPE_TINYINT:
+           getTinyInt() = INT8_NULL;
+           break;
+       case ValueType::VALUE_TYPE_SMALLINT:
+           getSmallInt() = INT16_NULL;
+           break;
+       case ValueType::VALUE_TYPE_INTEGER:
+           getInteger() = INT32_NULL;
+           break;
+       case ValueType::VALUE_TYPE_TIMESTAMP:
+           getTimestamp() = INT64_NULL;
+           break;
+       case ValueType::VALUE_TYPE_BIGINT:
+           getBigInt() = INT64_NULL;
+           break;
+       case ValueType::VALUE_TYPE_DOUBLE:
+           getDouble() = DOUBLE_MIN;
+           break;
+       case ValueType::VALUE_TYPE_VARCHAR:
+       case ValueType::VALUE_TYPE_VARBINARY:
+       case ValueType::VALUE_TYPE_GEOGRAPHY:
+           *reinterpret_cast<void**>(m_data) = NULL;
+           break;
+       case ValueType::VALUE_TYPE_DECIMAL:
+           getDecimal().SetMin();
+           break;
+       case ValueType::VALUE_TYPE_POINT:
+           getGeographyPointValue() = GeographyPointValue();
+           break;
+       default:
+           throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%s'",
+                   getTypeName(getValueType()).c_str());
    }
 }
 
 inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, bool isInlined, bool isVolatile) {
     NValue retval(type);
     switch (type) {
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             if ((retval.getInteger() = *reinterpret_cast<const int32_t*>(storage)) == INT32_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_BIGINT:
             if ((retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             if ((retval.getDouble() = *reinterpret_cast<const double*>(storage)) <= DOUBLE_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             {
                 retval.setVolatile(isVolatile);
                 //Potentially non-inlined type requires special handling
                 if (isInlined) {
                     //If it is inlined the storage area contains the actual data so copy a reference
                     //to the storage area
-                    vassert(type != VALUE_TYPE_GEOGRAPHY);
+                    vassert(type != ValueType::VALUE_TYPE_GEOGRAPHY);
                     const char* inline_data = reinterpret_cast<const char*>(storage);
                     *reinterpret_cast<const char**>(retval.m_data) = inline_data;
                     retval.setSourceInlined(true);
@@ -2784,25 +2782,25 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
                 }
                 break;
             }
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             if ((retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             if ((retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage)) == INT8_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             if ((retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage)) == INT16_NULL) {
                 retval.tagAsNull();
             }
             break;
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             ::memcpy(retval.m_data, storage, sizeof(TTInt));
             break;
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             retval.getGeographyPointValue() = *reinterpret_cast<const GeographyPointValue*>(storage);
             break;
         default:
@@ -2817,41 +2815,40 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
       int32_t maxLength, bool isInBytes, bool allocateObjects, POOL* tempPool) const {
     const ValueType type = getValueType();
     switch (type) {
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             *reinterpret_cast<int64_t*>(storage) = getTimestamp();
             return;
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             *reinterpret_cast<int8_t*>(storage) = getTinyInt();
             return;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             *reinterpret_cast<int16_t*>(storage) = getSmallInt();
             return;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             *reinterpret_cast<int32_t*>(storage) = getInteger();
             return;
-        case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_BIGINT:
             *reinterpret_cast<int64_t*>(storage) = getBigInt();
             return;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             *reinterpret_cast<double*>(storage) = getDouble();
             return;
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             ::memcpy(storage, m_data, sizeof(TTInt));
             return;
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             ::memcpy(storage, m_data, sizeof(GeographyPointValue));
             return;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             {
                 //Potentially non-inlined type requires special handling
                 if (isInlined) {
-                    vassert(type != VALUE_TYPE_GEOGRAPHY);
+                    vassert(type != ValueType::VALUE_TYPE_GEOGRAPHY);
                     serializeInlineObjectToTupleStorage(static_cast<char*>(storage), maxLength, isInBytes);
                     return;
-                }
-                if (isNull()) {
+                } else if (isNull()) {
                     *reinterpret_cast<void**>(storage) = NULL;
                     return;
                 }
@@ -2890,42 +2887,42 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
 inline void NValue::deserializeFrom(SerializeInputBE& input, Pool* tempPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
     deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, tempPool, storage,
-                                                type, isInlined, maxLength, isInBytes);
+            type, isInlined, maxLength, isInBytes);
 }
 
 template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(
         SerializeInput<E>& input, Pool* tempPool, char *storage,
         ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
     switch (type) {
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             *reinterpret_cast<int64_t*>(storage) = input.readLong();
             return;
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             *reinterpret_cast<int8_t*>(storage) = input.readByte();
             return;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             *reinterpret_cast<int16_t*>(storage) = input.readShort();
             return;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             *reinterpret_cast<int32_t*>(storage) = input.readInt();
             return;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             *reinterpret_cast<double* >(storage) = input.readDouble();
             return;
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             *reinterpret_cast<GeographyPointValue*>(storage) = GeographyPointValue::deserializeFrom(input);
             return;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             {
                 const int32_t length = input.readInt();
                 if (length < -1) {
                     throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
                 }
                 if (isInlined) {
-                    vassert(type != VALUE_TYPE_GEOGRAPHY);
+                    vassert(type != ValueType::VALUE_TYPE_GEOGRAPHY);
                     vassert(length <= OBJECT_MAX_LENGTH_SHORT_LENGTH);
                     // Always reset the bits regardless of how long the actual value is.
                     storage[0] = static_cast<char>(length);
@@ -2945,7 +2942,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 }
 
                 StringRef* sref = NULL;
-                if (type != VALUE_TYPE_GEOGRAPHY) {
+                if (type != ValueType::VALUE_TYPE_GEOGRAPHY) {
                     // This advances input past the end of the string
                     const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
                     checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
@@ -2964,7 +2961,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 *reinterpret_cast<StringRef**>(storage) = sref;
                 return;
             }
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             {
                 if (F == TUPLE_SERIALIZATION_DR) {
                     const int scale = input.readByte();
@@ -3011,78 +3008,78 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
    // so these NValues need to forget they were ever null.
    tagAsNotNull();
    switch (type) {
-      case VALUE_TYPE_BIGINT:
-         getBigInt() = input.readLong();
-         if (getBigInt() == INT64_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_TIMESTAMP:
-         getTimestamp() = input.readLong();
-         if (getTimestamp() == INT64_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_TINYINT:
-         getTinyInt() = input.readByte();
-         if (getTinyInt() == INT8_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_SMALLINT:
-         getSmallInt() = input.readShort();
-         if (getSmallInt() == INT16_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_INTEGER:
-         getInteger() = input.readInt();
-         if (getInteger() == INT32_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_DOUBLE:
-         getDouble() = input.readDouble();
-         if (getDouble() <= DOUBLE_NULL) {
-            tagAsNull();
-         }
-         return;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      case VALUE_TYPE_GEOGRAPHY:
-         {
-            const int32_t length = input.readInt();
-            // the NULL SQL string is a NULL C pointer
-            if (length == OBJECTLENGTH_NULL) {
-               setNull();
+       case ValueType::VALUE_TYPE_BIGINT:
+           getBigInt() = input.readLong();
+           if (getBigInt() == INT64_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_TIMESTAMP:
+           getTimestamp() = input.readLong();
+           if (getTimestamp() == INT64_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_TINYINT:
+           getTinyInt() = input.readByte();
+           if (getTinyInt() == INT8_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_SMALLINT:
+           getSmallInt() = input.readShort();
+           if (getSmallInt() == INT16_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_INTEGER:
+           getInteger() = input.readInt();
+           if (getInteger() == INT32_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_DOUBLE:
+           getDouble() = input.readDouble();
+           if (getDouble() <= DOUBLE_NULL) {
+               tagAsNull();
+           }
+           return;
+       case ValueType::VALUE_TYPE_VARCHAR:
+       case ValueType::VALUE_TYPE_VARBINARY:
+       case ValueType::VALUE_TYPE_GEOGRAPHY:
+           {
+               const int32_t length = input.readInt();
+               // the NULL SQL string is a NULL C pointer
+               if (length == OBJECTLENGTH_NULL) {
+                   setNull();
+                   return;
+               }
+
+               if (type != ValueType::VALUE_TYPE_GEOGRAPHY) {
+                   const char *str = (const char*) input.getRawPointer(length);
+                   createObjectPointer(length, str, tempPool);
+               } else {
+                   StringRef* sref = createObjectPointer(length, NULL, tempPool);
+                   GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
+               }
+
                return;
-            }
-
-            if (type != VALUE_TYPE_GEOGRAPHY) {
-               const char *str = (const char*) input.getRawPointer(length);
-               createObjectPointer(length, str, tempPool);
-            } else {
-               StringRef* sref = createObjectPointer(length, NULL, tempPool);
-               GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
-            }
-
-            return;
-         }
-      case VALUE_TYPE_DECIMAL:
-         getDecimal().table[1] = input.readLong();
-         getDecimal().table[0] = input.readLong();
-         return;
-      case VALUE_TYPE_POINT:
-         getGeographyPointValue() = GeographyPointValue::deserializeFrom(input);
-         return;
-      case VALUE_TYPE_NULL:
-         setNull();
-         return;
-      case VALUE_TYPE_ARRAY:
-         deserializeIntoANewNValueList(input, tempPool);
-         return;
-      default:
-         break;
+           }
+       case ValueType::VALUE_TYPE_DECIMAL:
+           getDecimal().table[1] = input.readLong();
+           getDecimal().table[0] = input.readLong();
+           return;
+       case ValueType::VALUE_TYPE_POINT:
+           getGeographyPointValue() = GeographyPointValue::deserializeFrom(input);
+           return;
+       case ValueType::VALUE_TYPE_NULL:
+           setNull();
+           return;
+       case ValueType::VALUE_TYPE_ARRAY:
+           deserializeIntoANewNValueList(input, tempPool);
+           return;
+       default:
+           break;
    }
 
    throwDynamicSQLException("NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
@@ -3095,65 +3092,66 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
 inline void NValue::serializeTo(SerializeOutput &output) const {
     const ValueType type = getValueType();
     switch (type) {
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY: {
-        if (isNull()) {
-            output.writeInt(OBJECTLENGTH_NULL);
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
+            {
+                if (isNull()) {
+                    output.writeInt(OBJECTLENGTH_NULL);
+                    return;
+                }
+                int32_t length;
+                const char* buf = getObject_withoutNull(length);
+                if (length <= OBJECTLENGTH_NULL) {
+                    throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
+                }
+                output.writeInt(length);
+
+                // Not a null string: write it out
+                if (type != ValueType::VALUE_TYPE_GEOGRAPHY) {
+                    output.writeBytes(buf, length);
+                } else {
+                    // geography gets its own serialization to deal with
+                    // byteswapping and endianness
+                    getGeographyValue().serializeTo(output);
+                }
+                return;
+            }
+        case ValueType::VALUE_TYPE_TINYINT:
+            output.writeByte(getTinyInt());
             return;
-        }
-        int32_t length;
-        const char* buf = getObject_withoutNull(length);
-        if (length <= OBJECTLENGTH_NULL) {
-            throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
-        }
-        output.writeInt(length);
 
-        // Not a null string: write it out
-        if (type != VALUE_TYPE_GEOGRAPHY) {
-            output.writeBytes(buf, length);
-        } else {
-            // geography gets its own serialization to deal with
-            // byteswapping and endianness
-            getGeographyValue().serializeTo(output);
-        }
-        return;
-    }
-    case VALUE_TYPE_TINYINT:
-        output.writeByte(getTinyInt());
-        return;
+        case ValueType::VALUE_TYPE_SMALLINT:
+            output.writeShort(getSmallInt());
+            return;
 
-    case VALUE_TYPE_SMALLINT:
-        output.writeShort(getSmallInt());
-        return;
+        case ValueType::VALUE_TYPE_INTEGER:
+            output.writeInt(getInteger());
+            return;
 
-    case VALUE_TYPE_INTEGER:
-        output.writeInt(getInteger());
-        return;
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+            output.writeLong(getTimestamp());
+            return;
 
-    case VALUE_TYPE_TIMESTAMP:
-        output.writeLong(getTimestamp());
-        return;
+        case ValueType::VALUE_TYPE_BIGINT:
+            output.writeLong(getBigInt());
+            return;
 
-    case VALUE_TYPE_BIGINT:
-        output.writeLong(getBigInt());
-        return;
+        case ValueType::VALUE_TYPE_DOUBLE:
+            output.writeDouble(getDouble());
+            return;
 
-    case VALUE_TYPE_DOUBLE:
-        output.writeDouble(getDouble());
-        return;
+        case ValueType::VALUE_TYPE_DECIMAL:
+            output.writeLong(getDecimal().table[1]);
+            output.writeLong(getDecimal().table[0]);
+            return;
 
-    case VALUE_TYPE_DECIMAL:
-        output.writeLong(getDecimal().table[1]);
-        output.writeLong(getDecimal().table[0]);
-        return;
+        case ValueType::VALUE_TYPE_POINT:
+            getGeographyPointValue().serializeTo(output);
+            return;
 
-    case VALUE_TYPE_POINT:
-        getGeographyPointValue().serializeTo(output);
-        return;
-
-    default:
-        break;
+        default:
+            break;
     }
 
     throwDynamicSQLException("NValue::serializeTo() found a column with ValueType '%s' that is not handled",
@@ -3166,13 +3164,13 @@ inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) c
     vassert(isNull() == false);
     const ValueType type = getValueType();
     switch (type) {
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             {
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
-                if (type == VALUE_TYPE_GEOGRAPHY) {
+                if (type == ValueType::VALUE_TYPE_GEOGRAPHY) {
                     sz += io.writeInt(length);
                     // geography gets its own serialization to deal with byte-swapping and endianness
                     getGeographyValue().serializeTo(io);
@@ -3182,39 +3180,39 @@ inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) c
                 }
                 return sz;
             }
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             sz += io.writeByte(getTinyInt());
             return sz;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             sz += io.writeShort(getSmallInt());
             return sz;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             sz += io.writeInt(getInteger());
             return sz;
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             sz += io.writeLong(getTimestamp());
             return sz;
-        case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_BIGINT:
             sz += io.writeLong(getBigInt());
             return sz;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             sz += io.writeDouble(getDouble());
             return sz;
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             sz += io.writeByte((int8_t)kMaxDecScale);
             sz += io.writeByte((int8_t)16);  //number of bytes in decimal
             sz += io.writeLong(htonll(getDecimal().table[1]));
             sz += io.writeLong(htonll(getDecimal().table[0]));
             return sz;
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             getGeographyPointValue().serializeTo(io);
             return sz;
-        case VALUE_TYPE_INVALID:
-        case VALUE_TYPE_NULL:
-        case VALUE_TYPE_BOOLEAN:
-        case VALUE_TYPE_ADDRESS:
-        case VALUE_TYPE_ARRAY:
-        case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+        case ValueType::VALUE_TYPE_INVALID:
+        case ValueType::VALUE_TYPE_NULL:
+        case ValueType::VALUE_TYPE_BOOLEAN:
+        case ValueType::VALUE_TYPE_ADDRESS:
+        case ValueType::VALUE_TYPE_ARRAY:
+        case ValueType::VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
             throwSerializableEEException(
                     "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
         default:
@@ -3227,7 +3225,7 @@ inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) c
  *  allocated non-inlined form.  Use the pool specified by the caller,
  *  or the temp string pool if none was supplied. **/
 inline void NValue::allocateObjectFromPool(Pool* pool) {
-    if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
+    if (m_valueType == ValueType::VALUE_TYPE_NULL || m_valueType == ValueType::VALUE_TYPE_INVALID) {
         return;
     }
 
@@ -3258,11 +3256,11 @@ inline bool NValue::isNull() const {
     // OBJECT_NULL_BIT, because they have a 16-byte
     // representation in m_data, and the object null bit
     // (if set) lives in m_data[13].
-    if (getValueType() == VALUE_TYPE_DECIMAL) {
+    if (getValueType() == ValueType::VALUE_TYPE_DECIMAL) {
         TTInt min;
         min.SetMin();
         return getDecimal() == min;
-    } else if (getValueType() == VALUE_TYPE_POINT) {
+    } else if (getValueType() == ValueType::VALUE_TYPE_POINT) {
         return getGeographyPointValue().isNull();
     }
 
@@ -3270,7 +3268,7 @@ inline bool NValue::isNull() const {
 }
 
 inline bool NValue::isNaN() const {
-    if (getValueType() == VALUE_TYPE_DOUBLE) {
+    if (getValueType() == ValueType::VALUE_TYPE_DOUBLE) {
         return std::isnan(getDouble());
     } else {
        return false;
@@ -3351,20 +3349,20 @@ inline NValue NValue::getNullValue(ValueType type) {
 
 inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
     switch (getValueType()) {
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             boost::hash_combine(seed, getTinyInt());
             return seed;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             boost::hash_combine(seed, getSmallInt());
             return seed;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             boost::hash_combine(seed, getInteger());
             return seed;
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             boost::hash_combine(seed, getBigInt());
             return seed;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             if (isNull()) {
                 // A range of values for FLOAT are considered to be
                 // NULL---anything less than or equal to DOUBLE_NULL.  Any
@@ -3377,7 +3375,7 @@ inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
                 MiscUtil::hashCombineFloatingPoint(seed, getDouble());
             }
             return seed;
-        case VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARCHAR:
             {
                 if (isNull()) {
                     boost::hash_combine(seed, std::string(""));
@@ -3388,7 +3386,7 @@ inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
                 boost::hash_combine(seed, std::string(buf, length));
                 return seed;
             }
-        case VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_VARBINARY:
             {
                 if (isNull()) {
                     boost::hash_combine(seed, std::string(""));
@@ -3401,12 +3399,12 @@ inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
                 }
                 return seed;
             }
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             getDecimal().hash(seed);
             return seed;
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             return getGeographyPointValue().hashCombine(seed);
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             return getGeographyValue().hashCombine(seed);
         default:
             vassert(false);     // should never reach here
@@ -3423,27 +3421,27 @@ inline NValue NValue::castAs(ValueType type) const {
     }
 
     switch (type) {
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             return castAsTinyInt();
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             return castAsSmallInt();
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             return castAsInteger();
-        case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_BIGINT:
             return castAsBigInt();
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return castAsTimestamp();
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             return castAsDouble();
-        case VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARCHAR:
             return castAsString();
-        case VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_VARBINARY:
             return castAsBinary();
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             return castAsDecimal();
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_POINT:
             return castAsGeographyPoint();
-        case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::VALUE_TYPE_GEOGRAPHY:
             return castAsGeography();
         default:
             break;
@@ -3458,11 +3456,11 @@ inline NValue NValue::castAs(ValueType type) const {
 inline void* NValue::castAsAddress() const {
     const ValueType type = getValueType();
     switch (type) {
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_ADDRESS:
-        return *reinterpret_cast<void* const*>(m_data);
-    default:
-        break;
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_ADDRESS:
+            return *reinterpret_cast<void* const*>(m_data);
+        default:
+            break;
     }
     throwDynamicSQLException("Type %s not a recognized type for casting as an address", getValueTypeString().c_str());
 }
@@ -3471,23 +3469,23 @@ inline NValue NValue::op_unary_minus() const {
     const ValueType type = getValueType();
     NValue retval(type);
     switch(type) {
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             retval.getTinyInt() = static_cast<int8_t>(-getTinyInt());
             break;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             retval.getSmallInt() = static_cast<int16_t>(-getSmallInt());
             break;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             retval.getInteger() = -getInteger();
             break;
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             retval.getBigInt() = -getBigInt();
             break;
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             retval.getDecimal() = -getDecimal();
             break;
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             retval.getDouble() = -getDouble();
             break;
         default:
@@ -3501,41 +3499,41 @@ inline NValue NValue::op_increment() const {
     const ValueType type = getValueType();
     NValue retval(type);
     switch(type) {
-    case VALUE_TYPE_TINYINT:
-        if (getTinyInt() == INT8_MAX) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Incrementing this TinyInt results in a value out of range");
-        }
-        retval.getTinyInt() = static_cast<int8_t>(getTinyInt() + 1);
-        break;
-    case VALUE_TYPE_SMALLINT:
-        if (getSmallInt() == INT16_MAX) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Incrementing this SmallInt results in a value out of range");
-        }
-        retval.getSmallInt() = static_cast<int16_t>(getSmallInt() + 1);
-        break;
-    case VALUE_TYPE_INTEGER:
-        if (getInteger() == INT32_MAX) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Incrementing this Integer results in a value out of range");
-        }
-        retval.getInteger() = getInteger() + 1;
-        break;
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
-        if (getBigInt() == INT64_MAX) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Incrementing this BigInt/Timestamp results in a value out of range");
-        }
-        retval.getBigInt() = getBigInt() + 1;
-        break;
-    case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = getDouble() + 1;
-        break;
-    default:
-        throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
-        break;
+        case ValueType::VALUE_TYPE_TINYINT:
+            if (getTinyInt() == INT8_MAX) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Incrementing this TinyInt results in a value out of range");
+            }
+            retval.getTinyInt() = static_cast<int8_t>(getTinyInt() + 1);
+            break;
+        case ValueType::VALUE_TYPE_SMALLINT:
+            if (getSmallInt() == INT16_MAX) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Incrementing this SmallInt results in a value out of range");
+            }
+            retval.getSmallInt() = static_cast<int16_t>(getSmallInt() + 1);
+            break;
+        case ValueType::VALUE_TYPE_INTEGER:
+            if (getInteger() == INT32_MAX) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Incrementing this Integer results in a value out of range");
+            }
+            retval.getInteger() = getInteger() + 1;
+            break;
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+            if (getBigInt() == INT64_MAX) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Incrementing this BigInt/Timestamp results in a value out of range");
+            }
+            retval.getBigInt() = getBigInt() + 1;
+            break;
+        case ValueType::VALUE_TYPE_DOUBLE:
+            retval.getDouble() = getDouble() + 1;
+            break;
+        default:
+            throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
+            break;
     }
     return retval;
 }
@@ -3544,40 +3542,40 @@ inline NValue NValue::op_decrement() const {
     const ValueType type = getValueType();
     NValue retval(type);
     switch(type) {
-    case VALUE_TYPE_TINYINT:
-        if (getTinyInt() == VOLT_INT8_MIN) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Decrementing this TinyInt results in a value out of range");
-        }
-        retval.getTinyInt() = static_cast<int8_t>(getTinyInt() - 1);
-        break;
-    case VALUE_TYPE_SMALLINT:
-        if (getSmallInt() == VOLT_INT16_MIN) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Decrementing this SmallInt results in a value out of range");
-        }
-        retval.getSmallInt() = static_cast<int16_t>(getSmallInt() - 1);
-        break;
-    case VALUE_TYPE_INTEGER:
-        if (getInteger() == VOLT_INT32_MIN) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Decrementing this Integer results in a value out of range");
-        }
-        retval.getInteger() = getInteger() - 1;
-        break;
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
-        if (getBigInt() == VOLT_INT64_MIN) {
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                    "Decrementing this BigInt/Timestamp results in a value out of range");
-        }
-        retval.getBigInt() = getBigInt() - 1;
-        break;
-    case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = getDouble() - 1;
-        break;
-    default:
-        throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
+        case ValueType::VALUE_TYPE_TINYINT:
+            if (getTinyInt() == VOLT_INT8_MIN) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Decrementing this TinyInt results in a value out of range");
+            }
+            retval.getTinyInt() = static_cast<int8_t>(getTinyInt() - 1);
+            break;
+        case ValueType::VALUE_TYPE_SMALLINT:
+            if (getSmallInt() == VOLT_INT16_MIN) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Decrementing this SmallInt results in a value out of range");
+            }
+            retval.getSmallInt() = static_cast<int16_t>(getSmallInt() - 1);
+            break;
+        case ValueType::VALUE_TYPE_INTEGER:
+            if (getInteger() == VOLT_INT32_MIN) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Decrementing this Integer results in a value out of range");
+            }
+            retval.getInteger() = getInteger() - 1;
+            break;
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+            if (getBigInt() == VOLT_INT64_MIN) {
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                        "Decrementing this BigInt/Timestamp results in a value out of range");
+            }
+            retval.getBigInt() = getBigInt() - 1;
+            break;
+        case ValueType::VALUE_TYPE_DOUBLE:
+            retval.getDouble() = getDouble() - 1;
+            break;
+        default:
+            throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
     }
     return retval;
 }
@@ -3585,16 +3583,16 @@ inline NValue NValue::op_decrement() const {
 inline bool NValue::isZero() const {
     const ValueType type = getValueType();
     switch(type) {
-        case VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_TINYINT:
             return getTinyInt() == 0;
-        case VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
             return getSmallInt() == 0;
-        case VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_INTEGER:
             return getInteger() == 0;
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return getBigInt() == 0;
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             return getDecimal().IsZero();
         default:
             break;
@@ -3610,19 +3608,19 @@ inline NValue NValue::op_subtract(const NValue& rhs) const {
     }
 
     switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return opSubtractBigInts(castAsBigIntAndGetValue(),
                     rhs.castAsBigIntAndGetValue());
 
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             return opSubtractDoubles(castAsDoubleAndGetValue(),
                     rhs.castAsDoubleAndGetValue());
 
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             return opSubtractDecimals(castAsDecimal(),
                     rhs.castAsDecimal());
 
@@ -3641,19 +3639,19 @@ inline NValue NValue::op_add(const NValue& rhs) const {
     }
 
     switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return opAddBigInts(castAsBigIntAndGetValue(),
                     rhs.castAsBigIntAndGetValue());
 
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             return opAddDoubles(castAsDoubleAndGetValue(),
                     rhs.castAsDoubleAndGetValue());
 
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             return opAddDecimals(castAsDecimal(),
                     rhs.castAsDecimal());
 
@@ -3672,21 +3670,18 @@ inline NValue NValue::op_multiply(const NValue& rhs) const {
     }
 
     switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-            return opMultiplyBigInts(castAsBigIntAndGetValue(),
-                    rhs.castAsBigIntAndGetValue());
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+            return opMultiplyBigInts(castAsBigIntAndGetValue(), rhs.castAsBigIntAndGetValue());
 
-        case VALUE_TYPE_DOUBLE:
-            return opMultiplyDoubles(castAsDoubleAndGetValue(),
-                    rhs.castAsDoubleAndGetValue());
+        case ValueType::VALUE_TYPE_DOUBLE:
+            return opMultiplyDoubles(castAsDoubleAndGetValue(), rhs.castAsDoubleAndGetValue());
 
-        case VALUE_TYPE_DECIMAL:
-            return opMultiplyDecimals(castAsDecimal(),
-                    rhs.castAsDecimal());
+        case ValueType::VALUE_TYPE_DECIMAL:
+            return opMultiplyDecimals(castAsDecimal(), rhs.castAsDecimal());
 
         default:
             break;
@@ -3703,19 +3698,19 @@ inline NValue NValue::op_divide(const NValue& rhs) const {
     }
 
     switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
             return opDivideBigInts(castAsBigIntAndGetValue(),
                     rhs.castAsBigIntAndGetValue());
 
-        case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
             return opDivideDoubles(castAsDoubleAndGetValue(),
                     rhs.castAsDoubleAndGetValue());
 
-        case VALUE_TYPE_DECIMAL:
+        case ValueType::VALUE_TYPE_DECIMAL:
             return opDivideDecimals(castAsDecimal(),
                     rhs.castAsDecimal());
 
@@ -3730,16 +3725,16 @@ inline NValue NValue::op_divide(const NValue& rhs) const {
 inline int32_t NValue::murmurHash3() const {
     const ValueType type = getValueType();
     switch(type) {
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_DOUBLE:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_POINT:
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+        case ValueType::VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_POINT:
             return MurmurHash3_x64_128(castAsBigIntAndGetValue());
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_VARCHAR:
+        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::VALUE_TYPE_VARCHAR:
             {
                 if (isNull()) {
                     // Use NULL check first to be able to get rid of checks inside of other functions.
@@ -3754,7 +3749,7 @@ inline int32_t NValue::murmurHash3() const {
         default:
             break;
     }
-    throwFatalException("Unknown type for murmur hashing %d", type);
+    throwFatalException("Unknown type for murmur hashing %s", getTypeName(type).c_str());
 }
 
 /*
@@ -3769,19 +3764,19 @@ inline NValue NValue::like(const NValue& rhs) const {
      * Validate that all params are VARCHAR
      */
     const ValueType mType = getValueType();
-    if (mType != VALUE_TYPE_VARCHAR) {
+    if (mType != ValueType::VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
                 "The left operand of the LIKE expression is %s not %s",
                 getValueTypeString().c_str(),
-                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+                getTypeName(ValueType::VALUE_TYPE_VARCHAR).c_str());
     }
 
     const ValueType rhsType = rhs.getValueType();
-    if (rhsType != VALUE_TYPE_VARCHAR) {
+    if (rhsType != ValueType::VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
                 "The right operand of the LIKE expression is %s not %s",
                 rhs.getValueTypeString().c_str(),
-                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+                getTypeName(ValueType::VALUE_TYPE_VARCHAR).c_str());
     }
 
     int32_t valueUTF8Length;
@@ -3922,19 +3917,19 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
      * Validate that all params are VARCHAR
      */
     const ValueType mType = getValueType();
-    if (mType != VALUE_TYPE_VARCHAR) {
+    if (mType != ValueType::VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
                 "The left operand of the STARTS WITH expression is %s not %s",
                 getValueTypeString().c_str(),
-                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+                getTypeName(ValueType::VALUE_TYPE_VARCHAR).c_str());
     }
 
     const ValueType rhsType = rhs.getValueType();
-    if (rhsType != VALUE_TYPE_VARCHAR) {
+    if (rhsType != ValueType::VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
                 "The right operand of the STARTS WITH expression is %s not %s",
                 rhs.getValueTypeString().c_str(),
-                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+                getTypeName(ValueType::VALUE_TYPE_VARCHAR).c_str());
     }
 
     int32_t valueUTF8Length;

@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef THEHASHINATOR_H_
-#define THEHASHINATOR_H_
+#pragma once
 
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
@@ -43,34 +42,29 @@ class TheHashinator {
      * However, since we currently have two matching implementations
      * of hashinate, it's nice to centralize and isolate the code here.
      */
-    int32_t hashinate(NValue value) const
-    {
+    int32_t hashinate(NValue value) const {
         // All null values hash to partition 0
-        if (value.isNull())
-        {
+        if (value.isNull()) {
             return 0;
         }
         ValueType val_type = ValuePeeker::peekValueType(value);
-        switch (val_type)
-        {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        {
-            return hashinate(ValuePeeker::peekAsRawInt64(value));
-        }
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_VARCHAR:
-        {
-            int32_t length;
-            const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
-            return hashinate(buf, length);
-        }
-        default:
-            throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
-                    getTypeName(val_type).c_str());
-            break;
+        switch (val_type) {
+            case ValueType::VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_BIGINT:
+                return hashinate(ValuePeeker::peekAsRawInt64(value));
+            case ValueType::VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_VARCHAR:
+                {
+                    int32_t length;
+                    const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
+                    return hashinate(buf, length);
+                }
+            default:
+                throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
+                        getTypeName(val_type).c_str());
+                break;
         }
     }
 
@@ -104,4 +98,3 @@ class TheHashinator {
 
 } // namespace voltdb
 
-#endif // THEHASHINATOR_H_

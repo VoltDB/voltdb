@@ -40,8 +40,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-#ifndef TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_
-#define TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_
+#pragma once
 
 #include "storage/table.h"
 #include "storage/tablefactory.h"
@@ -108,9 +107,9 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
         VOLT_TRACE("  column %02d type:         %hd\n",
                     idx,
                     column_count);
-        assert(colType != VALUE_TYPE_ARRAY);
-        if (colType == VALUE_TYPE_VARCHAR
-            || colType == VALUE_TYPE_VARBINARY) {
+        assert(colType != ValueType::VALUE_TYPE_ARRAY);
+        if (colType == ValueType::VALUE_TYPE_VARCHAR
+            || colType == ValueType::VALUE_TYPE_VARBINARY) {
             // Note that in the tests we do not have the schema handy, setting this to 256
             // which seems to be large enough for the cpp unit tests now.
             builder.setColumnAtIndex(idx, colType, 256);
@@ -143,4 +142,3 @@ TempTable *loadTableFrom(const char *buffer, size_t size)
 
 } // namespace voltdb
 
-#endif /* TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_ */

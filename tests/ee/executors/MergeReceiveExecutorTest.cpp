@@ -43,11 +43,11 @@
 namespace voltdb {
 static TupleSchema* createTupleScmema() {
     std::vector<ValueType> all_types;
-    all_types.push_back(VALUE_TYPE_BIGINT);
+    all_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     std::vector<bool> column_allow_null(1, true);
     std::vector<int32_t> all_inline_lengths;
     all_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
+                                 getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     return TupleSchema::createTupleSchemaForTest(all_types,
                                        all_inline_lengths,
                                        column_allow_null);
@@ -58,11 +58,11 @@ static TempTable* createTempTable() {
     const std::string tableName = "a_table";
 
     std::vector<ValueType> all_types;
-    all_types.push_back(VALUE_TYPE_BIGINT);
+    all_types.push_back(ValueType::VALUE_TYPE_BIGINT);
     std::vector<bool> column_allow_null(1, true);
     std::vector<int32_t> all_inline_lengths;
     all_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
+                                 getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     TupleSchema*  schema = createTupleScmema();
 
     std::vector<std::string> names(1);

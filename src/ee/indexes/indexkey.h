@@ -196,22 +196,22 @@ struct IntsKey
         const int columnCount = keySchema->columnCount();
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
-            case voltdb::VALUE_TYPE_BIGINT: {
+                case voltdb::ValueType::VALUE_TYPE_BIGINT: {
                 const uint64_t keyValue = extractKeyValue<uint64_t>(keyOffset, intraKeyOffset);
                 buffer << convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(keyValue) << ",";
                 break;
             }
-            case voltdb::VALUE_TYPE_INTEGER: {
+                case voltdb::ValueType::VALUE_TYPE_INTEGER: {
                 const uint64_t keyValue = extractKeyValue<uint32_t>(keyOffset, intraKeyOffset);
                 buffer << convertUnsignedValueToSignedValue< int32_t, INT32_MAX>(keyValue) << ",";
                 break;
             }
-            case voltdb::VALUE_TYPE_SMALLINT: {
+                case voltdb::ValueType::VALUE_TYPE_SMALLINT: {
                 const uint64_t keyValue = extractKeyValue<uint16_t>(keyOffset, intraKeyOffset);
                 buffer << convertUnsignedValueToSignedValue< int16_t, INT16_MAX>(keyValue) << ",";
                 break;
             }
-            case voltdb::VALUE_TYPE_TINYINT: {
+                case voltdb::ValueType::VALUE_TYPE_TINYINT: {
                 const uint64_t keyValue = extractKeyValue<uint8_t>(keyOffset, intraKeyOffset);
                 buffer << static_cast<int64_t>(convertUnsignedValueToSignedValue< int8_t, INT8_MAX>(keyValue)) << ",";
                 break;
@@ -238,25 +238,25 @@ struct IntsKey
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
-            case voltdb::VALUE_TYPE_BIGINT: {
+                case voltdb::ValueType::VALUE_TYPE_BIGINT: {
                 const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(ii));
                 const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
                 insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_INTEGER: {
+                case voltdb::ValueType::VALUE_TYPE_INTEGER: {
                 const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(ii));
                 const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
                 insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_SMALLINT: {
+                case voltdb::ValueType::VALUE_TYPE_SMALLINT: {
                 const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(ii));
                 const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
                 insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_TINYINT: {
+                case voltdb::ValueType::VALUE_TYPE_TINYINT: {
                 const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(ii));
                 const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
                 insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
@@ -281,25 +281,25 @@ struct IntsKey
             for (int ii = 0; ii < columnCount; ii++) {
                 AbstractExpression* ae = indexed_expressions[ii];
                 switch(ae->getValueType()) {
-                case voltdb::VALUE_TYPE_BIGINT: {
+                    case voltdb::ValueType::VALUE_TYPE_BIGINT: {
                     const int64_t value = ValuePeeker::peekBigInt(ae->eval(tuple, NULL));
                     const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
                     insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
                     break;
                 }
-                case voltdb::VALUE_TYPE_INTEGER: {
+                    case voltdb::ValueType::VALUE_TYPE_INTEGER: {
                     const int32_t value = ValuePeeker::peekInteger(ae->eval(tuple, NULL));
                     const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
                     insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
                     break;
                 }
-                case voltdb::VALUE_TYPE_SMALLINT: {
+                    case voltdb::ValueType::VALUE_TYPE_SMALLINT: {
                     const int16_t value = ValuePeeker::peekSmallInt(ae->eval(tuple, NULL));
                     const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
                     insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
                     break;
                 }
-                case voltdb::VALUE_TYPE_TINYINT: {
+                    case voltdb::ValueType::VALUE_TYPE_TINYINT: {
                     const int8_t value = ValuePeeker::peekTinyInt(ae->eval(tuple, NULL));
                     const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
                     insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
@@ -314,25 +314,25 @@ struct IntsKey
         }
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
-            case voltdb::VALUE_TYPE_BIGINT: {
+                case voltdb::ValueType::VALUE_TYPE_BIGINT: {
                 const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(indices[ii]));
                 const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
                 insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_INTEGER: {
+                case voltdb::ValueType::VALUE_TYPE_INTEGER: {
                 const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(indices[ii]));
                 const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
                 insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_SMALLINT: {
+                case voltdb::ValueType::VALUE_TYPE_SMALLINT: {
                 const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(indices[ii]));
                 const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
                 insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
                 break;
             }
-            case voltdb::VALUE_TYPE_TINYINT: {
+                case voltdb::ValueType::VALUE_TYPE_TINYINT: {
                 const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(indices[ii]));
                 const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
                 insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);

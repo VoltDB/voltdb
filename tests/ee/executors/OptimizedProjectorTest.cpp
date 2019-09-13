@@ -80,21 +80,21 @@ enum TypeAndSize {
 
 static ValueType toValueType(TypeAndSize tas) {
     switch (tas) {
-    case TINYINT: return VALUE_TYPE_TINYINT;
-    case SMALLINT: return VALUE_TYPE_SMALLINT;
-    case INTEGER: return VALUE_TYPE_INTEGER;
-    case BIGINT: return VALUE_TYPE_BIGINT;
-    case VARCHAR_INLINE: return VALUE_TYPE_VARCHAR;
-    case VARCHAR_OUTLINE: return VALUE_TYPE_VARCHAR;
-    case VARBINARY_INLINE: return VALUE_TYPE_VARBINARY;
-    case VARBINARY_OUTLINE: return VALUE_TYPE_VARBINARY;
-    case TIMESTAMP: return VALUE_TYPE_TIMESTAMP;
-    case DECIMAL: return VALUE_TYPE_DECIMAL;
-    default:
-        break;
+        case TINYINT: return ValueType::VALUE_TYPE_TINYINT;
+        case SMALLINT: return ValueType::VALUE_TYPE_SMALLINT;
+        case INTEGER: return ValueType::VALUE_TYPE_INTEGER;
+        case BIGINT: return ValueType::VALUE_TYPE_BIGINT;
+        case VARCHAR_INLINE: return ValueType::VALUE_TYPE_VARCHAR;
+        case VARCHAR_OUTLINE: return ValueType::VALUE_TYPE_VARCHAR;
+        case VARBINARY_INLINE: return ValueType::VALUE_TYPE_VARBINARY;
+        case VARBINARY_OUTLINE: return ValueType::VALUE_TYPE_VARBINARY;
+        case TIMESTAMP: return ValueType::VALUE_TYPE_TIMESTAMP;
+        case DECIMAL: return ValueType::VALUE_TYPE_DECIMAL;
+        default:
+                      break;
     }
 
-    return VALUE_TYPE_INVALID;
+    return ValueType::VALUE_TYPE_INVALID;
 }
 
 static std::vector<ValueType> toValueType(const std::vector<TypeAndSize> &tasVec) {
@@ -186,14 +186,14 @@ static void fillTable(Table* tbl, int64_t numRows) {
             ValueType vt = schema->columnType(j);
             NValue nval;
             switch (vt) {
-            case VALUE_TYPE_BIGINT: {
+                case ValueType::VALUE_TYPE_BIGINT: {
                 nval = ValueFactory::getBigIntValue(i * 10000 + j);
                 break;
             }
-            case VALUE_TYPE_VARCHAR:
+                case ValueType::VALUE_TYPE_VARCHAR:
                 nval = ValueFactory::getTempStringValue(randomString(length));
                 break;
-            case VALUE_TYPE_VARBINARY:
+                case ValueType::VALUE_TYPE_VARBINARY:
                 nval = ValueFactory::getTempBinaryValue(randomString(length));
                 break;
             default:

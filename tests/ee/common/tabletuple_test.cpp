@@ -54,8 +54,8 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 
     // Make sure that inlined strings are actually inlined
     int32_t maxInlinableLength = UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1;
-    ScopedTupleSchema allInlineSchema{Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                                         std::make_pair(VALUE_TYPE_VARCHAR, maxInlinableLength))};
+    ScopedTupleSchema allInlineSchema{Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+            std::make_pair(ValueType::VALUE_TYPE_VARCHAR, maxInlinableLength))};
     PoolBackedTupleStorage tupleStorage;
     tupleStorage.init(allInlineSchema.get(), pool);
     tupleStorage.allocateActiveTuple();
@@ -66,8 +66,8 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 
     // Now check that an non-inlined schema returns the right thing.
     int32_t nonInlinableLength = UNINLINEABLE_OBJECT_LENGTH + 10000;
-    ScopedTupleSchema nonInlinedSchema{Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                                         std::make_pair(VALUE_TYPE_VARCHAR, nonInlinableLength))};
+    ScopedTupleSchema nonInlinedSchema{Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+            std::make_pair(ValueType::VALUE_TYPE_VARCHAR, nonInlinableLength))};
     tupleStorage.init(nonInlinedSchema.get(), pool);
     tupleStorage.allocateActiveTuple();
     TableTuple nonInlinedTuple = tupleStorage;
@@ -83,8 +83,8 @@ TEST_F(TableTupleTest, HiddenColumns)
     UniqueEngine engine = UniqueEngineBuilder().build();
 
     TupleSchemaBuilder builder(2, 2);
-    builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
+    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_BIGINT);
+    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR, 256);
     builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
     builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
@@ -99,16 +99,16 @@ TEST_F(TableTupleTest, HiddenColumns)
     tuple.setNValue(0, nvalVisibleBigint);
     tuple.setNValue(1, nvalVisibleString);
     tuple.setHiddenNValue(0, nvalHiddenBigint);
-    tuple.setHiddenNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
+    tuple.setHiddenNValue(1, NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT));
 
     EXPECT_EQ(0, tuple.getNValue(0).compare(nvalVisibleBigint));
     EXPECT_EQ(0, tuple.getNValue(1).compare(nvalVisibleString));
     EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
-    EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(NValue::getNullValue(VALUE_TYPE_BIGINT)));
+    EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT)));
 
     EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
 
-    tuple.setHiddenNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
+    tuple.setHiddenNValue(1, NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT));
 
     // The hidden string is null, takes 8 serialized byte
     EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
@@ -121,9 +121,9 @@ TEST_F(TableTupleTest, ToJsonArray)
     UniqueEngine engine = UniqueEngineBuilder().build();
 
     TupleSchemaBuilder builder(3, 2);
-    builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
-    builder.setColumnAtIndex(2, VALUE_TYPE_VARCHAR, 256);
+    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_BIGINT);
+    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR, 256);
+    builder.setColumnAtIndex(2, ValueType::VALUE_TYPE_VARCHAR, 256);
     builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
     builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
@@ -154,9 +154,9 @@ TEST_F(TableTupleTest, VolatilePoolBackedTuple) {
     //    - one fixed size column
     //    - one inlined variable-length column
     //    - one non-inlined variable-length column
-    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    ScopedTupleSchema schema{Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 256))};
     PoolBackedTupleStorage poolBackedTuple;
     poolBackedTuple.init(schema.get(), &pool);
     poolBackedTuple.allocateActiveTuple();
@@ -194,9 +194,9 @@ TEST_F(TableTupleTest, VolatileStandAloneTuple) {
     //    - one fixed size column
     //    - one inlined variable-length column
     //    - one non-inlined variable-length column
-    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    ScopedTupleSchema schema{Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 256))};
     StandAloneTupleStorage standAloneTuple{schema.get()};
     TableTuple tuple = standAloneTuple.tuple();
     Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
@@ -222,9 +222,9 @@ TEST_F(TableTupleTest, VolatileTempTuple) {
     //    - one fixed-length column
     //    - one inlined variable-length column
     //    - one non-inlined variable-length column
-    TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 12),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    TupleSchema *schema = Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 12),
+                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 256));
     std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     std::unique_ptr<Table> table{TableFactory::buildTempTable("T",
                                                               schema,
@@ -271,9 +271,9 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
     //    - one fixed-length column
     //    - one inlined variable-length column
     //    - one non-inlined variable-length column
-    TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 12),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    TupleSchema *schema = Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 12),
+                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 256));
     std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     char signature[20];
     std::unique_ptr<Table> table{TableFactory::getPersistentTable(0,
@@ -323,9 +323,9 @@ TEST_F(TableTupleTest, HeaderDefaults) {
     //    - one fixed size column
     //    - one inlined variable-length column
     //    - one non-inlined variable-length column
-    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
-                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    ScopedTupleSchema schema{Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 256))};
     char *storage = static_cast<char*>(pool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     TableTuple theTuple{storage, schema.get()};
 
@@ -351,9 +351,9 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
     Pool pool;
 
     TupleSchemaBuilder schemaBuilder(3, 2);
-    schemaBuilder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    schemaBuilder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 60);
-    schemaBuilder.setColumnAtIndex(2, VALUE_TYPE_INTEGER);
+    schemaBuilder.setColumnAtIndex(0, ValueType::VALUE_TYPE_BIGINT);
+    schemaBuilder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR, 60);
+    schemaBuilder.setColumnAtIndex(2, ValueType::VALUE_TYPE_INTEGER);
     schemaBuilder.setHiddenColumnAtIndex(0, HiddenColumn::MIGRATE_TXN);
     schemaBuilder.setHiddenColumnAtIndex(1, HiddenColumn::XDCR_TIMESTAMP);
 
@@ -379,8 +379,8 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
     tuple.serializeTo(unfilteredOutput, &filterNone);
 
     // Reserved size + 3 bigints + string + integer
-    int unfilteredSize = 4 + NValue::getTupleStorageSize(VALUE_TYPE_BIGINT) * 3 + (4 + 6) +
-            NValue::getTupleStorageSize(VALUE_TYPE_INTEGER);
+    int unfilteredSize = 4 + NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT) * 3 + (4 + 6) +
+            NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER);
     ASSERT_EQ(unfilteredSize, unfilteredOutput.size());
 
     // Validate serialized contents has all columns
@@ -399,7 +399,7 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
     HiddenColumnFilter filterMigrate = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, schema.get());
     tuple.serializeTo(filteredOutput, &filterMigrate);
 
-    int filteredSize = unfilteredSize - NValue::getTupleStorageSize(VALUE_TYPE_BIGINT);
+    int filteredSize = unfilteredSize - NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT);
     ASSERT_EQ(filteredSize, filteredOutput.size());
 
     // Validate serialized contents has everything except the hidden migrate column

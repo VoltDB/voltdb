@@ -48,7 +48,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
+#pragma once
 #include <vector>
 
 #include "boost/optional.hpp"
@@ -58,8 +58,6 @@
 #include "common/TupleSchema.h"
 #include "common/ValueFactory.hpp"
 
-#ifndef _TEST_EE_TEST_UTILS_TOOLS_HPP_
-#define _TEST_EE_TEST_UTILS_TOOLS_HPP_
 
 /** Various useful methods for working with tuples and related data
     structures */
@@ -128,7 +126,7 @@ public:
     typedef std::tuple<voltdb::ValueType, int32_t, bool> VarLenTypeSpec;
     struct VarcharBuilder {
         VarLenTypeSpec operator()(int32_t count, VarcharUnits units) const {
-            return VarLenTypeSpec(voltdb::VALUE_TYPE_VARCHAR, count, units == BYTES);
+            return VarLenTypeSpec(voltdb::ValueType::VALUE_TYPE_VARCHAR, count, units == BYTES);
         }
     };
 
@@ -146,37 +144,37 @@ struct ValueTypeFor;
 
 template<>
 struct ValueTypeFor<double> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_DOUBLE;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_DOUBLE;
 };
 
 template<>
 struct ValueTypeFor<int64_t> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_BIGINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_BIGINT;
 };
 
 template<>
 struct ValueTypeFor<int32_t> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_INTEGER;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_INTEGER;
 };
 
 template<>
 struct ValueTypeFor<int16_t> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_SMALLINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_SMALLINT;
 };
 
 template<>
 struct ValueTypeFor<int8_t> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_TINYINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_TINYINT;
 };
 
 template<>
 struct ValueTypeFor<std::string> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_VARCHAR;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_VARCHAR;
 };
 
 template<>
 struct ValueTypeFor<const char*> {
-    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_VARCHAR;
+    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_VARCHAR;
 };
 
 template<typename R>
@@ -255,7 +253,7 @@ voltdb::NValue Tools::nvalueFromNative(voltdb::NValue nval) {
 
 template<>
 std::string Tools::nativeFromNValue(const voltdb::NValue& nval) {
-    assert(voltdb::ValuePeeker::peekValueType(nval) == voltdb::VALUE_TYPE_VARCHAR);
+    assert(voltdb::ValuePeeker::peekValueType(nval) == voltdb::ValueType::VALUE_TYPE_VARCHAR);
     int32_t valueLen;
     const char* value = voltdb::ValuePeeker::peekObject(nval, &valueLen);
     return std::string(value, valueLen);
@@ -313,7 +311,7 @@ int Tools::nvalueCompare(T val1, S val2) {
     voltdb::ValueType vt2 = voltdb::ValuePeeker::peekValueType(nval2);
 
     if (vt1 != vt2) {
-        return vt1 - vt2;
+        return static_cast<int>(vt1) - static_cast<int>(vt2);
     }
 
     if (nval1.isNull() != nval2.isNull()) {
@@ -459,10 +457,7 @@ voltdb::TupleSchema* Tools::buildSchema() {
     }
 
     std::vector<bool> inBytes(columnSizes.size(), false);
-    return voltdb::TupleSchema::createTupleSchema(columnTypes,
-                                                  columnSizes,
-                                                  allowNulls,
-                                                  inBytes);
+    return voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNulls, inBytes);
 }
 
 inline Tools::Tools() {
@@ -470,4 +465,3 @@ inline Tools::Tools() {
     setTupleValuesHelper(NULL, 0);
 }
 
-#endif // _TEST_EE_TEST_UTILS_TOOLS_HPP_

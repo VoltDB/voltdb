@@ -101,8 +101,8 @@ public:
         std::vector<bool> columnAllowNull;
 
         for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
+            columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
         }
         m_schema =

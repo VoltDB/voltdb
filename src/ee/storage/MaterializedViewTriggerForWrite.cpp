@@ -231,7 +231,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
         // we can not use CoveringCellIndex for value comparison.
         vassert(selectedIndex->getKeySchema()->getColumnInfo(
                 static_cast<int>(m_groupByColumnCount))->getVoltType() !=
-               VALUE_TYPE_POINT);
+               ValueType::VALUE_TYPE_POINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;

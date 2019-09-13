@@ -213,7 +213,7 @@ private:
 
 static CoveringCellIndex* getCoveringCellIndexInstance(const TableIndexScheme &scheme) {
     TupleSchemaBuilder builder(1);
-    builder.setColumnAtIndex(0, VALUE_TYPE_POINT);
+    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_POINT);
     return new CoveringCellIndex(builder.buildKeySchema(), scheme);
 }
 
@@ -248,7 +248,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             }
             bool inBytes = false;
             uint32_t declaredLength;
-            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+            if (exprType == ValueType::VALUE_TYPE_VARCHAR || exprType == ValueType::VALUE_TYPE_VARBINARY) {
                 // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
                 // maximum length of expression values that can be indexed with the same limit
                 // that gets applied to column values.
@@ -263,7 +263,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 // to reliably determine that the result value is always small enough to "inline".
                 declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
                 isInlinesOrColumnsOnly = false;
-                if (exprType == VALUE_TYPE_VARCHAR) {
+                if (exprType == ValueType::VALUE_TYPE_VARCHAR) {
                     inBytes = true;
                 }
             } else {

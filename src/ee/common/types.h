@@ -58,7 +58,7 @@ class NValue;
 //
 // N.B. Oridnals MUST equal corresponding types in Java
 // ------------------------------------------------------------------
-enum ValueType {
+enum class ValueType {
     VALUE_TYPE_INVALID      = 0,    // a column should never be this type!
     VALUE_TYPE_NULL         = 1,    // and they should never be this either!
     VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC = 2, // Java planner only. Not used in EE.

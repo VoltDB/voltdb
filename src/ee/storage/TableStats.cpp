@@ -48,43 +48,43 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull,
         vector<bool> &inBytes) {
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
-    types.push_back(VALUE_TYPE_VARCHAR);
+    types.push_back(ValueType::VALUE_TYPE_VARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_VARCHAR);
+    types.push_back(ValueType::VALUE_TYPE_VARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    types.push_back(ValueType::VALUE_TYPE_INTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
-    types.push_back(VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    types.push_back(ValueType::VALUE_TYPE_INTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
     allowNull.push_back(false);
     inBytes.push_back(false);
 }

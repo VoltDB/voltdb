@@ -83,8 +83,8 @@ public:
             if (ctr == 0) ::snprintf(name, 16, "id");
             else ::snprintf(name, 16, "val%02d", ctr);
             columnNames[ctr] = name;
-            columnTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-            columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+            columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_BIGINT);
+            columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_BIGINT));
             columnAllowNull.push_back(false);
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);

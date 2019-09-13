@@ -59,19 +59,19 @@ class TableTupleExportTest : public Test {
         // note that maxELSize() cares about the string tuple offsets..
 
         // set up a schema with each supported column type
-        addToSchema(VALUE_TYPE_TINYINT, allownull);  // 0
-        addToSchema(VALUE_TYPE_SMALLINT, allownull); // 1
-        addToSchema(VALUE_TYPE_INTEGER, allownull);  // 2
-        addToSchema(VALUE_TYPE_BIGINT, allownull);   // 3
-        addToSchema(VALUE_TYPE_TIMESTAMP, allownull); // 4
-        addToSchema(VALUE_TYPE_DECIMAL, allownull);   // 5
+        addToSchema(ValueType::VALUE_TYPE_TINYINT, allownull);  // 0
+        addToSchema(ValueType::VALUE_TYPE_SMALLINT, allownull); // 1
+        addToSchema(ValueType::VALUE_TYPE_INTEGER, allownull);  // 2
+        addToSchema(ValueType::VALUE_TYPE_BIGINT, allownull);   // 3
+        addToSchema(ValueType::VALUE_TYPE_TIMESTAMP, allownull); // 4
+        addToSchema(ValueType::VALUE_TYPE_DECIMAL, allownull);   // 5
 
         // need explicit lengths for varchar columns
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);  // 6
+        columnTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);  // 6
         columnLengths.push_back(15);
         columnAllowNull.push_back(allownull);
 
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);   // 7
+        columnTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);   // 7
         columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH * 2);
         columnAllowNull.push_back(allownull);
 

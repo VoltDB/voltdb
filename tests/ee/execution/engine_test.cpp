@@ -78,10 +78,12 @@
 // This is useful because it will allow us to check different types and other
 // configurations without having to dig down into the code
 //
-voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { voltdb::VALUE_TYPE_INTEGER,
-                                                    voltdb::VALUE_TYPE_VARCHAR,
-                                                    voltdb::VALUE_TYPE_VARCHAR,
-                                                    voltdb::VALUE_TYPE_INTEGER };
+voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = {
+    voltdb::ValueType::VALUE_TYPE_INTEGER,
+    voltdb::ValueType::VALUE_TYPE_VARCHAR,
+    voltdb::ValueType::VALUE_TYPE_VARCHAR,
+    voltdb::ValueType::VALUE_TYPE_INTEGER
+};
 int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };
 

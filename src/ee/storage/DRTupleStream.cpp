@@ -691,8 +691,7 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
                                        std::vector<int32_t> partitionKeyValueList,
                                        std::vector<int32_t> flagList,
                                        long startSequenceNumber,
-                                       char *outBytes)
-{
+                                       char *outBytes) {
     int tupleStreamPartitionId = partitionId;
     DRTupleStream stream(tupleStreamPartitionId,
                          2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING, // 2MB
@@ -706,8 +705,8 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull;
     for (int i = 0; i < 2; i++) {
-        columnTypes.push_back(VALUE_TYPE_INTEGER);
-        columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+        columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
+        columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
         columnAllowNull.push_back(false);
     }
     TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,

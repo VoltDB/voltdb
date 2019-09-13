@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORECONJUNCTIONEXPRESSION_H
-#define HSTORECONJUNCTIONEXPRESSION_H
+#pragma once
 
 #include "common/common.h"
 #include "common/serializeio.h"
@@ -60,14 +59,11 @@ class ConjunctionAnd;
 class ConjunctionOr;
 
 template <typename C>
-class ConjunctionExpression : public AbstractExpression
-{
+class ConjunctionExpression : public AbstractExpression {
   public:
-    ConjunctionExpression(ExpressionType type,
-                                   AbstractExpression *left,
-                                   AbstractExpression *right)
-        : AbstractExpression(type, left, right)
-    {
+      ConjunctionExpression(ExpressionType type,
+              AbstractExpression *left,
+              AbstractExpression *right) : AbstractExpression(type, left, right) {
         this->m_left = left;
         this->m_right = right;
     }
@@ -77,15 +73,13 @@ class ConjunctionExpression : public AbstractExpression
     std::string debugInfo(const std::string &spacer) const {
         return (spacer + "ConjunctionExpression\n");
     }
-
     AbstractExpression *m_left;
     AbstractExpression *m_right;
 };
 
 template<> inline NValue
 ConjunctionExpression<ConjunctionAnd>::eval(const TableTuple *tuple1,
-                                            const TableTuple *tuple2) const
-{
+        const TableTuple *tuple2) const {
     NValue leftBool = m_left->eval(tuple1, tuple2);
     // False False -> False
     // False True  -> False
@@ -100,16 +94,16 @@ ConjunctionExpression<ConjunctionAnd>::eval(const TableTuple *tuple1,
     // NULL  False -> False
     if (leftBool.isTrue() || rightBool.isFalse()) {
         return rightBool;
+    } else {
+        // NULL  True  -> NULL
+        // NULL  NULL  -> NULL
+        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
     }
-    // NULL  True  -> NULL
-    // NULL  NULL  -> NULL
-    return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
 }
 
 template<> inline NValue
 ConjunctionExpression<ConjunctionOr>::eval(const TableTuple *tuple1,
-                                           const TableTuple *tuple2) const
-{
+        const TableTuple *tuple2) const {
     NValue leftBool = m_left->eval(tuple1, tuple2);
     // True True  -> True
     // True False -> True
@@ -124,11 +118,11 @@ ConjunctionExpression<ConjunctionOr>::eval(const TableTuple *tuple1,
     // NULL  True  -> True
     if (leftBool.isFalse() || rightBool.isTrue()) {
         return rightBool;
+    } else {
+        // NULL  False -> NULL
+        // NULL  NULL  -> NULL
+        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
     }
-    // NULL  False -> NULL
-    // NULL  NULL  -> NULL
-    return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
 }
 
 }
-#endif

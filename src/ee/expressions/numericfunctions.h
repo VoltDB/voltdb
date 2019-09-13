@@ -32,28 +32,27 @@ template<> inline NValue NValue::callUnary<FUNC_ABS>() const {
     const ValueType type = getValueType();
     NValue retval(type);
     switch(type) {
-    /*abs() in C++ returns int (32-bits) if input is int, and long (64-bit) if input is long.
-      VoltDB INTEGER is 32-bit, BIGINT is 64-bit, so for TINYINT (8-bit) and SMALLINT (16-bit),
-      we need to cast.*/
-    case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = static_cast<int8_t>(std::abs(getTinyInt())); break;
-    case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = static_cast<int16_t>(std::abs(getSmallInt())); break;
-    case VALUE_TYPE_INTEGER:
-        retval.getInteger() = std::abs(getInteger()); break;
-    case VALUE_TYPE_BIGINT:
-        retval.getBigInt() = std::abs(getBigInt()); break;
-    case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = std::abs(getDouble()); break;
-    case VALUE_TYPE_DECIMAL: {
-        retval.getDecimal() = getDecimal();
-        retval.getDecimal().Abs(); // updates in place!
-    }
-    break;
-    case VALUE_TYPE_TIMESTAMP:
-    default:
-        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
-        break;
+        /*abs() in C++ returns int (32-bits) if input is int, and long (64-bit) if input is long.
+          VoltDB INTEGER is 32-bit, BIGINT is 64-bit, so for TINYINT (8-bit) and SMALLINT (16-bit),
+          we need to cast.*/
+        case ValueType::VALUE_TYPE_TINYINT:
+            retval.getTinyInt() = static_cast<int8_t>(std::abs(getTinyInt())); break;
+        case ValueType::VALUE_TYPE_SMALLINT:
+            retval.getSmallInt() = static_cast<int16_t>(std::abs(getSmallInt())); break;
+        case ValueType::VALUE_TYPE_INTEGER:
+            retval.getInteger() = std::abs(getInteger()); break;
+        case ValueType::VALUE_TYPE_BIGINT:
+            retval.getBigInt() = std::abs(getBigInt()); break;
+        case ValueType::VALUE_TYPE_DOUBLE:
+            retval.getDouble() = std::abs(getDouble()); break;
+        case ValueType::VALUE_TYPE_DECIMAL:
+            retval.getDecimal() = getDecimal();
+            retval.getDecimal().Abs(); // updates in place!
+            break;
+        case ValueType::VALUE_TYPE_TIMESTAMP:
+        default:
+            throwCastSQLException (type, ValueType::VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
+            break;
     }
     return retval;
 }
@@ -67,18 +66,18 @@ template<> inline NValue NValue::callUnary<FUNC_FLOOR>() const {
     NValue retval(type);
     switch(type) {
 
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
         return *this;
 
     /*floor() in C++ returns double (64-bits) if input is double, float (32-bit) if input is float,
       and long double (128-bit) if input is long double (128-bit).*/
-    case VALUE_TYPE_DOUBLE:
+        case ValueType::VALUE_TYPE_DOUBLE:
         retval.getDouble() = std::floor(getDouble());
         break;
-    case VALUE_TYPE_DECIMAL: {
+        case ValueType::VALUE_TYPE_DECIMAL: {
         TTInt scaledValue = getDecimal();
         TTInt fractional(scaledValue);
         fractional %= NValue::kMaxScaleFactor;
@@ -97,7 +96,7 @@ template<> inline NValue NValue::callUnary<FUNC_FLOOR>() const {
     }
     break;
     default:
-        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
+        throwCastSQLException (type, ValueType::VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
         break;
     }
     return retval;
@@ -112,40 +111,40 @@ template<> inline NValue NValue::callUnary<FUNC_CEILING>() const {
     const ValueType type = getValueType();
     NValue retval(type);
     switch(type) {
-
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
-        return *this;
-
-    /*ceil() in C++ returns double (64-bits) if input is double, float (32-bit) if input is float,
-      and long double (128-bit) if input is long double (128-bit). VoltDB INTEGER is 32-bit, BIGINT is 64-bit,
-      so for TINYINT (8-bit) and SMALLINT (16-bit), we need to cast.*/
-
-    case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = std::ceil(getDouble());
-        break;
-    case VALUE_TYPE_DECIMAL: {
-        TTInt scaledValue = getDecimal();
-        TTInt fractional(scaledValue);
-        fractional %= NValue::kMaxScaleFactor;
-        if (fractional == 0) {
+        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::VALUE_TYPE_BIGINT:
             return *this;
-        }
 
-        TTInt whole(scaledValue);
-        whole /= NValue::kMaxScaleFactor;
-        if (!scaledValue.IsSign()) {
-            whole++;
-        }
-        whole *= NValue::kMaxScaleFactor;
-        retval.getDecimal() = whole;
-    }
-    break;
-    default:
-        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
-        break;
+            /*ceil() in C++ returns double (64-bits) if input is double, float (32-bit) if input is float,
+              and long double (128-bit) if input is long double (128-bit). VoltDB INTEGER is 32-bit, BIGINT is 64-bit,
+              so for TINYINT (8-bit) and SMALLINT (16-bit), we need to cast.*/
+
+        case ValueType::VALUE_TYPE_DOUBLE:
+            retval.getDouble() = std::ceil(getDouble());
+            break;
+        case ValueType::VALUE_TYPE_DECIMAL:
+            {
+                TTInt scaledValue = getDecimal();
+                TTInt fractional(scaledValue);
+                fractional %= NValue::kMaxScaleFactor;
+                if (fractional == 0) {
+                    return *this;
+                }
+
+                TTInt whole(scaledValue);
+                whole /= NValue::kMaxScaleFactor;
+                if (!scaledValue.IsSign()) {
+                    whole++;
+                }
+                whole *= NValue::kMaxScaleFactor;
+                retval.getDecimal() = whole;
+            }
+            break;
+        default:
+            throwCastSQLException(type, ValueType::VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
+            break;
     }
     return retval;
 }
@@ -157,7 +156,7 @@ template<> inline NValue NValue::callUnary<FUNC_SQRT>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     /*sqrt() in C++ returns double (64-bits) if input is double, float (32-bit) if input is float,
       and long double (128-bit) if input is long double (128-bit).*/
     double inputValue = castAsDoubleAndGetValue();
@@ -173,7 +172,7 @@ template<> inline NValue NValue::callUnary<FUNC_EXP>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     //exp() in C++ returns double (64-bits) if input is double, float (32-bit) if input is float,
     //and long double (128-bit) if input is long double (128-bit).
     double exponentValue = castAsDoubleAndGetValue();
@@ -189,7 +188,7 @@ template<> inline NValue NValue::callUnary<FUNC_LN>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::log(inputValue);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function LN");
@@ -202,7 +201,7 @@ template<> inline NValue NValue::callUnary<FUNC_LOG10>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::log10(inputValue);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function LOG10");
@@ -216,7 +215,7 @@ template<> inline NValue NValue::callUnary<FUNC_SIN>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::sin(inputValue);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function SIN");
@@ -229,7 +228,7 @@ template<> inline NValue NValue::callUnary<FUNC_COS>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::cos(inputValue);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function COS");
@@ -242,7 +241,7 @@ template<> inline NValue NValue::callUnary<FUNC_TAN>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::tan(inputValue);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function TAN");
@@ -255,7 +254,7 @@ template<> inline NValue NValue::callUnary<FUNC_COT>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double tanDouble = std::tan(inputValue);
     double resultDouble = 1 / tanDouble;
@@ -269,7 +268,7 @@ template<> inline NValue NValue::callUnary<FUNC_CSC>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double sinDouble = std::sin(inputValue);
     double resultDouble = 1 / sinDouble;
@@ -284,7 +283,7 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double cosDouble = std::cos(inputValue);
     double resultDouble = 1 / cosDouble;
@@ -298,7 +297,7 @@ template<> inline NValue NValue::callUnary<FUNC_DEGREES>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = inputValue*(180.0 / M_PI);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function DEGREES");
@@ -311,7 +310,7 @@ template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
     if (isNull()) {
         return *this;
     }
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = inputValue*(M_PI / 180.0);
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function Radians");
@@ -322,7 +321,7 @@ template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     vassert(arguments.size() == 2);
-    NValue retval(VALUE_TYPE_DOUBLE);
+    NValue retval(ValueType::VALUE_TYPE_DOUBLE);
     const NValue& base = arguments[0];
     const NValue& exponent = arguments[1];
 
@@ -368,14 +367,14 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
     }
 
     bool areAllIntegralOrDecimalType = (isIntegralType(baseType) && isIntegralType(divisorType))
-        || (baseType == VALUE_TYPE_DECIMAL && divisorType == VALUE_TYPE_DECIMAL);
+        || (baseType == ValueType::VALUE_TYPE_DECIMAL && divisorType == ValueType::VALUE_TYPE_DECIMAL);
 
     if (! areAllIntegralOrDecimalType) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-integral or non-decimal type for SQL MOD function");
     }
 
     if (base.isNull() || divisor.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::VALUE_TYPE_BIGINT);
     } else if (divisor.castAsDoubleAndGetValue() == 0) {
         throw SQLException(SQLException::data_exception_division_by_zero, "division by zero");
     }
@@ -413,14 +412,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
     const ValueType type = arg1.getValueType();
     //only double and decimal is allowed
 
-    if (type != VALUE_TYPE_DECIMAL && type != VALUE_TYPE_DOUBLE) {
-        throwCastSQLException (type, VALUE_TYPE_DECIMAL);
+    if (type != ValueType::VALUE_TYPE_DECIMAL && type != ValueType::VALUE_TYPE_DOUBLE) {
+        throwCastSQLException (type, ValueType::VALUE_TYPE_DECIMAL);
     }
 
     std::ostringstream out;
 
     TTInt scaledValue;
-    if(type == VALUE_TYPE_DOUBLE) {
+    if(type == ValueType::VALUE_TYPE_DOUBLE) {
         scaledValue = arg1.castAsDecimal().castAsDecimalAndGetValue();
     } else {
         scaledValue = arg1.castAsDecimalAndGetValue();

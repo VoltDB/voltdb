@@ -250,8 +250,8 @@ public:
         vassert(columnInfo);
         const ValueType valueType = columnInfo->getVoltType();
         // shrink is permissible only on variable length column and currently only for varchar and varbinary
-        vassert((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
-        bool isColumnLngthInBytes = (valueType == VALUE_TYPE_VARBINARY) ? true : columnInfo->inBytes;
+        vassert(valueType == ValueType::VALUE_TYPE_VARBINARY || valueType == ValueType::VALUE_TYPE_VARCHAR);
+        bool isColumnLngthInBytes = valueType == ValueType::VALUE_TYPE_VARBINARY ? true : columnInfo->inBytes;
         uint32_t columnLength = columnInfo->length;
 
         // For the given NValue, compute the shrink length in bytes to shrink the nvalue based on
@@ -661,22 +661,22 @@ private:
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
-          case VALUE_TYPE_TINYINT:
+            case ValueType::VALUE_TYPE_TINYINT:
               return sizeof (int8_t);
-          case VALUE_TYPE_SMALLINT:
+            case ValueType::VALUE_TYPE_SMALLINT:
               return sizeof (int16_t);
-          case VALUE_TYPE_INTEGER:
+            case ValueType::VALUE_TYPE_INTEGER:
               return sizeof (int32_t);
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP:
-          case VALUE_TYPE_DOUBLE:
+            case ValueType::VALUE_TYPE_BIGINT:
+            case ValueType::VALUE_TYPE_TIMESTAMP:
+            case ValueType::VALUE_TYPE_DOUBLE:
               return sizeof (int64_t);
-          case VALUE_TYPE_DECIMAL:
+            case ValueType::VALUE_TYPE_DECIMAL:
               //1-byte scale, 1-byte precision, 16 bytes all the time right now
               return 18;
-          case VALUE_TYPE_VARCHAR:
-          case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_GEOGRAPHY:
+            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::VALUE_TYPE_VARBINARY:
+            case ValueType::VALUE_TYPE_GEOGRAPHY:
         {
             bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
             if (isNullCol) {
@@ -689,7 +689,7 @@ private:
             ValuePeeker::peekObject_withoutNull(value, &length);
             return sizeof(int32_t) + length;
               }
-          case VALUE_TYPE_POINT:
+            case ValueType::VALUE_TYPE_POINT:
               return sizeof (GeographyPointValue);
           default:
             // let caller handle this error
@@ -710,7 +710,7 @@ private:
             if (isNull(colIndex)) {
                 return sizeof(int32_t);
             }
-        } else if (columnType == VALUE_TYPE_DECIMAL) {
+        } else if (columnType == ValueType::VALUE_TYPE_DECIMAL) {
             // Other than export and DR table, decimal column in regular table
             // doesn't contain scale and precision bytes.
             return 16;

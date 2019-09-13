@@ -23,13 +23,13 @@ namespace voltdb {
 NValue HiddenColumn::getDefaultValue(HiddenColumn::Type columnType) {
     switch (columnType) {
     case HiddenColumn::MIGRATE_TXN:
-        return NValue::getNullValue(VALUE_TYPE_BIGINT);
+        return NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT);
     case HiddenColumn::XDCR_TIMESTAMP:
         return ValueFactory::getBigIntValue(ExecutorContext::getExecutorContext()->currentDRTimestamp());
     default:
         // Unsupported hidden column type passed in
         vassert(false);
-        return NValue::getNullValue(VALUE_TYPE_BIGINT);
+        return NValue::getNullValue(ValueType::VALUE_TYPE_BIGINT);
     }
 }
 

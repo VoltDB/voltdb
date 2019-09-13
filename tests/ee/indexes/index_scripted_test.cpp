@@ -345,30 +345,30 @@ voltdb::TableTuple *tupleFromString(char *tupleStr, voltdb::TupleSchema *tupleSc
         int64_t bi_value;
         double d_value;
         switch (type) {
-            case voltdb::VALUE_TYPE_TINYINT:
+            case voltdb::ValueType::VALUE_TYPE_TINYINT:
                 bi_value = static_cast<int64_t>(atoll(value));
                 tuple->setNValue(i, ValueFactory::getTinyIntValue(static_cast<int8_t>(bi_value)));
                 break;
-            case voltdb::VALUE_TYPE_SMALLINT:
+            case voltdb::ValueType::VALUE_TYPE_SMALLINT:
                 bi_value = static_cast<int64_t>(atoll(value));
                 tuple->setNValue(i, ValueFactory::getSmallIntValue(static_cast<int16_t>(bi_value)));
                 break;
-            case voltdb::VALUE_TYPE_INTEGER:
+            case voltdb::ValueType::VALUE_TYPE_INTEGER:
                 bi_value = static_cast<int64_t>(atoll(value));
                 tuple->setNValue(i, ValueFactory::getIntegerValue(static_cast<int32_t>(bi_value)));
                 break;
-            case voltdb::VALUE_TYPE_BIGINT:
+            case voltdb::ValueType::VALUE_TYPE_BIGINT:
                 bi_value = static_cast<int64_t>(atoll(value));
                 tuple->setNValue(i, ValueFactory::getBigIntValue(bi_value));
                 break;
-            case voltdb::VALUE_TYPE_DOUBLE:
+            case voltdb::ValueType::VALUE_TYPE_DOUBLE:
                 d_value = atof(value);
                 tuple->setNValue(i, ValueFactory::getDoubleValue(d_value));
                 break;
-            case voltdb::VALUE_TYPE_DECIMAL:
+            case voltdb::ValueType::VALUE_TYPE_DECIMAL:
                 tuple->setNValue(i, ValueFactory::getDecimalValueFromString(value));
                 break;
-            case voltdb::VALUE_TYPE_VARCHAR: {
+            case voltdb::ValueType::VALUE_TYPE_VARCHAR: {
                 NValue nv = ValueFactory::getStringValue(value);
                 tuple->setNValueAllocateForObjectCopies(i, nv);
                 nv.free();
@@ -423,42 +423,42 @@ int main(int argc, char **argv)
             char *typecode = strtok(schema, ",");
             while (typecode) {
                 if (strcmp(typecode, kBigIntTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_BIGINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kIntegerTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_INTEGER);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kSmallIntTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_SMALLINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_SMALLINT);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_SMALLINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kTinyIntTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_TINYINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_TINYINT);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TINYINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kFloatTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_DOUBLE);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_DOUBLE);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DOUBLE));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kDecimalTypecode) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_DECIMAL);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+                    columnTypes.push_back(ValueType::VALUE_TYPE_DECIMAL);
+                    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DECIMAL));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kStringTypecode4) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_VARCHAR);
+                    columnTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);
                     columnLengths.push_back(4);
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kStringTypecode128) == 0) {
-                    columnTypes.push_back(VALUE_TYPE_VARCHAR);
+                    columnTypes.push_back(ValueType::VALUE_TYPE_VARCHAR);
                     columnLengths.push_back(128);
                     columnAllowNull.push_back(false);
                 }

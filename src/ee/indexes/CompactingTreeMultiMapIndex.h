@@ -199,16 +199,16 @@ class CompactingTreeMultiMapIndex : public TableIndex
             if (searchKey->getNValue(i).isNull()) {
                 const ValueType valueType = searchKey->getSchema()->columnType(i);
                 switch (valueType) {
-                    case VALUE_TYPE_BIGINT:
+                    case ValueType::VALUE_TYPE_BIGINT:
                         searchKey->setNValue(i, ValueFactory::getBigIntValue(INT64_MAX));
                         break;
-                    case VALUE_TYPE_INTEGER:
+                    case ValueType::VALUE_TYPE_INTEGER:
                         searchKey->setNValue(i, ValueFactory::getIntegerValue(INT32_MAX));
                         break;
-                    case VALUE_TYPE_SMALLINT:
+                    case ValueType::VALUE_TYPE_SMALLINT:
                         searchKey->setNValue(i, ValueFactory::getSmallIntValue(INT16_MAX));
                         break;
-                    case VALUE_TYPE_TINYINT:
+                    case ValueType::VALUE_TYPE_TINYINT:
                         searchKey->setNValue(i, ValueFactory::getTinyIntValue(INT8_MAX));
                         break;
                     default: // other null types will be handled in GenericComparator

@@ -230,7 +230,7 @@ class TV  : public AE {
 class HR : public AE {
 public:
     HR(int hashColumn, int32_t ranges[][2], int numRanges) :
-        AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
+        AE(EXPRESSION_TYPE_HASH_RANGE, ValueType::VALUE_TYPE_BIGINT, 8),
         m_hashColumn(hashColumn),
         m_ranges(ranges),
         m_numRanges(numRanges) {
@@ -319,9 +319,9 @@ TEST_F(ExpressionTest, SimpleAddition) {
     TableTuple junk;
 
     // 1 + 4
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)4));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)4));
     boost::scoped_ptr<AbstractExpression> testexp(convertToExpression(e));
 
     NValue result = testexp->eval(&junk,NULL);
@@ -336,8 +336,8 @@ TEST_F(ExpressionTest, SimpleUnaryMinus) {
     TableTuple junk;
 
     // -5
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)5));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, ValueType::VALUE_TYPE_TINYINT, 1));
     // dummy right expression to prevent segmentation fault
     // since unary minus is the only arithmetic operator with one operand
     e.push(NULL);
@@ -347,11 +347,11 @@ TEST_F(ExpressionTest, SimpleUnaryMinus) {
     ASSERT_EQ(ValuePeeker::peekAsBigInt(r1), -5LL);
 
     // -(-3)
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)3));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)3));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, ValueType::VALUE_TYPE_TINYINT, 1));
     // dummy right expression to prevent segmentation fault
     e.push(NULL);
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, ValueType::VALUE_TYPE_TINYINT, 1));
     // dummy right expression to prevent segmentation fault
     e.push(NULL);
 
@@ -368,36 +368,36 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
     TableTuple junk;
 
     // (1 + 4) * 5
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)4));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)4));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)5));
 
     boost::scoped_ptr<AbstractExpression> e1(convertToExpression(e));
     NValue r1 = e1->eval(&junk,NULL);
     ASSERT_EQ(ValuePeeker::peekAsBigInt(r1), 25LL);
 
     // (2 * 5) + 3
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)2));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)3));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)2));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)5));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)3));
 
     boost::scoped_ptr<AbstractExpression> e2(convertToExpression(e));
     NValue r2 = e2->eval(&junk,NULL);
     ASSERT_EQ(ValuePeeker::peekAsBigInt(r2), 13LL);
 
     // -(1 + 4) * 5
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)4));
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)4));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, ValueType::VALUE_TYPE_TINYINT, 1));
     // dummy right expression to prevent segmentation fault
     e.push(NULL);
-    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, VALUE_TYPE_TINYINT, 1));
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, ValueType::VALUE_TYPE_TINYINT, 1));
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, ValueType::VALUE_TYPE_TINYINT, 1, (int64_t)5));
 
     boost::scoped_ptr<AbstractExpression> testexp3(convertToExpression(e));
     NValue r3 = testexp3->eval(&junk,NULL);
@@ -443,8 +443,8 @@ TEST_F(ExpressionTest, HashRange) {
     allowNull.push_back(false);
 
     vector<voltdb::ValueType> types;
-    types.push_back(voltdb::VALUE_TYPE_BIGINT);
-    types.push_back(voltdb::VALUE_TYPE_INTEGER);
+    types.push_back(voltdb::ValueType::VALUE_TYPE_BIGINT);
+    types.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
 
     TupleSchema *schema = TupleSchema::createTupleSchemaForTest(types,columnSizes,allowNull);
 

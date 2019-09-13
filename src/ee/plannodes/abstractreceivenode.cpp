@@ -49,13 +49,9 @@
 
 namespace voltdb {
 
-AbstractReceivePlanNode::AbstractReceivePlanNode()
-{
-}
+AbstractReceivePlanNode::AbstractReceivePlanNode() { }
 
-AbstractReceivePlanNode::~AbstractReceivePlanNode()
-{
-}
+AbstractReceivePlanNode::~AbstractReceivePlanNode() { }
 
 void AbstractReceivePlanNode::schemaDebugInfo(std::ostringstream& buffer, const std::vector<SchemaColumn*>& schema,
     const std::string& schema_name, const std::string& spacer) {
@@ -65,7 +61,7 @@ void AbstractReceivePlanNode::schemaDebugInfo(std::ostringstream& buffer, const 
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << col->getColumnName() << " : ";
         buffer << "size=" << col->getExpression()->getValueSize() << " : ";
-        buffer << "type=" << col->getExpression()->getValueType() << "\n";
+        buffer << "type=" << getTypeName(col->getExpression()->getValueType()) << "\n";
     }
 }
 
