@@ -195,7 +195,6 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
     public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
-    public static final String EXPORT_POOL_DEFAULT_SIZE = "__EXPORT_POOL_DEFAULT_SIZE__";
 
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
@@ -1851,30 +1850,28 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        if (exportType.getDefaultpoolsize() != null) {
-            System.setProperty(EXPORT_POOL_DEFAULT_SIZE, exportType.getDefaultpoolsize().toString());
-        }
-        List<String> targetList = new ArrayList<>();
+
+        Set<String> targetSet = new HashSet<>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            String targetName = exportConfiguration.getTarget();
+            // target name is case insensitive
+            String targetName = exportConfiguration.getTarget().toUpperCase();
             if (connectorEnabled) {
                 m_exportEnabled = true;
-                if (targetList.contains(targetName)) {
+                if (!targetSet.add(targetName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
                             targetName + ".");
-                }
-                else {
-                    targetList.add(targetName);
                 }
             }
 
             Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+
             // Check if the thread pool name set in the export target configuration exists
             getConfiguredThreadPoolSize(exportConfiguration, threadPoolsType);
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().getIgnoreCase(targetName);
+
             if (catconn == null) {
                 if (connectorEnabled) {
                     hostLog.info("Export configuration enabled and provided for export target " + targetName
