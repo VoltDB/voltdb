@@ -284,7 +284,7 @@ string valueToString(ValueType type) {
    return getTypeName(type);
 }
 
-ValueType stringToValue(string nam) {
+ValueType stringToValue(string const& nam) {
    return lookup(mapToValueType, nam, VALUE_TYPE_INVALID);
 }
 
@@ -292,7 +292,7 @@ string joinToString(JoinType type) {
    return lookup(mapOfJoinType, type, "INVALID");
 }
 
-JoinType stringToJoin(string nam) {
+JoinType stringToJoin(string const& nam) {
    return lookup(mapToJoinType, nam, JOIN_TYPE_INVALID);
 }
 
@@ -300,7 +300,7 @@ string sortDirectionToString(SortDirectionType type) {
    return lookup(mapOfSortDirectionType, type, "INVALID");
 }
 
-SortDirectionType stringToSortDirection(string nam) {
+SortDirectionType stringToSortDirection(string const& nam) {
    return lookup(mapToSortDirectionType, nam, SORT_DIRECTION_TYPE_INVALID);
 }
 
@@ -308,7 +308,7 @@ string planNodeToString(PlanNodeType type) {
    return lookup(mapOfPlanNodeType, type, "UNDEFINED");
 }
 
-PlanNodeType stringToPlanNode(string nam) {
+PlanNodeType stringToPlanNode(string const& nam) {
    return lookup(mapToPlanNodeType, nam, PLAN_NODE_TYPE_INVALID);
 }
 
@@ -316,7 +316,7 @@ string expressionToString(ExpressionType type) {
    return lookup(mapOfExpressionType, type, "INVALID");
 }
 
-ExpressionType stringToExpression(string str) {
+ExpressionType stringToExpression(string const& str) {
    return lookup(mapToExpressionType, str, EXPRESSION_TYPE_INVALID);
 }
 
@@ -324,7 +324,7 @@ string quantifierToString(QuantifierType type) {
    return lookup(mapOfQuantifierType, type, "INVALID");
 }
 
-QuantifierType stringToQuantifier(string nam) {
+QuantifierType stringToQuantifier(string const& nam) {
    return lookup(mapToQuantifierType, nam, QUANTIFIER_TYPE_NONE);
 }
 
@@ -332,7 +332,7 @@ string indexLookupToString(IndexLookupType type) {
    return lookup(mapOfIndexLookupType, type, "INVALID");
 }
 
-IndexLookupType stringToIndexLookup(string nam) {
+IndexLookupType stringToIndexLookup(string const& nam) {
    return lookup(mapToIndexLookupType, nam, IndexLookupType::Invalid);
 }
 

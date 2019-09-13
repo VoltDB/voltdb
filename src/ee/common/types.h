@@ -675,22 +675,22 @@ bool isIntegralType(ValueType type);
 bool isVariableLengthType(ValueType type);
 
 std::string valueToString(ValueType type);
-ValueType stringToValue(std::string str );
+ValueType stringToValue(std::string const& str);
 
 std::string joinToString(JoinType type);
-JoinType stringToJoin(std::string str );
+JoinType stringToJoin(std::string const& str);
 
 std::string sortDirectionToString(SortDirectionType type);
-SortDirectionType stringToSortDirection(std::string str );
+SortDirectionType stringToSortDirection(std::string const& str);
 
 std::string planNodeToString(PlanNodeType type);
-PlanNodeType stringToPlanNode(std::string str );
+PlanNodeType stringToPlanNode(std::string const& str);
 
 std::string expressionToString(ExpressionType type);
-ExpressionType stringToExpression(std::string str );
+ExpressionType stringToExpression(std::string const& str);
 
 std::string indexLookupToString(IndexLookupType type);
-IndexLookupType stringToIndexLookup(std::string str );
+IndexLookupType stringToIndexLookup(std::string const& str);
 
 int64_t getMaxTypeValue (ValueType type);
 
