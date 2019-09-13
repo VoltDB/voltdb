@@ -124,13 +124,13 @@ bool NestLoopIndexExecutor::p_init(
                    m_indexNode->getTargetIndexName().c_str(),
                    inner_table->name().c_str(), m_indexNode->debug().c_str());
         return false;
+    } else {
+        // NULL tuples for left and full joins
+        p_init_null_tuples(node->getInputTable(), m_indexNode->getTargetTable());
+
+        m_indexValues.init(index->getKeySchema());
+        return true;
     }
-
-    // NULL tuples for left and full joins
-    p_init_null_tuples(node->getInputTable(), m_indexNode->getTargetTable());
-
-    m_indexValues.init(index->getKeySchema());
-    return true;
 }
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
@@ -256,8 +256,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
         join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable, &postfilter);
-    }
-    else {
+    } else {
         join_tuple = m_tmpOutputTable->tempTuple();
     }
 
@@ -307,8 +306,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                 }
                 try {
                     index_values.setNValue(ctr, candidateValue);
-                }
-                catch (const SQLException &e) {
+                } catch (const SQLException &e) {
                     // This next bit of logic handles underflow and overflow while
                     // setting up the search keys.
                     // e.g. TINYINT > 200 or INT <= 6000000000
@@ -322,19 +320,18 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                     // handle the case where this is a comparison, rather than equality match
                     // comparison is the only place where the executor might return matching tuples
                     // e.g. TINYINT < 1000 should return all values
-                    if ((localLookupType != IndexLookupType::Equal) &&
-                        (ctr == (activeNumOfSearchKeys - 1))) {
+                    if (localLookupType != IndexLookupType::Equal &&
+                        ctr == (activeNumOfSearchKeys - 1)) {
 
                         if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                            if ((localLookupType == IndexLookupType::Greater) ||
-                                (localLookupType == IndexLookupType::GreaterEqual)) {
+                            if (localLookupType == IndexLookupType::Greater ||
+                                localLookupType == IndexLookupType::GreaterEqual) {
 
                                 // gt or gte when key overflows breaks out
                                 // and only returns for left-outer
                                 keyException = true;
                                 break; // the outer while loop
-                            }
-                            else {
+                            } else {
                                 // overflow of LT or LTE should be treated as LTE
                                 // to issue an "initial" forward scan
                                 localLookupType = IndexLookupType::LessEqual;
@@ -346,8 +343,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                                 // overflow of LT or LTE should be treated as LTE
                                 // to issue an "initial" forward scans
                                 localLookupType = IndexLookupType::LessEqual;
-                            }
-                            else {
+                            } else {
                                 // don't allow GTE because it breaks null handling
                                 localLookupType = IndexLookupType::Greater;
                             }
@@ -378,10 +374,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                         if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
                             localSortDirection = SORT_DIRECTION_TYPE_ASC;
                         }
-                    }
-                    // if a EQ comparison is out of range, then the tuple from
-                    // the outer loop returns no matches (except left-outer)
-                    else {
+                    } else {
+                        // if a EQ comparison is out of range, then the tuple from
+                        // the outer loop returns no matches (except left-outer)
                         keyException = true;
                     }
                     break;
@@ -408,22 +403,29 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                 // Essentially cut and pasted this if ladder from
                 // index scan executor
                 if (num_of_searchkeys > 0) {
-                    if (localLookupType == IndexLookupType::Equal) {
-                        index->moveToKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::Greater) {
-                        index->moveToGreaterThanKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::GreaterEqual) {
-                        index->moveToKeyOrGreater(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::Less) {
-                        index->moveToLessThanKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::LessEqual) {
-                        // find the entry whose key is less than or equal to search key
-                        // as the start point to do a reverse scan
-                        index->moveToKeyOrLess(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::GeoContains) {
-                        index->moveToCoveringCell(&index_values, indexCursor);
-                    } else {
-                        return false;
+                    switch(localLookupType) {
+                        case IndexLookupType::Equal:
+                            index->moveToKey(&index_values, indexCursor);
+                            break;
+                        case IndexLookupType::Greater:
+                            index->moveToGreaterThanKey(&index_values, indexCursor);
+                            break;
+                        case IndexLookupType::GreaterEqual:
+                            index->moveToKeyOrGreater(&index_values, indexCursor);
+                            break;
+                        case IndexLookupType::Less:
+                            index->moveToLessThanKey(&index_values, indexCursor);
+                            break;
+                        case IndexLookupType::LessEqual:
+                            // find the entry whose key is less than or equal to search key
+                            // as the start point to do a reverse scan
+                            index->moveToKeyOrLess(&index_values, indexCursor);
+                            break;
+                        case IndexLookupType::GeoContains:
+                            index->moveToCoveringCell(&index_values, indexCursor);
+                            break;
+                        default:
+                            return false;
                     }
                 } else {
                     bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
@@ -432,12 +434,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
 
                 AbstractExpression* skipNullExprIteration = skipNullExpr;
 
-                while (postfilter.isUnderLimit() &&
-                       IndexScanExecutor::getNextTuple(localLookupType,
-                                                       &inner_tuple,
-                                                       index,
-                                                       &indexCursor,
-                                                       num_of_searchkeys)) {
+                while (postfilter.isUnderLimit() && IndexScanExecutor::getNextTuple(
+                            localLookupType, &inner_tuple, index, &indexCursor, num_of_searchkeys)) {
                     if (inner_tuple.isPendingDelete()) {
                         continue;
                     }
@@ -551,7 +549,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
 
     VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug("").c_str());
     VOLT_TRACE("Finished NestLoopIndex");
-
     return true;
 }
 

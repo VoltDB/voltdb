@@ -319,14 +319,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                 // definitions of throwCastSQLValueOutOfRangeException,
                 // whence these all come.
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == IndexLookupType::Greater) ||
-                            (localLookupType == IndexLookupType::GreaterEqual)) {
+                    if (localLookupType == IndexLookupType::Greater ||
+                            localLookupType == IndexLookupType::GreaterEqual) {
 
                         // gt or gte when key overflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
-                    }
-                    else {
+                    } else {
                         // for overflow on reverse scan, we need to
                         // do a forward scan to find the correct start
                         // point, which is exactly what LTE would do.
@@ -342,8 +341,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                         // lt or lte when key underflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
-                    }
-                    else {
+                    } else {
                         // don't allow GTE because it breaks null handling
                         localLookupType = IndexLookupType::Greater;
                     }

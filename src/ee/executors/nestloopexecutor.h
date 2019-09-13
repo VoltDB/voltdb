@@ -55,14 +55,11 @@ namespace voltdb {
  *
  */
 class NestLoopExecutor : public AbstractJoinExecutor {
-    public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractJoinExecutor(engine, abstract_node) { }
-    private:
-
-        bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
-        bool p_execute(const NValueArray &params);
-
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
+    bool p_execute(const NValueArray &params);
+public:
+    NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+        AbstractJoinExecutor(engine, abstract_node) {}
 };
 
 }
