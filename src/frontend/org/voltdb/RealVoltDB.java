@@ -104,9 +104,9 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.messaging.SocketJoiner;
 import org.voltcore.network.CipherExecutor;
@@ -5256,7 +5256,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_messenger != null) {
             Set<Integer> liveHosts = m_messenger.getLiveHostIds();
             liveHosts.remove(m_messenger.getHostId());
-            FaultMessage msg = new FaultMessage(m_messenger.getHostId(), m_messenger.getHostId());
+            SiteFailureForwardMessage msg = new SiteFailureForwardMessage();
+            msg.m_reportingHSId = CoreUtils.getHSIdFromHostAndSite(m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID);
             for (int hostId : liveHosts) {
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }

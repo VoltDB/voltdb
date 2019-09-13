@@ -57,9 +57,9 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
@@ -1251,11 +1251,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                             true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
-                } else if ( message instanceof FaultMessage) {
-                    FaultMessage msg = (FaultMessage)message;
-                    m_messenger.notifyOfHostDown((int)msg.failedSite);
-                }
-                else {
+                } else if (message instanceof SiteFailureForwardMessage) {
+                    SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;
+                    m_messenger.notifyOfHostDown(CoreUtils.getHostIdFromHSId(msg.m_reportingHSId));
+                } else {
                     // m_d is for test only
                     m_d.offer(message);
                 }
