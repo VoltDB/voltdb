@@ -1888,8 +1888,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void notifyOfHostDown(int failedHostId) {
         ForeignHost fh = m_foreignHosts.get(failedHostId);
         if (fh != null) {
-            fh.close();
-            reportForeignHostFailed(failedHostId);
+            fh.updateDeadReportCount();
         }
     }
 }

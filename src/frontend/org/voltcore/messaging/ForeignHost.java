@@ -345,6 +345,10 @@ public class ForeignHost {
         setLogRate(timeout);
     }
 
+    public void updateDeadReportCount() {
+        m_deadReportsCount.incrementAndGet();
+    }
+
     /**
      * Test only method
      * used to immediately cut off reads from a foreign host
