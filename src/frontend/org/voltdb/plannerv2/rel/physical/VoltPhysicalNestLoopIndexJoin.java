@@ -38,6 +38,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
@@ -100,7 +101,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         final NestLoopIndexPlanNode nlipn = new NestLoopIndexPlanNode();
-        nlipn.setJoinType(JoinType.INNER);
+        nlipn.setJoinType(RelConverter.convertJointType(joinType));
         // Set children
         nlipn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         // Set inner node table index to "1" prior to its conversion to AbstractPlanNode

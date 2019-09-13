@@ -29,18 +29,16 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MergeJoinPlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;
@@ -108,7 +106,7 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
-        mjpn.setJoinType(JoinType.INNER);
+        mjpn.setJoinType(RelConverter.convertJointType(joinType));
 
         // Outer node
         AbstractPlanNode outerPlanNode = inputRelNodeToPlanNode(this, 0);

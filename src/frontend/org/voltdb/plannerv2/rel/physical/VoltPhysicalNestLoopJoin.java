@@ -30,11 +30,10 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
 
@@ -83,7 +82,7 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         final NestLoopPlanNode nlpn = new NestLoopPlanNode();
-        nlpn.setJoinType(JoinType.INNER);
+        nlpn.setJoinType(RelConverter.convertJointType(joinType));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));
         // Set join predicate
