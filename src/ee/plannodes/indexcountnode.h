@@ -78,10 +78,10 @@ protected:
     OwningExpressionVector m_endkey_expressions{};
 
     // Index Lookup Type
-    IndexLookupType m_lookup_type = IndexLookupType::INDEX_LOOKUP_TYPE_EQ;
+    IndexLookupType m_lookup_type = IndexLookupType::Equal;
 
     // Index Lookup End Type
-    IndexLookupType m_end_type = IndexLookupType::INDEX_LOOKUP_TYPE_EQ;
+    IndexLookupType m_end_type = IndexLookupType::Equal;
 
     // count null row predicate for edge cases: reverse scan or underflow case
     boost::scoped_ptr<AbstractExpression> m_skip_null_predicate{};

@@ -112,15 +112,15 @@ public:
             TableIndex* index,
             IndexCursor* cursor,
             int activeNumOfSearchKeys) {
-        if (lookupType == IndexLookupType::INDEX_LOOKUP_TYPE_EQ
-            || lookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+        if (lookupType == IndexLookupType::Equal
+            || lookupType == IndexLookupType::GeoContains) {
             *tuple = index->nextValueAtKey(*cursor);
             if (! tuple->isNullTuple()) {
                 return true;
             }
         }
-        if ((lookupType != IndexLookupType::INDEX_LOOKUP_TYPE_EQ
-             && lookupType != IndexLookupType::INDEX_LOOKUP_TYPE_GEO_CONTAINS)
+        if ((lookupType != IndexLookupType::Equal
+             && lookupType != IndexLookupType::GeoContains)
             || activeNumOfSearchKeys == 0) {
             *tuple = index->nextValue(*cursor);
         }

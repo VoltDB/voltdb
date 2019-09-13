@@ -73,7 +73,7 @@ protected:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
     IndexScanPlanNode* m_indexNode = nullptr;
-    IndexLookupType m_lookupType = IndexLookupType::INDEX_LOOKUP_TYPE_INVALID;
+    IndexLookupType m_lookupType = IndexLookupType::Invalid;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_indexValues;

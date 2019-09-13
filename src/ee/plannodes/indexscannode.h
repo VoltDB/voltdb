@@ -115,7 +115,7 @@ protected:
     boost::scoped_ptr<AbstractExpression> m_initial_expression{};
 
     // Index Lookup Type
-    IndexLookupType m_lookup_type = IndexLookupType::INDEX_LOOKUP_TYPE_EQ;
+    IndexLookupType m_lookup_type = IndexLookupType::Equal;
 
     // Offset rank
     bool m_hasOffsetRank = false;

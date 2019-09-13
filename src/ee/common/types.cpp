@@ -197,13 +197,13 @@ map<QuantifierType, string> const mapOfQuantifierType {
 map<string, QuantifierType> const mapToQuantifierType = revert(mapOfQuantifierType);
 
 map<IndexLookupType, string> const mapOfIndexLookupType {
-   {IndexLookupType::INDEX_LOOKUP_TYPE_INVALID, "INVALID"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_EQ, "EQ"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_GT, "GT"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_GTE, "GTE"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_LT, "LT"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_LTE, "LTE"},
-   {IndexLookupType::INDEX_LOOKUP_TYPE_GEO_CONTAINS, "GEO_CONTAINS"}
+   {IndexLookupType::Invalid, "INVALID"},
+   {IndexLookupType::Equal, "EQ"},
+   {IndexLookupType::Greater, "GT"},
+   {IndexLookupType::GreaterEqual, "GTE"},
+   {IndexLookupType::Less, "LT"},
+   {IndexLookupType::LessEqual, "LTE"},
+   {IndexLookupType::GeoContains, "GEO_CONTAINS"}
 };
 
 map<string, IndexLookupType> const mapToIndexLookupType = revert(mapOfIndexLookupType);
@@ -333,7 +333,7 @@ string indexLookupToString(IndexLookupType type) {
 }
 
 IndexLookupType stringToIndexLookup(string nam) {
-   return lookup(mapToIndexLookupType, nam, IndexLookupType::INDEX_LOOKUP_TYPE_INVALID);
+   return lookup(mapToIndexLookupType, nam, IndexLookupType::Invalid);
 }
 
 /** takes in 0-F, returns 0-15 */

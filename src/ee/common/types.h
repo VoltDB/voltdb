@@ -376,13 +376,13 @@ enum TableIndexType {
 // Index Lookup Types
 // ------------------------------------------------------------------
 enum class IndexLookupType {
-   INDEX_LOOKUP_TYPE_INVALID = 0,
-   INDEX_LOOKUP_TYPE_EQ      = 1,
-   INDEX_LOOKUP_TYPE_GT      = 2,
-   INDEX_LOOKUP_TYPE_GTE     = 3,
-   INDEX_LOOKUP_TYPE_LT      = 4,
-   INDEX_LOOKUP_TYPE_LTE     = 5,
-   INDEX_LOOKUP_TYPE_GEO_CONTAINS = 6,
+   Invalid = 0,
+   Equal = 1,
+   Greater = 2,
+   GreaterEqual = 3,
+   Less = 4,
+   LessEqual = 5,
+   GeoContains = 6
 };
 
 // ------------------------------------------------------------------

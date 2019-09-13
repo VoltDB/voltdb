@@ -322,12 +322,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                     // handle the case where this is a comparison, rather than equality match
                     // comparison is the only place where the executor might return matching tuples
                     // e.g. TINYINT < 1000 should return all values
-                    if ((localLookupType != IndexLookupType::INDEX_LOOKUP_TYPE_EQ) &&
+                    if ((localLookupType != IndexLookupType::Equal) &&
                         (ctr == (activeNumOfSearchKeys - 1))) {
 
                         if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                            if ((localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GT) ||
-                                (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GTE)) {
+                            if ((localLookupType == IndexLookupType::Greater) ||
+                                (localLookupType == IndexLookupType::GreaterEqual)) {
 
                                 // gt or gte when key overflows breaks out
                                 // and only returns for left-outer
@@ -337,19 +337,19 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                             else {
                                 // overflow of LT or LTE should be treated as LTE
                                 // to issue an "initial" forward scan
-                                localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_LTE;
+                                localLookupType = IndexLookupType::LessEqual;
                             }
                         }
                         if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                            if ((localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LT) ||
-                                (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LTE)) {
+                            if ((localLookupType == IndexLookupType::Less) ||
+                                (localLookupType == IndexLookupType::LessEqual)) {
                                 // overflow of LT or LTE should be treated as LTE
                                 // to issue an "initial" forward scans
-                                localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_LTE;
+                                localLookupType = IndexLookupType::LessEqual;
                             }
                             else {
                                 // don't allow GTE because it breaks null handling
-                                localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_GT;
+                                localLookupType = IndexLookupType::Greater;
                             }
                         }
                         if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
@@ -358,13 +358,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                             // search will be performed on shrinked key, so update lookup operation
                             // to account for it
                             switch (localLookupType) {
-                                case IndexLookupType::INDEX_LOOKUP_TYPE_LT:
-                                case IndexLookupType::INDEX_LOOKUP_TYPE_LTE:
-                                    localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_LTE;
+                                case IndexLookupType::Less:
+                                case IndexLookupType::LessEqual:
+                                    localLookupType = IndexLookupType::LessEqual;
                                     break;
-                                case IndexLookupType::INDEX_LOOKUP_TYPE_GT:
-                                case IndexLookupType::INDEX_LOOKUP_TYPE_GTE:
-                                    localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_GT;
+                                case IndexLookupType::Greater:
+                                case IndexLookupType::GreaterEqual:
+                                    localLookupType = IndexLookupType::Greater;
                                     break;
                                 default:
                                     vassert(!"IndexScanExecutor::p_execute - can't index on not equals");
@@ -408,19 +408,19 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                 // Essentially cut and pasted this if ladder from
                 // index scan executor
                 if (num_of_searchkeys > 0) {
-                    if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_EQ) {
+                    if (localLookupType == IndexLookupType::Equal) {
                         index->moveToKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GT) {
+                    } else if (localLookupType == IndexLookupType::Greater) {
                         index->moveToGreaterThanKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GTE) {
+                    } else if (localLookupType == IndexLookupType::GreaterEqual) {
                         index->moveToKeyOrGreater(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LT) {
+                    } else if (localLookupType == IndexLookupType::Less) {
                         index->moveToLessThanKey(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LTE) {
+                    } else if (localLookupType == IndexLookupType::LessEqual) {
                         // find the entry whose key is less than or equal to search key
                         // as the start point to do a reverse scan
                         index->moveToKeyOrLess(&index_values, indexCursor);
-                    } else if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+                    } else if (localLookupType == IndexLookupType::GeoContains) {
                         index->moveToCoveringCell(&index_values, indexCursor);
                     } else {
                         return false;

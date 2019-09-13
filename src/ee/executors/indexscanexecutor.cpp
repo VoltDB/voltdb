@@ -159,7 +159,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
     // TODO: we may need to comment out this assertion for merge join.
-    vassert(m_lookupType != IndexLookupType::INDEX_LOOKUP_TYPE_EQ ||
+    vassert(m_lookupType != IndexLookupType::Equal ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
@@ -308,7 +308,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                             SQLException::TYPE_UNDERFLOW |
                             SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                 throw e;
-            } else if (localLookupType != IndexLookupType::INDEX_LOOKUP_TYPE_EQ && ctr == activeNumOfSearchKeys - 1) {
+            } else if (localLookupType != IndexLookupType::Equal && ctr == activeNumOfSearchKeys - 1) {
             // handle the case where this is a comparison, rather than equality match
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
@@ -319,8 +319,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                 // definitions of throwCastSQLValueOutOfRangeException,
                 // whence these all come.
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GT) ||
-                            (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_GTE)) {
+                    if ((localLookupType == IndexLookupType::Greater) ||
+                            (localLookupType == IndexLookupType::GreaterEqual)) {
 
                         // gt or gte when key overflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
@@ -332,12 +332,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                         // point, which is exactly what LTE would do.
                         // so, set the lookupType to LTE and the missing
                         // searchkey will be handled by extra post filters
-                        localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_LTE;
+                        localLookupType = IndexLookupType::LessEqual;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if (localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LT ||
-                            localLookupType == IndexLookupType::INDEX_LOOKUP_TYPE_LTE) {
+                    if (localLookupType == IndexLookupType::Less ||
+                            localLookupType == IndexLookupType::LessEqual) {
 
                         // lt or lte when key underflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
@@ -345,7 +345,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                     }
                     else {
                         // don't allow GTE because it breaks null handling
-                        localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_GT;
+                        localLookupType = IndexLookupType::Greater;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
@@ -354,13 +354,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                     // search will be performed on shrinked key, so update lookup operation
                     // to account for it
                     switch (localLookupType) {
-                        case IndexLookupType::INDEX_LOOKUP_TYPE_LT:
-                        case IndexLookupType::INDEX_LOOKUP_TYPE_LTE:
-                            localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_LTE;
+                        case IndexLookupType::Less:
+                        case IndexLookupType::LessEqual:
+                            localLookupType = IndexLookupType::LessEqual;
                             break;
-                        case IndexLookupType::INDEX_LOOKUP_TYPE_GT:
-                        case IndexLookupType::INDEX_LOOKUP_TYPE_GTE:
-                            localLookupType = IndexLookupType::INDEX_LOOKUP_TYPE_GT;
+                        case IndexLookupType::Greater:
+                        case IndexLookupType::GreaterEqual:
+                            localLookupType = IndexLookupType::Greater;
                             break;
                         default:
                             vassert(!"IndexScanExecutor::p_execute - can't index on not equals");
@@ -445,24 +445,24 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         switch(localLookupType) {
-            case IndexLookupType::INDEX_LOOKUP_TYPE_EQ:
+            case IndexLookupType::Equal:
                 tableIndex->moveToKey(&searchKey, indexCursor);
                 break;
-            case IndexLookupType::INDEX_LOOKUP_TYPE_GT:
+            case IndexLookupType::Greater:
                 tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
                 break;
-            case IndexLookupType::INDEX_LOOKUP_TYPE_GTE:
+            case IndexLookupType::GreaterEqual:
                 tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
                 break;
-            case IndexLookupType::INDEX_LOOKUP_TYPE_LT:
+            case IndexLookupType::Less:
                 tableIndex->moveToLessThanKey(&searchKey, indexCursor);
                 break;
-            case IndexLookupType::INDEX_LOOKUP_TYPE_LTE:
+            case IndexLookupType::LessEqual:
                 // find the entry whose key is less than or equal to search key
                 // as the start point to do a reverse scan
                 tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
                 break;
-            case IndexLookupType::INDEX_LOOKUP_TYPE_GEO_CONTAINS:
+            case IndexLookupType::GeoContains:
                 tableIndex->moveToCoveringCell(&searchKey, indexCursor);
                 break;
             default:
