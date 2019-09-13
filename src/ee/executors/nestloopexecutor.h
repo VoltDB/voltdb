@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENESTLOOPEXECUTOR_H
-#define HSTORENESTLOOPEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -68,4 +67,3 @@ class NestLoopExecutor : public AbstractJoinExecutor {
 
 }
 
-#endif

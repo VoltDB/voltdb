@@ -42,8 +42,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef HSTORETYPES_H
-#define HSTORETYPES_H
+#pragma once
 
 #include <string>
 #include <stdint.h>
@@ -376,7 +375,7 @@ enum TableIndexType {
 // ------------------------------------------------------------------
 // Index Lookup Types
 // ------------------------------------------------------------------
-enum IndexLookupType {
+enum class IndexLookupType {
    INDEX_LOOKUP_TYPE_INVALID = 0,
    INDEX_LOOKUP_TYPE_EQ      = 1,
    INDEX_LOOKUP_TYPE_GT      = 2,
@@ -698,4 +697,3 @@ int64_t getMaxTypeValue (ValueType type);
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString);
 }
 
-#endif

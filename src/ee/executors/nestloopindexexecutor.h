@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENESTLOOPINDEXEXECUTOR_H
-#define HSTORENESTLOOPINDEXEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -69,30 +68,20 @@ class TableTuple;
  * This executor is faster than HashMatchJoin and MergeJoin if only one
  * of underlying tables has low selectivity.
  */
-class NestLoopIndexExecutor : public AbstractJoinExecutor
-{
-public:
-    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractJoinExecutor(engine, abstract_node)
-        , m_indexNode(NULL)
-        , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
-    { }
-
-    ~NestLoopIndexExecutor();
-
+class NestLoopIndexExecutor : public AbstractJoinExecutor {
 protected:
-
-    bool p_init(AbstractPlanNode*,
-                const ExecutorVector& executorVector);
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
-
-    IndexScanPlanNode* m_indexNode;
-    IndexLookupType m_lookupType;
+    IndexScanPlanNode* m_indexNode = nullptr;
+    IndexLookupType m_lookupType = IndexLookupType::INDEX_LOOKUP_TYPE_INVALID;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_indexValues;
+public:
+    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+        AbstractJoinExecutor(engine, abstract_node) {}
+    ~NestLoopIndexExecutor();
 };
 
 }
 
-#endif
