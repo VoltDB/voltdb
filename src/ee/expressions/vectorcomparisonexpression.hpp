@@ -70,7 +70,7 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2) {
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
         NValue value1 = tuple1.getNValue(columnIdx);
         if (value1.isNull() && OP::isNullRejecting()) {
-            fallback_result = NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            fallback_result = NValue::getNullValue(ValueType::tBOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
             }
@@ -78,7 +78,7 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2) {
         }
         NValue value2 = tuple2.getNValue(columnIdx);
         if (value2.isNull() && OP::isNullRejecting()) {
-            fallback_result = NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            fallback_result = NValue::getNullValue(ValueType::tBOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
             }
@@ -155,9 +155,9 @@ public:
     template<typename OP>
     NValue compare(const NValue& nvalue) const {
         if (m_value.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         } else if (nvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         } else {
             return OP::compare(m_value, nvalue);
         }
@@ -227,10 +227,10 @@ public:
         vassert(m_tuple.getSchema()->columnCount() == 1);
         NValue lvalue = m_tuple.getNValue(0);
         if (lvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
         if (nvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
         return OP::compare(lvalue, nvalue);
     }
@@ -293,7 +293,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             // Check if the comparison operator is Null rejecting. If it is, return
             // NULL for boolean.
             if (OP::isNullRejecting() || !outerExtractor.hasNext()) {
-                return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+                return NValue::getNullValue(ValueType::tBOOLEAN);
             }
 
             // If for the operator, NULL is a valid value in result, construct RHS value
@@ -313,7 +313,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
 
     vassert (innerExtractor.resultSize() > 0);
     if (!outerExtractor.hasNext() || (outerExtractor.hasNullValue() && OP::isNullRejecting()) ) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 
     //  Iterate over the inner results until
@@ -343,7 +343,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // A NULL match along the way determines the result
     // for cases that never found a definitive result.
     if (hasInnerNull) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
     // Otherwise, return the unanimous result. false for ANY, true for ALL.
     return result;

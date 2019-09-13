@@ -107,9 +107,9 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
         VOLT_TRACE("  column %02d type:         %hd\n",
                     idx,
                     column_count);
-        assert(colType != ValueType::VALUE_TYPE_ARRAY);
-        if (colType == ValueType::VALUE_TYPE_VARCHAR
-            || colType == ValueType::VALUE_TYPE_VARBINARY) {
+        assert(colType != ValueType::tARRAY);
+        if (colType == ValueType::tVARCHAR
+            || colType == ValueType::tVARBINARY) {
             // Note that in the tests we do not have the schema handy, setting this to 256
             // which seems to be large enough for the cpp unit tests now.
             builder.setColumnAtIndex(idx, colType, 256);

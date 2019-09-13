@@ -311,10 +311,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
         return docNVal;
     } else if (pathNVal.isNull()) {
         throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid FIELD path argument (SQL null)");
-    } else if (docNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(docNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
-    } else if (pathNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(pathNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    } else if (docNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(docNVal.getValueType(), ValueType::tVARCHAR);
+    } else if (pathNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(pathNVal.getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t lenDoc;
@@ -338,8 +338,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     const NValue& docNVal = arguments[0];
     if (docNVal.isNull()) {
         return getNullStringValue();
-    } else if (docNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(docNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    } else if (docNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(docNVal.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& indexNVal = arguments[1];
@@ -397,10 +397,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
 template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
 
     if (isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return getNullValue(ValueType::tINTEGER);
     }
-    if (getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t lenDoc;
@@ -419,10 +419,10 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
 
     // only array type contains indexed elements. objects, primitives do not
     if ( ! root.isArray()) {
-        return getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return getNullValue(ValueType::tINTEGER);
     }
 
-    NValue result(ValueType::VALUE_TYPE_INTEGER);
+    NValue result(ValueType::tINTEGER);
     int32_t size = static_cast<int32_t>(root.size());
     result.getInteger() = size;
     return result;
@@ -448,16 +448,16 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
                            "Invalid SET_FIELD value argument (SQL null)");
     }
 
-    if (docNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(docNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (docNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(docNVal.getValueType(), ValueType::tVARCHAR);
     }
 
-    if (pathNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(pathNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (pathNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(pathNVal.getValueType(), ValueType::tVARCHAR);
     }
 
-    if (valueNVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(valueNVal.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (valueNVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(valueNVal.getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t lenDoc;

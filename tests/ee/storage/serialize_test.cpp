@@ -69,12 +69,12 @@ using namespace voltdb;
 
 #define NUM_OF_COLUMNS 6
 ValueType col_types[NUM_OF_COLUMNS] = {
-    ValueType::VALUE_TYPE_TINYINT,
-    ValueType::VALUE_TYPE_BIGINT,
-    ValueType::VALUE_TYPE_BIGINT,
-    ValueType::VALUE_TYPE_BIGINT,
-    ValueType::VALUE_TYPE_VARCHAR,
-    ValueType::VALUE_TYPE_DOUBLE
+    ValueType::tTINYINT,
+    ValueType::tBIGINT,
+    ValueType::tBIGINT,
+    ValueType::tBIGINT,
+    ValueType::tVARCHAR,
+    ValueType::tDOUBLE
 };
 
 class TableSerializeTest : public Test {
@@ -92,7 +92,7 @@ class TableSerializeTest : public Test {
                 if (ctr == 0) ::snprintf(name, 16, "id");
                 else ::snprintf(name, 16, "val%02d", ctr);
                 columnNames[ctr] = name;
-                int size = (col_types[ctr] != ValueType::VALUE_TYPE_VARCHAR ? 8 : 20);
+                int size = (col_types[ctr] != ValueType::tVARCHAR ? 8 : 20);
                 columnSizes.push_back(static_cast<int32_t>(size));
                 columnTypes.push_back(col_types[ctr]);
             }
@@ -166,7 +166,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
 
 TEST_F(TableSerializeTest, NullStrings) {
     std::vector<std::string> columnNames(1);
-    std::vector<voltdb::ValueType> columnTypes(1, voltdb::ValueType::VALUE_TYPE_VARCHAR);
+    std::vector<voltdb::ValueType> columnTypes(1, voltdb::ValueType::tVARCHAR);
     std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
@@ -196,8 +196,8 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ(1, table_->columnCount());
     EXPECT_EQ("", table_->columnName(0));
     EXPECT_EQ("", deserialized->columnName(0));
-    EXPECT_EQ(ValueType::VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
-    EXPECT_EQ(ValueType::VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
+    EXPECT_EQ(ValueType::tVARCHAR, table_->schema()->columnType(0));
+    EXPECT_EQ(ValueType::tVARCHAR, deserialized->schema()->columnType(0));
     EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
     TableIterator iter = deserialized->iterator();
@@ -205,9 +205,9 @@ TEST_F(TableSerializeTest, NullStrings) {
     int count = 0;
     while (iter.next(t)) {
         const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(0);
-        EXPECT_EQ(ValueType::VALUE_TYPE_VARCHAR, columnInfo->getVoltType());
+        EXPECT_EQ(ValueType::tVARCHAR, columnInfo->getVoltType());
         const TupleSchema::ColumnInfo *tcolumnInfo = t.getSchema()->getColumnInfo(0);
-        EXPECT_EQ(ValueType::VALUE_TYPE_VARCHAR, tcolumnInfo->getVoltType());
+        EXPECT_EQ(ValueType::tVARCHAR, tcolumnInfo->getVoltType());
         EXPECT_TRUE(tuple.getNValue(0).isNull());
         EXPECT_TRUE(t.getNValue(0).isNull());
         EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(tuple.getNValue(0)).isTrue());

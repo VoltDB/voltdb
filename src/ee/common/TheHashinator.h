@@ -49,13 +49,13 @@ class TheHashinator {
         }
         ValueType val_type = ValuePeeker::peekValueType(value);
         switch (val_type) {
-            case ValueType::VALUE_TYPE_TINYINT:
-            case ValueType::VALUE_TYPE_SMALLINT:
-            case ValueType::VALUE_TYPE_INTEGER:
-            case ValueType::VALUE_TYPE_BIGINT:
+            case ValueType::tTINYINT:
+            case ValueType::tSMALLINT:
+            case ValueType::tINTEGER:
+            case ValueType::tBIGINT:
                 return hashinate(ValuePeeker::peekAsRawInt64(value));
-            case ValueType::VALUE_TYPE_VARBINARY:
-            case ValueType::VALUE_TYPE_VARCHAR:
+            case ValueType::tVARBINARY:
+            case ValueType::tVARCHAR:
                 {
                     int32_t length;
                     const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);

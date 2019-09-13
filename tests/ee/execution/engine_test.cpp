@@ -79,10 +79,10 @@
 // configurations without having to dig down into the code
 //
 voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = {
-    voltdb::ValueType::VALUE_TYPE_INTEGER,
-    voltdb::ValueType::VALUE_TYPE_VARCHAR,
-    voltdb::ValueType::VALUE_TYPE_VARCHAR,
-    voltdb::ValueType::VALUE_TYPE_INTEGER
+    voltdb::ValueType::tINTEGER,
+    voltdb::ValueType::tVARCHAR,
+    voltdb::ValueType::tVARCHAR,
+    voltdb::ValueType::tINTEGER
 };
 int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };

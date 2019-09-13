@@ -49,23 +49,23 @@ map<V, K> revert(map<K, V>const& original) {
 }
 
 map<ValueType, string> const mapOfTypeName {
-   {ValueType::VALUE_TYPE_TINYINT, "TINYINT"},
-   {ValueType::VALUE_TYPE_SMALLINT, "SMALLINT"},
-   {ValueType::VALUE_TYPE_INTEGER, "INTEGER"},
-   {ValueType::VALUE_TYPE_BIGINT, "BIGINT"},
-   {ValueType::VALUE_TYPE_DOUBLE, "FLOAT"},
-   {ValueType::VALUE_TYPE_VARCHAR, "VARCHAR"},
-   {ValueType::VALUE_TYPE_VARBINARY, "VARBINARY"},
-   {ValueType::VALUE_TYPE_TIMESTAMP, "TIMESTAMP"},
-   {ValueType::VALUE_TYPE_DECIMAL, "DECIMAL"},
-   {ValueType::VALUE_TYPE_BOOLEAN, "BOOLEAN"},
-   {ValueType::VALUE_TYPE_POINT, "POINT"},
-   {ValueType::VALUE_TYPE_GEOGRAPHY, "GEOGRAPHY"},
-   {ValueType::VALUE_TYPE_ADDRESS, "ADDRESS"},
-   {ValueType::VALUE_TYPE_INVALID, "INVALID"},
-   {ValueType::VALUE_TYPE_NULL, "NULL"},
-   {ValueType::VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC, "NUMERIC"},
-   {ValueType::VALUE_TYPE_ARRAY, "ARRAY"}
+   {ValueType::tTINYINT, "TINYINT"},
+   {ValueType::tSMALLINT, "SMALLINT"},
+   {ValueType::tINTEGER, "INTEGER"},
+   {ValueType::tBIGINT, "BIGINT"},
+   {ValueType::tDOUBLE, "FLOAT"},
+   {ValueType::tVARCHAR, "VARCHAR"},
+   {ValueType::tVARBINARY, "VARBINARY"},
+   {ValueType::tTIMESTAMP, "TIMESTAMP"},
+   {ValueType::tDECIMAL, "DECIMAL"},
+   {ValueType::tBOOLEAN, "BOOLEAN"},
+   {ValueType::tPOINT, "POINT"},
+   {ValueType::tGEOGRAPHY, "GEOGRAPHY"},
+   {ValueType::tADDRESS, "ADDRESS"},
+   {ValueType::tINVALID, "INVALID"},
+   {ValueType::tNULL, "NULL"},
+   {ValueType::NumericDiagnostics, "NUMERIC"},
+   {ValueType::tARRAY, "ARRAY"}
 };
 
 map<TableStreamType, string> const mapOfStreamTypeName {
@@ -211,22 +211,22 @@ map<string, IndexLookupType> const mapToIndexLookupType = revert(mapOfIndexLooku
 /** Testing utility */
 bool isNumeric(ValueType type) {
     switch (type) {
-        case ValueType::VALUE_TYPE_TINYINT:
-        case ValueType::VALUE_TYPE_SMALLINT:
-        case ValueType::VALUE_TYPE_INTEGER:
-        case ValueType::VALUE_TYPE_BIGINT:
-        case ValueType::VALUE_TYPE_DECIMAL:
-        case ValueType::VALUE_TYPE_DOUBLE:
+        case ValueType::tTINYINT:
+        case ValueType::tSMALLINT:
+        case ValueType::tINTEGER:
+        case ValueType::tBIGINT:
+        case ValueType::tDECIMAL:
+        case ValueType::tDOUBLE:
             return true;
             break;
-        case ValueType::VALUE_TYPE_VARCHAR:
-        case ValueType::VALUE_TYPE_VARBINARY:
-        case ValueType::VALUE_TYPE_TIMESTAMP:
-        case ValueType::VALUE_TYPE_POINT:
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
-        case ValueType::VALUE_TYPE_NULL:
-        case ValueType::VALUE_TYPE_INVALID:
-        case ValueType::VALUE_TYPE_ARRAY:
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tTIMESTAMP:
+        case ValueType::tPOINT:
+        case ValueType::tGEOGRAPHY:
+        case ValueType::tNULL:
+        case ValueType::tINVALID:
+        case ValueType::tARRAY:
             return false;
         default:
             throw exception();
@@ -237,21 +237,21 @@ bool isNumeric(ValueType type) {
 /** Used in index optimization **/
 bool isIntegralType(ValueType type) {
     switch (type) {
-        case ValueType::VALUE_TYPE_TINYINT:
-        case ValueType::VALUE_TYPE_SMALLINT:
-        case ValueType::VALUE_TYPE_INTEGER:
-        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::tTINYINT:
+        case ValueType::tSMALLINT:
+        case ValueType::tINTEGER:
+        case ValueType::tBIGINT:
             return true;
             break;
-        case ValueType::VALUE_TYPE_DOUBLE:
-        case ValueType::VALUE_TYPE_VARCHAR:
-        case ValueType::VALUE_TYPE_VARBINARY:
-        case ValueType::VALUE_TYPE_TIMESTAMP:
-        case ValueType::VALUE_TYPE_POINT:
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
-        case ValueType::VALUE_TYPE_NULL:
-        case ValueType::VALUE_TYPE_DECIMAL:
-        case ValueType::VALUE_TYPE_ARRAY:
+        case ValueType::tDOUBLE:
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tTIMESTAMP:
+        case ValueType::tPOINT:
+        case ValueType::tGEOGRAPHY:
+        case ValueType::tNULL:
+        case ValueType::tDECIMAL:
+        case ValueType::tARRAY:
             return false;
         default:
             throw exception();
@@ -261,9 +261,9 @@ bool isIntegralType(ValueType type) {
 
 bool isVariableLengthType(ValueType type) {
     switch (type) {
-        case ValueType::VALUE_TYPE_VARCHAR:
-    case ValueType::VALUE_TYPE_VARBINARY:
-    case ValueType::VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tVARCHAR:
+    case ValueType::tVARBINARY:
+    case ValueType::tGEOGRAPHY:
         return true;
     default:
         return false;
@@ -285,7 +285,7 @@ string valueToString(ValueType type) {
 }
 
 ValueType stringToValue(string const& nam) {
-   return lookup(mapToValueType, nam, ValueType::VALUE_TYPE_INVALID);
+   return lookup(mapToValueType, nam, ValueType::tINVALID);
 }
 
 string joinToString(JoinType type) {
@@ -353,13 +353,13 @@ int32_t hexCharToInt(char c) {
 
 int64_t getMaxTypeValue (ValueType type) {
     switch(type) {
-        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::tTINYINT:
             return static_cast<int64_t>(INT8_MAX);
-        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::tSMALLINT:
             return static_cast<int64_t>(INT16_MAX);
-        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::tINTEGER:
             return static_cast<int64_t>(INT32_MAX);
-        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::tBIGINT:
             return static_cast<int64_t>(INT64_MAX);
         default:
             return static_cast<int64_t>(-1);

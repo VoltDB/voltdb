@@ -83,8 +83,8 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     vector<bool> columnAllowNull;
 
     columnIndices.push_back(0);
-    columnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+    columnTypes.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     columnAllowNull.push_back(false);
 
     TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,

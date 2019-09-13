@@ -39,8 +39,8 @@ TEST_F(TupleSchemaTest, Basic)
 {
     voltdb::TupleSchemaBuilder builder(2);
 
-    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_INTEGER);
-    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    builder.setColumnAtIndex(0, ValueType::tINTEGER);
+    builder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              256, // column size
                              false, // do not allow nulls
                              true); // size is in bytes
@@ -61,7 +61,7 @@ TEST_F(TupleSchemaTest, Basic)
     ASSERT_NE(NULL, colInfo);
     EXPECT_EQ(0, colInfo->offset);
     EXPECT_EQ(4, colInfo->length);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_INTEGER), colInfo->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tINTEGER), colInfo->type);
     EXPECT_EQ(1, colInfo->allowNull);
     EXPECT_EQ(true, colInfo->inlined);
     EXPECT_EQ(false, colInfo->inBytes);
@@ -70,7 +70,7 @@ TEST_F(TupleSchemaTest, Basic)
     ASSERT_NE(NULL, colInfo);
     EXPECT_EQ(4, colInfo->offset);
     EXPECT_EQ(256, colInfo->length);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_VARCHAR), colInfo->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tVARCHAR), colInfo->type);
     EXPECT_EQ(false, colInfo->allowNull);
     EXPECT_EQ(false, colInfo->inlined);
     EXPECT_EQ(true, colInfo->inBytes);
@@ -80,8 +80,8 @@ TEST_F(TupleSchemaTest, HiddenColumn)
 {
     voltdb::TupleSchemaBuilder builder(2,  // 2 visible columns
                                        2); // 1 hidden column
-    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_INTEGER);
-    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    builder.setColumnAtIndex(0, ValueType::tINTEGER);
+    builder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              256,   // column size
                              false, // do not allow nulls
                              true); // size is in bytes
@@ -112,7 +112,7 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     ASSERT_NE(NULL, colInfo);
     EXPECT_EQ(0, colInfo->offset);
     EXPECT_EQ(4, colInfo->length);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_INTEGER), colInfo->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tINTEGER), colInfo->type);
     EXPECT_EQ(1, colInfo->allowNull);
     EXPECT_EQ(true, colInfo->inlined);
     EXPECT_EQ(false, colInfo->inBytes);
@@ -121,7 +121,7 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     ASSERT_NE(NULL, colInfo);
     EXPECT_EQ(4, colInfo->offset);
     EXPECT_EQ(256, colInfo->length);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_VARCHAR), colInfo->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tVARCHAR), colInfo->type);
     EXPECT_EQ(false, colInfo->allowNull);
     EXPECT_EQ(false, colInfo->inlined);
     EXPECT_EQ(true, colInfo->inBytes);
@@ -130,34 +130,34 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     const TupleSchema::HiddenColumnInfo *hiddenCol = schema->getHiddenColumnInfo(0);
     ASSERT_NE(NULL, hiddenCol);
     EXPECT_EQ(12, hiddenCol->offset);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_BIGINT), hiddenCol->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tBIGINT), hiddenCol->type);
     EXPECT_EQ(true, hiddenCol->allowNull);
 
     hiddenCol = schema->getHiddenColumnInfo(1);
     ASSERT_NE(NULL, hiddenCol);
     EXPECT_EQ(20, hiddenCol->offset);
-    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::VALUE_TYPE_BIGINT), hiddenCol->type);
+    EXPECT_EQ(static_cast<decltype(colInfo->type)>(ValueType::tBIGINT), hiddenCol->type);
     EXPECT_EQ(false, hiddenCol->allowNull);
 }
 
 TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
 {
     voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
-    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_DECIMAL);
-    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    builder.setColumnAtIndex(0, ValueType::tDECIMAL);
+    builder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
-    builder.setColumnAtIndex(2, ValueType::VALUE_TYPE_TIMESTAMP);
+    builder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
     ScopedTupleSchema schema1(builder.build());
 
     voltdb::TupleSchemaBuilder hiddenBuilder(3, 1); // 3 visible columns
-    hiddenBuilder.setColumnAtIndex(0, ValueType::VALUE_TYPE_DECIMAL);
-    hiddenBuilder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    hiddenBuilder.setColumnAtIndex(0, ValueType::tDECIMAL);
+    hiddenBuilder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
-    hiddenBuilder.setColumnAtIndex(2, ValueType::VALUE_TYPE_TIMESTAMP);
+    hiddenBuilder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
 
     hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::XDCR_TIMESTAMP);
 
@@ -175,7 +175,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
 
     // Create another schema where the varchar column is longer (but
     // still uninlined)
-    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR, 128);
+    builder.setColumnAtIndex(1, ValueType::tVARCHAR, 128);
     ScopedTupleSchema schema3(builder.build());
 
     // Structural layout is the same
@@ -203,24 +203,24 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
 
 TEST_F(TupleSchemaTest, MaxSerializedTupleSize) {
     voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
-    builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_DECIMAL);
-    builder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    builder.setColumnAtIndex(0, ValueType::tDECIMAL);
+    builder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
-    builder.setColumnAtIndex(2, ValueType::VALUE_TYPE_TIMESTAMP);
+    builder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
     ScopedTupleSchema schema(builder.build());
 
     EXPECT_EQ((4 + 16 + (4 + 64 * 4) + 8),
               schema.get()->getMaxSerializedTupleSize());
 
     voltdb::TupleSchemaBuilder hiddenBuilder(3, 2); // 3 visible columns, 2 hidden columns
-    hiddenBuilder.setColumnAtIndex(0, ValueType::VALUE_TYPE_DECIMAL);
-    hiddenBuilder.setColumnAtIndex(1, ValueType::VALUE_TYPE_VARCHAR,
+    hiddenBuilder.setColumnAtIndex(0, ValueType::tDECIMAL);
+    hiddenBuilder.setColumnAtIndex(1, ValueType::tVARCHAR,
                              64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
-    hiddenBuilder.setColumnAtIndex(2, ValueType::VALUE_TYPE_TIMESTAMP);
+    hiddenBuilder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
     hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::MIGRATE_TXN);
     hiddenBuilder.setHiddenColumnAtIndex(1, voltdb::HiddenColumn::XDCR_TIMESTAMP);
     ScopedTupleSchema schemaWithHidden(hiddenBuilder.build());

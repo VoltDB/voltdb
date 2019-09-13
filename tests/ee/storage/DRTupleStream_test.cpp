@@ -86,8 +86,8 @@ public:
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
+            columnTypes.push_back(ValueType::tINTEGER);
+            columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
             columnAllowNull.push_back(false);
         }
         m_schema =
@@ -99,8 +99,8 @@ public:
         std::vector<int32_t> largeColumnLengths;
         std::vector<bool> largeColumnAllowNull;
         for (int i = 0; i < LARGE_TUPLE_COLUMN_COUNT; i++) {
-            largeColumnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
-            largeColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+            largeColumnTypes.push_back(ValueType::tBIGINT);
+            largeColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
             largeColumnAllowNull.push_back(false);
         }
 

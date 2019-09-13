@@ -705,8 +705,8 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull;
     for (int i = 0; i < 2; i++) {
-        columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
-        columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
+        columnTypes.push_back(ValueType::tINTEGER);
+        columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
         columnAllowNull.push_back(false);
     }
     TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,

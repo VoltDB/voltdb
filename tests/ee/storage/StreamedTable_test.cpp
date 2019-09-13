@@ -96,8 +96,8 @@ public:
         m_columnNames->push_back("four");
         m_columnNames->push_back("five");
         for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(ValueType::VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER));
+            columnTypes.push_back(ValueType::tINTEGER);
+            columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
             columnAllowNull.push_back(false);
         }
         m_schema =

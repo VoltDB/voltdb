@@ -319,12 +319,12 @@ public:
 
         NValue lnv = m_left->eval(tuple1, tuple2);
         if (lnv.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
 
         NValue rnv = m_right->eval(tuple1, tuple2);
         if (rnv.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
 
         // comparisons with null or NaN are always false

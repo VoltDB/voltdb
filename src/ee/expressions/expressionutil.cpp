@@ -285,39 +285,39 @@ static AbstractExpression* constantValueFactory(
     PlannerDomValue valueValue = obj.valueForKey("VALUE");
 
     switch (vt) {
-        case ValueType::VALUE_TYPE_INVALID:
-            throw SerializableEEException("constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
-        case ValueType::VALUE_TYPE_NULL:
-            throw SerializableEEException("constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
-        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::tINVALID:
+            throw SerializableEEException("constantValueFactory: Value type should never be tINVALID");
+        case ValueType::tNULL:
+            throw SerializableEEException("constantValueFactory: And they should be never be this either! tNULL");
+        case ValueType::tTINYINT:
             newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
             break;
-        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::tSMALLINT:
             newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
             break;
-        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::tINTEGER:
             newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
             break;
-        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::tBIGINT:
             newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
             break;
-        case ValueType::VALUE_TYPE_DOUBLE:
+        case ValueType::tDOUBLE:
             newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
             break;
-        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
             newvalue = ValueFactory::getStringValue(valueValue.asStr());
             break;
-        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::tVARBINARY:
             // uses hex encoding
             newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
             break;
-        case ValueType::VALUE_TYPE_TIMESTAMP:
+        case ValueType::tTIMESTAMP:
             newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
             break;
-        case ValueType::VALUE_TYPE_DECIMAL:
+        case ValueType::tDECIMAL:
             newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
             break;
-        case ValueType::VALUE_TYPE_BOOLEAN:
+        case ValueType::tBOOLEAN:
             newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
             break;
         default:

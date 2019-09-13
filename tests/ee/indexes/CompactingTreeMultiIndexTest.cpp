@@ -114,25 +114,25 @@ public:
     void prepareForPerformanceDifference() {
         // tuple schema
         for(int i = 0; i < 3; i++) {
-            m_columnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
-            m_columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+            m_columnTypes.push_back(ValueType::tBIGINT);
+            m_columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
             m_columnAllowNull.push_back(false);
         }
 
         m_columnIndices.push_back(0);
         // index using one column
-        m_kcolumnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
-        m_kcolumnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+        m_kcolumnTypes.push_back(ValueType::tBIGINT);
+        m_kcolumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
         m_kcolumnAllowNull.push_back(false);
 
         // index using two columns
         m_columnIndices2.push_back(0);
-        m_kcolumnTypes2.push_back(ValueType::VALUE_TYPE_BIGINT);
-        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+        m_kcolumnTypes2.push_back(ValueType::tBIGINT);
+        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
         m_kcolumnAllowNull2.push_back(false);
         m_columnIndices2.push_back(1);
-        m_kcolumnTypes2.push_back(ValueType::VALUE_TYPE_BIGINT);
-        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+        m_kcolumnTypes2.push_back(ValueType::tBIGINT);
+        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
         m_kcolumnAllowNull2.push_back(false);
     }
 
@@ -215,8 +215,8 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     vector<bool> columnAllowNull;
 
     columnIndices.push_back(0);
-    columnTypes.push_back(ValueType::VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+    columnTypes.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     columnAllowNull.push_back(false);
 
     TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,

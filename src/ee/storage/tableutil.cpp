@@ -153,7 +153,7 @@ void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple) {
         const TupleSchema::ColumnInfo *tupleColumnInfo = tuple->getSchema()->getColumnInfo(col_ctr);
 
         const ValueType t = tupleColumnInfo->getVoltType();
-        if ((t == ValueType::VALUE_TYPE_VARCHAR || t == ValueType::VALUE_TYPE_VARBINARY) &&
+        if ((t == ValueType::tVARCHAR || t == ValueType::tVARBINARY) &&
                 tupleColumnInfo->inlined) {
             value.free();
         }

@@ -275,7 +275,7 @@ static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
     // Inlined variable length data has a 1-byte size prefix.
 
     switch (colInfo->getVoltType()) {
-        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
             if (colInfo->inlined && !colInfo->inBytes) {
                 // For VARCHAR we need to consider multi-byte characters.
                 uint32_t maxLength = colInfo->length * MAX_BYTES_PER_UTF8_CHARACTER;
@@ -285,10 +285,10 @@ static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
 
             // FALL THROUGH
 
-        case ValueType::VALUE_TYPE_VARBINARY:
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tVARBINARY:
+        case ValueType::tGEOGRAPHY:
             if (colInfo->inlined) {
-                vassert(colInfo->getVoltType() != ValueType::VALUE_TYPE_GEOGRAPHY);
+                vassert(colInfo->getVoltType() != ValueType::tGEOGRAPHY);
                 return colInfo->length + 1;
             } else {
                 return sizeof (StringRef**);

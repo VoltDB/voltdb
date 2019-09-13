@@ -38,8 +38,8 @@ class IndexKeyTest : public Test {
 };
 
 TEST_F(IndexKeyTest, Int64KeyTest) {
-    std::vector<voltdb::ValueType> columnTypes(1, voltdb::ValueType::VALUE_TYPE_BIGINT);
-    std::vector<int32_t> columnLengths(1, NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_BIGINT));
+    std::vector<voltdb::ValueType> columnTypes(1, voltdb::ValueType::tBIGINT);
+    std::vector<int32_t> columnLengths(1, NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
     std::vector<bool> columnAllowNull(1, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
@@ -85,8 +85,8 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
 }
 
 TEST_F(IndexKeyTest, TwoInt64KeyTest) {
-    std::vector<voltdb::ValueType> columnTypes(2, voltdb::ValueType::VALUE_TYPE_BIGINT);
-    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_BIGINT));
+    std::vector<voltdb::ValueType> columnTypes(2, voltdb::ValueType::tBIGINT);
+    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
     std::vector<bool> columnAllowNull(2, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
@@ -138,8 +138,8 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
 }
 
 TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
-    std::vector<voltdb::ValueType> columnTypes(2, voltdb::ValueType::VALUE_TYPE_BIGINT);
-    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_BIGINT));
+    std::vector<voltdb::ValueType> columnTypes(2, voltdb::ValueType::tBIGINT);
+    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
     std::vector<bool> columnAllowNull(2, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
@@ -186,13 +186,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
+    columnTypes.push_back(voltdb::ValueType::tINTEGER);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
 
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_INTEGER));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
@@ -242,14 +242,14 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
+    columnTypes.push_back(voltdb::ValueType::tINTEGER);
 
 
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_INTEGER));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
 
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
@@ -314,14 +314,14 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_TINYINT);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
+    columnTypes.push_back(voltdb::ValueType::tTINYINT);
+    columnTypes.push_back(voltdb::ValueType::tINTEGER);
 
 
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_TINYINT));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_INTEGER));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
@@ -359,7 +359,7 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(1, true);
 
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_VARCHAR);
+    columnTypes.push_back(voltdb::ValueType::tVARCHAR);
     columnLengths.push_back(30);
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createKeySchema(columnTypes, columnLengths, columnAllowNull);
@@ -404,10 +404,10 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(2, true);
 
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
-    columnTypes.push_back(voltdb::ValueType::VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_INTEGER));
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::VALUE_TYPE_INTEGER));
+    columnTypes.push_back(voltdb::ValueType::tINTEGER);
+    columnTypes.push_back(voltdb::ValueType::tINTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
+    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 

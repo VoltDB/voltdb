@@ -29,7 +29,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     const ValueType type = getValueType();
     char msg_format_buffer[1024];
     char state_format_buffer[6];
-    if (type == ValueType::VALUE_TYPE_VARCHAR) {
+    if (type == ValueType::tVARCHAR) {
         if (isNull()) {
              throw SQLException(SQLException::dynamic_sql_error,
                      "Must not ask for object length on sql null object.");
@@ -79,8 +79,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
     if (strValue.isNull()) {
         msg_format_buffer[0] = '\0';
     } else {
-        if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-            throwCastSQLException(strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+        if (strValue.getValueType() != ValueType::tVARCHAR) {
+            throwCastSQLException(strValue.getValueType(), ValueType::tVARCHAR);
         }
         int32_t length;
         const char* buf = strValue.getObject_withoutNull(length);

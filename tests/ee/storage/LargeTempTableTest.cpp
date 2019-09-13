@@ -78,10 +78,10 @@ TEST_F(LargeTempTableTest, Basic) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    TupleSchema* schema = Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
-                                             ValueType::VALUE_TYPE_DOUBLE,
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 15),
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, 128));
+    TupleSchema* schema = Tools::buildSchema(ValueType::tBIGINT,
+                                             ValueType::tDOUBLE,
+                                             std::make_pair(ValueType::tVARCHAR, 15),
+                                             std::make_pair(ValueType::tVARCHAR, 128));
     std::vector<std::string> columnNames{
         "pk", "val", "inline_text", "noninline_text"
     };
@@ -185,17 +185,17 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
     TupleSchema* schema = Tools::buildSchema(
         //                                       status byte: 1
-        ValueType::VALUE_TYPE_BIGINT,                                //  8
-        ValueType::VALUE_TYPE_DOUBLE,                                //  8
-        ValueType::VALUE_TYPE_DOUBLE,                                //  8
-        ValueType::VALUE_TYPE_DOUBLE,                                //  8
-        ValueType::VALUE_TYPE_DECIMAL,                               // 16
-        ValueType::VALUE_TYPE_DECIMAL,                               // 16
-        ValueType::VALUE_TYPE_DECIMAL,                               // 16
-        std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
-        std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
-        std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
-        std::make_pair(ValueType::VALUE_TYPE_VARCHAR, NONINLINE_LEN)); //  8 (pointer to non-inlined)
+        ValueType::tBIGINT,                                //  8
+        ValueType::tDOUBLE,                                //  8
+        ValueType::tDOUBLE,                                //  8
+        ValueType::tDOUBLE,                                //  8
+        ValueType::tDECIMAL,                               // 16
+        ValueType::tDECIMAL,                               // 16
+        ValueType::tDECIMAL,                               // 16
+        std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
+        std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
+        std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
+        std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN)); //  8 (pointer to non-inlined)
     // --> Tuple length is 272 bytes (not counting non-inlined data)
 
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
@@ -332,17 +332,17 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     const int INLINE_LEN = 15;
     const int NONINLINE_LEN = 50000;
 
-    TupleSchema* schema = Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT,
-                                             ValueType::VALUE_TYPE_DOUBLE,
-                                             ValueType::VALUE_TYPE_DOUBLE,
-                                             ValueType::VALUE_TYPE_DOUBLE,
-                                             ValueType::VALUE_TYPE_DECIMAL,
-                                             ValueType::VALUE_TYPE_DECIMAL,
-                                             ValueType::VALUE_TYPE_DECIMAL,
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, INLINE_LEN),
-                                             std::make_pair(ValueType::VALUE_TYPE_VARCHAR, NONINLINE_LEN));
+    TupleSchema* schema = Tools::buildSchema(ValueType::tBIGINT,
+                                             ValueType::tDOUBLE,
+                                             ValueType::tDOUBLE,
+                                             ValueType::tDOUBLE,
+                                             ValueType::tDECIMAL,
+                                             ValueType::tDECIMAL,
+                                             ValueType::tDECIMAL,
+                                             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
+                                             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
+                                             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
+                                             std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN));
 
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
@@ -429,7 +429,7 @@ TEST_F(LargeTempTableTest, basicBlockCache) {
         .setTopend(std::move(topend))
         .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
         .build();
-    ScopedTupleSchema schema(Tools::buildSchema(ValueType::VALUE_TYPE_BIGINT, ValueType::VALUE_TYPE_DOUBLE));
+    ScopedTupleSchema schema(Tools::buildSchema(ValueType::tBIGINT, ValueType::tDOUBLE));
     LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     LargeTempTableBlock* block = lttBlockCache.getEmptyBlock(schema.get());
     LargeTempTableBlockId blockId = block->id();

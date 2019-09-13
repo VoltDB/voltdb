@@ -189,9 +189,9 @@ protected:
 private:
     TupleSchema* getSchemaOfLength(int32_t varcharLengthBytes, int32_t inlinePadding) {
         TupleSchemaBuilder builder(inlinePadding + 1);
-        builder.setColumnAtIndex(0, ValueType::VALUE_TYPE_VARCHAR, varcharLengthBytes, true, true);
+        builder.setColumnAtIndex(0, ValueType::tVARCHAR, varcharLengthBytes, true, true);
         for (int i = 0; i < inlinePadding; ++i) {
-            builder.setColumnAtIndex(i + 1, ValueType::VALUE_TYPE_TINYINT);
+            builder.setColumnAtIndex(i + 1, ValueType::tTINYINT);
         }
         return builder.build();
     }
@@ -207,7 +207,7 @@ private:
 
         uint32_t varcharLength = block->schema()->getColumnInfo(0)->length;
         do {
-            tupleToInsert.setNValue(0, ValueFactory::getRandomValue(ValueType::VALUE_TYPE_VARCHAR, varcharLength, tempPool));
+            tupleToInsert.setNValue(0, ValueFactory::getRandomValue(ValueType::tVARCHAR, varcharLength, tempPool));
         }
         while (block->insertTuple(tupleToInsert));
     }

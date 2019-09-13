@@ -40,7 +40,7 @@ namespace voltdb {
 /** implement the 1-argument SQL OCTET_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return getNullValue(ValueType::tINTEGER);
     }
     int32_t length;
     getObject_withoutNull(length);
@@ -62,7 +62,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int32_t lenValue;
@@ -98,8 +98,8 @@ template<> inline NValue NValue::callUnary<FUNC_FOLD_LOWER>() const {
         return getNullStringValue();
     }
 
-    if (getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t length;
@@ -114,8 +114,8 @@ template<> inline NValue NValue::callUnary<FUNC_FOLD_UPPER>() const {
     if (isNull())
         return getNullStringValue();
 
-    if (getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t length;
@@ -133,8 +133,8 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     if (strValue.isNull()) {
         return strValue;
     }
-    if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strValue.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (strValue.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& countArg = arguments[1];
@@ -180,14 +180,14 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     vassert(arguments.size() == 2);
     const NValue& target = arguments[0];
     if (target.isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return getNullValue(ValueType::tINTEGER);
     }
-    if (target.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (target.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (target.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (target.getValueType(), ValueType::tVARCHAR);
     }
     const NValue& pool = arguments[1];
     if (pool.isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return getNullValue(ValueType::tINTEGER);
     }
     int32_t lenTarget;
     const char* targetChars = target.getObject_withoutNull(lenTarget);
@@ -212,8 +212,8 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
     if (strValue.isNull()) {
         return strValue;
     }
-    if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strValue.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (strValue.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& startArg = arguments[1];
@@ -242,8 +242,8 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     if (strValue.isNull()) {
         return strValue;
     }
-    if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strValue.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (strValue.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& startArg = arguments[1];
@@ -280,8 +280,8 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
         if (iter->isNull()) {
             return getNullStringValue();
         }
-        if (iter->getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (iter->getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+        if (iter->getValueType() != ValueType::tVARCHAR) {
+            throwCastSQLException (iter->getValueType(), ValueType::tVARCHAR);
         }
         int32_t length;
         iter->getObject_withoutNull(length);
@@ -317,8 +317,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
     if (strValue.isNull()) {
         return strValue;
     }
-    if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strValue.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (strValue.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& startArg = arguments[1];
@@ -369,8 +369,8 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
     }
 
     const NValue& trimChar = arguments[0];
-    if (trimChar.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (trimChar.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (trimChar.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (trimChar.getValueType(), ValueType::tVARCHAR);
     }
 
     int32_t length;
@@ -386,8 +386,8 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
     std::string trimArg(buf, length);
 
     const NValue& strVal = arguments[1];
-    if (strVal.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (trimChar.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strVal.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (trimChar.getValueType(), ValueType::tVARCHAR);
     }
 
     buf = strVal.getObject_withoutNull(length);
@@ -422,24 +422,24 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     }
 
     const NValue& str0 = arguments[0];
-    if (str0.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (str0.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (str0.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (str0.getValueType(), ValueType::tVARCHAR);
     }
     int32_t length;
     const char* buf = str0.getObject_withoutNull(length);
     std::string targetStr(buf, length);
 
     const NValue& str1 = arguments[1];
-    if (str1.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (str1.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (str1.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (str1.getValueType(), ValueType::tVARCHAR);
     }
     buf = str1.getObject_withoutNull(length);
     std::string matchStr(buf, length);
 
     const NValue& str2 = arguments[2];
 
-    if (str2.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (str2.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (str2.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (str2.getValueType(), ValueType::tVARCHAR);
     }
     buf = str2.getObject_withoutNull(length);
     std::string replaceStr(buf, length);
@@ -455,8 +455,8 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     if (strValue.isNull()) {
         return strValue;
     }
-    if (strValue.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (strValue.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (strValue.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& startArg = arguments[1];
@@ -523,15 +523,15 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     }
 
     const NValue& str0 = arguments[0];
-    if (str0.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (str0.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (str0.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (str0.getValueType(), ValueType::tVARCHAR);
     }
     int32_t lenSrc;
     const char* srcChars = str0.getObject_withoutNull(lenSrc);
 
     const NValue& str1 = arguments[1];
-    if (str1.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (str1.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (str1.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException (str1.getValueType(), ValueType::tVARCHAR);
     }
     int32_t lenInsert;
     const char* insertChars = str1.getObject_withoutNull(lenInsert);
@@ -585,8 +585,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
         return getNullStringValue();
     }
     const ValueType type = arg1.getValueType();
-    if (type != ValueType::VALUE_TYPE_DECIMAL) {
-        throwCastSQLException (type, ValueType::VALUE_TYPE_DECIMAL);
+    if (type != ValueType::tDECIMAL) {
+        throwCastSQLException (type, ValueType::tDECIMAL);
     }
 
     std::ostringstream out;
@@ -659,13 +659,13 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
        return getNullStringValue();
     }
 
-    if (getValueType() != ValueType::VALUE_TYPE_DECIMAL && getValueType() != ValueType::VALUE_TYPE_DOUBLE) {
-        throwCastSQLException (getValueType(), ValueType::VALUE_TYPE_DECIMAL);
+    if (getValueType() != ValueType::tDECIMAL && getValueType() != ValueType::tDOUBLE) {
+        throwCastSQLException (getValueType(), ValueType::tDECIMAL);
     }
 
     std::ostringstream out;
     TTInt scaledValue;
-    if(getValueType() == ValueType::VALUE_TYPE_DOUBLE)
+    if(getValueType() == ValueType::tDOUBLE)
     {
         scaledValue = castAsDecimal().castAsDecimalAndGetValue();
     } else {
@@ -749,13 +749,13 @@ template<> inline NValue NValue::call<FUNC_VOLT_STR>(const std::vector<NValue>& 
     }
 
     const ValueType type = arg1.getValueType();
-    if (type != ValueType::VALUE_TYPE_DECIMAL && type != ValueType::VALUE_TYPE_DOUBLE) {
-        throwCastSQLException (type, ValueType::VALUE_TYPE_DECIMAL);
+    if (type != ValueType::tDECIMAL && type != ValueType::tDOUBLE) {
+        throwCastSQLException (type, ValueType::tDECIMAL);
     }
 
     std::ostringstream out;
     TTInt scaledValue;
-    if (type == ValueType::VALUE_TYPE_DOUBLE) {
+    if (type == ValueType::tDOUBLE) {
         scaledValue = arg1.castAsDecimal().castAsDecimalAndGetValue();
     } else {
         scaledValue = arg1.castAsDecimalAndGetValue();
@@ -860,18 +860,18 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
 
     const NValue& source = arguments[0];
     if (source.isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
-    if (source.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(source.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (source.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(source.getValueType(), ValueType::tVARCHAR);
     }
 
     const NValue& pat = arguments[1];
     if (pat.isNull()) {
-        return getNullValue(ValueType::VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
-    if (pat.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-        throwCastSQLException(pat.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+    if (pat.getValueType() != ValueType::tVARCHAR) {
+        throwCastSQLException(pat.getValueType(), ValueType::tVARCHAR);
     }
 
     uint32_t syntaxOpts = PCRE2_UTF;
@@ -879,8 +879,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     if (arguments.size() == 3) {
         const NValue& flags = arguments[2];
         if (!flags.isNull()) {
-            if (flags.getValueType() != ValueType::VALUE_TYPE_VARCHAR) {
-                 throwCastSQLException(flags.getValueType(), ValueType::VALUE_TYPE_VARCHAR);
+            if (flags.getValueType() != ValueType::tVARCHAR) {
+                 throwCastSQLException(flags.getValueType(), ValueType::tVARCHAR);
             }
 
             int32_t lenFlags;

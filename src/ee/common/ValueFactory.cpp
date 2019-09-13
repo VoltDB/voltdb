@@ -23,17 +23,17 @@ NValue ValueFactory::getRandomValue(ValueType type,
                                     uint32_t maxLength,
                                     Pool* pool) {
     switch (type) {
-        case ValueType::VALUE_TYPE_TIMESTAMP:
+        case ValueType::tTIMESTAMP:
             return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
-        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::tTINYINT:
             return ValueFactory::getTinyIntValue(static_cast<int8_t>(rand() % 128));
-        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::tSMALLINT:
             return ValueFactory::getSmallIntValue(static_cast<int16_t>(rand() % 32768));
-        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::tINTEGER:
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
-        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::tBIGINT:
             return ValueFactory::getBigIntValue(rand());
-        case ValueType::VALUE_TYPE_DECIMAL:
+        case ValueType::tDECIMAL:
             {
                 char characters[29];
                 int i;
@@ -47,9 +47,9 @@ NValue ValueFactory::getRandomValue(ValueType type,
                 characters[i] = '\0';
                 return ValueFactory::getDecimalValueFromString(std::string(characters));
             }
-        case ValueType::VALUE_TYPE_DOUBLE:
+        case ValueType::tDOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / double((rand() % 10000) + 1));
-        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
             {
                 int length = (rand() % maxLength);
                 char characters[maxLength];
@@ -59,7 +59,7 @@ NValue ValueFactory::getRandomValue(ValueType type,
                 characters[length] = '\0';
                 return ValueFactory::getStringValue(string(characters), pool);
             }
-        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::tVARBINARY:
             {
                 int length = (rand() % maxLength);
                 unsigned char bytes[maxLength];
@@ -70,7 +70,7 @@ NValue ValueFactory::getRandomValue(ValueType type,
                 return ValueFactory::getBinaryValue(bytes, length, pool);
             }
             break;
-        case ValueType::VALUE_TYPE_ARRAY:
+        case ValueType::tARRAY:
         default:
             throwSerializableEEException("Attempted to get a random value of unsupported value type %s",
                     getTypeName(type).c_str());

@@ -133,7 +133,7 @@ static double getDistance(const GeographyPointValue &point1,
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_POINT);
+        return NValue::getNullValue(ValueType::tPOINT);
     }
 
     int32_t textLength;
@@ -177,7 +177,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const {
         throwInvalidWktPoint(wkt);
     }
 
-    NValue returnValue(ValueType::VALUE_TYPE_POINT);
+    NValue returnValue(ValueType::tPOINT);
     returnValue.getGeographyPointValue() = GeographyPointValue(lng, lat);
 
     return returnValue;
@@ -348,7 +348,7 @@ static NValue polygonFromText(const std::string &wkt, bool doRepairs) {
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY);
+        return NValue::getNullValue(ValueType::tGEOGRAPHY);
     }
 
     int32_t textLength;
@@ -360,7 +360,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const {
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY);
+        return NValue::getNullValue(ValueType::tGEOGRAPHY);
     }
 
     int32_t textLength;
@@ -372,7 +372,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const {
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
     if (arguments[0].isNull() || arguments[1].isNull())
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
 
     Polygon poly;
     poly.initFromGeography(arguments[0].getGeographyValue());
@@ -382,13 +382,13 @@ template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& ar
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return NValue::getNullValue(ValueType::tINTEGER);
     }
 
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
 
-    NValue retVal(ValueType::VALUE_TYPE_INTEGER);
+    NValue retVal(ValueType::tINTEGER);
     // exclude exterior ring
     retVal.getInteger() = poly.num_loops() - 1;
     return retVal;
@@ -396,7 +396,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() cons
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_INTEGER);
+        return NValue::getNullValue(ValueType::tINTEGER);
     }
 
     Polygon poly;
@@ -407,53 +407,53 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     // representation.  So add an extra vertex for each loop.
     int32_t numPoints = poly.num_vertices() + poly.num_loops();
 
-    NValue retVal(ValueType::VALUE_TYPE_INTEGER);
+    NValue retVal(ValueType::tINTEGER);
     retVal.getInteger() = numPoints;
     return retVal;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_DOUBLE);
+        return NValue::getNullValue(ValueType::tDOUBLE);
     }
     const GeographyPointValue point = getGeographyPointValue();
-    NValue retVal(ValueType::VALUE_TYPE_DOUBLE);
+    NValue retVal(ValueType::tDOUBLE);
     retVal.getDouble() = point.getLatitude();
     return retVal;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_DOUBLE);
+        return NValue::getNullValue(ValueType::tDOUBLE);
     }
     const GeographyPointValue point = getGeographyPointValue();
-    NValue retVal(ValueType::VALUE_TYPE_DOUBLE);
+    NValue retVal(ValueType::tDOUBLE);
     retVal.getDouble() = point.getLongitude();
     return retVal;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_POINT);
+        return NValue::getNullValue(ValueType::tPOINT);
     }
 
     Polygon polygon;
     polygon.initFromGeography(getGeographyValue());
     const GeographyPointValue point(polygon.GetCentroid());
-    NValue retVal(ValueType::VALUE_TYPE_POINT);
+    NValue retVal(ValueType::tPOINT);
     retVal.getGeographyPointValue() = point;
     return retVal;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_DOUBLE);
+        return NValue::getNullValue(ValueType::tDOUBLE);
     }
 
     Polygon polygon;
     polygon.initFromGeography(getGeographyValue());
 
-    NValue retVal(ValueType::VALUE_TYPE_DOUBLE);
+    NValue retVal(ValueType::tDOUBLE);
     // area is in steradians which is a solid angle. Earth in the calculation is treated as sphere
     // and area of sphere can be calculated as steradians * radius^2
     retVal.getDouble() = polygon.GetArea() * RADIUS_SQ_M;
@@ -461,39 +461,39 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vector<NValue>& arguments) {
-    vassert(arguments[0].getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
-    vassert(arguments[1].getValueType() == ValueType::VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == ValueType::tGEOGRAPHY);
+    vassert(arguments[1].getValueType() == ValueType::tPOINT);
 
     if (arguments[0].isNull() || arguments[1].isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_DOUBLE);
+        return NValue::getNullValue(ValueType::tDOUBLE);
     }
 
     Polygon polygon;
     polygon.initFromGeography(arguments[0].getGeographyValue());
     GeographyPointValue point = arguments[1].getGeographyPointValue();
-    NValue retVal(ValueType::VALUE_TYPE_DOUBLE);
+    NValue retVal(ValueType::tDOUBLE);
     // distance is in radians, so convert it to meters
     retVal.getDouble() = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
     return retVal;
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector<NValue>& arguments) {
-    vassert(arguments[0].getValueType() == ValueType::VALUE_TYPE_POINT);
-    vassert(arguments[1].getValueType() == ValueType::VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == ValueType::tPOINT);
+    vassert(arguments[1].getValueType() == ValueType::tPOINT);
 
     if (arguments[0].isNull() || arguments[1].isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_DOUBLE);
+        return NValue::getNullValue(ValueType::tDOUBLE);
     } else {
-        NValue retVal(ValueType::VALUE_TYPE_DOUBLE);
+        NValue retVal(ValueType::tDOUBLE);
         retVal.getDouble() = getDistance(arguments[0].getGeographyPointValue(), arguments[1].getGeographyPointValue());
         return retVal;
     }
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
-    vassert(getValueType() == ValueType::VALUE_TYPE_POINT);
+    vassert(getValueType() == ValueType::tPOINT);
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_VARCHAR);
+        return NValue::getNullValue(ValueType::tVARCHAR);
     } else {
         const std::string pointAsText = getGeographyPointValue().toWKT();
         return getTempStringValue(pointAsText.c_str(), pointAsText.length());
@@ -501,9 +501,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
-    vassert(getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == ValueType::tGEOGRAPHY);
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_VARCHAR);
+        return NValue::getNullValue(ValueType::tVARCHAR);
     } else {
         const std::string polygonAsText = getGeographyValue().toWKT();
         return getTempStringValue(polygonAsText.c_str(), polygonAsText.length());
@@ -554,9 +554,9 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
  * close to the same thing.  Maybe they could be unified?
  */
 template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
-    vassert(getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == ValueType::tGEOGRAPHY);
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
     // Be optimistic.
     bool returnval = true;
@@ -570,9 +570,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
-    vassert(getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == ValueType::tGEOGRAPHY);
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_VARCHAR);
+        return NValue::getNullValue(ValueType::tVARCHAR);
     }
     // Extract the polygon and check its validity.
     std::stringstream msg;
@@ -589,9 +589,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
-    vassert(getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == ValueType::tGEOGRAPHY);
     if (isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_GEOGRAPHY);
+        return NValue::getNullValue(ValueType::tGEOGRAPHY);
     }
     // Extract the polygon and check its validity.
     std::stringstream msg;
@@ -630,12 +630,12 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
-    vassert(arguments[0].getValueType() == ValueType::VALUE_TYPE_GEOGRAPHY);
-    vassert(arguments[1].getValueType() == ValueType::VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == ValueType::tGEOGRAPHY);
+    vassert(arguments[1].getValueType() == ValueType::tPOINT);
     vassert(isNumeric(arguments[2].getValueType()));
 
     if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 
     Polygon polygon;
@@ -650,12 +650,12 @@ template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vecto
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POINT_POINT>(const std::vector<NValue>& arguments) {
-    vassert(arguments[0].getValueType() == ValueType::VALUE_TYPE_POINT);
-    vassert(arguments[1].getValueType() == ValueType::VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == ValueType::tPOINT);
+    vassert(arguments[1].getValueType() == ValueType::tPOINT);
     vassert(isNumeric(arguments[2].getValueType()));
 
     if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 
     double withinDistanceOf = arguments[2].castAsDoubleAndGetValue();

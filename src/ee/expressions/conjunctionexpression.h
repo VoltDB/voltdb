@@ -97,7 +97,7 @@ ConjunctionExpression<ConjunctionAnd>::eval(const TableTuple *tuple1,
     } else {
         // NULL  True  -> NULL
         // NULL  NULL  -> NULL
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 }
 
@@ -121,7 +121,7 @@ ConjunctionExpression<ConjunctionOr>::eval(const TableTuple *tuple1,
     } else {
         // NULL  False -> NULL
         // NULL  NULL  -> NULL
-        return NValue::getNullValue(ValueType::VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 }
 

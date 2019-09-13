@@ -266,7 +266,7 @@ public:
                 if (vals != NULL) {
                     // If we have values, then use them.
                     val = vals[(row*nCols) + col];
-                    if (types[col] == voltdb::ValueType::VALUE_TYPE_VARCHAR) {
+                    if (types[col] == voltdb::ValueType::tVARCHAR) {
                         if (val < 0 || (num_strings <= val)) {
                             std::ostringstream oss;
                             oss << "string index "
@@ -285,7 +285,7 @@ public:
                     }
                 } else {
                     // If we have no values, generate them randomly.
-                    if (types[col] == voltdb::ValueType::VALUE_TYPE_VARCHAR) {
+                    if (types[col] == voltdb::ValueType::tVARCHAR) {
                         strstr = getRandomString(1, typesizes[col]);
                         voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str(), &m_pool);
                         tuple.setNValue(col, nval);
@@ -413,7 +413,7 @@ public:
             ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer->m_contents[row * nCols + col];
-                if (answer->m_types[col] == voltdb::ValueType::VALUE_TYPE_VARCHAR) {
+                if (answer->m_types[col] == voltdb::ValueType::tVARCHAR) {
                     voltdb::NValue nval = tuple.getNValue(col);
                     int32_t actualSize;
                     const char *actualStr = voltdb::ValuePeeker::peekObject(nval, &actualSize);
@@ -434,7 +434,7 @@ public:
                     if (neq) {
                         failed = true;
                     }
-                } else if (answer->m_types[col] == voltdb::ValueType::VALUE_TYPE_INTEGER) {
+                } else if (answer->m_types[col] == voltdb::ValueType::tINTEGER) {
                     int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
                     VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
                                row, col,
@@ -448,9 +448,9 @@ public:
                     oss << "Value type "
                         << getTypeName(answer->m_types[col])
                         << " Only "
-                        << getTypeName(voltdb::ValueType::VALUE_TYPE_INTEGER)
+                        << getTypeName(voltdb::ValueType::tINTEGER)
                         << " and "
-                        << getTypeName(voltdb::ValueType::VALUE_TYPE_VARCHAR)
+                        << getTypeName(voltdb::ValueType::tVARCHAR)
                         << " are supported."
                         << std::endl;
                     throw std::logic_error(oss.str());
@@ -490,8 +490,8 @@ public:
     void addParameterToBuffer(voltdb::ValueType type, const void *buf, int32_t length = OBJECTLENGTH_NULL) {
         m_paramsOutput.writeByte(static_cast<int8_t>(type));
         switch (type) {
-            case voltdb::ValueType::VALUE_TYPE_VARCHAR:
-            case voltdb::ValueType::VALUE_TYPE_VARBINARY:
+            case voltdb::ValueType::tVARCHAR:
+            case voltdb::ValueType::tVARBINARY:
                 if (buf == NULL) {
                     m_paramsOutput.writeInt(OBJECTLENGTH_NULL);
                     break;
@@ -503,22 +503,22 @@ public:
                 m_paramsOutput.writeInt(length);
                 m_paramsOutput.writeBytes(buf, length);
                 break;
-            case voltdb::ValueType::VALUE_TYPE_TINYINT:
+            case voltdb::ValueType::tTINYINT:
                 m_paramsOutput.writeByte(*static_cast<const int8_t*>(buf));
                 break;
-            case voltdb::ValueType::VALUE_TYPE_SMALLINT:
+            case voltdb::ValueType::tSMALLINT:
                 m_paramsOutput.writeShort(*static_cast<const int16_t*>(buf));
                 break;
-            case voltdb::ValueType::VALUE_TYPE_INTEGER:
+            case voltdb::ValueType::tINTEGER:
                 m_paramsOutput.writeInt(*static_cast<const int32_t*>(buf));
                 break;
-            case voltdb::ValueType::VALUE_TYPE_TIMESTAMP:
+            case voltdb::ValueType::tTIMESTAMP:
                 m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
                 break;
-            case voltdb::ValueType::VALUE_TYPE_BIGINT:
+            case voltdb::ValueType::tBIGINT:
                 m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
                 break;
-            case voltdb::ValueType::VALUE_TYPE_DOUBLE:
+            case voltdb::ValueType::tDOUBLE:
                 m_paramsOutput.writeDouble(*static_cast<const double*>(buf));
                 break;
             default:

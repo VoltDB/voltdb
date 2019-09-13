@@ -29,73 +29,73 @@ Pool* NValue::getTempStringPool() {
 // For x<op>y where x is an integer,
 // promote x and y to s_intPromotionTable[y]
 ValueType NValue::s_intPromotionTable[] = {
-    ValueType::VALUE_TYPE_INVALID,   // 0 invalid
-    ValueType::VALUE_TYPE_NULL,      // 1 null
-    ValueType::VALUE_TYPE_INVALID,   // 2 <unused>
-    ValueType::VALUE_TYPE_BIGINT,    // 3 tinyint
-    ValueType::VALUE_TYPE_BIGINT,    // 4 smallint
-    ValueType::VALUE_TYPE_BIGINT,    // 5 integer
-    ValueType::VALUE_TYPE_BIGINT,    // 6 bigint
-    ValueType::VALUE_TYPE_INVALID,   // 7 <unused>
-    ValueType::VALUE_TYPE_DOUBLE,    // 8 double
-    ValueType::VALUE_TYPE_INVALID,   // 9 varchar
-    ValueType::VALUE_TYPE_INVALID,   // 10 <unused>
-    ValueType::VALUE_TYPE_BIGINT,    // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tBIGINT,    // 3 tinyint
+    ValueType::tBIGINT,    // 4 smallint
+    ValueType::tBIGINT,    // 5 integer
+    ValueType::tBIGINT,    // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tBIGINT,    // 11 timestamp
     // 12 - 21 unused
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_DECIMAL,   // 22 decimal
-    ValueType::VALUE_TYPE_INVALID,   // 23 boolean
-    ValueType::VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDECIMAL,   // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 // for x<op>y where x is a double
 // promote x and y to s_doublePromotionTable[y]
 ValueType NValue::s_doublePromotionTable[] = {
-    ValueType::VALUE_TYPE_INVALID,   // 0 invalid
-    ValueType::VALUE_TYPE_NULL,      // 1 null
-    ValueType::VALUE_TYPE_INVALID,   // 2 <unused>
-    ValueType::VALUE_TYPE_DOUBLE,    // 3 tinyint
-    ValueType::VALUE_TYPE_DOUBLE,    // 4 smallint
-    ValueType::VALUE_TYPE_DOUBLE,    // 5 integer
-    ValueType::VALUE_TYPE_DOUBLE,    // 6 bigint
-    ValueType::VALUE_TYPE_INVALID,   // 7 <unused>
-    ValueType::VALUE_TYPE_DOUBLE,    // 8 double
-    ValueType::VALUE_TYPE_INVALID,   // 9 varchar
-    ValueType::VALUE_TYPE_INVALID,   // 10 <unused>
-    ValueType::VALUE_TYPE_DOUBLE,    // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tDOUBLE,    // 3 tinyint
+    ValueType::tDOUBLE,    // 4 smallint
+    ValueType::tDOUBLE,    // 5 integer
+    ValueType::tDOUBLE,    // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tDOUBLE,    // 11 timestamp
     // 12 - 21 unused.
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_DOUBLE,    // 22 decimal
-    ValueType::VALUE_TYPE_INVALID,   // 23 boolean
-    ValueType::VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDOUBLE,    // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 // for x<op>y where x is a decimal
 // promote x and y to s_decimalPromotionTable[y]
 ValueType NValue::s_decimalPromotionTable[] = {
-    ValueType::VALUE_TYPE_INVALID,   // 0 invalid
-    ValueType::VALUE_TYPE_NULL,      // 1 null
-    ValueType::VALUE_TYPE_INVALID,   // 2 <unused>
-    ValueType::VALUE_TYPE_DECIMAL,   // 3 tinyint
-    ValueType::VALUE_TYPE_DECIMAL,   // 4 smallint
-    ValueType::VALUE_TYPE_DECIMAL,   // 5 integer
-    ValueType::VALUE_TYPE_DECIMAL,   // 6 bigint
-    ValueType::VALUE_TYPE_INVALID,   // 7 <unused>
-    ValueType::VALUE_TYPE_DOUBLE,    // 8 double
-    ValueType::VALUE_TYPE_INVALID,   // 9 varchar
-    ValueType::VALUE_TYPE_INVALID,   // 10 <unused>
-    ValueType::VALUE_TYPE_DECIMAL,   // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tDECIMAL,   // 3 tinyint
+    ValueType::tDECIMAL,   // 4 smallint
+    ValueType::tDECIMAL,   // 5 integer
+    ValueType::tDECIMAL,   // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tDECIMAL,   // 11 timestamp
     // 12 - 21 unused. ick.
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_INVALID, ValueType::VALUE_TYPE_INVALID,
-    ValueType::VALUE_TYPE_DECIMAL,   // 22 decimal
-    ValueType::VALUE_TYPE_INVALID,   // 23 boolean
-    ValueType::VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDECIMAL,   // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 TTInt NValue::s_maxDecimalValue("9999999999"   //10 digits
@@ -130,40 +130,40 @@ std::string NValue::debug() const {
     }
 
     switch (type) {
-        case ValueType::VALUE_TYPE_BOOLEAN:
+        case ValueType::tBOOLEAN:
           buffer << (getBoolean() ? "true" : "false");
           break;
-        case ValueType::VALUE_TYPE_TINYINT:
+        case ValueType::tTINYINT:
           buffer << static_cast<int32_t>(getTinyInt());
           break;
-        case ValueType::VALUE_TYPE_SMALLINT:
+        case ValueType::tSMALLINT:
           buffer << getSmallInt();
           break;
-        case ValueType::VALUE_TYPE_INTEGER:
+        case ValueType::tINTEGER:
           buffer << getInteger();
           break;
-        case ValueType::VALUE_TYPE_BIGINT:
+        case ValueType::tBIGINT:
           buffer << getBigInt();
           break;
-        case ValueType::VALUE_TYPE_DOUBLE:
+        case ValueType::tDOUBLE:
           buffer << getDouble();
           break;
-        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]";
           buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
           break;
-        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::tVARBINARY:
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]";
           buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
           break;
-        case ValueType::VALUE_TYPE_DECIMAL:
+        case ValueType::tDECIMAL:
           buffer << createStringFromDecimal();
           break;
-        case ValueType::VALUE_TYPE_TIMESTAMP:
+        case ValueType::tTIMESTAMP:
           try {
              std::stringstream ss;
              streamTimestamp(ss);
@@ -174,10 +174,10 @@ std::string NValue::debug() const {
              buffer << "<exception when converting timestamp:" << getBigInt() << ">";
           }
           break;
-        case ValueType::VALUE_TYPE_POINT:
+        case ValueType::tPOINT:
           buffer << getGeographyPointValue().toString();
           break;
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tGEOGRAPHY:
           buffer << getGeographyValue().toString();
           break;
        default:
@@ -189,9 +189,9 @@ std::string NValue::debug() const {
 
 int32_t NValue::serializedSize() const {
     switch (m_valueType) {
-        case ValueType::VALUE_TYPE_VARCHAR:
-        case ValueType::VALUE_TYPE_VARBINARY:
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tGEOGRAPHY:
           if (! isNull()) {
              int32_t valueLength;
              getObject_withoutNull(valueLength);
@@ -382,12 +382,12 @@ struct NValueList {
 
 /**
  * This NValue can be of any scalar value type.
- * @param rhs  a VALUE_TYPE_ARRAY NValue whose referent must be an NValueList.
+ * @param rhs  a tARRAY NValue whose referent must be an NValueList.
  *             The NValue elements of the NValueList should be comparable to and ideally
  *             of exactly the same VALUE_TYPE as "this".
  * The planner and/or deserializer should have taken care of this with checks and
  * explicit cast operators and and/or constant promotions as needed.
- * @return a VALUE_TYPE_BOOLEAN NValue.
+ * @return a tBOOLEAN NValue.
  */
 bool NValue::inList(const NValue& rhs) const {
     //TODO: research: does the SQL standard allow a null to match a null list element
@@ -398,7 +398,7 @@ bool NValue::inList(const NValue& rhs) const {
     }
 
     const ValueType rhsType = rhs.getValueType();
-    if (rhsType != ValueType::VALUE_TYPE_ARRAY) {
+    if (rhsType != ValueType::tARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(rhs.getObjectValue_withoutNull());
@@ -430,7 +430,7 @@ void NValue::allocateANewNValueList(size_t length, ValueType elementType) {
 }
 
 void NValue::setArrayElements(std::vector<NValue> &args) const {
-    vassert(m_valueType == ValueType::VALUE_TYPE_ARRAY);
+    vassert(m_valueType == ValueType::tARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
     // Assign each of the elements.
@@ -444,13 +444,13 @@ void NValue::setArrayElements(std::vector<NValue> &args) const {
 }
 
 int NValue::arrayLength() const {
-    vassert(m_valueType == ValueType::VALUE_TYPE_ARRAY);
+    vassert(m_valueType == ValueType::tARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
 const NValue& NValue::itemAtIndex(int index) const {
-    vassert(m_valueType == ValueType::VALUE_TYPE_ARRAY);
+    vassert(m_valueType == ValueType::tARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     vassert(index >= 0);
     vassert(index < listOfNValues->m_length);
@@ -518,7 +518,7 @@ inline static void throwTimestampFormatError(const std::string &str) {
     // No space separator for between the date and time
     throwSQLException(SQLException::dynamic_sql_error,
             "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'or \'YYYY-MM-DD\'",
-            str.c_str(), valueToString(ValueType::VALUE_TYPE_TIMESTAMP).c_str());
+            str.c_str(), valueToString(ValueType::tTIMESTAMP).c_str());
 }
 
 int64_t NValue::parseTimestampString(const std::string &str) {

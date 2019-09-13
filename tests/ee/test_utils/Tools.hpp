@@ -71,8 +71,8 @@ public:
         length, e.g.:
 
         TupleSchema* schema = Tools::buildSchema(
-            VALUE_TYPE_BIGINT,
-            std::make_pair(VALUE_TYPE_VARCHAR, 15));
+            tBIGINT,
+            std::make_pair(tVARCHAR, 15));
     */
     template<typename... Args>
     static voltdb::TupleSchema* buildSchema(Args... args);
@@ -126,7 +126,7 @@ public:
     typedef std::tuple<voltdb::ValueType, int32_t, bool> VarLenTypeSpec;
     struct VarcharBuilder {
         VarLenTypeSpec operator()(int32_t count, VarcharUnits units) const {
-            return VarLenTypeSpec(voltdb::ValueType::VALUE_TYPE_VARCHAR, count, units == BYTES);
+            return VarLenTypeSpec(voltdb::ValueType::tVARCHAR, count, units == BYTES);
         }
     };
 
@@ -138,43 +138,43 @@ public:
 };
 
 /** A helper template to convert from a native type to the equivalent
-    VALUE_TYPE_* enum value */
+    t* enum value */
 template<class NativeType>
 struct ValueTypeFor;
 
 template<>
 struct ValueTypeFor<double> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_DOUBLE;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tDOUBLE;
 };
 
 template<>
 struct ValueTypeFor<int64_t> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_BIGINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tBIGINT;
 };
 
 template<>
 struct ValueTypeFor<int32_t> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_INTEGER;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tINTEGER;
 };
 
 template<>
 struct ValueTypeFor<int16_t> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_SMALLINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tSMALLINT;
 };
 
 template<>
 struct ValueTypeFor<int8_t> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_TINYINT;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tTINYINT;
 };
 
 template<>
 struct ValueTypeFor<std::string> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_VARCHAR;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tVARCHAR;
 };
 
 template<>
 struct ValueTypeFor<const char*> {
-    static const voltdb::ValueType valueType = voltdb::ValueType::VALUE_TYPE_VARCHAR;
+    static const voltdb::ValueType valueType = voltdb::ValueType::tVARCHAR;
 };
 
 template<typename R>
@@ -253,7 +253,7 @@ voltdb::NValue Tools::nvalueFromNative(voltdb::NValue nval) {
 
 template<>
 std::string Tools::nativeFromNValue(const voltdb::NValue& nval) {
-    assert(voltdb::ValuePeeker::peekValueType(nval) == voltdb::ValueType::VALUE_TYPE_VARCHAR);
+    assert(voltdb::ValuePeeker::peekValueType(nval) == voltdb::ValueType::tVARCHAR);
     int32_t valueLen;
     const char* value = voltdb::ValuePeeker::peekObject(nval, &valueLen);
     return std::string(value, valueLen);

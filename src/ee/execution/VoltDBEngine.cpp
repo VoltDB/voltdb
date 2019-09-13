@@ -188,7 +188,7 @@ VoltDBEngine::initialize(
     m_templateSingleLongTable[11] = 23; // size of header
     m_templateSingleLongTable[13] = 0;  // status code
     m_templateSingleLongTable[14] = 1;  // number of columns
-    m_templateSingleLongTable[15] = static_cast<char>(ValueType::VALUE_TYPE_BIGINT); // column type
+    m_templateSingleLongTable[15] = static_cast<char>(ValueType::tBIGINT); // column type
     m_templateSingleLongTable[19] = 15; // column name length:  "modified_tuples" == 15
 
     strcpy(&m_templateSingleLongTable[20], "modified_tuples");
@@ -658,7 +658,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     // three int32_t: size of the buffer, function id, and udaf index
     int32_t bufferSizeNeeded = 3 * sizeof(int32_t);
     NValue cast_argument;
-    if (type != ValueType::VALUE_TYPE_INVALID) {
+    if (type != ValueType::tINVALID) {
         cast_argument = argument.castAs(type);
         bufferSizeNeeded += cast_argument.serializedSize();
     }
@@ -675,7 +675,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     m_udfOutput.writeInt(functionId);
     m_udfOutput.writeInt(udafIndex);
 
-    if (type != ValueType::VALUE_TYPE_INVALID) {
+    if (type != ValueType::tINVALID) {
         cast_argument.serializeTo(m_udfOutput);
     }
 
@@ -715,7 +715,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
 
     int32_t bufferSizeNeeded = 4 * sizeof(int32_t);
     vector<NValue> cast_argument(argCount);
-    if (type != ValueType::VALUE_TYPE_INVALID) {
+    if (type != ValueType::tINVALID) {
         for (int i = 0; i < argCount; i++) {
             cast_argument[i] = argVector[i].castAs(type);
             bufferSizeNeeded += cast_argument[i].serializedSize();
@@ -735,7 +735,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
     m_udfOutput.writeInt(udafIndex);
     m_udfOutput.writeInt(argCount);
 
-    if (type != ValueType::VALUE_TYPE_INVALID) {
+    if (type != ValueType::tINVALID) {
         for (int i = 0; i < argCount; i++) {
             cast_argument[i].serializeTo(m_udfOutput);
         }
@@ -767,7 +767,7 @@ NValue VoltDBEngine::udfResultHelper(int32_t returnCode, bool partition_table, V
             // if this is a partitioned table, the returnType here
             // is a varbinary since we serialized the worker's
             // output on the java side
-            retval = ValueFactory::getNValueOfType(ValueType::VALUE_TYPE_VARBINARY);
+            retval = ValueFactory::getNValueOfType(ValueType::tVARBINARY);
         } else {
             // if this is a replicated table, the returnType will just be
             // the final returnType in the end method
@@ -802,7 +802,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(
     checkUserDefinedFunctionInfo(findInMapOrNull(functionId, m_functionInfo), functionId);
     // the argument here is of the type varbinary because this is the serialized byte
     // array after the worker end method
-    serializeToUDFOutputBuffer(functionId, argument, ValueType::VALUE_TYPE_VARBINARY, udafIndex);
+    serializeToUDFOutputBuffer(functionId, argument, ValueType::tVARBINARY, udafIndex);
     checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateCombine(),
             "callJavaUserDefinedAggregateCombine");
 }
@@ -810,16 +810,16 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(ValueType::VALUE_TYPE_INVALID),
-            ValueType::VALUE_TYPE_VARBINARY, udafIndex);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(ValueType::tINVALID),
+            ValueType::tVARBINARY, udafIndex);
     return udfResultHelper(m_topend->callJavaUserDefinedAggregateWorkerEnd(), true, info->returnType);
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
-    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(ValueType::VALUE_TYPE_INVALID),
-            ValueType::VALUE_TYPE_INVALID, udafIndex);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(ValueType::tINVALID),
+            ValueType::tINVALID, udafIndex);
     return udfResultHelper(m_topend->callJavaUserDefinedAggregateCoordinatorEnd(), false, info->returnType);
 }
 
@@ -1174,10 +1174,10 @@ static bool haveDifferentSchema(
         }
 
         // check the size of types where size matters
-        if ((type == static_cast<decltype(type)>(ValueType::VALUE_TYPE_VARCHAR) ||
-                    type == static_cast<decltype(type)>(ValueType::VALUE_TYPE_VARBINARY)) &&
+        if ((type == static_cast<decltype(type)>(ValueType::tVARCHAR) ||
+                    type == static_cast<decltype(type)>(ValueType::tVARBINARY)) &&
                 (columnInfo->length != size || columnInfo->inBytes != inBytes)) {
-            vassert(columnInfo->inBytes == inBytes || type == static_cast<decltype(type)>(ValueType::VALUE_TYPE_VARCHAR));
+            vassert(columnInfo->inBytes == inBytes || type == static_cast<decltype(type)>(ValueType::tVARCHAR));
             return true;
         }
     }
@@ -3015,10 +3015,10 @@ bool VoltDBEngine::externalStreamsEnabled() {
 void VoltDBEngine::loadBuiltInJavaFunctions() {
     // Hard code the info of format_timestamp function
     UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
-    info->returnType = ValueType::VALUE_TYPE_VARCHAR;
+    info->returnType = ValueType::tVARCHAR;
     info->paramTypes.resize(2);
-    info->paramTypes.at(0) = ValueType::VALUE_TYPE_TIMESTAMP;
-    info->paramTypes.at(1) = ValueType::VALUE_TYPE_VARCHAR;
+    info->paramTypes.at(0) = ValueType::tTIMESTAMP;
+    info->paramTypes.at(1) = ValueType::tVARCHAR;
 
     m_functionInfo[FUNC_VOLT_FORMAT_TIMESTAMP] = info;
 }

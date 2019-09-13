@@ -525,7 +525,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
 
         // assign a default value, if one exists
         ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
-        if (defaultColType == ValueType::VALUE_TYPE_INVALID) {
+        if (defaultColType == ValueType::tINVALID) {
             defaults[newIndex] = ValueFactory::getNullValue();
         }
         else {
@@ -807,11 +807,11 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
         switch (defaultColType) {
-            case ValueType::VALUE_TYPE_INVALID:
+            case ValueType::tINVALID:
                 tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
                 break;
 
-            case ValueType::VALUE_TYPE_TIMESTAMP:
+            case ValueType::tTIMESTAMP:
                 if (isDefaultNow(col->defaultvalue())) {
                     // Caller will need to set this to the current
                     // timestamp at the appropriate time

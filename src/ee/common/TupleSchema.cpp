@@ -45,16 +45,16 @@ static inline int memSizeForTupleSchema(uint16_t columnCount,
 
 static inline bool isInlineable(ValueType vt, int32_t length, bool inBytes) {
     switch (vt) {
-        case ValueType::VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
             if (inBytes) {
                 return length < UNINLINEABLE_OBJECT_LENGTH;
             } else {
                 return length < UNINLINEABLE_CHARACTER_LENGTH;
             }
-        case ValueType::VALUE_TYPE_VARBINARY:
+        case ValueType::tVARBINARY:
             return length < UNINLINEABLE_OBJECT_LENGTH;
 
-        case ValueType::VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tGEOGRAPHY:
             return false; // never inlined
 
         default:
@@ -254,7 +254,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
             columnInfo->inlined = true;
 
             // If the length was specified in characters, convert to bytes.
-            int32_t factor = (type == ValueType::VALUE_TYPE_VARCHAR && !inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+            int32_t factor = (type == ValueType::tVARCHAR && !inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
 
             // inlined variable length columns have a size prefix (1 byte)
             offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTHLENGTH + (length * factor));
@@ -287,10 +287,10 @@ void TupleSchema::setHiddenColumnMetaData(uint16_t index, HiddenColumn::Type col
             return;
         case HiddenColumn::XDCR_TIMESTAMP:
         case HiddenColumn::VIEW_COUNT:
-            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::VALUE_TYPE_BIGINT, 8, false);
+            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::tBIGINT, 8, false);
             return;
         case HiddenColumn::MIGRATE_TXN:
-            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::VALUE_TYPE_BIGINT, 8, true);
+            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::tBIGINT, 8, true);
             return;
     }
 }
@@ -333,7 +333,7 @@ size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
     for (int i = 0;i < columnCount(); ++i) {
         const TupleSchema::ColumnInfo* columnInfo = getColumnInfo(i);
         int32_t factor =
-            columnInfo->type == static_cast<int>(ValueType::VALUE_TYPE_VARCHAR) && !columnInfo->inBytes ?
+            columnInfo->type == static_cast<int>(ValueType::tVARCHAR) && !columnInfo->inBytes ?
             MAX_BYTES_PER_UTF8_CHARACTER : 1;
         if (isVariableLengthType((ValueType)columnInfo->type)) {
             bytes += sizeof(int32_t); // value length placeholder for variable length columns

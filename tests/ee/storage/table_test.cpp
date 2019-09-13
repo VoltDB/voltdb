@@ -76,26 +76,26 @@ using namespace voltdb;
 #define NUM_OF_TUPLES 5000
 
 ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = {
-    ValueType::VALUE_TYPE_TINYINT,
-    ValueType::VALUE_TYPE_SMALLINT,
-    ValueType::VALUE_TYPE_INTEGER,
-    ValueType::VALUE_TYPE_BIGINT,
-    ValueType::VALUE_TYPE_DECIMAL,
-    ValueType::VALUE_TYPE_DOUBLE,
-    ValueType::VALUE_TYPE_TIMESTAMP,
-    ValueType::VALUE_TYPE_VARCHAR,
-    ValueType::VALUE_TYPE_VARBINARY
+    ValueType::tTINYINT,
+    ValueType::tSMALLINT,
+    ValueType::tINTEGER,
+    ValueType::tBIGINT,
+    ValueType::tDECIMAL,
+    ValueType::tDOUBLE,
+    ValueType::tTIMESTAMP,
+    ValueType::tVARCHAR,
+    ValueType::tVARBINARY
 };
 
 int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
     {
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TINYINT),    // 1
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_SMALLINT),   // 2
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_INTEGER),    // 4
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT),     // 8
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DECIMAL),    // 16
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_DOUBLE),     // 8
-        NValue::getTupleStorageSize(ValueType::VALUE_TYPE_TIMESTAMP),  // 8
+        NValue::getTupleStorageSize(ValueType::tTINYINT),    // 1
+        NValue::getTupleStorageSize(ValueType::tSMALLINT),   // 2
+        NValue::getTupleStorageSize(ValueType::tINTEGER),    // 4
+        NValue::getTupleStorageSize(ValueType::tBIGINT),     // 8
+        NValue::getTupleStorageSize(ValueType::tDECIMAL),    // 16
+        NValue::getTupleStorageSize(ValueType::tDOUBLE),     // 8
+        NValue::getTupleStorageSize(ValueType::tTIMESTAMP),  // 8
         10,    /* The test uses getRandomValue() to generate random value,
                   make sure the column size not conflict with the value it generates. */
         16     /* same as above */

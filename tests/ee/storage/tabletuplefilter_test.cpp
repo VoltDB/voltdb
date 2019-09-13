@@ -63,8 +63,8 @@ private:
         std::vector<int32_t> all_inline_lengths;
 
         for (int i = 0 ; i < columns; ++i) {
-            all_types.push_back(ValueType::VALUE_TYPE_BIGINT);
-            all_inline_lengths.push_back(NValue::getTupleStorageSize(ValueType::VALUE_TYPE_BIGINT));
+            all_types.push_back(ValueType::tBIGINT);
+            all_inline_lengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
         }
         return TupleSchema::createTupleSchemaForTest(all_types,
                                        all_inline_lengths,

@@ -226,9 +226,9 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
         public final String getColumnTypeName() {
             if (m_type == VoltType.STRING) {
-                return "voltdb::ValueType::VALUE_TYPE_VARCHAR";
+                return "voltdb::ValueType::tVARCHAR";
             }
-            return "voltdb::ValueType::VALUE_TYPE_" + m_type.getName();
+            return "voltdb::ValueType::t" + m_type.getName();
         }
         private String   m_name;
         private VoltType m_type;

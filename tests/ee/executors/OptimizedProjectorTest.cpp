@@ -80,21 +80,21 @@ enum TypeAndSize {
 
 static ValueType toValueType(TypeAndSize tas) {
     switch (tas) {
-        case TINYINT: return ValueType::VALUE_TYPE_TINYINT;
-        case SMALLINT: return ValueType::VALUE_TYPE_SMALLINT;
-        case INTEGER: return ValueType::VALUE_TYPE_INTEGER;
-        case BIGINT: return ValueType::VALUE_TYPE_BIGINT;
-        case VARCHAR_INLINE: return ValueType::VALUE_TYPE_VARCHAR;
-        case VARCHAR_OUTLINE: return ValueType::VALUE_TYPE_VARCHAR;
-        case VARBINARY_INLINE: return ValueType::VALUE_TYPE_VARBINARY;
-        case VARBINARY_OUTLINE: return ValueType::VALUE_TYPE_VARBINARY;
-        case TIMESTAMP: return ValueType::VALUE_TYPE_TIMESTAMP;
-        case DECIMAL: return ValueType::VALUE_TYPE_DECIMAL;
+        case TINYINT: return ValueType::tTINYINT;
+        case SMALLINT: return ValueType::tSMALLINT;
+        case INTEGER: return ValueType::tINTEGER;
+        case BIGINT: return ValueType::tBIGINT;
+        case VARCHAR_INLINE: return ValueType::tVARCHAR;
+        case VARCHAR_OUTLINE: return ValueType::tVARCHAR;
+        case VARBINARY_INLINE: return ValueType::tVARBINARY;
+        case VARBINARY_OUTLINE: return ValueType::tVARBINARY;
+        case TIMESTAMP: return ValueType::tTIMESTAMP;
+        case DECIMAL: return ValueType::tDECIMAL;
         default:
                       break;
     }
 
-    return ValueType::VALUE_TYPE_INVALID;
+    return ValueType::tINVALID;
 }
 
 static std::vector<ValueType> toValueType(const std::vector<TypeAndSize> &tasVec) {
@@ -186,14 +186,14 @@ static void fillTable(Table* tbl, int64_t numRows) {
             ValueType vt = schema->columnType(j);
             NValue nval;
             switch (vt) {
-                case ValueType::VALUE_TYPE_BIGINT: {
+                case ValueType::tBIGINT: {
                 nval = ValueFactory::getBigIntValue(i * 10000 + j);
                 break;
             }
-                case ValueType::VALUE_TYPE_VARCHAR:
+                case ValueType::tVARCHAR:
                 nval = ValueFactory::getTempStringValue(randomString(length));
                 break;
-                case ValueType::VALUE_TYPE_VARBINARY:
+                case ValueType::tVARBINARY:
                 nval = ValueFactory::getTempBinaryValue(randomString(length));
                 break;
             default:
