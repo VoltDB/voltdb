@@ -41,8 +41,8 @@ thread_local size_t* m_allocated = nullptr;
 thread_local int32_t* m_threadPartitionIdPtr = nullptr;
 thread_local int32_t* m_enginePartitionIdPtr = nullptr;
 
-#ifdef VOLT_POOL_CHECKING
 std::mutex ThreadLocalPool::s_sharedMemoryMutex;
+#ifdef VOLT_POOL_CHECKING
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
@@ -277,6 +277,8 @@ void ThreadLocalPool::freeRelocatable(Sized* sized) {
     int32_t alloc_size = getAllocationSizeForObject(sized->m_size);
     CompactingStringStorage& poolMap = getStringPoolMap();
     //std::cerr << " *** Deallocating from pool " << &poolMap << std::endl;
+
+    std::lock_guard<std::mutex> g(s_sharedMemoryMutex);
     auto iter = poolMap.find(alloc_size);
     if (iter == poolMap.cend()) {
         // If the pool can not be found, there could not have been a prior
@@ -464,13 +466,17 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
     }
 #endif
 
-    PoolsByObjectSize& pools = *(m_key->second);
-    auto const iter = pools.find(sz);
-    if (iter == pools.cend()) {
-        throwFatalException("Failed to locate an allocated object of size %ld to free it.",
-                static_cast<long>(sz));
+    PoolsByObjectSize& pools = *m_key->second;
+    {
+        std::lock_guard<std::mutex> guard(s_sharedMemoryMutex);
+        auto const iter = pools.find(sz);
+        if (iter == pools.cend()) {
+            throwFatalException("Failed to locate an allocated object of size %ld to free it.",
+                    static_cast<long>(sz));
+        } else {
+            iter->second.get()->free(object);
+        }
     }
-    iter->second.get()->free(object);
 }
 
 // internal non-member helper function for calcuate Pool allocation Size

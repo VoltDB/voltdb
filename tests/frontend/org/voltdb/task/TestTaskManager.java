@@ -89,6 +89,7 @@ public class TestTaskManager {
     static AtomicInteger s_postRunActionSchedulerCallCount = new AtomicInteger();
 
     private static final String PROCEDURE_NAME = "SomeProcedure";
+    private static final String USER_NAME = "user";
 
     @Rule
     public final TestName m_name = new TestName();
@@ -107,6 +108,7 @@ public class TestTaskManager {
     @Before
     public void setup() {
         m_database = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        m_database.getUsers().add(USER_NAME);
         m_procedure = m_database.getProcedures().add(PROCEDURE_NAME);
 
         m_authSystem = mock(AuthSystem.class);
@@ -142,7 +144,7 @@ public class TestTaskManager {
      */
     @Test
     public void systemScheduleCreateDrop() throws Exception {
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -165,7 +167,7 @@ public class TestTaskManager {
      */
     @Test
     public void hostScheduleCreateDrop() throws Exception {
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_HOSTS);
+        Task task = createTask(TestActionScheduler.class, TaskScope.HOSTS);
 
         m_procedure.setTransactional(false);
 
@@ -188,7 +190,7 @@ public class TestTaskManager {
      */
     @Test
     public void partitionScheduleCreateDrop() throws Exception {
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createTask(TestActionScheduler.class, TaskScope.PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -227,7 +229,7 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithParameters() throws Exception {
-        Task task = createTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "AFFA47");
+        Task task = createTask(TestActionSchedulerParams.class, TaskScope.DATABASE, 5, "TESTING", "AFFA47");
 
         startSync();
         assertEquals(0, s_firstActionSchedulerCallCount.get());
@@ -250,7 +252,7 @@ public class TestTaskManager {
      */
     @Test
     public void schedulerWithBadParameters() throws Exception {
-        Task task = createTask(TestActionSchedulerParams.class, TaskManager.SCOPE_DATABASE, 5, "TESTING", "ZZZ");
+        Task task = createTask(TestActionSchedulerParams.class, TaskScope.DATABASE, 5, "TESTING", "ZZZ");
 
         assertFalse(validateTask(task).isValid());
 
@@ -269,8 +271,8 @@ public class TestTaskManager {
     public void shutdownWithSchedulesActive() throws Exception {
         TheHashinator.initialize(ElasticHashinator.class, new ElasticHashinator(6).getConfigBytes());
 
-        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
+        Task task2 = createTask(TestActionScheduler.class, TaskScope.PARTITIONS);
 
         m_procedure.setTransactional(true);
         m_procedure.setSinglepartition(true);
@@ -292,7 +294,7 @@ public class TestTaskManager {
      */
     @Test
     public void rerunActionScheduler() throws Exception {
-        Task task = createTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE, 5);
+        Task task = createTask(TestActionSchedulerRerun.class, TaskScope.DATABASE, 5);
 
         startSync(task);
         promoteToLeaderSync(task);
@@ -308,7 +310,7 @@ public class TestTaskManager {
      */
     @Test
     public void disableReenableActionScheduler() throws Exception {
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
 
         startSync();
         promoteToLeaderSync(task);
@@ -331,7 +333,7 @@ public class TestTaskManager {
      */
     @Test
     public void partitionPromotionAndDisabledSchedules() throws Exception {
-        Task task = createTask(TestActionSchedulerRerun.class, TaskManager.SCOPE_PARTITIONS, 5);
+        Task task = createTask(TestActionSchedulerRerun.class, TaskScope.PARTITIONS, 5);
 
         startSync(task);
 
@@ -374,7 +376,7 @@ public class TestTaskManager {
     @Test
     public void minDelay() throws Exception {
         m_schedulesConfig.setMinDelayMs(10000);
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
@@ -388,7 +390,7 @@ public class TestTaskManager {
     @Test
     public void maxRunFrequency() throws Exception {
         m_schedulesConfig.setMaxRunFrequency(1.0);
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);
         Thread.sleep(50);
@@ -407,15 +409,15 @@ public class TestTaskManager {
         VoltCompiler vc = new VoltCompiler(false);
         vc.addClassToJar(jarFile, TestTaskManager.class);
 
-        Task task1 = createTask("TestActionScheduler", TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask("TestActionSchedulerRerun", TestActionSchedulerRerun.class, TaskManager.SCOPE_DATABASE,
+        Task task1 = createTask("TestActionScheduler", TestActionScheduler.class, TaskScope.DATABASE);
+        Task task2 = createTask("TestActionSchedulerRerun", TestActionSchedulerRerun.class, TaskScope.DATABASE,
                 Integer.MAX_VALUE);
 
         startSync();
         promoteToLeaderSync();
         processUpdateSync(jarFile.getLoader(), false, task1, task2);
 
-        Thread.sleep(30);
+        Thread.sleep(100);
 
         VoltTable table = getScheduleStats();
         Map<String, Long> invocationCounts = new HashMap<>();
@@ -450,7 +452,7 @@ public class TestTaskManager {
                 assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
             } else {
                 assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
-                        previousCount * 3 / 2 > currentCount);
+                        previousCount > currentCount);
             }
         }
 
@@ -480,7 +482,7 @@ public class TestTaskManager {
     @Test
     public void changeOnErrorWhileRunning() throws Exception {
         when(m_response.getStatus()).thenReturn(ClientResponse.USER_ABORT);
-        Task task = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task = createTask(TestActionScheduler.class, TaskScope.PARTITIONS);
         m_procedure.setSinglepartition(true);
         task.setOnerror("IGNORE");
 
@@ -507,7 +509,7 @@ public class TestTaskManager {
      */
     @Test
     public void testValidateParameters() throws Exception {
-        Task task = createTask(TestActionSchedulerValidateParams.class, TaskManager.SCOPE_HOSTS, new Object[1]);
+        Task task = createTask(TestActionSchedulerValidateParams.class, TaskScope.HOSTS, new Object[1]);
 
         assertTrue(validateTask(task).isValid());
 
@@ -527,7 +529,7 @@ public class TestTaskManager {
      */
     @Test
     public void testCustomSchedule() throws Exception {
-        Task task = createTask(TestActionSchedule.class, TaskManager.SCOPE_DATABASE, 50, 250);
+        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 50, 250);
 
         startSync();
         promoteToLeaderSync(task);
@@ -545,7 +547,7 @@ public class TestTaskManager {
      */
     @Test
     public void testCustomGenerator() throws Exception {
-        Task task = createTask(TestActionGenerator.class, TaskManager.SCOPE_DATABASE);
+        Task task = createTask(TestActionGenerator.class, TaskScope.DATABASE);
 
         startSync();
         promoteToLeaderSync(task);
@@ -575,13 +577,32 @@ public class TestTaskManager {
     }
 
     /*
+     * Test that validation of username works
+     */
+    @Test
+    public void testInvalidUser() throws Exception {
+        Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
+
+        // Create user to test
+        m_database.getUsers().add(m_name.getMethodName());
+
+        // Test user created
+        task.setUser(m_name.getMethodName());
+        assertTrue(validateTask(task).isValid());
+
+        // Test invalid user
+        task.setUser("fakeUser");
+        assertFalse(validateTask(task).isValid());
+    }
+
+    /*
      * Test starting the manager in paused mode and then unpause and pause
      */
     @Test
     public void pausedMode() throws Exception {
-        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
+        Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         Task task2 = createTask(TestActionScheduler.class,
-                TaskManager.SCOPE_PARTITIONS);
+                TaskScope.PARTITIONS);
 
         startSync(true, task1, task2);
 
@@ -618,8 +639,8 @@ public class TestTaskManager {
      */
     @Test
     public void disabledTasks() throws Exception {
-        Task task1 = createTask(TestActionScheduler.class, TaskManager.SCOPE_DATABASE);
-        Task task2 = createTask(TestActionScheduler.class, TaskManager.SCOPE_PARTITIONS);
+        Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
+        Task task2 = createTask(TestActionScheduler.class, TaskScope.PARTITIONS);
 
         // Start manager with all tasks disabled
         task1.setEnabled(false);
@@ -639,6 +660,21 @@ public class TestTaskManager {
         task2.setEnabled(true);
         processUpdateSync(task1, task2);
         validateStats(5);
+    }
+
+    @Test
+    public void mustExecuteWorkProcsOnPartitions() throws Exception {
+        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 10, 100);
+        m_procedure.setSinglepartition(true);
+        m_procedure.setPartitionparameter(-1);
+
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.HOSTS.getId());
+        assertFalse(validateTask(task).isValid());
+
+        task.setScope(TaskScope.PARTITIONS.getId());
+        assertTrue(validateTask(task).isValid());
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {
@@ -667,11 +703,11 @@ public class TestTaskManager {
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
-    private Task createTask(Class<? extends Initializable> clazz, String scope, Object... params) {
+    private Task createTask(Class<? extends Initializable> clazz, TaskScope scope, Object... params) {
         return createTask(m_name.getMethodName() + m_taskNumber++, clazz, scope, params);
     }
 
-    private Task createTask(String name, Class<? extends Initializable> clazz, String scope, Object... params) {
+    private Task createTask(String name, Class<? extends Initializable> clazz, TaskScope scope, Object... params) {
         Task task = initializeTask(name, scope);
 
         if (ActionScheduler.class.isAssignableFrom(clazz)) {
@@ -704,12 +740,12 @@ public class TestTaskManager {
         }
     }
 
-    private Task initializeTask(String name, String scope) {
+    private Task initializeTask(String name, TaskScope scope) {
         Task task = m_database.getTasks().add(name);
         task.setEnabled(true);
         task.setName(name);
-        task.setScope(scope);
-        task.setUser("user");
+        task.setScope(scope.getId());
+        task.setUser(USER_NAME);
         task.setOnerror("ABORT");
         return task;
     }
@@ -784,7 +820,7 @@ public class TestTaskManager {
     }
 
     private TaskValidationResult validateTask(Task task) {
-        return TaskManager.validateTask(task, null, getClass().getClassLoader());
+        return TaskManager.validateTask(task, TaskScope.fromId(task.getScope()), m_database, getClass().getClassLoader());
     }
 
     public static class TestActionScheduler implements ActionScheduler {

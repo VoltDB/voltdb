@@ -400,6 +400,8 @@
     <!-- Standard junit fileset -->
     <include name='org/voltdb/dr2/**/Test*.class' />
     <include name='org/voltdb/TestExport*.class' />
+	<!-- E3-specific test cases  --> 
+    <include name='org/voltdb/e3/Test*.class' />
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>
@@ -598,6 +600,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/task/ActionType.java" />
             <include name="src/frontend/org/voltdb/task/Initializable.java" />
             <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/TaskScope.java" />
             <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
         </fileset>
     </javadoc>

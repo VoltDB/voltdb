@@ -169,7 +169,7 @@ public class Benchmark {
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> enabledThreads = null;
 
-        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt".split(",")));
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt,partTasklt,replTasklt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -563,6 +563,8 @@ public class Benchmark {
     TTLLoader replNDlt = null;
     TTLLoader partttlMigratelt = null;
     TTLLoader replttlMigratelt = null;
+    TaskLoader replTasklt = null;
+    TaskLoader partTasklt = null;
 
     /**
      * Core benchmark code.
@@ -688,6 +690,18 @@ public class Benchmark {
             replttlMigratelt.start();
         }
 
+
+        // Load a simple table and track scheduled TASK progress -- currently a time driven delete
+        if (!config.disabledThreads.contains("parttask")) {
+            partTasklt = new TaskLoader(client, "taskp", 100000, 1024, 50, permits, partitionCount);
+            partTasklt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("repltask"))) {
+            replTasklt = new TaskLoader(client, "taskr", 100000, 1024, 3, permits, partitionCount);
+            replTasklt.start();
+        }
+
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         scheduleRunTimer();
@@ -802,39 +816,43 @@ public class Benchmark {
                 if (partBiglt != null) {
                     int lpcc = partBiglt.getPercentLoadComplete();
                     if (!partBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                        exitcode += reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
                     } else
                         log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
                 } if (replBiglt != null) {
                     int lpcc = replBiglt.getPercentLoadComplete();
                     if (!replBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                        exitcode += reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
                     } else
                         log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
                 }
                 // check if all threads still alive
                 if (partTrunclt != null && !partTrunclt.isAlive())
-                    exitcode = reportDeadThread(partTrunclt);
+                    exitcode += reportDeadThread(partTrunclt);
                 if (replTrunclt != null && !replTrunclt.isAlive())
-                    exitcode = reportDeadThread(replTrunclt);
+                    exitcode += reportDeadThread(replTrunclt);
+
                 /* XXX if (! partLoadlt.isAlive())
                     exitcode = reportDeadThread(partLoadlt);
                 if (! replLoadlt.isAlive())
                     exitcode = reportDeadThread(replLoadlt);
                 */
                 if (readThread != null && !readThread.isAlive())
-                    exitcode = reportDeadThread(readThread);
+                    exitcode += reportDeadThread(readThread);
                 if (adHocMayhemThread != null && !config.disableadhoc && !adHocMayhemThread.isAlive())
-                    exitcode = reportDeadThread(adHocMayhemThread);
+                    exitcode += reportDeadThread(adHocMayhemThread);
                 if (idpt != null && !idpt.isAlive())
-                    exitcode = reportDeadThread(idpt);
+                    exitcode += reportDeadThread(idpt);
                 /* XXX if (! ddlt.isAlive())
                     exitcode = reportDeadThread(ddlt);*/
                 for (ClientThread ct : clientThreads) {
                     if (!ct.isAlive()) {
-                        exitcode = reportDeadThread(ct);
+                        exitcode += reportDeadThread(ct);
                     }
                 }
+                log.debug("Call Task shutdown methods");
+                replTasklt.shutdown();
+                partTasklt.shutdown();
                 /*
                 replBiglt.shutdown();
                 partBiglt.shutdown();
@@ -879,7 +897,7 @@ public class Benchmark {
                 long count = txnCount.get();
                 log.info("Client thread transaction count: " + count + "\n");
                 if (exitcode > 0 && txnCount.get() == 0) {
-                    System.err.println("Shutting down, but found that no work was done.");
+                    System.err.println("Shutting down, but found that no work was done. Exit code: " + exitcode);
                     exitcode = 2;
                 }
                 System.exit(exitcode);

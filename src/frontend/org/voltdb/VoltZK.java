@@ -487,7 +487,7 @@ public class VoltZK {
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retyr elastic operation later.";
+                    errorMsg = "while a catalog update is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeBanElasticOperation)) {
                     errorMsg = "while elastic operation is blocked by DR established with a cluster that "
                             + "does not support remote elastic operation during DR. "

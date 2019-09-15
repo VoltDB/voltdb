@@ -40,15 +40,13 @@ public class UpdateClassesThread extends BenchmarkThread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final byte[] jarData;
-    final long cycletime;
+    final long cycletime = 3000;
 
     public UpdateClassesThread(Client client, long duration_secs) {
         log.info("UpdateClasses initializing...");
         setName("UpdateClasses");
         this.client = client;
-        // try to do about 100 update classes during the run
-        cycletime = duration_secs / 100;
-        log.info("UpdateClasses cycle " + cycletime);
+        log.info("UpdateClasses cycle " + cycletime+"ms");
         // read the jar file
         File file = new File("txnid.jar");
         log.info("Loaded jar " + file.getAbsolutePath()+ " File size: " + file.length());
@@ -91,7 +89,7 @@ public class UpdateClassesThread extends BenchmarkThread {
             // if not, connected, sleep
             if (m_needsBlock.get()) {
                 do {
-                    try { Thread.sleep(3000); } catch (Exception e) {} // sleep for 3s
+                    try { Thread.sleep(cycletime); } catch (Exception e) {} // sleep for 3s
                     // bail on wakeup if we're supposed to bail
                     if (!m_shouldContinue.get()) {
                         return;
@@ -105,26 +103,31 @@ public class UpdateClassesThread extends BenchmarkThread {
 
             // call a transaction
             try {
+                // randomly run UC 50% of the time per cycle
                 int write = r.nextInt(1);
-                log.info("UpdateClasses running " + write);
                 switch (write) {
 
                     case 0:
+                        log.info("UpdateClasses running");
                         ClientResponse cr;
                         cr = client.callProcedure("@UpdateClasses", jarData, "");
                         String msg = cr.getStatusString() + " ("+cr.getStatus()+")";
                         if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
                             hardStop("UpdateClasses failed " + msg);
+                        } else if (cr.getStatus() != ClientResponse.SUCCESS ) {
+                            // make a note about non-graceful errors , such as CONNECTION_LOST, SERVER_UNAVAILABLE etc
+                            log.warn("UpdateClasses non-graceful failure error:" + msg);
+                        } else {
+                            log.info("UpdateClasses response: " + msg);
                         }
-                        log.info("UpdateClasses response: " + msg);
                         break;
                     }
 
-                Thread.sleep(cycletime * 3000);
+                Thread.sleep(cycletime);
             }
             catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
-                log.info("UpdateClasses response: " + cr.getStatusString() + " (" + cr.getStatus() + ")");
+                log.info("UpdateClasses ProcCallException response: " + cr.getStatusString() + " (" + cr.getStatus() + ")");
                 if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
                     if (!     (cr.getStatusString().contains("Please retry catalog update")
                             || cr.getStatusString().contains("Transaction dropped due to change in mastership")

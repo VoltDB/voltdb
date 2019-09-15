@@ -80,6 +80,7 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
+
         }
 
         // Execute last statement batch

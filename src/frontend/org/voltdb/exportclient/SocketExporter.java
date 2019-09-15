@@ -46,6 +46,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
@@ -60,7 +62,6 @@ public class SocketExporter extends ExportClientBase {
     boolean m_skipInternals = false;
     TimeZone m_timeZone = VoltDB.REAL_DEFAULT_TIMEZONE;
     ExportDecoderBase.BinaryEncoding m_binaryEncoding = ExportDecoderBase.BinaryEncoding.HEX;
-    final Map<HostAndPort, OutputStream> haplist = new HashMap<HostAndPort, OutputStream>();
     private String[] serverArray;
     private Set<Callable<Pair<HostAndPort, OutputStream>>> callables;
     ExecutorService m_executorService;
@@ -107,17 +108,19 @@ public class SocketExporter extends ExportClientBase {
     }
 
     /**
-     * Connect to a set of servers in parallel. Each will retry until
+     * Connect to a set of servers in parallel, and return map of connections. Each will retry until
      * connection. This call will block until all have connected.
      *
+     * @param haplist map of hosts to writers filled by this method
      * @throws InterruptedException if anything bad happens with the threads.
      * @throws RestartBlockException
      */
-    void connect() throws InterruptedException, RestartBlockException {
+    void connect(final Map<HostAndPort, OutputStream> haplist) throws InterruptedException, RestartBlockException {
         m_logger.info("Connecting to Socket export endpoint...");
 
         // gather the result or retry
         List<Future<Pair<HostAndPort, OutputStream>>> futures = m_executorService.invokeAll(callables);
+        boolean complete = false;
         try {
             for (Future<Pair<HostAndPort, OutputStream>> future : futures) {
                 Pair<HostAndPort, OutputStream> result = future.get();
@@ -129,9 +132,21 @@ public class SocketExporter extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
+            complete = true;
         } catch (ExecutionException ex) {
             ex.getCause().printStackTrace();
             throw new RestartBlockException(true);
+        } finally {
+            if (!complete) {
+                for (OutputStream writer : haplist.values()) {
+                    try {
+                        writer.close();
+                    } catch (Exception e) {
+                        // Best effort... oh well...
+                    }
+                }
+                haplist.clear();
+            }
         }
     }
 
@@ -157,8 +172,7 @@ public class SocketExporter extends ExportClientBase {
         try {
             Socket pushSocket = new Socket(server, port);
             OutputStream out = pushSocket.getOutputStream();
-            m_logger.info("Connected to export endpoint node at: " + server +
-                    ":" + port + " using port " + pushSocket.getLocalPort());
+            m_logger.info("Connected to export endpoint node at: " + server + ":" + port);
             return out;
         } catch (UnknownHostException e) {
             m_logger.rateLimitedLog(120, Level.ERROR, e, "Don't know about host: " + server);
@@ -169,6 +183,11 @@ public class SocketExporter extends ExportClientBase {
         }
     }
 
+    /**
+     * One instance of {@code SocketExporter} exports rows for 1 stream/partition and opens
+     * a socket to each target host.
+     *
+     */
     class SocketExportDecoder extends ExportDecoderBase {
         private final ListeningExecutorService m_es;
 
@@ -176,6 +195,7 @@ public class SocketExporter extends ExportClientBase {
         long totalDecodeTime = 0;
         long timerStart = 0;
         final CSVStringDecoder m_decoder;
+        final Map<HostAndPort, OutputStream> haplist = new HashMap<HostAndPort, OutputStream>();
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -192,9 +212,13 @@ public class SocketExporter extends ExportClientBase {
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
-            m_es =
-                    CoreUtils.getListeningSingleThreadExecutor(
-                            "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es =
+                        CoreUtils.getListeningSingleThreadExecutor(
+                                "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         @Override
@@ -205,38 +229,34 @@ public class SocketExporter extends ExportClientBase {
                 }
                 haplist.clear();
             } catch (IOException ignore) {}
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
         @Override
         public boolean processRow(ExportRow rd) throws ExportDecoderBase.RestartBlockException {
             try {
+                if (haplist.isEmpty()) {
+                    connect(haplist);
+                }
+                if (haplist.isEmpty()) {
+                    m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
+                    throw new RestartBlockException(true);
+                }
                 String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);
                 buf.flip();
-                m_atomicWorkLock.lock();
-                try {
-                    if (haplist.isEmpty()) {
-                        connect();
-                    }
-                    if (haplist.isEmpty()) {
-                        m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
-                        throw new RestartBlockException(true);
-                    }
-                    for (OutputStream hap : haplist.values()) {
-                        hap.write(buf.array());
-                        hap.flush();
-                    }
-                }
-                finally {
-                    m_atomicWorkLock.unlock();
+                for (OutputStream hap : haplist.values()) {
+                    hap.write(buf.array());
+                    hap.flush();
                 }
             } catch (Exception e) {
                 m_logger.error(e.getLocalizedMessage());

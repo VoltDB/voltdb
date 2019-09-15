@@ -59,6 +59,7 @@ import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -482,7 +483,8 @@ public abstract class CatalogSchemaTools {
             sb.append(" FROM CLASS ").append(task.getSchedulerclass());
             appendTaskParameters(sb, task.getSchedulerparameters());
         }
-        sb.append(" ON ERROR ").append(task.getOnerror()).append(" RUN ON ").append(task.getScope());
+        sb.append(" ON ERROR ").append(task.getOnerror()).append(" RUN ON ")
+                .append(TaskScope.translateIdToName(task.getScope()));
         if (task.getUser() != null) {
             sb.append(" AS USER ").append(task.getUser());
         }
@@ -544,7 +546,7 @@ public abstract class CatalogSchemaTools {
             }
             partitionClause.append(spacer);
             if (proc.getPartitiontable() == null) {
-                partitionClause.append("PARTITIONED");
+                partitionClause.append("DIRECTED");
             } else {
                 partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
                         .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());

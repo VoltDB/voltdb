@@ -208,6 +208,7 @@ partition_count = get_partition_count()
 
 print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms     c cpu partitions   skew   inMB/s  outMB/s"
 print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
+sys.stdout.flush()
 
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
@@ -311,8 +312,7 @@ while end_time > time.time():
         partitions_used_string = str(partitions_used) + "/" + str(partition_count)
 
         print '%8s %40s %5s %8.1f %11d %7d %10.3f %7d %5.2f %3d %10s %6.3f %8.3f %8.3f' % (now, procname, label, exec_pct, invs, tps, avgms, latency, c_svrs, cpu, partitions_used_string, tps_coeff_var, mbin, mbout)
-
-
+        sys.stdout.flush()
 
 
     time.sleep(args.frequency)
