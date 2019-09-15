@@ -546,7 +546,7 @@ public abstract class CatalogSchemaTools {
             }
             partitionClause.append(spacer);
             if (proc.getPartitiontable() == null) {
-                partitionClause.append("PARTITIONED");
+                partitionClause.append("DIRECTED");
             } else {
                 partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
                         .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());

@@ -25,6 +25,12 @@ end
 begin Deployment javaonly         "Run-time deployment settings"
   int kfactor                     "The required k-safety factor"
   Systemsettings* systemsettings  "Values from the systemsettings element"
+  ThreadPool* threadPools         "The Thread Pool configuration"
+end
+
+begin ThreadPool javaonly         "Thread Pool configuration"
+  string name                     "The name of the thread pool"
+  int size                        "The size of the thread pool"
 end
 
 begin Systemsettings javaonly "Container for deployment systemsettings element"
@@ -70,6 +76,7 @@ end
 
 begin Connector                 "Export connector"
   string loaderclass            "The class name of the connector"
+  string threadpoolname         "The name of the thread pool"
   bool enabled                  "Is the connector enabled"
   ConnectorTableInfo* tableInfo "Per table configuration"
   ConnectorProperty* config     "Connector configuration properties"
@@ -119,7 +126,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   Table? partitiontable2    "The second table that contains the partition column for this procedure"
   Column? partitioncolumn   "Which column in the partitioned table is this procedure mapped on?"
   Column? partitioncolumn2  "If two part, which column is this proc also partitioned on?"
-  int partitionparameter    "Which parameter identifies the partition column. Will be -1 if single partition but not partitioned on a parameter"
+  int partitionparameter    "Which parameter identifies the partition column. Will be -1 if directed procedure"
   int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
   // Note that UDF dependences are recorded on the

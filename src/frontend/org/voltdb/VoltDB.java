@@ -51,6 +51,7 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExporterVersion;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
@@ -170,6 +171,9 @@ public class VoltDB {
         /** ssl context for client and admin ports */
         public SslContext m_sslServerContext = null;
         public SslContext m_sslClientContext = null;
+
+        /** specifies which version of exporter the system will use */
+        public ExporterVersion m_exporterVersion = ExporterVersion.UNDEFINED;
 
         /** enable ssl */
         public boolean m_sslEnable = System.getenv("ENABLE_SSL") == null ?
@@ -699,6 +703,10 @@ public class VoltDB {
                         }
                         m_stagedClassesPaths.add(stagedJar);
                     }
+                } else if (arg.equalsIgnoreCase("e2")) {
+                    m_exporterVersion = ExporterVersion.E2;
+                } else if (arg.equalsIgnoreCase("e3")) {
+                    m_exporterVersion = ExporterVersion.E3;
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

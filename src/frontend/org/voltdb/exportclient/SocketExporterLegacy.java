@@ -46,6 +46,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
@@ -193,9 +195,13 @@ public class SocketExporterLegacy extends ExportClientBase {
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
-            m_es =
-                    CoreUtils.getListeningSingleThreadExecutor(
-                            "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es =
+                        CoreUtils.getListeningSingleThreadExecutor(
+                                "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         @Override
@@ -206,11 +212,13 @@ public class SocketExporterLegacy extends ExportClientBase {
                 }
                 haplist.clear();
             } catch (IOException ignore) {}
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 

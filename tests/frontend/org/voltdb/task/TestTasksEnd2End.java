@@ -198,7 +198,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
 
         String procName = getMethodName() + "_prune";
         client.callProcedure("@AdHoc",
-                "CREATE PROCEDURE " + procName + " PARTITIONED AS DELETE FROM " + tableName
+                "CREATE PROCEDURE " + procName + " DIRECTED AS DELETE FROM " + tableName
                         + " ORDER BY key OFFSET 10");
 
         AtomicReference<Exception> error = new AtomicReference<>();
@@ -323,7 +323,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         String procName = getMethodName() + "_prune";
 
         client.callProcedure("@AdHoc",
-                "CREATE PROCEDURE " + procName + " PARTITIONED AS DELETE FROM " + tableName
+                "CREATE PROCEDURE " + procName + " DIRECTED AS DELETE FROM " + tableName
                         + " ORDER BY key OFFSET 10");
 
         try {
