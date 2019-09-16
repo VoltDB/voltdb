@@ -59,6 +59,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
@@ -1051,10 +1052,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             try {
-                ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
-                int partition = TheHashinator.getPartitionForParameter(
-                        ppi.type, invocationParameter);
+                int partition = -1;
+                if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+                    // Directed procedure running on partition
+                    partition = response.getInvocation().getPartitionDestination();
+                    assert partition != -1;
+                } else {
+                     // Regular partitioned procedure
+                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                    Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
+                    partition = TheHashinator.getPartitionForParameter(
+                          ppi.type, invocationParameter);
+                }
                 m_dispatcher.createTransaction(cihm.connection.connectionId(),
                         response.getInvocation(),
                         catProc.getReadonly(),
@@ -1250,8 +1259,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                             true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
-                }
-                else {
+                } else if (message instanceof SiteFailureForwardMessage) {
+                    SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;
+                    m_messenger.notifyOfHostDown(CoreUtils.getHostIdFromHSId(msg.m_reportingHSId));
+                } else {
                     // m_d is for test only
                     m_d.offer(message);
                 }

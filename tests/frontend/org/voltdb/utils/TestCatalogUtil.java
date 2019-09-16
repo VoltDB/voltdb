@@ -1648,6 +1648,89 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(definedOptionalTableNames, returnedOptionalTableNames);
     }
 
+    public void testExportTargetDuplicate() {
+        final String goodDeploy =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test2\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test3\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "</deployment>";
+
+        final File tmpGoodDeploy = VoltProjectBuilder.writeStringToTempFile(goodDeploy);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpGoodDeploy.getPath(), false);
+        assertNull(msg);
+
+        final String duplicateWithoutCase =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test3\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "</deployment>";
+
+        final File tmpDuplicateWithoutCase = VoltProjectBuilder.writeStringToTempFile(duplicateWithoutCase);
+        msg = CatalogUtil.compileDeployment(catalog, tmpDuplicateWithoutCase.getPath(), false);
+        assertTrue(msg.contains("Multiple connectors can not be assigned to single export target"));
+
+        final String duplicateWithCase =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+                        "<deployment>\n" +
+                        "    <cluster hostcount=\"1\"/>\n" +
+                        "    <export>\n" +
+                        "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"TESt1\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "        <configuration enabled=\"true\" target=\"test3\" type=\"kafka\">\n" +
+                        "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+                        "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+                        "            <property name=\"skipinternals\">true</property>\n" +
+                        "        </configuration>\n" +
+                        "    </export>\n" +
+                        "</deployment>";
+
+        final File tmpDuplicateWithCase = VoltProjectBuilder.writeStringToTempFile(duplicateWithCase);
+        msg = CatalogUtil.compileDeployment(catalog, tmpDuplicateWithCase.getPath(), false);
+        assertTrue(msg.contains("Multiple connectors can not be assigned to single export target"));
+    }
+
     public void testThreadPoolSettings() {
         final String goodDeploy1 =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +

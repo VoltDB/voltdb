@@ -37,7 +37,7 @@ public interface ActionScheduler extends Initializable {
      * If this method returns {@code true} that means the type of procedure which this scheduler can run is restricted
      * based upon the scope type.
      * <ul>
-     * <li>SYSTEM - No restrictions</li>
+     * <li>SYSTEM - Cannot run single partition procedures</li>
      * <li>HOSTS - Only NT procedures are allowed</li>
      * <li>PARTITIONS - Only partitioned procedures are allowed</li>
      * </ul>

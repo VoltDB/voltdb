@@ -691,7 +691,7 @@ public final class TaskManager {
                     toString.add(field, task.getField(field));
                 }
                 log.debug(generateLogMessage(task.getName(),
-                        "Applying schedule configuration: " + toString()));
+                        "Applying schedule configuration: " + toString.toString()));
             }
             TaskHandler handler = m_handlers.remove(task.getName());
             TaskScope scope = TaskScope.fromId(task.getScope());
@@ -842,9 +842,8 @@ public final class TaskManager {
     static String isProcedureValidForScope(TaskScope scope, Procedure procedure, boolean restrictProcedureByScope) {
         if (scope != TaskScope.PARTITIONS && procedure.getSinglepartition()
                 && procedure.getPartitionparameter() == -1) {
-            return String.format(
-                    "Procedure %s is a work procedure and must be run on PARTITIONS. Cannot be scheduled on %s.",
-                    procedure.getTypeName(), scope.name().toLowerCase());
+            return String.format("Procedure %s is a directed procedure and must be run on PARTITIONS only.",
+                    procedure.getTypeName());
         }
 
         if (!restrictProcedureByScope) {
@@ -853,22 +852,22 @@ public final class TaskManager {
 
         switch (scope) {
         case DATABASE:
+            if (procedure.getSinglepartition()) {
+                return String.format(
+                        "Procedure %s is a single partition procedure, which cannot be scheduled on the database",
+                        procedure.getTypeName());
+            }
             break;
         case HOSTS:
             if (procedure.getTransactional()) {
-                return String.format("Procedure %s is a transactional procedure. Cannot be scheduled on a host.",
+                return String.format("Procedure %s is a transactional procedure, which cannot be scheduled on a host.",
                         procedure.getTypeName());
             }
             break;
         case PARTITIONS:
-            if (!procedure.getSinglepartition()) {
-                return String.format("Procedure %s is not a partitioned procedure. Cannot be scheduled on a partition.",
-                        procedure.getTypeName());
-            }
-            if (procedure.getPartitionparameter() != -1) {
+            if (!procedure.getSinglepartition() && procedure.getPartitionparameter() != -1) {
                 return String.format(
-                        "Procedure %s must be a work procedure which is not partitioned on a table. "
-                                + "Cannot be scheduled on a partition.",
+                        "Procedure %s must be a directed procedure, which cannot be scheduled on a partition.",
                         procedure.getTypeName());
             }
             break;

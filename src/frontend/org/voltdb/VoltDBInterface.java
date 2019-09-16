@@ -353,4 +353,9 @@ public interface VoltDBInterface
      * @return The instance of {@link TaskManager} which is running in this instance
      */
     public TaskManager getTaskManager();
+
+    /**
+     * notify surviving node upon shutting itself down
+     */
+    public void notifyOfShutdown();
 }

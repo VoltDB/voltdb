@@ -691,6 +691,14 @@ public class JDBCExportClient extends ExportClientBase {
             if (m_preparedStmtStr == null) {
                 throw new RestartBlockException(true);
             }
+
+            if (rowinst.getOperation() == ROW_OPERATION.UPDATE_NEW && !m_supportsUpsert) {
+                if (!m_warnedOfUnsupportedOperation) {
+                    rateLimitedLogWarn(m_logger, "JDBC export skipped past a row with an operation type " +
+                            rowinst.getOperation().name() + " from stream " + rowinst.tableName);
+                }
+                return true;
+            }
             if (pstmt == null) {
                 if (m_disableAutoCommits) {
                     try {
@@ -719,15 +727,6 @@ public class JDBCExportClient extends ExportClientBase {
                     m_logger.warn("JDBC export unable to prepare insert statement", e);
                     closeConnection();
                     throw new RestartBlockException(true);
-                }
-            }
-            if (rowinst.getOperation() != ROW_OPERATION.INSERT) {
-                if (rowinst.getOperation() != ROW_OPERATION.UPDATE_NEW || !m_supportsUpsert) {
-                    if (!m_warnedOfUnsupportedOperation) {
-                        m_logger.warn("JDBC export skipped past a row with an operation type " +
-                                rowinst.getOperation().name() + " from stream " + rowinst.tableName);
-                    }
-                    return true;
                 }
             }
 

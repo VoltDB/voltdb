@@ -9,17 +9,17 @@
 
 import re, string, sys, random
 
-def rand_char(len):
+def rand_char(len, src=string.ascii_letters + string.digits):
     """
     Generate random characther of given maximum length.
     """
     # No escape needed inside the generated content.
     return "'%s'" % \
-            (''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(random.randint(1, len))))
+            (''.join(random.choice(src) for _ in range(random.randint(1, len))))
 
 def failwith(msg, retcode=2):
-    print(msg)
-    sys.exit(2)
+    sys.stderr.write('datagen error: %s' % msg)
+    sys.exit(retcode)
 
 # constants for regex
 RE_WS = re.compile(' +')
@@ -37,7 +37,9 @@ COLUMN_TYPES = {
     'FLOAT' : lambda _ : lambda:random.uniform(-9999, 9999),
     'DECIMAL' : lambda width : lambda:random.randint(-10**(width-1), 10**(width-1)),       #  ignore precision
     'VARCHAR' : lambda width : lambda:rand_char(width),
-    'VARBINARY' : lambda width : lambda:"CAST(%s AS VARBINARY(%d))" % (rand_char(width), width),
+    'VARBINARY' : lambda _ : lambda:failwith('VARBINARY unsupported'),
+    # TODO: this is buggy; what Volt allows as VARBINARY is also limiting (and undocumented?).
+    #"CAST(%s AS VARBINARY(%d))" % (rand_char(width, string.hexdigits), width),
     'TIMESTAMP': lambda _ :lambda:'TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, CURRENT_TIMESTAMP())%+d)' % random.randint(-9999, 9999),
     'GEOGRAPHY': lambda _ :lambda:failwith('GEOGRAPHY unsupported'),
     'GEOGRAPHY_POINT': lambda  _ :lambda:failwith('GEOGRAPHY_POINT unsupported'),
@@ -54,7 +56,7 @@ def parse_table_field(field):
     elif ctype not in COLUMN_TYPES:
         failwith('Unknown column type parsed: %s' % ctype)
     else:
-        return COLUMN_TYPES[ctype](int(RE_COMMA_OR_RIGHT_PAREN.split(elms[1])[0]) if len(elms) > 1 else 0)
+        return COLUMN_TYPES[ctype](int(RE_COMMA_OR_RIGHT_PAREN.split(elms[1])[0]) if len(elms) > 1 else 64)
 
 def datagen(fn, number):
     return tuple(fn() for _ in range(number))
