@@ -33,8 +33,8 @@ namespace voltdb {
 
 // Initialized when executor context is created.
 std::mutex SynchronizedThreadLock::s_sharedEngineMutex{};
-pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition = PTHREAD_COND_INITIALIZER;
-pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition = PTHREAD_COND_INITIALIZER;
+pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition;
+pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
 
 // The Global Countdown Latch is critical to correctly coordinating between engine threads
 // when replicated tables are updated. Therefore we use SITES_PER_HOST as a constant that
@@ -78,6 +78,8 @@ void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
 void SynchronizedThreadLock::create() {
     vassert(s_SITES_PER_HOST == -1);
     s_SITES_PER_HOST = 0;
+    pthread_cond_init(&s_sharedEngineCondition, nullptr);
+    pthread_cond_init(&s_wakeLowestEngineCondition, nullptr);
 }
 
 void SynchronizedThreadLock::destroy() {
