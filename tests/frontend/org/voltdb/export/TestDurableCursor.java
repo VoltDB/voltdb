@@ -83,7 +83,6 @@ public class TestDurableCursor {
 
     private void fillNextCycle(int numUpdates, boolean expect) {
         for (int ii = 0; ii < numUpdates; ii++) {
-            Random m_random = new Random();
             int maxStreamSuffix = m_expectedValues.lastKey() + 1;
             int targetSuffix;
             do {
@@ -91,6 +90,15 @@ public class TestDurableCursor {
             } while (!m_expectedValues.containsKey(targetSuffix));
             changeCursor(targetSuffix, getRandomPartitionId(), Math.abs(m_random.nextLong()), expect);
         }
+    }
+
+    private void removeRandomStream(byte[] genId) {
+        int targetStream = -1;
+        do {
+            targetStream = m_random.nextInt(m_expectedValues.lastKey()+1);
+        } while (m_expectedValues.remove(targetStream) == null);
+        String streamName = STREAM_NAME_PREFIX + targetStream;
+        m_startCursor.removeCursorBlock(streamName, genId);
     }
 
     class CursorUpdater implements Runnable {
@@ -138,18 +146,21 @@ public class TestDurableCursor {
 
     private void verifyExpected(DurableCursor cursor, int maxStreams) {
         for (int ii = 0; ii < maxStreams; ii++) {
-            Map<Integer, Long> result = cursor.getCursors(STREAM_NAME_PREFIX + ii);
-            assertTrue(Maps.difference(result, m_expectedValues.get(ii)).areEqual());
+            String streamName = STREAM_NAME_PREFIX + ii;
+            if (cursor.haveStreamName(streamName)) {
+                Map<Integer, Long> result = cursor.getCursors(streamName);
+                assertTrue(Maps.difference(result, m_expectedValues.get(ii)).areEqual());
+            }
+            else {
+                assertTrue(m_expectedValues.get(ii) == null);
+            }
         }
     }
 
     @Before
     public void setUp() throws Exception {
         setupTestDir();
-        m_startCursor = new DurableCursor(5, TEST_DIR, PATH_STR, 10, PARTITION_IDS, STARTING_GENID);
-        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
-            configureStreamBlock(ii, STARTING_GENID);
-        }
+        m_startCursor = new DurableCursor(50, TEST_DIR, PATH_STR, 10, PARTITION_IDS, STARTING_GENID);
     }
 
     public static void setupTestDir() throws IOException {
@@ -188,33 +199,69 @@ public class TestDurableCursor {
     @Test
     public void testSimple() throws Exception {
         System.out.println("Running testSimple");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(15, true);
-        m_startCursor.writeFile(m_startCursor.m_0);
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
         fillNextCycle(15, true);
-        m_startCursor.writeFile(m_startCursor.m_1);
-        m_startCursor.m_0.closeFile();
-        m_startCursor.m_1.closeFile();
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
         DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
         verifyExpected(recovery, START_STREAM_COUNT);
         recovery.shutdown();
     }
 
+    @Test
+    public void testEmpty() throws Exception {
+        System.out.println("Running testSimple");
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
+        DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
+        assertEquals(recovery.getStreamCount(), 0);
+        recovery.shutdown();
+    }
 
     @Test
     public void testGrowCursorFiles() throws Exception {
         System.out.println("Running testGrowCursorFiles");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(15, true);
-        m_startCursor.writeFile(m_startCursor.m_1);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
         int newStreamCount = START_STREAM_COUNT + STREAMS_PER_PAGE;
         for (int ii = START_STREAM_COUNT; ii < newStreamCount; ii ++) {
             configureStreamBlock(ii, STARTING_GENID);
         }
         fillNextCycle(500, true);
-        m_startCursor.writeFile(m_startCursor.m_0);
-        m_startCursor.m_0.closeFile();
-        m_startCursor.m_1.closeFile();
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
         DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
         verifyExpected(recovery, newStreamCount);
+        recovery.shutdown();
+    }
+
+
+    @Test
+    public void testRemoveStream() throws Exception {
+        System.out.println("Running testGrowCursorFiles");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
+        fillNextCycle(40, true);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        removeRandomStream(STARTING_GENID);
+        fillNextCycle(50, true);
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
+        DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
+        verifyExpected(recovery, START_STREAM_COUNT);
         recovery.shutdown();
     }
 
@@ -234,9 +281,12 @@ public class TestDurableCursor {
     @Test
     public void testMissingFirstCursorFile() throws Exception {
         System.out.println("Running testMissingFirstCursorFile");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(40, true);
-        m_startCursor.writeFile(m_startCursor.m_1);
-        m_startCursor.m_1.closeFile();
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        m_startCursor.m_fileRef1.closeFile();
         DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
         verifyExpected(recovery, START_STREAM_COUNT);
         recovery.shutdown();
@@ -245,14 +295,40 @@ public class TestDurableCursor {
     @Test
     public void testSaveThenUpdate() throws Exception {
         System.out.println("Running testSaveThenUpdate");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(40, true);
-        m_startCursor.writeFile(m_startCursor.m_0);
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
         fillNextCycle(100, false);
-        m_startCursor.m_0.closeFile();
-        m_startCursor.m_1.closeFile();
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
         m_startCursor.shutdown();
         DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
         verifyExpected(recovery, START_STREAM_COUNT);
+        recovery.shutdown();
+    }
+
+    @Test
+    public void testBothFilesUpdated() throws Exception {
+        System.out.println("Running testBothFilesUpdated");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
+        fillNextCycle(15, true);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        int newStreamCount = START_STREAM_COUNT + STREAMS_PER_PAGE;
+        for (int ii = START_STREAM_COUNT; ii < newStreamCount; ii ++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
+        fillNextCycle(500, true);
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
+        fillNextCycle(200, true);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
+        m_startCursor.m_fileRef0.closeFile();
+        m_startCursor.m_fileRef1.closeFile();
+        DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
+        verifyExpected(recovery, newStreamCount);
         recovery.shutdown();
     }
 
@@ -272,14 +348,17 @@ public class TestDurableCursor {
     @Test
     public void testCorruptFile() throws Exception {
         System.out.println("Running testCorruptFile");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(40, true);
-        m_startCursor.writeFile(m_startCursor.m_0);
+        m_startCursor.writeFile(m_startCursor.m_fileRef0);
         fillNextCycle(100, false);
-        m_startCursor.writeFile(m_startCursor.m_1);
+        m_startCursor.writeFile(m_startCursor.m_fileRef1);
         m_startCursor.shutdown();
 
         // Currupt the m_1 file. Even though the version of m_1 is better, m_0 should always be recovered.
-        RandomAccessFile ras = new RandomAccessFile(m_startCursor.m_1.m_durabilityMarker, "rw");
+        RandomAccessFile ras = new RandomAccessFile(m_startCursor.m_fileRef1.m_path, "rw");
         FileChannel ch = ras.getChannel();
         long randFileOffset = m_random.nextInt((int)ch.size());
         ByteBuffer b = ByteBuffer.allocateDirect(1);
@@ -296,7 +375,7 @@ public class TestDurableCursor {
         ch.write(b, randFileOffset);
         ch.close();
         DurableCursor recovery = DurableCursor.RecoverBestCursor(TEST_DIR, PATH_STR);
-        assertEquals(recovery.m_1, null);
+        assertEquals(recovery.m_fileRef1, null);
         verifyExpected(recovery, START_STREAM_COUNT);
         recovery.shutdown();
     }
@@ -304,6 +383,9 @@ public class TestDurableCursor {
     @Test
     public void testSimultaneousUpdates() throws Exception {
         System.out.println("Running testSimultaneousUpdates");
+        for (int ii = 0; ii < START_STREAM_COUNT; ii++) {
+            configureStreamBlock(ii, STARTING_GENID);
+        }
         fillNextCycle(40, true);
         m_startCursor.startupScheduledWriter();
         Thread t1 = new Thread(new CursorUpdater(1000000, 0, 4));
