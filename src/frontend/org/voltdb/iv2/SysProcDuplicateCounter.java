@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -62,50 +63,54 @@ public class SysProcDuplicateCounter extends DuplicateCounter
      * that dependency.
      */
     @Override
-    int offer(FragmentResponseMessage message)
+    int offer(VoltMessage message)
     {
-        long hash = 0;
-        for (int i = 0; i < message.getTableCount(); i++) {
-            int depId = message.getTableDependencyIdAtIndex(i);
-            VoltTable dep = message.getTableAtIndex(i);
-            List<VoltTable> tables = m_alldeps.get(depId);
-            if (tables == null)
-            {
-                tables = new ArrayList<VoltTable>();
-                m_alldeps.put(depId, tables);
-            }
-
-            if (!message.isRecovering()) {
-                /*
-                 * If the current table is a real response, check if
-                 * any previous responses were dummy, if so, replace
-                 * the dummy ones with this legit response.
-                 */
-                if (!tables.isEmpty() && tables.get(0).getStatusCode() == VoltTableUtil.NULL_DEPENDENCY_STATUS) {
-                    tables.clear();
+        if (message instanceof FragmentResponseMessage) {
+            FragmentResponseMessage msg = (FragmentResponseMessage)message;
+            long hash = 0;
+            for (int i = 0; i < msg.getTableCount(); i++) {
+                int depId = msg.getTableDependencyIdAtIndex(i);
+                VoltTable dep = msg.getTableAtIndex(i);
+                List<VoltTable> tables = m_alldeps.get(depId);
+                if (tables == null)
+                {
+                    tables = new ArrayList<VoltTable>();
+                    m_alldeps.put(depId, tables);
                 }
 
-                // Only update the hash with non-dummy responses
-                hash ^= MiscUtils.cheesyBufferCheckSum(dep.getBuffer());
-            } else {
-                /* If it's a dummy response, record it if and only if
-                 * it's the first response. If the previous response
-                 * is a real response, we don't want the dummy response.
-                 * If the previous one is also a dummy, one should be
-                 * enough.
-                 */
-                if (!tables.isEmpty()) {
-                    continue;
+                if (!msg.isRecovering()) {
+                    /*
+                     * If the current table is a real response, check if
+                     * any previous responses were dummy, if so, replace
+                     * the dummy ones with this legit response.
+                     */
+                    if (!tables.isEmpty() && tables.get(0).getStatusCode() == VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                        tables.clear();
+                    }
+
+                    // Only update the hash with non-dummy responses
+                    hash ^= MiscUtils.cheesyBufferCheckSum(dep.getBuffer());
+                } else {
+                    /* If it's a dummy response, record it if and only if
+                     * it's the first response. If the previous response
+                     * is a real response, we don't want the dummy response.
+                     * If the previous one is also a dummy, one should be
+                     * enough.
+                     */
+                    if (!tables.isEmpty()) {
+                        continue;
+                    }
                 }
+
+                tables.add(dep);
             }
 
-            tables.add(dep);
+            // needs to be a three long array to work
+            int[] hashes = new int[] { (int) hash, 0, 0 };
+
+            return checkCommon(hashes, msg.isRecovering(), message, false);
         }
-
-        // needs to be a three long array to work
-        int[] hashes = new int[] { (int) hash, 0, 0 };
-
-        return checkCommon(hashes, message.isRecovering(), null, message, false);
+        return super.offer(message);
     }
 
     @Override

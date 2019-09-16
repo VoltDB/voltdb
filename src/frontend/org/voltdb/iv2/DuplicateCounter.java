@@ -18,18 +18,16 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -37,7 +35,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -62,19 +59,27 @@ public class DuplicateCounter
     int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     // if any response shows the transaction aborted
+    boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     final long m_leaderHSID;
     final TransactionInfoBaseMessage m_openMessage;
-
-    List<Long> m_misMatchedSites = Lists.newArrayList();
-    int[] m_leaderResponseHashes = null;
-    boolean m_leaderTxnSucceed = false;
-    Map<Long, int[]> m_replicaResponseHashes = Maps.newTreeMap();
+    Map<Long, ResponseResult> m_responses = Maps.newTreeMap();
+    private boolean m_allMatched = true;
     Set<Long> m_replicas = Sets.newHashSet();
-    Set<VoltMessage> m_failedReplicas = Sets.newHashSet();
 
-    final boolean m_counterForEverySiteProc;
+    final boolean m_forEverySite;
+
+    static class ResponseResult {
+        final int[] hashes;
+        final boolean success;
+        final VoltMessage message;
+        public ResponseResult(int[] respHashes, boolean status, VoltMessage msg) {
+            hashes = respHashes;
+            success = status;
+            message = msg;
+        }
+    }
 
     DuplicateCounter(
             long destinationHSId,
@@ -82,15 +87,14 @@ public class DuplicateCounter
             List<Long> expectedHSIds,
             TransactionInfoBaseMessage openMessage,
             long leaderHSID,
-            boolean counterForEverySiteProc) {
+            boolean forEverySite) {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
         m_openMessage = openMessage;
         m_leaderHSID = leaderHSID;
+        m_forEverySite = forEverySite;
         m_replicas.addAll(expectedHSIds);
-        m_replicas.remove(m_leaderHSID);
-        m_counterForEverySiteProc = counterForEverySiteProc;
     }
 
     DuplicateCounter(
@@ -109,12 +113,8 @@ public class DuplicateCounter
     int updateReplicas(List<Long> replicas) {
         m_expectedHSIds.retainAll(replicas);
         m_replicas.retainAll(replicas);
-        m_failedReplicas = m_failedReplicas.stream().filter(
-                s->replicas.contains(s.m_sourceHSId)).collect(Collectors.toSet());
         if (m_expectedHSIds.isEmpty()) {
-            if (!m_leaderTxnSucceed && !m_failedReplicas.isEmpty() && m_failedReplicas.size() == m_replicas.size()) {
-                m_misMatchedSites.clear();
-            }
+            determineResult();
             return DONE;
         }
         return WAITING;
@@ -132,6 +132,10 @@ public class DuplicateCounter
         m_expectedHSIds.add(newMaster);
         m_replicas.remove(previousMaster);
         m_replicas.add(newMaster);
+        ResponseResult respResult = m_responses.remove(previousMaster);
+        if (respResult != null) {
+            m_responses.put(newMaster,respResult);
+        }
     }
 
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
@@ -144,7 +148,7 @@ public class DuplicateCounter
                 + "PREV RESPONSE MESSAGE: %s\n"
                 + "CURR RESPONSE MESSAGE: %s\n",
                 hashes[0],
-                m_leaderResponseHashes[0],
+                m_responseHashes[0],
                 m_openMessage.toString(),
                 m_lastResponse.toString(),
                 recentMessage.toString());
@@ -192,17 +196,17 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-            int pos = -1;
-
+            m_lastResponse = message;
             // Every partition sys proc InitiateResponseMessage
-            if (m_counterForEverySiteProc) {
+            if (m_forEverySite) {
+                int pos = -1;
                 if (m_responseHashes == null) {
                     m_responseHashes = hashes;
-                    m_leaderTxnSucceed = txnSucceed;
-                } else if (m_leaderTxnSucceed != txnSucceed) {
+                    m_txnSucceed = txnSucceed;
+                } else if (m_txnSucceed != txnSucceed) {
                     tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
                     logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
                     return ABORT;
@@ -211,46 +215,9 @@ public class DuplicateCounter
                     logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                     return MISMATCH;
                 }
-            } else if (message.m_sourceHSId == m_leaderHSID) {
-                m_leaderResponseHashes = hashes;
-                m_leaderTxnSucceed = txnSucceed;
-                // Responses from replicas may have arrived earlier than partition master
-                for (Map.Entry<Long, int[]> entry : m_replicaResponseHashes.entrySet()) {
-                    int [] theHashes = entry.getValue();
-                    if ((pos = DeterminismHash.compareHashes(m_leaderResponseHashes, theHashes)) >= 0) {
-                        tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                        logRelevantMismatchInformation("HASH MISMATCH", theHashes, message, pos);
-                        m_misMatchedSites.add(entry.getKey());
-                    }
-                }
-                m_replicaResponseHashes.clear();
-                if (m_leaderTxnSucceed) {
-                    if (!m_failedReplicas.isEmpty()) {
-                        tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                        for (VoltMessage msg : m_failedReplicas) {
-                            logRelevantMismatchInformation("HASH MISMATCH", ZERO_HASHES, msg, -1);
-                        }
-                    }
-                }
-            } else if (message.m_sourceHSId != m_leaderHSID) {
-                if (m_leaderResponseHashes != null) {
-                    if (m_leaderTxnSucceed != txnSucceed) {
-                        tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                        logRelevantMismatchInformation("HASH MISMATCH", ZERO_HASHES, message, -1);
-                    } else {
-                        if ((pos = DeterminismHash.compareHashes(m_leaderResponseHashes, hashes)) >= 0) {
-                            tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                            logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
-                            m_misMatchedSites.add(message.m_sourceHSId);
-                        }
-                    }
-                } else if (txnSucceed) {
-                    m_replicaResponseHashes.put(message.m_sourceHSId, hashes);
-                } else {
-                    m_failedReplicas.add(message);
-                }
+            } else {
+                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes,txnSucceed, message));
             }
-            m_lastResponse = message;
         }
 
         /*
@@ -268,62 +235,72 @@ public class DuplicateCounter
             return WAITING;
         }
 
-        // Clean up failed sites
-        m_misMatchedSites.retainAll(m_replicas);
-        m_failedReplicas = m_failedReplicas.stream().filter(
-                s->m_replicas.contains(s.m_sourceHSId)).collect(Collectors.toSet());
-
-        // Transaction fails on all replicas
-        if (!m_leaderTxnSucceed && !m_failedReplicas.isEmpty() && m_failedReplicas.size() == m_replicas.size()) {
-            m_misMatchedSites.clear();
-        }
+        determineResult();
         return DONE;
     }
 
-    protected int checkCommon(VoltMessage message) {
-        /*
-         * Set m_lastResponse to a response once at least. It's possible
-         * that all responses are dummy responses in the case of elastic
-         * join. So only setting m_lastResponse when the message is not
-         * a dummy will leave the variable as null.
-         */
-        if (m_lastResponse == null) {
-            m_lastResponse = message;
+    private void determineResult() {
+        if (!m_forEverySite || m_responses.isEmpty()) {
+            return;
+        }
+        ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
+        assert (leaderResponse != null);
+        m_responseHashes = leaderResponse.hashes;
+        m_lastResponse = leaderResponse.message;
+        int failedCount = m_responses.size();
+        for (Iterator<Map.Entry<Long, ResponseResult>> it = m_responses.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<Long, ResponseResult> entry = it.next();
+            if (!m_replicas.contains(entry.getKey())) {
+                it.remove();
+                failedCount--;
+            }
+            ResponseResult res = entry.getValue();
+            if (!res.success) {
+                failedCount--;
+            }
+            int [] theHashes = res.hashes;
+            int pos = -1;
+            if (leaderResponse.success != entry.getValue().success) {
+                tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
+                logRelevantMismatchInformation("HASH MISMATCH", theHashes, res.message, -1);
+                m_allMatched = false;
+            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, theHashes)) >= 0) {
+                tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
+                logRelevantMismatchInformation("HASH MISMATCH", theHashes, res.message, pos);
+                m_allMatched = false;
+            }
         }
 
-        m_expectedHSIds.remove(message.m_sourceHSId);
-        return (m_expectedHSIds.isEmpty()) ? DONE : WAITING;
+        // All replicas, including leader, failed
+        if (!leaderResponse.success && failedCount ==0) {
+            m_allMatched = true;
+        }
     }
 
     public boolean allResponsesMatched() {
-        return m_misMatchedSites.isEmpty();
+        return m_allMatched;
     }
 
-    int offer(InitiateResponseMessage message)
-    {
-        ClientResponseImpl r = message.getClientResponseData();
-        // get the hash of sql run
-        int[] hashes = r.getHashes();
+    int offer(VoltMessage message) {
+        if (message instanceof FragmentResponseMessage ||
+                message instanceof CompleteTransactionResponseMessage ||
+                message instanceof DummyTransactionResponseMessage) {
+            if (m_lastResponse == null) {
+                m_lastResponse = message;
+            }
 
-        boolean txnAbort = true;
-        if (ClientResponseImpl.isTransactionallySuccessful(message.getClientResponseData().getStatus())) {
-            txnAbort = false;
+            m_expectedHSIds.remove(message.m_sourceHSId);
+            return (m_expectedHSIds.isEmpty()) ? DONE : WAITING;
         }
-
-        return checkCommon(hashes, message.isRecovering(), r.getResults(), message, txnAbort);
-    }
-
-    int offer(FragmentResponseMessage message) {
-        // No check on fragment message
-        return checkCommon(message);
-    }
-
-    int offer(CompleteTransactionResponseMessage message) {
-        return checkCommon(message);
-    }
-
-    int offer(DummyTransactionResponseMessage message) {
-        return checkCommon(message);
+        if (message instanceof InitiateResponseMessage) {
+            final InitiateResponseMessage msg = (InitiateResponseMessage)message;
+            ClientResponseImpl r = msg.getClientResponseData();
+            return checkCommon(r.getHashes(),
+                    msg.isRecovering(),
+                    message,
+                    !(ClientResponseImpl.isTransactionallySuccessful(r.getStatus())));
+        }
+        return DONE;
     }
 
     VoltMessage getLastResponse() {
