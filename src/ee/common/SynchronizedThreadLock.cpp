@@ -78,8 +78,8 @@ void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
 void SynchronizedThreadLock::create() {
     vassert(s_SITES_PER_HOST == -1);
     s_SITES_PER_HOST = 0;
-    pthread_cond_init(&s_sharedEngineCondition, 0);
-    pthread_cond_init(&s_wakeLowestEngineCondition, 0);
+    pthread_cond_init(&s_sharedEngineCondition, nullptr);
+    pthread_cond_init(&s_wakeLowestEngineCondition, nullptr);
 }
 
 void SynchronizedThreadLock::destroy() {
