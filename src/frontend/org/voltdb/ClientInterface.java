@@ -1051,10 +1051,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             try {
-                ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
-                int partition = TheHashinator.getPartitionForParameter(
-                        ppi.type, invocationParameter);
+                int partition = -1;
+                if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+                    // Directed procedure running on partition
+                    partition = response.getInvocation().getPartitionDestination();
+                    assert partition != -1;
+                } else {
+                     // Regular partitioned procedure
+                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                    Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
+                    partition = TheHashinator.getPartitionForParameter(
+                          ppi.type, invocationParameter);
+                }
                 m_dispatcher.createTransaction(cihm.connection.connectionId(),
                         response.getInvocation(),
                         catProc.getReadonly(),
