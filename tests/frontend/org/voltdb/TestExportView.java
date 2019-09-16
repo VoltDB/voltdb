@@ -65,6 +65,7 @@ public class TestExportView extends TestExportBase {
         final Client client = getClient();
 
         client.callProcedure("@AdHoc", "create stream ex partition on column i (i bigint not null)");
+        m_streamNames.add("EX");
         client.callProcedure("@AdHoc", "create view v_ex (i, counti) AS select i, count(*) from ex group by i");
         StringBuilder insertSql;
         for (int i=0;i<5000;i++) {
@@ -73,7 +74,7 @@ public class TestExportView extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, m_streamNames);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
     }
@@ -83,6 +84,7 @@ public class TestExportView extends TestExportBase {
         final Client client = getClient();
 
         client.callProcedure("@AdHoc", "create stream ex partition on column i (i bigint not null)");
+        m_streamNames.add("EX");
         client.callProcedure("@AdHoc", "create view v_ex (i, counti) AS select i, count(*) from ex group by i");
         StringBuilder insertSql;
         for (int i=0;i<5000;i++) {
@@ -91,7 +93,7 @@ public class TestExportView extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, m_streamNames);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
     }

@@ -1936,16 +1936,23 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
+
     if (isTableWithMigrate(m_tableType)) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
-            vassert(it != m_migratingRows.end());
-            MigratingBatch& batch = it->second;
-            void* addr = originalTuple.address();
-            size_t found = batch.erase(addr);
-            vassert(found == 1);
-            batch.emplace(destinationTuple.address());
+
+            // The delete-pending tuple should have been removed from migrating index
+            if (originalTuple.isPendingDelete()) {
+                vassert(it == m_migratingRows.end());
+            } else {
+                 vassert(it != m_migratingRows.end());
+                 MigratingBatch& batch = it->second;
+                 void* addr = originalTuple.address();
+                 size_t found = batch.erase(addr);
+                 vassert(found == 1);
+                 batch.emplace(destinationTuple.address());
+            }
         }
     }
 }
@@ -2128,7 +2135,7 @@ void PersistentTable::printBucketInfo() {
     boost::unordered_set<TBPtr>::iterator blocksNotPendingSnapshot = m_blocksNotPendingSnapshot.begin();
     std::cout << "Blocks not pending snapshot: ";
     while (blocksNotPendingSnapshot != m_blocksNotPendingSnapshot.end()) {
-        std::cout << static_cast<void*>((*blocksNotPendingSnapshot)->address()) << ",";
+        std::cout << static_cast<void*>(TBPtr(*blocksNotPendingSnapshot)->address()) << ",";
         blocksNotPendingSnapshot++;
     }
     std::cout << std::endl;
@@ -2139,7 +2146,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksNotPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksNotPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksNotPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksNotPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(TBPtr(*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }
@@ -2147,7 +2154,7 @@ void PersistentTable::printBucketInfo() {
     boost::unordered_set<TBPtr>::iterator blocksPendingSnapshot = m_blocksPendingSnapshot.begin();
     std::cout << "Blocks pending snapshot: ";
     while (blocksPendingSnapshot != m_blocksPendingSnapshot.end()) {
-        std::cout << static_cast<void*>((*blocksPendingSnapshot)->address()) << ",";
+        std::cout << static_cast<void*>(TBPtr(*blocksPendingSnapshot)->address()) << ",";
         blocksPendingSnapshot++;
     }
     std::cout << std::endl;
@@ -2158,7 +2165,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(TBPtr(*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }

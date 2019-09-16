@@ -43,7 +43,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -60,7 +60,6 @@ import com.google_voltpatches.common.collect.Sets;
 public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private final TickProducer m_tickProducer;
     private boolean m_promoted = false;
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
@@ -129,7 +128,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks, getInitiatorHSId());
         m_scheduler.m_repairLog = m_repairLog;
     }
 
@@ -156,8 +154,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, agent, memStats, cl,
                 coreBindIds, isLowestSiteId);
-
-        m_tickProducer.start();
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
@@ -299,7 +295,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
                 }
-                ExportManager.instance().becomeLeader(m_partitionId);
+                ExportManagerInterface.instance().becomeLeader(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

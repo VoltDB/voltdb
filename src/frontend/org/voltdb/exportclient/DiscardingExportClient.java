@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -60,7 +62,7 @@ public class DiscardingExportClient extends ExportClientBase {
             super(source);
             m_atomicWorkLock.lock();
             try {
-                if (s_es == null) {
+                if (s_es == null && ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
                     s_es = CoreUtils.getListeningSingleThreadExecutor(
                             "Common Discarding Export decoder thread", CoreUtils.MEDIUM_STACK_SIZE);
                 }
@@ -115,6 +117,7 @@ public class DiscardingExportClient extends ExportClientBase {
                 m_logger.error("Failed to decode ackdelay value \'" + sleepValue + "\': " + e);
             }
         }
+        setRunEverywhere(Boolean.parseBoolean(config.getProperty("replicated", "false")));
     }
 
     @Override

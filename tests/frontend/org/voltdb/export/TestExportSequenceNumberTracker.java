@@ -77,6 +77,53 @@ public class TestExportSequenceNumberTracker {
         tracker.append(25L, 30L);
         tracker.append(35L, 40L);
 
+        // Test finding gap by sequence number, checking boundary cases
+        // Testing finding gaps on [1, 9] [15, 20] [25, 30] [35, 40]
+
+        assertEquals(10L, tracker.getFirstGap(0L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(0L).getSecond().longValue());
+        assertEquals(10L, tracker.getFirstGap(9L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(9L).getSecond().longValue());
+        assertEquals(10L, tracker.getFirstGap(10L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(10L).getSecond().longValue());
+        assertEquals(10L, tracker.getFirstGap(13L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(13L).getSecond().longValue());
+        assertEquals(10L, tracker.getFirstGap(14L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(14L).getSecond().longValue());
+
+        assertEquals(21L, tracker.getFirstGap(15L).getFirst().longValue());
+        assertEquals(24L, tracker.getFirstGap(15L).getSecond().longValue());
+        assertEquals(21L, tracker.getFirstGap(16L).getFirst().longValue());
+        assertEquals(24L, tracker.getFirstGap(16L).getSecond().longValue());
+        assertEquals(21L, tracker.getFirstGap(20L).getFirst().longValue());
+        assertEquals(24L, tracker.getFirstGap(20L).getSecond().longValue());
+        assertEquals(21L, tracker.getFirstGap(21L).getFirst().longValue());
+        assertEquals(24L, tracker.getFirstGap(21L).getSecond().longValue());
+        assertEquals(21L, tracker.getFirstGap(24L).getFirst().longValue());
+        assertEquals(24L, tracker.getFirstGap(24L).getSecond().longValue());
+
+        assertEquals(31L, tracker.getFirstGap(25L).getFirst().longValue());
+        assertEquals(34L, tracker.getFirstGap(25L).getSecond().longValue());
+        assertEquals(31L, tracker.getFirstGap(26L).getFirst().longValue());
+        assertEquals(34L, tracker.getFirstGap(26L).getSecond().longValue());
+        assertEquals(31L, tracker.getFirstGap(30L).getFirst().longValue());
+        assertEquals(34L, tracker.getFirstGap(30L).getSecond().longValue());
+        assertEquals(31L, tracker.getFirstGap(31L).getFirst().longValue());
+        assertEquals(34L, tracker.getFirstGap(31L).getSecond().longValue());
+        assertEquals(31L, tracker.getFirstGap(34L).getFirst().longValue());
+        assertEquals(34L, tracker.getFirstGap(34L).getSecond().longValue());
+
+        assertEquals(null, tracker.getFirstGap(35L));
+        assertEquals(null, tracker.getFirstGap(35L));
+        assertEquals(null, tracker.getFirstGap(36L));
+        assertEquals(null, tracker.getFirstGap(36L));
+        assertEquals(null, tracker.getFirstGap(40L));
+        assertEquals(null, tracker.getFirstGap(40L));
+        assertEquals(null, tracker.getFirstGap(41L));
+        assertEquals(null, tracker.getFirstGap(41L));
+        assertEquals(null, tracker.getFirstGap(42L));
+        assertEquals(null, tracker.getFirstGap(42L));
+
         // try appending an overlapping value
         boolean failed = false;
         try {
@@ -149,5 +196,4 @@ public class TestExportSequenceNumberTracker {
         tracker.addRange(40L, 50L);
         tracker.addRange(8L, 12L);
     }
-
 }

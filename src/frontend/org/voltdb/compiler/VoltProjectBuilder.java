@@ -41,6 +41,7 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -53,6 +54,9 @@ import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
+import org.voltdb.compiler.deploymentfile.FlushIntervalType;
+import org.voltdb.compiler.deploymentfile.FeatureType;
+import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -78,6 +82,8 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -319,6 +325,7 @@ public class VoltProjectBuilder {
     private Integer m_resourceCheckInterval = null;
     private Map<FeatureNameType, String> m_featureDiskLimits;
     private Map<FeatureNameType, String> m_snmpFeatureDiskLimits;
+    private FlushIntervalType m_flushIntervals = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -328,6 +335,7 @@ public class VoltProjectBuilder {
     private String m_drConsumerSslPropertyFile = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
+    private FeaturesType m_featureOptions;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -372,6 +380,31 @@ public class VoltProjectBuilder {
     public VoltProjectBuilder setElasticDuration(int target) {
         m_elasticDuration = target;
         return this;
+    }
+
+    public void setExportMode(ExportMode mode) {
+        if (mode == ExportMode.ADVANCED && !VoltDB.instance().getConfig().m_isEnterprise) {
+            throw new IllegalArgumentException("Attempt to set export mode to ADVANCED in community build");
+        }
+
+        if (m_featureOptions == null) {
+            m_featureOptions = new FeaturesType();
+        } else {
+            FeatureType exportFeature = null;
+            for (FeatureType feature : m_featureOptions.getFeature()) {
+                if (feature.getName().equals(ExportManagerInterface.EXPORT_FEATURE)) {
+                    exportFeature = feature;
+                    break;
+                }
+            }
+            if (exportFeature != null) {
+                m_featureOptions.getFeature().remove(exportFeature);
+            }
+        }
+        FeatureType exportFeature = new FeatureType();
+        exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
+        exportFeature.setOption(mode.name());
+        m_featureOptions.getFeature().add(exportFeature);
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -441,6 +474,10 @@ public class VoltProjectBuilder {
                 assert(added);
             }
         }
+    }
+
+    public void clearUsers() {
+        m_users.clear();
     }
 
     public void addRoles(final RoleInfo roles[]) {
@@ -713,6 +750,18 @@ public class VoltProjectBuilder {
         m_heartbeatTimeout = seconds;
     }
 
+    public void setFlushIntervals(int minimumInterval, int drFlushInterval, int exportFlushInterval) {
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory = new org.voltdb.compiler.deploymentfile.ObjectFactory();
+        m_flushIntervals = factory.createFlushIntervalType();
+        m_flushIntervals.setMinimum(minimumInterval);
+        FlushIntervalType.Dr drFlush = new FlushIntervalType.Dr();
+        drFlush.setInterval(drFlushInterval);
+        m_flushIntervals.setDr(drFlush);
+        FlushIntervalType.Export exportFlush = new FlushIntervalType.Export();
+        exportFlush.setInterval(exportFlushInterval);
+        m_flushIntervals.setExport(exportFlush);
+    }
+
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
          addImport(enabled, importType, importFormat, importBundle, config, new Properties());
     }
@@ -739,12 +788,17 @@ public class VoltProjectBuilder {
         m_ilImportConnectors.add(importConnector);
     }
 
+    // Use this to update deployment with new or modified export targets
+    public void clearExports() {
+        m_exportConfigs.clear();
+    }
+
     public void addExport(boolean enabled) {
         addExport(enabled, null, null);
     }
 
     public void addExport(boolean enabled, ServerExportEnum exportType, Properties config) {
-        addExport(enabled, exportType, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        addExport(enabled, exportType, config, Constants.CONNECTORLESS_STREAM_TARGET_NAME);
     }
 
     public void addExport(boolean enabled, ServerExportEnum exportType, Properties config, String target) {
@@ -1320,6 +1374,8 @@ public class VoltProjectBuilder {
             conn.setSsl(m_drConsumerSslPropertyFile);
         }
 
+        setFeatureOptions(deployment);
+
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
         JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
@@ -1329,6 +1385,23 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
+    }
+
+    private void setFeatureOptions(DeploymentType deployment) {
+        // set export mode to ADVANCED in pro builds, unless it is already explicitly set.
+        // This is so that we can run E3 export in pro junits by default.
+           if (m_featureOptions == null &&
+               VoltDB.instance().getConfig() != null && VoltDB.instance().getConfig().m_isEnterprise) {
+            m_featureOptions = new FeaturesType();
+            FeatureType exportFeature = new FeatureType();
+            exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
+            exportFeature.setOption(ExportMode.ADVANCED.name());
+            m_featureOptions.getFeature().add(exportFeature);
+        }
+
+        if (m_featureOptions != null) {
+            deployment.setFeatures(m_featureOptions);
+        }
     }
 
 
@@ -1359,6 +1432,10 @@ public class VoltProjectBuilder {
             procedure.setLoginfo(m_procedureLogThreshold);
             systemSettingType.setProcedure(procedure);
         }
+
+        // <flushIntervals>
+        systemSettingType.setFlushinterval(m_flushIntervals);
+
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();

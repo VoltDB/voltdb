@@ -34,7 +34,7 @@ public class SiteFailureForwardMessage extends SiteFailureMessage {
         m_safeTxnIds = ImmutableMap.copyOf(sfm.m_safeTxnIds);
     }
 
-    SiteFailureForwardMessage() {
+    public SiteFailureForwardMessage() {
     }
 
     @Override

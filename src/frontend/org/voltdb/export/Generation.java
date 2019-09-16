@@ -50,4 +50,7 @@ public interface Generation {
     public int getCatalogVersion();
 
     public void updateGenerationId(long genId);
+
+    // FIXME: review if needed
+    public void sync();
 }

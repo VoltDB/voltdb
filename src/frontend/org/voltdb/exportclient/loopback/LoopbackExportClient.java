@@ -34,7 +34,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.aeonbits.owner.Accessible;
 import org.aeonbits.owner.ConfigFactory;
@@ -47,9 +47,12 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.CSVWriterDecoder;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -57,7 +60,6 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import org.voltdb.exportclient.ExportRow;
 
 public class LoopbackExportClient extends ExportClientBase {
 
@@ -142,7 +144,7 @@ public class LoopbackExportClient extends ExportClientBase {
         private final ListeningExecutorService m_es;
         private final AuthUser m_user;
         private final InternalConnectionHandler m_invoker;
-        private final Function<Integer, Boolean> m_shouldContinue;
+        private final Predicate<Integer> m_shouldContinue;
 
         private BitSet m_failed = new BitSet(0);
         private BitSet m_resubmit = new BitSet(0);
@@ -150,6 +152,7 @@ public class LoopbackExportClient extends ExportClientBase {
         private BlockContext m_ctx;
         private boolean m_restarted = false;
         private boolean m_wrote = false;
+        private volatile boolean m_isShutDown;
 
         private final Supplier<CSVWriter> m_rejs;
 
@@ -186,11 +189,19 @@ public class LoopbackExportClient extends ExportClientBase {
                 .skipInternalFields(m_skipInternals)
             ;
             m_csvWriterDecoder = builder.build();
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Loopback Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "Loopback Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
             m_user = getVoltDB().getCatalogContext().authSystem.getImporterUser();
             m_invoker = getVoltDB().getClientInterface().getInternalConnectionHandler();
-            m_shouldContinue = (x) -> !m_es.isShutdown();
+            m_shouldContinue = (x) -> !isShutDown();
+        }
+
+        public boolean isShutDown() {
+            return m_isShutDown;
         }
 
         @Override
@@ -266,12 +277,15 @@ public class LoopbackExportClient extends ExportClientBase {
                     m_rejs.get().close();
                 } catch (IOException ignoreIt) {}
             }
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                LOG.error("Interrupted while awaiting executor shutdown", e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    LOG.error("Interrupted while awaiting executor shutdown", e);
+                }
             }
+            m_isShutDown = true;
         }
 
         @Override

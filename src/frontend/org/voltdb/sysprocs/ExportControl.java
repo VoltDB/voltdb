@@ -34,7 +34,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -75,7 +75,7 @@ public class ExportControl extends VoltSystemProcedure {
                 final String operationMode = (String) params.toArray()[2];
                 List<String> exportTargets = Arrays.asList(targets).stream().
                         filter(s -> (!StringUtil.isEmpty(s))).collect(Collectors.toList());
-                ExportManager.instance().processStreamControl(exportSource, exportTargets,
+                ExportManagerInterface.instance().processStreamControl(exportSource, exportTargets,
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
 

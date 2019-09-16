@@ -68,9 +68,9 @@ public enum StatsSelector {
     IMPORTER,       // synonym as IMPORT for backward compatibility
     IMPORT(IMPORTER),
     EXPORT,
-    SCHEDULES(false),
-    SCHEDULERS(SCHEDULES),
-    SCHEDULED_PROCEDURES(SCHEDULES);
+    TASK(false),
+    TASK_SCHEDULER(TASK),
+    TASK_PROCEDURE(TASK);
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;
@@ -100,5 +100,9 @@ public enum StatsSelector {
 
     StatsSelector[] subSelectors() {
         return m_subSelctors;
+    }
+
+    public static StatsSelector[] getAllStatsCollector() {
+        return StatsSelector.class.getEnumConstants();
     }
 }

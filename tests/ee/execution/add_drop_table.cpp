@@ -74,6 +74,9 @@ class AddDropTableTest : public Test {
 
         std::string initialCatalog =
           "add / clusters cluster\n"
+          "set /clusters#cluster localepoch 0\n"
+          "set $PREV drFlushInterval 1\n"
+          "set $PREV exportFlushInterval 1\n"
           "add /clusters#cluster databases database\n"
           "set /clusters#cluster/databases#database isActiveActiveDRed false\n"
           "add /clusters#cluster/databases#database programs program\n";

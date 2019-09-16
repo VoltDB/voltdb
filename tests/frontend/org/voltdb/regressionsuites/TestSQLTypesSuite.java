@@ -1469,9 +1469,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addSchema(TestSQLTypesSuite.class
                 .getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("NO_NULLS_GRP", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS_GRP", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
         project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");

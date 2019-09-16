@@ -75,8 +75,8 @@ public class Constants
     /** String that can be used to indicate NULL value in CSV files */
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
-    // default export group to use when no group name is provided
-    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__default__";
+    // export connector name for streams that don't specify a target (Connectorless streams)
+    public static final String CONNECTORLESS_STREAM_TARGET_NAME = "__UNSPECIFIED_TARGET__";
 
     // Special HTTP port values to disable or trigger auto-scan.
     public static final int UNDEFINED = -1;

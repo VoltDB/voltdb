@@ -495,8 +495,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         if (!message.isSinglePartition()) {
-            throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
-                    "should never receive multi-partition initiations.");
+            VoltDB.crashLocalVoltDB("SpScheduler.handleIv2InitiateTaskMessage " +
+                    "should never receive multi-partition initiations. Invocation: " + message, true, null);
         }
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;

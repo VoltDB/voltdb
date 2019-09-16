@@ -71,8 +71,8 @@
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
-                                <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
-                                <li id="navExporter" style="display:none"><a href="#">Exporter</a></li>
+                                <li id="navImporter" style="display:none"><a href="#">Import</a></li>
+                                <li id="navExporter" style="display:none"><a href="#">Export</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -1388,16 +1388,24 @@
                                         <tr >
                                             <th>Source</th>
                                             <th>Target</th>
-                                            <th>Thoroughput</th>
+                                            <th>Type</th>
+                                            <th>Throughput (Tuples/sec)</th>
                                             <th>Pending</th>
                                         </tr>
                                     </thead>
                                     <tbody>
+                                    <tr id=DUMMY_EXPORT_PLACE_HOLDER style="color: rgb(0, 0, 0);">
+                                        <td>0</td>
+                                        <td>0</td>
+                                        <td>0</td>
+                                        <td>0</td>
+                                        <td>0</td>
+                                    </tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                    </div>   
+                    </div>
                     <div class="clear"></div>
                     <div class="errorExporterMsgLocalStorageFull" style="display:none">
                         <div class="errorMsgLocalWrapper">
@@ -1420,7 +1428,7 @@
                         </div>
                         <div id="chartQueuedForExport" class="chart right">
                             <div class="chartHeader" id="chartQueuedHeaderForExport">
-                                <h1>Queued (Tuples/sec)<span class="activeServerName" title=""></span>
+                                <h1>Pending (Tuples/sec)<span class="activeServerName" title=""></span>
                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "queued-data" }, "queued");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                 </h1>

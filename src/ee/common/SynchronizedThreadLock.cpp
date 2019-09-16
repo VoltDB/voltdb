@@ -33,8 +33,8 @@ namespace voltdb {
 
 // Initialized when executor context is created.
 std::mutex SynchronizedThreadLock::s_sharedEngineMutex{};
-std::condition_variable SynchronizedThreadLock::s_sharedEngineCondition;
-std::condition_variable SynchronizedThreadLock::s_wakeLowestEngineCondition;
+pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition = PTHREAD_COND_INITIALIZER;
+pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition = PTHREAD_COND_INITIALIZER;
 
 // The Global Countdown Latch is critical to correctly coordinating between engine threads
 // when replicated tables are updated. Therefore we use SITES_PER_HOST as a constant that
@@ -82,6 +82,8 @@ void SynchronizedThreadLock::create() {
 
 void SynchronizedThreadLock::destroy() {
     s_SITES_PER_HOST = -1;
+    pthread_cond_destroy(&s_sharedEngineCondition);
+    pthread_cond_destroy(&s_wakeLowestEngineCondition);
 }
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineLocals) {
@@ -184,7 +186,11 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
         {
             std::unique_lock<std::mutex> g(s_sharedEngineMutex);
             if (--s_globalTxnStartCountdownLatch != 0) {
-                s_wakeLowestEngineCondition.wait(g);
+                // NOTE: using std::condition_variable::wait()
+                // methods would hang TestImportSuite. So we have
+                // to use pthread_ methods.
+                pthread_cond_wait(&s_wakeLowestEngineCondition,
+                        s_sharedEngineMutex.native_handle());
             }
         }
         VOLT_DEBUG("Switching context to MP partition on thread %d",
@@ -197,9 +203,10 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
         {
             std::unique_lock<std::mutex> g(s_sharedEngineMutex);
             if (--s_globalTxnStartCountdownLatch == 0) {
-                s_wakeLowestEngineCondition.notify_all();
+                pthread_cond_broadcast(&s_wakeLowestEngineCondition);
             }
-            s_sharedEngineCondition.wait(g);
+            pthread_cond_wait(&s_sharedEngineCondition,
+                    s_sharedEngineMutex.native_handle());
         }
         VOLT_DEBUG("Other SP partition thread released on thread %d",
                 ThreadLocalPool::getThreadPartitionId());
@@ -214,7 +221,7 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
     VOLT_DEBUG("Restore context to lowest SP partition on thread %d",
             ThreadLocalPool::getThreadPartitionId());
     setIsInSingleThreadMode(false);
-    s_sharedEngineCondition.notify_all();
+    pthread_cond_broadcast(&s_sharedEngineCondition);
 }
 
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,

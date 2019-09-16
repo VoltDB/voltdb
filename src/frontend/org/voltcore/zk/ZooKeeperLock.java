@@ -19,9 +19,7 @@ package org.voltcore.zk;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.apache.zookeeper_voltpatches.AsyncCallback.VoidCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -66,7 +64,7 @@ public class ZooKeeperLock implements Watcher {
             synchronized(m_lock) {
                 long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 while(true) {
-                    List<String> nodes = getAllLockingNodes();
+                    List<String> nodes = m_zk.getChildren(m_basePath, this);
 
                     //Sort the nodes by name which ends with a 10 digit number
                     //Grant the lock to the first entry with the lowest sequence number
@@ -91,23 +89,6 @@ public class ZooKeeperLock implements Watcher {
             hostLog.warn("Could not acquire a ZK lock:" + e.getMessage());
         }
         return false;
-    }
-
-    private List<String> getAllLockingNodes() throws KeeperException, InterruptedException {
-        //ensure that any updates with the lower sequence numbers are committed on both leader
-        //and all followers to avoid any missing reads on followers because ZooKeeper does not guarantee a write
-        //is immediately visible on all followers.
-        CountDownLatch latch = new CountDownLatch(1);
-        m_zk.sync(m_basePath, new VoidCallback() {
-            @Override
-            public void processResult(int rc, String path, Object ctx) {
-                latch.countDown();
-            }
-        }, null);
-        latch.await();
-
-        //get a list of sequential nodes and watch on updates on this node
-        return m_zk.getChildren(m_basePath, this);
     }
 
     public void releaseLock() throws IOException {

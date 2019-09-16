@@ -25,7 +25,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -33,7 +32,6 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.util.Pair;
@@ -43,7 +41,13 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
-import org.voltdb.plannerv2.rel.physical.*;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalMergeJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopIndexJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableIndexScan;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 import org.voltdb.plannerv2.utils.IndexUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.IndexLookupType;
@@ -52,6 +56,7 @@ import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ImmutableList;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
 
@@ -366,10 +371,6 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         final VoltPhysicalJoin join = call.rel(0);
-        // INNER only at the moment
-        if (join.getJoinType() != JoinRelType.INNER) {
-            return;
-        }
 
         // Outer Child
         final RelNode outerNode = m_matchType.getOuterNode(call);

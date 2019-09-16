@@ -145,7 +145,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        public void sync() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
@@ -156,6 +156,12 @@ public class TestExportDataSource extends TestCase {
 
         @Override
         public void updateGenerationId(long genId) {
+        }
+
+        @Override
+        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+            // TODO Auto-generated method stub
+            return null;
         }
     }
 
@@ -391,7 +397,7 @@ public class TestExportDataSource extends TestCase {
             // Do a reentrant poll - the returned fut should have the expected exception
             ListenableFuture<AckingContainer> fut2 = s.poll();
             try {
-                AckingContainer c = fut2.get();
+                fut2.get();
                 fail("Did not get expected exception");
             }
             catch (Exception e) {
@@ -415,6 +421,53 @@ public class TestExportDataSource extends TestCase {
             cont1.discard();
             cont1 = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
+
+        } finally {
+            s.close();
+        }
+    }
+
+    // FIXME: ENG-17720 instrumentation
+    public void testDiscards() throws Exception{
+        System.out.println("Running testDiscards");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
+            foo0.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo0);
+
+            AckingContainer cont0 = s.poll().get();
+            cont0.updateStartTime(System.currentTimeMillis());
+
+            // Push a buffer - should satisfy fut1
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo1);
+
+            // Verify the pushed buffer can be got
+            AckingContainer cont1 = s.poll().get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            // Discard out of order
+            cont1.discard();
+            cont0.discard();
 
         } finally {
             s.close();

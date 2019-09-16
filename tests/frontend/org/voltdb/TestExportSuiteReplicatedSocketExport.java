@@ -23,9 +23,14 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,6 +58,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
 
     private static SocketExportTestServer m_serverSocket;
     private static LocalCluster config;
+    private static List<String> exStream = new ArrayList<>(Arrays.asList("EX"));
 
     @Override
     public void setUp() throws Exception {
@@ -79,7 +85,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         System.out.println("testExportReplicatedExportToSocket");
         final Client client = getClient();
 
-        client.callProcedure("@AdHoc", "create stream ex (i bigint not null)");
+        client.callProcedure("@AdHoc", "create stream ex export to target ex (i bigint not null)");
         StringBuilder insertSql;
         for (int i=0;i<5000;i++) {
             insertSql = new StringBuilder();
@@ -87,7 +93,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(5000);
 
         for (int i=5000;i<10000;i++) {
@@ -96,7 +102,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(10000);
 
         for (int i=10000;i<15000;i++) {
@@ -105,7 +111,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(15000);
 
         for (int i=15000;i<30000;i++) {
@@ -114,7 +120,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(30000);
 
         for (int i=30000;i<45000;i++) {
@@ -123,7 +129,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(45000);
     }
 
@@ -134,14 +140,14 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.createConnection("localhost", config.port(0));
 
         client.callProcedure("@AdHoc", "create table regular (i bigint not null)");
-        client.callProcedure("@AdHoc", "create stream ex (i bigint not null)");
+        client.callProcedure("@AdHoc", "create stream ex export to target ex (i bigint not null)");
         StringBuilder insertSql = new StringBuilder();
         for (int i=0;i<50;i++) {
             insertSql.append("insert into ex values(" + i + ");");
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(50);
 
         config.killSingleHost(1);
@@ -153,7 +159,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         //After recovery make sure we get exact 2 of each.
         m_serverSocket.verifyExportedTuples(100);
 
@@ -166,7 +172,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         //After recovery make sure we get exact 2 of each.
         m_serverSocket.verifyExportedTuples(150);
 
@@ -182,7 +188,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForExportAllocatedMemoryZero(client);
+        waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(2000);
     }
 
@@ -206,7 +212,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         props.put("replicated", "true");
         props.put("skipinternals", "true");
 
-        project.addExport(true, ServerExportEnum.CUSTOM, props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "ex");
         /*
          * compile the catalog all tests start with
          */

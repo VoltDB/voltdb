@@ -31,20 +31,13 @@ public class InsertBase extends VoltProcedure {
     protected final SQLStmt i_no_nulls = new SQLStmt
     ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    protected final SQLStmt i_no_nulls_grp = new SQLStmt
-    ("INSERT INTO NO_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
-
     protected final SQLStmt i_allow_nulls = new SQLStmt
     ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-    protected final SQLStmt i_allow_nulls_grp = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_defaults = new SQLStmt
     ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
 
     public long run() {
-        assert(false);
         throw new RuntimeException("Don't call this.");
     }
 

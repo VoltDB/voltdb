@@ -21,14 +21,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexProgram;
 import org.json_voltpatches.JSONException;
@@ -36,13 +34,20 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
-import org.voltdb.plannerv2.rel.physical.*;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopIndexJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableIndexScan;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 import org.voltdb.plannerv2.utils.IndexUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ImmutableList;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Matching rule sets from nest loop join to nest loop-index join
@@ -165,11 +170,6 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         final VoltPhysicalTableScan innerScan = extractor.getInnerTableScan();
         final Calc innerCalc = extractor.getInnerCalc();
         final RexProgram program = extractor.getInnerProgram();
-
-        // INNER only at the moment
-        if (join.getJoinType() != JoinRelType.INNER) {
-            return;
-        }
 
         final Table innerTable = innerScan.getVoltTable().getCatalogTable();
         final Map<RelNode, RelNode> equiv = new HashMap<>();

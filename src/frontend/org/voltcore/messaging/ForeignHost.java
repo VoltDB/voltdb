@@ -163,6 +163,7 @@ public class ForeignHost {
         m_hasMultiConnections = true;
     }
 
+    @SuppressWarnings("deprecation")
     synchronized void close()
     {
         if (!m_isUp) {
@@ -342,6 +343,10 @@ public class ForeignHost {
     public void updateDeadHostTimeout(int timeout) {
         m_deadHostTimeout = timeout;
         setLogRate(timeout);
+    }
+
+    public void updateDeadReportCount() {
+        m_deadReportsCount.incrementAndGet();
     }
 
     /**
