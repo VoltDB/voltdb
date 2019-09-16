@@ -1868,19 +1868,24 @@ public final class TaskManager {
          */
         void setDynamicThreadCount(int threadCount) {
             if (m_dynamicThreadCount) {
-//                if (log.isTraceEnabled()) {
-//                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
-//                }
-                log.warn("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
+                if (log.isTraceEnabled()) {
+                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
+                }
                 setCorePoolSize(threadCount);
             }
         }
 
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
-                log.warn("MANAGER: Setting CorePoolSize to " + threadCount + " on " + m_name + " max size: " + m_rawExecutor.getMaximumPoolSize());
-                m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
-                m_rawExecutor.setCorePoolSize(threadCount);
+                // In JDK>=9, setCorePoolSize(poolSize) requires the poolSize <= MaximumPoolSize
+                // and setMaximumPoolSize(poolSize) requires the poolSize >= CorePoolSize.
+                if (m_rawExecutor.getMaximumPoolSize() >= threadCount) {
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                } else {
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                }
             }
         }
     }
