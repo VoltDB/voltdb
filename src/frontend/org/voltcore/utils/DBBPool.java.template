@@ -503,7 +503,7 @@ public final class DBBPool {
                 clear();
                 retval = ByteBuffer.allocateDirect(capacity);
             } else {
-                throw new Error(e);
+                throw e;
             }
         }
         bytesAllocatedGlobally.getAndAdd(capacity);
