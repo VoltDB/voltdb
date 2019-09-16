@@ -72,7 +72,7 @@ inline static signedType convertUnsignedValueToSignedValue(uint64_t value) {
  * to prevent overflow.
  */
 template<>
-inline int64_t convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(uint64_t value) {
+inline int64_t convertUnsignedValueToSignedValue<int64_t, INT64_MAX>(uint64_t value) {
     if (value > static_cast<uint64_t>(INT64_MAX) + 1) {
         value -= INT64_MAX;
         value--;
@@ -112,9 +112,9 @@ inline uint64_t convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(
     return retval;
 }
 
-template <std::size_t keySize> struct IntsEqualityChecker;
-template <std::size_t keySize> struct IntsComparator;
-template <std::size_t keySize> struct IntsHasher;
+template <std::size_t> struct IntsEqualityChecker;
+template <std::size_t> struct IntsComparator;
+template <std::size_t> struct IntsHasher;
 
 /**
  *  Integer key that will pack all key data into keySize number of uint64_t.
@@ -191,7 +191,7 @@ struct IntsKey {
         return retval;
     }
 
-    std::string debug( const voltdb::TupleSchema *keySchema) const {
+    std::string debug(const voltdb::TupleSchema *keySchema) const {
         std::ostringstream buffer;
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
@@ -200,20 +200,21 @@ struct IntsKey {
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
                 case voltdb::ValueType::tBIGINT:
-                    keyValue = extractKeyValue<uint64_t>(keyOffset, intraKeyOffset);
-                    buffer << convertUnsignedValueToSignedValue< int64_t, INT64_MAX>(keyValue) << ",";
+                    buffer << convertUnsignedValueToSignedValue<int64_t, INT64_MAX>(
+                            extractKeyValue<uint64_t>(keyOffset, intraKeyOffset)) << ",";
                     break;
                 case voltdb::ValueType::tINTEGER:
-                    keyValue = extractKeyValue<uint32_t>(keyOffset, intraKeyOffset);
-                    buffer << convertUnsignedValueToSignedValue< int32_t, INT32_MAX>(keyValue) << ",";
+                    buffer << convertUnsignedValueToSignedValue<int32_t, INT32_MAX>(
+                            extractKeyValue<uint32_t>(keyOffset, intraKeyOffset)) << ",";
                     break;
                 case voltdb::ValueType::tSMALLINT:
-                    keyValue = extractKeyValue<uint16_t>(keyOffset, intraKeyOffset);
-                    buffer << convertUnsignedValueToSignedValue< int16_t, INT16_MAX>(keyValue) << ",";
+                    buffer << convertUnsignedValueToSignedValue<int16_t, INT16_MAX>(
+                            extractKeyValue<uint16_t>(keyOffset, intraKeyOffset)) << ",";
                     break;
                 case voltdb::ValueType::tTINYINT:
-                    keyValue = extractKeyValue<uint8_t>(keyOffset, intraKeyOffset);
-                    buffer << static_cast<int64_t>(convertUnsignedValueToSignedValue< int8_t, INT8_MAX>(keyValue)) << ",";
+                    buffer <<
+                        static_cast<int64_t>(convertUnsignedValueToSignedValue<int8_t, INT8_MAX>(
+                                    extractKeyValue<uint8_t>(keyOffset, intraKeyOffset))) << ",";
                     break;
                 default:
                     throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys [%s]",
@@ -228,6 +229,34 @@ struct IntsKey {
         ::memset(data, 0, keySize * sizeof(uint64_t));
     }
 
+    template<typename signed_type>
+    bool insertIntegralVal(voltdb::ValueType vt, int& keyOffset, int& intraKeyOffset, signed_type val) {
+        switch (vt) {
+            case voltdb::ValueType::tBIGINT:
+                insertKeyValue<uint64_t>(keyOffset, intraKeyOffset,
+                        convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(
+                            ValuePeeker::peekBigInt(val)));
+                return true;
+            case voltdb::ValueType::tINTEGER:
+                insertKeyValue<uint32_t>(keyOffset, intraKeyOffset,
+                        convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(
+                            ValuePeeker::peekInteger(val)));
+                return true;
+            case voltdb::ValueType::tSMALLINT:
+                insertKeyValue<uint16_t>(keyOffset, intraKeyOffset,
+                        convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(
+                            ValuePeeker::peekSmallInt(val)));
+                return true;
+            case voltdb::ValueType::tTINYINT:
+                insertKeyValue<uint8_t>(keyOffset, intraKeyOffset,
+                        convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(
+                            ValuePeeker::peekTinyInt(val)));
+                return true;
+            default:
+                return false;
+        }
+    }
+
     IntsKey(const TableTuple *tuple) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         vassert(tuple);
@@ -236,45 +265,16 @@ struct IntsKey {
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         for (int ii = 0; ii < columnCount; ii++) {
-            switch(keySchema->columnType(ii)) {
-                case voltdb::ValueType::tBIGINT:
-                    {
-                        const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(ii));
-                        const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
-                        insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
-                        break;
-                    }
-                case voltdb::ValueType::tINTEGER:
-                    {
-                        const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(ii));
-                        const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
-                        insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
-                        break;
-                    }
-                case voltdb::ValueType::tSMALLINT:
-                    {
-                        const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(ii));
-                        const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
-                        insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
-                        break;
-                    }
-                case voltdb::ValueType::tTINYINT:
-                    {
-                        const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(ii));
-                        const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
-                        insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
-                        break;
-                    }
-                default:
-                    throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)",
-                            getTypeName(keySchema->columnType(ii)).c_str());
-                    break;
+            if (! insertIntegralVal(keySchema->columnType(ii), keyOffset, intraKeyOffset, tuple->getNValue(ii))) {
+                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)",
+                        getTypeName(keySchema->columnType(ii)).c_str());
             }
         }
     }
 
     IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
-            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
@@ -282,71 +282,19 @@ struct IntsKey {
         if (! indexed_expressions.empty()) {
             for (int ii = 0; ii < columnCount; ii++) {
                 AbstractExpression* ae = indexed_expressions[ii];
-                switch(ae->getValueType()) {
-                    case voltdb::ValueType::tBIGINT: {
-                    const int64_t value = ValuePeeker::peekBigInt(ae->eval(tuple, NULL));
-                    const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
-                    insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
-                    break;
-                }
-                    case voltdb::ValueType::tINTEGER: {
-                    const int32_t value = ValuePeeker::peekInteger(ae->eval(tuple, NULL));
-                    const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
-                    insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
-                    break;
-                }
-                    case voltdb::ValueType::tSMALLINT: {
-                    const int16_t value = ValuePeeker::peekSmallInt(ae->eval(tuple, NULL));
-                    const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
-                    insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
-                    break;
-                }
-                    case voltdb::ValueType::tTINYINT: {
-                    const int8_t value = ValuePeeker::peekTinyInt(ae->eval(tuple, NULL));
-                    const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
-                    insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
-                    break;
-                }
-                default:
-                    throwFatalException( "We currently only support a specific set of column index types/sizes for IntsKeys {%s}", getTypeName(keySchema->columnType(ii)).c_str());
-                    break;
+                if (! insertIntegralVal(ae->getValueType(), keyOffset, intraKeyOffset, ae->eval(tuple, nullptr))) {
+                    throwFatalException(
+                            "We currently only support a specific set of column index types/sizes for IntsKeys {%s}",
+                            getTypeName(keySchema->columnType(ii)).c_str());
                 }
             }
         } else {
             for (int ii = 0; ii < columnCount; ii++) {
-                switch(keySchema->columnType(ii)) {
-                    case voltdb::ValueType::tBIGINT:
-                        {
-                            const int64_t value = ValuePeeker::peekBigInt(tuple->getNValue(indices[ii]));
-                            const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
-                            insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
-                            break;
-                        }
-                    case voltdb::ValueType::tINTEGER:
-                        {
-                            const int32_t value = ValuePeeker::peekInteger(tuple->getNValue(indices[ii]));
-                            const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
-                            insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
-                            break;
-                        }
-                    case voltdb::ValueType::tSMALLINT:
-                        {
-                            const int16_t value = ValuePeeker::peekSmallInt(tuple->getNValue(indices[ii]));
-                            const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
-                            insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
-                            break;
-                        }
-                    case voltdb::ValueType::tTINYINT:
-                        {
-                            const int8_t value = ValuePeeker::peekTinyInt(tuple->getNValue(indices[ii]));
-                            const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
-                            insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
-                            break;
-                        }
-                    default:
-                        throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
-                                getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
-                        break;
+                if (! insertIntegralVal(keySchema->columnType(ii), keyOffset, intraKeyOffset,
+                            tuple->getNValue(indices[ii]))) {
+                    throwFatalException(
+                            "We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
+                            getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
                 }
             }
         }
@@ -360,7 +308,7 @@ template <std::size_t keySize>
 struct IntsComparator {
     IntsComparator(const TupleSchema *unused_keySchema) : m_keySchema(unused_keySchema) {}
 
-    inline int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+    int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         // lexographical compare could be faster for fixed N
         /*
          * Hopefully the compiler can unroll this loop
@@ -396,9 +344,11 @@ protected:
  * Required by CompactingHashTable keyed by IntsKey<>
  */
 template <std::size_t keySize>
-struct IntsEqualityChecker {
+class IntsEqualityChecker {
+    const TupleSchema *m_keySchema;
+public:
     IntsEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
-    inline bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+    bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         for (unsigned int ii = 0; ii < keySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
             const uint64_t *rvalue = &rhs.data[ii];
@@ -409,8 +359,6 @@ struct IntsEqualityChecker {
         }
         return true;
     }
-private:
-    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -419,8 +367,7 @@ private:
 template <std::size_t keySize>
 struct IntsHasher {
     IntsHasher(const TupleSchema*) {}
-
-    inline size_t operator()(IntsKey<keySize> const& p) const {
+    size_t operator()(IntsKey<keySize> const& p) const {
         size_t seed = 0;
         for (int ii = 0; ii < keySize; ii++) {
             boost::hash_combine(seed, p.data[ii]);
@@ -429,9 +376,9 @@ struct IntsHasher {
     }
 };
 
-template <std::size_t keySize> struct GenericEqualityChecker;
-template <std::size_t keySize> struct GenericComparator;
-template <std::size_t keySize> struct GenericHasher;
+template <std::size_t> struct GenericEqualityChecker;
+template <std::size_t> struct GenericComparator;
+template <std::size_t> struct GenericHasher;
 
 /**
  * Key object for indexes of mixed types.
@@ -624,8 +571,10 @@ public:
     GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        TableTuple lhTuple(m_keySchema);
+        lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_keySchema);
+        rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
         // lexographical compare could be faster for fixed N
         return lhTuple.compare(rhTuple);
     }
@@ -735,7 +684,8 @@ public:
 
     // Set a key from a table-schema tuple.
     TupleKey(const TableTuple *tuple, const std::vector<int> &indices,
-             const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *unused_keySchema) {
+             const std::vector<AbstractExpression*> &indexed_expressions,
+             const TupleSchema *unused_keySchema) {
         vassert(tuple);
         vassert(! indices.empty());
         m_columnIndices = &indices;
