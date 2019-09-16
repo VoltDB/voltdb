@@ -1878,9 +1878,9 @@ public final class TaskManager {
 
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
-                log.warn("MANAGER: Setting CorePoolSize to " + threadCount + " on " + m_name);
-                m_rawExecutor.setCorePoolSize(threadCount);
+                log.warn("MANAGER: Setting CorePoolSize to " + threadCount + " on " + m_name + " max size: " + m_rawExecutor.getMaximumPoolSize());
                 m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                m_rawExecutor.setCorePoolSize(threadCount);
             }
         }
     }
