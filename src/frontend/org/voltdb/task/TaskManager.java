@@ -1868,9 +1868,10 @@ public final class TaskManager {
          */
         void setDynamicThreadCount(int threadCount) {
             if (m_dynamicThreadCount) {
-                if (log.isTraceEnabled()) {
-                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
-                }
+//                if (log.isTraceEnabled()) {
+//                    log.trace("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
+//                }
+                log.warn("MANAGER: Updating dynamic thread count to " + threadCount + " on " + m_name);
                 setCorePoolSize(threadCount);
             }
         }
