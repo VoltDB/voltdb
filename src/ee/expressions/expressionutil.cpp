@@ -259,11 +259,8 @@ AbstractExpression* ExpressionUtil::comparisonFactory(
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
     }
 
-    SubqueryExpression *l_subquery =
-        dynamic_cast<SubqueryExpression*>(lc);
-
-    SubqueryExpression *r_subquery =
-        dynamic_cast<SubqueryExpression*>(rc);
+    SubqueryExpression *l_subquery = dynamic_cast<SubqueryExpression*>(lc);
+    SubqueryExpression *r_subquery = dynamic_cast<SubqueryExpression*>(rc);
 
     if (l_subquery != NULL || r_subquery != NULL) {
         return subqueryComparisonFactory(obj, et, lc, rc);
@@ -280,8 +277,7 @@ static AbstractExpression* constantValueFactory(
     // read before ctor - can then instantiate fully init'd obj.
     NValue newvalue;
     bool isNull = obj.valueForKey("ISNULL").asBool();
-    if (isNull)
-    {
+    if (isNull) {
         newvalue = NValue::getNullValue(vt);
         return new ConstantValueExpression(newvalue);
     }
@@ -289,43 +285,43 @@ static AbstractExpression* constantValueFactory(
     PlannerDomValue valueValue = obj.valueForKey("VALUE");
 
     switch (vt) {
-    case VALUE_TYPE_INVALID:
-       throw SerializableEEException("constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
-    case VALUE_TYPE_NULL:
-        throw SerializableEEException("constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
-    case VALUE_TYPE_TINYINT:
-        newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_SMALLINT:
-        newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_INTEGER:
-        newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_BIGINT:
-        newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_DOUBLE:
-        newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
-        break;
-    case VALUE_TYPE_VARCHAR:
-        newvalue = ValueFactory::getStringValue(valueValue.asStr());
-        break;
-    case VALUE_TYPE_VARBINARY:
-        // uses hex encoding
-        newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
-        break;
-    case VALUE_TYPE_TIMESTAMP:
-        newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_DECIMAL:
-        newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
-        break;
-    case VALUE_TYPE_BOOLEAN:
-        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
-        break;
-    default:
-        throw SerializableEEException("constantValueFactory: Unrecognized value type");
+        case ValueType::tINVALID:
+            throw SerializableEEException("constantValueFactory: Value type should never be tINVALID");
+        case ValueType::tNULL:
+            throw SerializableEEException("constantValueFactory: And they should be never be this either! tNULL");
+        case ValueType::tTINYINT:
+            newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
+            break;
+        case ValueType::tSMALLINT:
+            newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
+            break;
+        case ValueType::tINTEGER:
+            newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
+            break;
+        case ValueType::tBIGINT:
+            newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
+            break;
+        case ValueType::tDOUBLE:
+            newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
+            break;
+        case ValueType::tVARCHAR:
+            newvalue = ValueFactory::getStringValue(valueValue.asStr());
+            break;
+        case ValueType::tVARBINARY:
+            // uses hex encoding
+            newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
+            break;
+        case ValueType::tTIMESTAMP:
+            newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
+            break;
+        case ValueType::tDECIMAL:
+            newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
+            break;
+        case ValueType::tBOOLEAN:
+            newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
+            break;
+        default:
+            throw SerializableEEException("constantValueFactory: Unrecognized value type");
     }
 
     return new ConstantValueExpression(newvalue);
