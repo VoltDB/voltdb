@@ -829,7 +829,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                if (counter.allResponsesMismatched()) {
+                if (counter.allResponsesMatched()) {
                     m_duplicateCounters.remove(dcKey);
                     final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                     setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
@@ -1206,7 +1206,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                if (counter.allResponsesMismatched()) {
+                if (counter.allResponsesMatched()) {
                     if (txn != null && txn.isDone()) {
                         setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
                     }

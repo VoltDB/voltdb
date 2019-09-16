@@ -61,7 +61,6 @@ public class DuplicateCounter
     final long m_destinationId;
     int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
-    protected VoltTable m_lastResultTables[] = null;
     // if any response shows the transaction aborted
     final List<Long> m_expectedHSIds;
     final long m_txnId;
@@ -252,7 +251,6 @@ public class DuplicateCounter
                 }
             }
             m_lastResponse = message;
-            m_lastResultTables = resultTables;
         }
 
         /*
@@ -263,7 +261,6 @@ public class DuplicateCounter
          */
         if (m_lastResponse == null) {
             m_lastResponse = message;
-            m_lastResultTables = resultTables;
         }
 
         m_expectedHSIds.remove(message.m_sourceHSId);
@@ -298,7 +295,7 @@ public class DuplicateCounter
         return (m_expectedHSIds.isEmpty()) ? DONE : WAITING;
     }
 
-    public boolean allResponsesMismatched() {
+    public boolean allResponsesMatched() {
         return m_misMatchedSites.isEmpty();
     }
 
