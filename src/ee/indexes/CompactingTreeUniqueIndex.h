@@ -101,11 +101,11 @@ class CompactingTreeUniqueIndex : public TableIndex {
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
-            if (! CompactingTreeUniqueIndex::deleteEntry(&originalTuple)) {
+            if (! deleteEntry(&originalTuple)) {
                 return false;
             } else {
                 TableTuple conflict(destinationTuple.getSchema());
-                CompactingTreeUniqueIndex::addEntry(&destinationTuple, &conflict);
+                addEntry(&destinationTuple, &conflict);
                 return conflict.isNullTuple();
             }
         }
@@ -138,7 +138,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
         mapIter = findKey(searchKey);
 
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
@@ -152,7 +152,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
         mapIter = findTuple(*persistentTuple);
 
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
@@ -282,7 +282,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
 
     TableTuple nextValueAtKey(IndexCursor& cursor) const override {
         TableTuple retval = cursor.m_match;
-        cursor.m_match.move(NULL);
+        cursor.m_match.move(nullptr);
         return retval;
     }
 
@@ -295,7 +295,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
             mapIter.movePrev();
         }
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
@@ -361,7 +361,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
         auto &mapConstIter = castToIter(cursor);
         mapConstIter = m_entries.findRank(denseRank);
         if (mapConstIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapConstIter.value()));

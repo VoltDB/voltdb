@@ -28,6 +28,15 @@ class TempTable;
  * StatsSource extension for tables.
  */
 class TableStats : public StatsSource {
+    /**
+     * Table whose stats are being collected.
+     */
+    Table* m_table;
+    NValue m_tableType;
+    int64_t m_lastTupleCount = 0;
+    int64_t m_lastAllocatedTupleMemory = 0;
+    int64_t m_lastOccupiedTupleMemory = 0;
+    int64_t m_lastStringDataMemory = 0;
 public:
     /**
      * Static method to generate the column names for the tables which
@@ -39,8 +48,10 @@ public:
      * Static method to generate the remaining schema information for
      * the tables which contain persistent table stats.
      */
-    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types, std::vector<int32_t>& columnLengths,
-            std::vector<bool>& allowNull, std::vector<bool>& inBytes);
+    static void populateTableStatsSchema(std::vector<ValueType>& types,
+            std::vector<int32_t>& columnLengths,
+            std::vector<bool>& allowNull,
+            std::vector<bool>& inBytes);
 
     /**
      * Return an empty TableStats table
@@ -50,7 +61,8 @@ public:
     /*
      * Constructor caches reference to the table that will be generating the statistics
      */
-    TableStats(voltdb::Table* table);
+    TableStats(Table* table);
+    ~TableStats();
 
     /**
      * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
@@ -64,36 +76,23 @@ protected:
     /**
      * Update the stats tuple with the latest statistics available to this StatsSource.
      */
-    virtual void updateStatsTuple(voltdb::TableTuple *tuple);
+    virtual void updateStatsTuple(TableTuple *tuple);
 
     /**
      * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
      * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
      * contributing to the end of the list.
      */
-    virtual std::vector<std::string> generateStatsColumnNames();
+    virtual std::vector<std::string> generateStatsColumnNames() const;
 
     /**
      * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
      * end of a list.
      */
-    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths,
-            std::vector<bool> &allowNull, std::vector<bool> &inBytes);
-
-    ~TableStats();
-
-private:
-    /**
-     * Table whose stats are being collected.
-     */
-    voltdb::Table* m_table;
-
-    voltdb::NValue m_tableType;
-
-    int64_t m_lastTupleCount;
-    int64_t m_lastAllocatedTupleMemory;
-    int64_t m_lastOccupiedTupleMemory;
-    int64_t m_lastStringDataMemory;
+    virtual void populateSchema(std::vector<ValueType>& types,
+            std::vector<int32_t>& columnLengths,
+            std::vector<bool>& allowNull,
+            std::vector<bool>& inBytes);
 };
 
 }

@@ -128,12 +128,14 @@ class CompactingHashMultiMapIndex : public TableIndex {
         return {};
     }
 
-    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper,
+            IndexCursor& cursor) const override {
         notImplemented("getCounterGET");
         return {};
     }
 
-    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper,
+            IndexCursor& cursor) const override {
         notImplemented("getCounterLET");
         return {};
     }
@@ -166,10 +168,10 @@ class CompactingHashMultiMapIndex : public TableIndex {
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
-            if ( ! CompactingHashMultiMapIndex::deleteEntry(&originalTuple)) {
+            if (! deleteEntry(&originalTuple)) {
                 return false;
             } else {
-                CompactingHashMultiMapIndex::addEntry(&destinationTuple, nullptr);
+                addEntry(&destinationTuple, nullptr);
                 return true;
             }
         }
@@ -212,7 +214,7 @@ class CompactingHashMultiMapIndex : public TableIndex {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
@@ -229,7 +231,7 @@ class CompactingHashMultiMapIndex : public TableIndex {
         MapIterator &mapIter = castToIter(cursor);
         mapIter.moveNext();
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
         }

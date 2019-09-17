@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLESTATS_H_
-#define PERSISTENTTABLESTATS_H_
+#pragma once
 
 #include "storage/TableStats.h"
 #include <vector>
@@ -28,13 +27,10 @@ class PersistentTable;
 /**
  * Further specialization of TableStats that currently adds no extra functionality.
  */
-class PersistentTableStats : public voltdb::TableStats {
-  public:
-    PersistentTableStats(voltdb::PersistentTable* table);
-  protected:
-    virtual std::vector<std::string> generateStatsColumnNames();
+class PersistentTableStats : public TableStats {
+    public:
+        PersistentTableStats(PersistentTable* table);
 };
 
 }
 
-#endif /* PERSISTENTTABLESTATS_H_ */

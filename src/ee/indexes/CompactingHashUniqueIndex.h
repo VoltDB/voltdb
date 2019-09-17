@@ -118,12 +118,14 @@ class CompactingHashUniqueIndex : public TableIndex {
         return {};
     }
 
-    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+    int64_t getCounterGET(const TableTuple *searchKey, bool isUpper,
+            IndexCursor& cursor) const override {
         notImplemented("getCounterGET");
         return {};
     }
 
-    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const override {
+    int64_t getCounterLET(const TableTuple *searchKey, bool isUpper,
+            IndexCursor& cursor) const override {
         notImplemented("getCounterLET");
         return {};
     }
@@ -135,8 +137,8 @@ class CompactingHashUniqueIndex : public TableIndex {
 
     void addEntryDo(const TableTuple* tuple, TableTuple* conflictTuple) override {
         ++m_inserts;
-        const void* const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
-        if (conflictEntry != NULL && conflictTuple != NULL) {
+        auto const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        if (conflictEntry != nullptr && conflictTuple != nullptr) {
             conflictTuple->move(const_cast<void*>(*conflictEntry));
         }
     }
@@ -149,16 +151,17 @@ class CompactingHashUniqueIndex : public TableIndex {
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChangeDo(const TableTuple& destinationTuple, const TableTuple& originalTuple) override {
+    bool replaceEntryNoKeyChangeDo(const TableTuple& destinationTuple,
+            const TableTuple& originalTuple) override {
         vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
-            if (! CompactingHashUniqueIndex::deleteEntry(&originalTuple)) {
+            if (! deleteEntry(&originalTuple)) {
                 return false;
             } else {
                 TableTuple conflict(destinationTuple.getSchema());
-                CompactingHashUniqueIndex::addEntry(&destinationTuple, &conflict);
+                addEntry(&destinationTuple, &conflict);
                 return conflict.isNullTuple();
             }
         }
@@ -203,7 +206,7 @@ class CompactingHashUniqueIndex : public TableIndex {
         mapIter = findTuple(*persistentTuple);
 
         if (mapIter.isEnd()) {
-            cursor.m_match.move(NULL);
+            cursor.m_match.move(nullptr);
             return false;
         } else {
             cursor.m_match.move(const_cast<void*>(mapIter.value()));
@@ -213,7 +216,7 @@ class CompactingHashUniqueIndex : public TableIndex {
 
     TableTuple nextValueAtKey(IndexCursor& cursor) const override {
         TableTuple retval = cursor.m_match;
-        cursor.m_match.move(NULL);
+        cursor.m_match.move(nullptr);
         return retval;
     }
 
@@ -261,7 +264,8 @@ class CompactingHashUniqueIndex : public TableIndex {
     }
 public:
     CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
-        TableIndex(keySchema, scheme), m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
+        TableIndex(keySchema, scheme),
+        m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
         m_eq(keySchema) {}
 };
 

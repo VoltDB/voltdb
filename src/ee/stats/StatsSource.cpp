@@ -24,45 +24,28 @@
 using namespace voltdb;
 using namespace std;
 
-vector<string> StatsSource::generateBaseStatsColumnNames() {
-    vector<string> columnNames;
-    columnNames.push_back("TIMESTAMP");
-    columnNames.push_back("HOST_ID");
-    columnNames.push_back("HOSTNAME");
-    columnNames.push_back("SITE_ID");
-    columnNames.push_back("PARTITION_ID");
-    return columnNames;
-}
+std::vector<std::string> const StatsSource::STATS_COLUMN_NAMES = {
+    "TIMESTAMP", "HOST_ID", "HOSTNAME", "SITE_ID", "PARTITION_ID"
+};
 
-void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
-        vector<bool> &allowNull, vector<bool> &inBytes) {
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
+array<tuple<ValueType, int32_t, bool, bool>, 5> const StatsSource::BASE_SCHEMA = {
+    make_tuple(ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+        make_tuple(ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
+        make_tuple(ValueType::tVARCHAR, 4096,                                           false, false),
+        make_tuple(ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
+        make_tuple(ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false)
+};
 
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-}
-
-StatsSource::StatsSource()  : m_statsTable(NULL) {
+void StatsSource::populateBaseSchema(vector<ValueType>& types,
+        vector<int32_t>& columnLengths,
+        vector<bool>& allowNull,
+        vector<bool>& inBytes) {
+    for (auto const& t : BASE_SCHEMA) {
+        types.emplace_back(get<0>(t));
+        columnLengths.emplace_back(get<1>(t));
+        allowNull.emplace_back(get<2>(t));
+        inBytes.emplace_back(get<3>(t));
+    }
 }
 
 /**
@@ -74,7 +57,7 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  * @parameter siteId this stat source is associated with
  * @parameter partitionId id of the partition assigned to this site
  */
-void StatsSource::configure(string name) {
+void StatsSource::configure(string const& name) {
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     m_hostId = executorContext->m_hostId;
     m_hostname = ValueFactory::getStringValue(executorContext->m_hostname);
@@ -86,13 +69,14 @@ void StatsSource::configure(string name) {
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
     populateSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    TupleSchema *schema = TupleSchema::createTupleSchema(
+            columnTypes, columnLengths, columnAllowNull, columnInBytes);
 
     for (int ii = 0; ii < columnNames.size(); ii++) {
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(TableFactory::buildTempTable(name, schema, columnNames, NULL));
+    m_statsTable.reset(TableFactory::buildTempTable(name, schema, columnNames, nullptr));
     m_statsTuple = m_statsTable->tempTuple();
 }
 
@@ -105,7 +89,7 @@ StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-const string StatsSource::getTableName() {
+string StatsSource::getTableName() const {
     return m_tableName.toString();
 }
 
@@ -130,10 +114,10 @@ Table* StatsSource::getStatsTable(int64_t siteId, int32_t partitionId, bool inte
  */
 TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now) {
     m_interval = interval;
-    if (m_statsTable == NULL) {
+    if (m_statsTable == nullptr) {
         VOLT_DEBUG("Table stats for site %" PRId64 ", partition %d is missing", siteId, partitionId);
-        vassert(m_statsTable != NULL);
-        return NULL;
+        vassert(m_statsTable != nullptr);       // TODO: WTF???
+        return nullptr;
     }
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
     m_statsTuple.setNValue(1, ValueFactory::getIntegerValue(static_cast<int32_t>(m_hostId)));
@@ -148,38 +132,27 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     return &m_statsTuple;
 }
 
-/**
- * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
- * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
- * contributing to the end of the list.
- */
-vector<string> StatsSource::generateStatsColumnNames()
-{
-    return StatsSource::generateBaseStatsColumnNames();
+vector<string> StatsSource::generateStatsColumnNames() const {
+    return generateBaseStatsColumnNames();
 }
 
 /**
  * String representation of the statistics. Default implementation is to print the stats table.
  * @return String representation
  */
-string StatsSource::toString() {
-    string retString = "";
+string StatsSource::toString() const {
+    string retString;
     for (int ii = 0; ii < m_statsTable->columnCount(); ii++) {
-        retString += m_statsTable->columnName(ii);
-        retString += "\t";
+        retString.append(m_statsTable->columnName(ii)).append("\t");
     }
-    retString += "\n";
-    retString += m_statsTuple.debug(m_statsTable->name().c_str());
-    return retString;
+    return retString.append("\n")
+        .append(m_statsTuple.debug(m_statsTable->name().c_str()));
 }
 
 
-/**
- * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
- * end of a list.
- */
-void
-StatsSource::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
-        vector<bool> &allowNull, vector<bool> &inBytes) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
+void StatsSource::populateSchema(vector<ValueType>& types,
+        vector<int32_t>& columnLengths,
+        vector<bool>& allowNull,
+        vector<bool>& inBytes) {
+    populateBaseSchema(types, columnLengths, allowNull, inBytes);
 }

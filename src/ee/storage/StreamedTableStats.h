@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STREAMEDTABLESTATS_H_
-#define STREAMEDTABLESTATS_H_
+#pragma once
 
 #include "storage/TableStats.h"
 #include <vector>
@@ -28,13 +27,10 @@ class StreamedTable;
 /**
  * Further specialization of TableStats that currently adds no extra functionality.
  */
-class StreamedTableStats : public voltdb::TableStats {
+class StreamedTableStats : public TableStats {
   public:
-    StreamedTableStats(voltdb::StreamedTable* table);
-  protected:
-    virtual std::vector<std::string> generateStatsColumnNames();
+    StreamedTableStats(StreamedTable* table);
 };
 
 }
 
-#endif /* STREAMEDTABLESTATS_H_ */

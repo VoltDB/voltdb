@@ -34,7 +34,6 @@ vector<string> IndexStats::generateIndexStatsColumnNames() {
     columnNames.push_back("IS_COUNTABLE");
     columnNames.push_back("ENTRY_COUNT");
     columnNames.push_back("MEMORY_ESTIMATE");
-
     return columnNames;
 }
 
@@ -95,30 +94,21 @@ TempTable* IndexStats::generateEmptyIndexStatsTable() {
     // An empty stats table isn't clearly associated with any specific
     // database ID.  Just pick something that works for now (Yes,
     // abstractplannode::databaseId(), I'm looking in your direction)
-    vector<string> columnNames = IndexStats::generateIndexStatsColumnNames();
+    vector<string> columnNames = generateIndexStatsColumnNames();
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
-    IndexStats::populateIndexStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull, columnInBytes);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, columnInBytes);
-    return TableFactory::buildTempTable(name,
-                                        schema,
-                                        columnNames,
-                                        NULL);
+    populateIndexStatsSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    TupleSchema *schema = TupleSchema::createTupleSchema(
+            columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    return TableFactory::buildTempTable(name, schema, columnNames, nullptr);
 }
 
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
-IndexStats::IndexStats(TableIndex* index)
-    : StatsSource(), m_index(index), m_isUnique(0), m_isCountable(0),
-      m_lastTupleCount(0), m_lastMemEstimate(0)
-{
-}
+IndexStats::IndexStats(TableIndex* index) : StatsSource(), m_index(index) {}
 
 /**
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in
@@ -126,7 +116,7 @@ IndexStats::IndexStats(TableIndex* index)
  * @parameter name Name of this set of statistics
  * @parameter tableName Name of the indexed table
  */
-void IndexStats::configure(string name, string tableName) {
+void IndexStats::configure(string const& name, string const& tableName) {
     VOLT_TRACE("Configuring stats for index %s in table %s.", name.c_str(), tableName.c_str());
     StatsSource::configure(name);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
@@ -136,7 +126,7 @@ void IndexStats::configure(string name, string tableName) {
     m_isCountable = static_cast<int8_t>(m_index->isCountableIndex() ? 1 : 0);
 }
 
-void IndexStats::rename(std::string name) {
+void IndexStats::rename(std::string const& name) {
     m_indexName.free();
     m_indexName = ValueFactory::getStringValue(name);
 }
@@ -146,9 +136,8 @@ void IndexStats::rename(std::string name) {
  * this method and call the parent class's version to obtain the list of columns contributed by
  * ancestors and then append the columns they will be contributing to the end of the list.
  */
-vector<string> IndexStats::generateStatsColumnNames()
-{
-    return IndexStats::generateIndexStatsColumnNames();
+vector<string> IndexStats::generateStatsColumnNames() const {
+    return generateIndexStatsColumnNames();
 }
 
 /**
@@ -162,23 +151,19 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
     int64_t mem_estimate_kb = m_index->getMemoryEstimate() / 1024;
 
     if (interval()) {
-        count = count - m_lastTupleCount;
+        count -= m_lastTupleCount;
         m_lastTupleCount = static_cast<int64_t>(m_index->getSize());
         mem_estimate_kb = mem_estimate_kb - (m_lastMemEstimate / 1024);
         m_lastMemEstimate = m_index->getMemoryEstimate();
     }
-
-    tuple->setNValue(
-            StatsSource::m_columnName2Index["IS_UNIQUE"],
+    tuple->setNValue(StatsSource::m_columnName2Index["IS_UNIQUE"],
             ValueFactory::getTinyIntValue(m_isUnique));
-    tuple->setNValue(
-                StatsSource::m_columnName2Index["IS_COUNTABLE"],
-                ValueFactory::getTinyIntValue(m_isCountable));
-    tuple->setNValue( StatsSource::m_columnName2Index["ENTRY_COUNT"],
+    tuple->setNValue(StatsSource::m_columnName2Index["IS_COUNTABLE"],
+            ValueFactory::getTinyIntValue(m_isCountable));
+    tuple->setNValue(StatsSource::m_columnName2Index["ENTRY_COUNT"],
             ValueFactory::getBigIntValue(count));
     tuple->setNValue(StatsSource::m_columnName2Index["MEMORY_ESTIMATE"],
-                     ValueFactory::
-                     getBigIntValue(mem_estimate_kb));
+            ValueFactory::getBigIntValue(mem_estimate_kb));
 }
 
 /**
@@ -189,8 +174,7 @@ void IndexStats::populateSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
         vector<bool> &allowNull,
-        vector<bool> &inBytes)
-{
+        vector<bool> &inBytes) {
     IndexStats::populateIndexStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 

@@ -138,8 +138,7 @@ struct TableIndexScheme {
 
 struct IndexCursor {
 public:
-    IndexCursor(const TupleSchema * schema) :
-        m_forward(true), m_match(schema) {
+    IndexCursor(const TupleSchema* schema) : m_match(schema) {
         memset(m_keyIter, 0, sizeof(m_keyIter));
         memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
     }
@@ -147,7 +146,7 @@ public:
     ~IndexCursor() {}
 
     // iteration stuff
-    bool m_forward;  // for tree index ONLY
+    bool m_forward = true;  // for tree index ONLY
     TableTuple m_match;
     char m_keyIter[16];
     char m_keyEndIter[16]; // for multiple tree index ONLY
@@ -190,9 +189,9 @@ protected:
     const std::string m_id;
 
     // counters
-    int m_inserts;
-    int m_deletes;
-    int m_updates;
+    int m_inserts = 0;
+    int m_deletes = 0;
+    int m_updates = 0;
 
     // stats
     IndexStats m_stats;
@@ -464,7 +463,7 @@ public:
         return m_scheme.name;
     }
 
-    void rename(std::string name) {
+    void rename(std::string const& name) {
         if (m_scheme.name.compare(name) != 0) {
             m_scheme.name = name;
             IndexStats *stats = getIndexStats();

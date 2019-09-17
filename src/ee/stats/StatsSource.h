@@ -15,14 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STATSSOURCE_H_
-#define STATSSOURCE_H_
+#pragma once
 
 #include "common/tabletuple.h"
 #include "common/ids.h"
 
-#include "boost/scoped_ptr.hpp"
-
+#include <array>
 #include <string>
 #include <vector>
 #include <map>
@@ -38,6 +36,57 @@ class TableTuple;
  * row table that is updated every time it is retrieved.
  */
 class StatsSource {
+    /**
+     * Table containing the stat information. Shared pointer used as a substitute for scoped_ptr due to forward
+     * declaration.
+     */
+    std::shared_ptr<Table> m_statsTable = nullptr;
+
+    /**
+     * Tuple used to modify the stat table.
+     */
+    TableTuple m_statsTuple;
+    CatalogId m_hostId;
+    NValue m_hostname;
+    bool m_interval;
+    static std::vector<std::string> const STATS_COLUMN_NAMES;
+    /**
+     * ValueType, column length, allow nulls, in bytes */
+    static std::array<std::tuple<ValueType, int32_t, bool, bool>, 5> const BASE_SCHEMA;
+protected:
+    /**
+     * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
+     * @parameter tuple TableTuple pointing to a row in the stats table.
+     */
+    virtual void updateStatsTuple(TableTuple *tuple) = 0;
+
+    /**
+     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
+     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
+     * contributing to the end of the list.
+     */
+    virtual std::vector<std::string> generateStatsColumnNames() const;
+
+    /**
+     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
+     * end of a list.
+     */
+    virtual void populateSchema(std::vector<ValueType>& types,
+            std::vector<int32_t>& columnLengths,
+            std::vector<bool>& allowNull,
+            std::vector<bool>& inBytes);
+
+    /**
+     * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the
+     * inheritance hierarchy can vary the number of columns they contribute. This removes the dependency between them.
+     */
+    std::map<std::string, int> m_columnName2Index;
+
+    NValue m_tableName;
+
+    bool interval() const {
+        return m_interval;
+    }
 public:
 
     /**
@@ -47,14 +96,16 @@ public:
      * within it to populate the column name vector before adding
      * their stat-specific column names.
      */
-    static std::vector<std::string> generateBaseStatsColumnNames();
+    static std::vector<std::string> generateBaseStatsColumnNames() {
+        return STATS_COLUMN_NAMES;
+    }
 
     /**
      * Populates the other schema information which is present for
      * every stats table.  Usage by derived classes takes the same
      * pattern as generateBaseStatsColumnNames.
      */
-    static void populateBaseSchema(std::vector<voltdb::ValueType>& types,
+    static void populateBaseSchema(std::vector<ValueType>& types,
                                    std::vector<int32_t>& columnLengths,
                                    std::vector<bool>& allowNull,
                                    std::vector<bool>& inBytes);
@@ -62,14 +113,14 @@ public:
     /*
      * Do nothing constructor that initializes statTable_ and schema_ to NULL.
      */
-    StatsSource();
+    StatsSource() = default;
 
     /**
      * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
      */
-    void configure(std::string name);
+    void configure(std::string const& name);
 
     void updateTableName(const std::string& tableName);
 
@@ -85,7 +136,7 @@ public:
      * @param now Timestamp to return with each row
      * @return Pointer to a table containing the statistics.
      */
-    voltdb::Table* getStatsTable(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
+    Table* getStatsTable(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
 
     /*
      * Retrieve tuple containing the latest statistics available. An updated stat is requested from the derived class by calling
@@ -96,70 +147,19 @@ public:
      * @param Timestamp to embed in each row
      * @return Pointer to a table tuple containing the latest version of the statistics.
      */
-    voltdb::TableTuple* getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
+    TableTuple* getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
 
     /**
      * Retrieve the name of the table that this set of statistics is associated with.
      * @return Table name.
      */
-    const string getTableName();
+    string getTableName() const;
 
     /**
      * String representation of the statistics. Default implementation is to print the stats table.
      * @return String representation
      */
-    virtual std::string toString();
-
-protected:
-    /**
-     * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
-     * @parameter tuple TableTuple pointing to a row in the stats table.
-     */
-    virtual void updateStatsTuple(voltdb::TableTuple *tuple) = 0;
-
-    /**
-     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
-     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
-     * contributing to the end of the list.
-     */
-    virtual std::vector<std::string> generateStatsColumnNames();
-
-    /**
-     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
-     * end of a list.
-     */
-    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths,
-            std::vector<bool> &allowNull, std::vector<bool> &inBytes);
-
-    /**
-     * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the
-     * inheritance hierarchy can vary the number of columns they contribute. This removes the dependency between them.
-     */
-    std::map<std::string, int> m_columnName2Index;
-
-    NValue m_tableName;
-
-    bool interval() { return m_interval; }
-
-private:
-    /**
-     * Table containing the stat information. Shared pointer used as a substitute for scoped_ptr due to forward
-     * declaration.
-     */
-    boost::scoped_ptr<voltdb::Table> m_statsTable;
-
-    /**
-     * Tuple used to modify the stat table.
-     */
-    voltdb::TableTuple m_statsTuple;
-
-    voltdb::CatalogId m_hostId;
-
-    voltdb::NValue m_hostname;
-
-    bool m_interval;
-
+    virtual std::string toString() const;
 };
 
 }
-#endif /* STATSCONTAINER_H_ */

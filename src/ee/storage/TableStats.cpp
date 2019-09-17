@@ -105,10 +105,7 @@ TempTable* TableStats::generateEmptyTableStatsTable() {
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
-TableStats::TableStats(Table* table)
-    : StatsSource(), m_table(table), m_lastTupleCount(0),
-      m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
-      m_lastStringDataMemory(0) { }
+TableStats::TableStats(Table* table) : StatsSource(), m_table(table) {}
 
 /**
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
@@ -131,8 +128,8 @@ void TableStats::configure(std::string const& name) {
  * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
  * contributing to the end of the list.
  */
-vector<string> TableStats::generateStatsColumnNames() {
-    return TableStats::generateTableStatsColumnNames();
+vector<string> TableStats::generateStatsColumnNames() const {
+    return generateTableStatsColumnNames();
 }
 
 /**
@@ -177,22 +174,25 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getBigIntValue(string_data_mem_kb));
 
-    bool hasTupleLimit = tupleLimit == INT_MAX ? false : true;
+    bool const hasTupleLimit = tupleLimit != INT_MAX;
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
-            hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit): ValueFactory::getNullValue());
+            hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit) : ValueFactory::getNullValue());
     int32_t percentage = 0;
     if (hasTupleLimit && tupleLimit > 0) {
-        percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
+        percentage = static_cast<int32_t>(ceil(tupleCount * 100. / tupleLimit));
     }
-    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
+    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],
+            ValueFactory::getIntegerValue(percentage));
 }
 
 /**
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
  * end of a list.
  */
-void TableStats::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
-        vector<bool> &allowNull, vector<bool> &inBytes) {
+void TableStats::populateSchema(vector<ValueType>& types,
+        vector<int32_t>& columnLengths,
+        vector<bool>& allowNull,
+        vector<bool>& inBytes) {
     TableStats::populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 

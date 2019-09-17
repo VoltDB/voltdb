@@ -15,17 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/StreamedTableStats.h"
-#include "storage/streamedtable.h"
-#include <vector>
-#include <string>
+#include "storage/persistenttable.h"
 
 namespace voltdb {
-
-StreamedTableStats::StreamedTableStats(voltdb::StreamedTable* table) : voltdb::TableStats(table) {
-}
-
-std::vector<std::string> StreamedTableStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = TableStats::generateStatsColumnNames();
-    return columnNames;
-}
+StreamedTableStats::StreamedTableStats(voltdb::StreamedTable* table) : voltdb::TableStats(table) {}
 }

@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef INDEXSTATS_H_
-#define INDEXSTATS_H_
+#pragma once
 
 #include "stats/StatsSource.h"
 
@@ -29,6 +28,38 @@ class TempTable;
  * StatsSource extension for tables.
  */
 class IndexStats : public StatsSource {
+    /**
+     * Index whose stats are being collected.
+     */
+    TableIndex* m_index;
+    NValue m_indexName;
+    NValue m_indexType;
+
+    int8_t m_isUnique = 0;
+    int8_t m_isCountable = 0;
+    int64_t m_lastTupleCount = 0;
+    int64_t m_lastMemEstimate = 0;
+protected:
+    /**
+     * Update the stats tuple with the latest statistics available to this StatsSource.
+     */
+    virtual void updateStatsTuple(TableTuple *tuple);
+
+    /**
+     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
+     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
+     * contributing to the end of the list.
+     */
+    virtual std::vector<std::string> generateStatsColumnNames() const;
+
+    /**
+     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
+     * end of a list.
+     */
+    virtual void populateSchema(std::vector<ValueType> &types,
+            std::vector<int32_t> &columnLengths,
+            std::vector<bool> &allowNull,
+            std::vector<bool> &inBytes);
 public:
     /**
      * Static method to generate the column names for the tables which
@@ -40,7 +71,7 @@ public:
      * Static method to generate the remaining schema information for
      * the tables which contain index stats.
      */
-    static void populateIndexStatsSchema(std::vector<voltdb::ValueType>& types,
+    static void populateIndexStatsSchema(std::vector<ValueType>& types,
                                          std::vector<int32_t>& columnLengths,
                                          std::vector<bool>& allowNull,
                                          std::vector<bool>& inBytes);
@@ -60,47 +91,10 @@ public:
      * @parameter name Name of this set of statistics
      * @parameter tableName Name of the indexed table
      */
-    void configure(std::string name, std::string tableName);
+    void configure(std::string const& name, std::string const& tableName);
 
-    void rename(std::string name);
-
-protected:
-
-    /**
-     * Update the stats tuple with the latest statistics available to this StatsSource.
-     */
-    virtual void updateStatsTuple(TableTuple *tuple);
-
-    /**
-     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
-     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
-     * contributing to the end of the list.
-     */
-    virtual std::vector<std::string> generateStatsColumnNames();
-
-    /**
-     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
-     * end of a list.
-     */
-    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths,
-            std::vector<bool> &allowNull, std::vector<bool> &inBytes);
-
-private:
-    /**
-     * Index whose stats are being collected.
-     */
-    voltdb::TableIndex *m_index;
-
-    voltdb::NValue m_indexName;
-    voltdb::NValue m_indexType;
-
-    int8_t m_isUnique;
-    int8_t m_isCountable;
-
-    int64_t m_lastTupleCount;
-    int64_t m_lastMemEstimate;
+    void rename(std::string const& name);
 };
 
 }
 
-#endif /* INDEXSTATS_H_ */

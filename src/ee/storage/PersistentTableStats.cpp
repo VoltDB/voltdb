@@ -16,20 +16,7 @@
  */
 #include "storage/PersistentTableStats.h"
 #include "storage/persistenttable.h"
-#include "common/executorcontext.hpp"
-#include "execution/VoltDBEngine.h"
-#include <vector>
-#include <string>
 
 namespace voltdb {
-
-PersistentTableStats::PersistentTableStats(voltdb::PersistentTable* table)
-  : voltdb::TableStats(table)
-{
-}
-
-std::vector<std::string> PersistentTableStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = TableStats::generateStatsColumnNames();
-    return columnNames;
-}
+PersistentTableStats::PersistentTableStats(PersistentTable* table) : TableStats(table) {}
 }

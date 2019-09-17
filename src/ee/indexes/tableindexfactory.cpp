@@ -92,7 +92,7 @@ class TableIndexPicker {
         } else if (m_intsOnly) {
             // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
             // the number of 8-byte uint64's required to store KeySize packed bytes.
-            return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
+            return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1>>();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
@@ -107,18 +107,18 @@ class TableIndexPicker {
         // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
         // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
-            return getInstanceForKeyType<GenericKey<KeySize> >();
+            return getInstanceForKeyType<GenericKey<KeySize>>();
         } else {
-            return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
+            return getInstanceForKeyType<GenericPersistentKey<KeySize>>();
         }
     }
 
     template <int ColCount>
     TableIndex *getInstanceForHashedGenericColumns() const {
         if (m_scheme.unique) {
-            return new CompactingHashUniqueIndex<GenericKey<ColCount> >(m_keySchema, m_scheme);
+            return new CompactingHashUniqueIndex<GenericKey<ColCount>>(m_keySchema, m_scheme);
         } else {
-            return new CompactingHashMultiMapIndex<GenericKey<ColCount> >(m_keySchema, m_scheme);
+            return new CompactingHashMultiMapIndex<GenericKey<ColCount>>(m_keySchema, m_scheme);
         }
     }
 
@@ -176,12 +176,12 @@ public:
 
         if (m_scheme.unique) {
             if (m_scheme.countable) {
-                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, true>(m_keySchema, m_scheme);
             } else {
                 return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
             }
         } else if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true>(m_keySchema, m_scheme);
         } else {
             return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
         }
