@@ -1031,7 +1031,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
                sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
            }
        } else {
-           sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
+           sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(ValueType::tBIGINT));
            migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
        }
     }

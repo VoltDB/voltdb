@@ -35,38 +35,35 @@ static inline int memSizeForTupleSchema(uint16_t columnCount,
     // Also allocate space for an int16_t for each uninlineable object
     // column so that the indices of uninlineable columns can be
     // stored at the front and aid in iteration.
-    return static_cast<int>(sizeof(TupleSchema) +
-                            (uninlineableObjectColumnCount * sizeof(int16_t)) +
-                            (sizeof(TupleSchema::ColumnInfo) * columnCount) +
-                            (sizeof(TupleSchema::HiddenColumnInfo) * hiddenColumnCount) +
-                            sizeof(TupleSchema::ColumnInfoBase));
+    return static_cast<int>(
+            sizeof(TupleSchema) +
+            (uninlineableObjectColumnCount * sizeof(int16_t)) +
+            (sizeof(TupleSchema::ColumnInfo) * columnCount) +
+            (sizeof(TupleSchema::HiddenColumnInfo) * hiddenColumnCount) +
+            sizeof(TupleSchema::ColumnInfoBase));
 }
 
 static inline bool isInlineable(ValueType vt, int32_t length, bool inBytes) {
     switch (vt) {
-    case VALUE_TYPE_VARCHAR:
-        if (inBytes) {
+        case ValueType::tVARCHAR:
+            if (inBytes) {
+                return length < UNINLINEABLE_OBJECT_LENGTH;
+            } else {
+                return length < UNINLINEABLE_CHARACTER_LENGTH;
+            }
+        case ValueType::tVARBINARY:
             return length < UNINLINEABLE_OBJECT_LENGTH;
-        }
-        else {
-            return length < UNINLINEABLE_CHARACTER_LENGTH;
-        }
 
-    case VALUE_TYPE_VARBINARY:
-        return length < UNINLINEABLE_OBJECT_LENGTH;
+        case ValueType::tGEOGRAPHY:
+            return false; // never inlined
 
-    case VALUE_TYPE_GEOGRAPHY:
-        return false; // never inlined
-
-    default:
-        return true;
+        default:
+            return true;
     }
 }
 
 TupleSchema* TupleSchema::createKeySchema(const std::vector<ValueType>& columnTypes,
-                                              const std::vector<int32_t>& columnSizes,
-                                              const std::vector<bool>& columnInBytes)
-{
+        const std::vector<int32_t>& columnSizes, const std::vector<bool>& columnInBytes) {
     std::vector<bool> allowNull(columnTypes.size(), true);
     TupleSchema* schema = createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
     schema->m_isHeaderless = true;
@@ -74,18 +71,15 @@ TupleSchema* TupleSchema::createKeySchema(const std::vector<ValueType>& columnTy
 }
 
 TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType>& columnTypes,
-                                                   const std::vector<int32_t>& columnSizes,
-                                                   const std::vector<bool>& allowNull)
-{
+        const std::vector<int32_t>& columnSizes, const std::vector<bool>& allowNull) {
     const std::vector<bool> columnInBytes (allowNull.size(), false);
     return TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
 }
 
 TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& columnTypes,
-                                            const std::vector<int32_t>& columnSizes,
-                                            const std::vector<bool>& allowNull,
-                                            const std::vector<bool>& columnInBytes)
-{
+        const std::vector<int32_t>& columnSizes,
+        const std::vector<bool>& allowNull,
+        const std::vector<bool>& columnInBytes) {
     const std::vector<HiddenColumn::Type> hiddenTypes(0);
     return TupleSchema::createTupleSchema(columnTypes,
                                           columnSizes,
@@ -95,11 +89,10 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
 }
 
 TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& columnTypes,
-                                            const std::vector<int32_t>&   columnSizes,
-                                            const std::vector<bool>&      allowNull,
-                                            const std::vector<bool>&      columnInBytes,
-                                            const std::vector<HiddenColumn::Type>& hiddenColumnTypes)
-{
+        const std::vector<int32_t>&   columnSizes,
+        const std::vector<bool>&      allowNull,
+        const std::vector<bool>&      columnInBytes,
+        const std::vector<HiddenColumn::Type>& hiddenColumnTypes) {
     const uint16_t uninlineableObjectColumnCount =
       TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
     const uint16_t columnCount = static_cast<uint16_t>(columnTypes.size());
@@ -147,8 +140,8 @@ TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema) {
     return reinterpret_cast<TupleSchema*>(data);
 }
 
-TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema,
-                                            const std::vector<uint16_t>& set) {
+TupleSchema* TupleSchema::createTupleSchema(
+        const TupleSchema *schema, const std::vector<uint16_t>& set) {
     return createTupleSchema(schema, set, NULL, std::vector<uint16_t>());
 }
 
@@ -172,9 +165,9 @@ TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *first,
 
 TupleSchema*
 TupleSchema::createTupleSchema(const TupleSchema *first,
-                               const std::vector<uint16_t>& firstSet,
-                               const TupleSchema *second,
-                               const std::vector<uint16_t>& secondSet) {
+        const std::vector<uint16_t>& firstSet,
+        const TupleSchema *second,
+        const std::vector<uint16_t>& secondSet) {
     vassert(first);
 
     const std::vector<uint16_t>::size_type offset = firstSet.size();
@@ -243,8 +236,7 @@ void TupleSchema::freeTupleSchema(TupleSchema *schema) {
 }
 
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,
-                                    uint16_t &uninlinedObjectColumnIndex, bool inBytes)
-{
+                                    uint16_t &uninlinedObjectColumnIndex, bool inBytes) {
     vassert(length <= COLUMN_MAX_VALUE_LENGTH);
     uint32_t offset = 0;
 
@@ -262,7 +254,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
             columnInfo->inlined = true;
 
             // If the length was specified in characters, convert to bytes.
-            int32_t factor = (type == VALUE_TYPE_VARCHAR && !inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+            int32_t factor = (type == ValueType::tVARCHAR && !inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
 
             // inlined variable length columns have a size prefix (1 byte)
             offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTHLENGTH + (length * factor));
@@ -290,16 +282,16 @@ void TupleSchema::setHiddenColumnMetaData(uint16_t index, HiddenColumn::Type col
     vassert(m_hiddenColumnIndexes[columnType] == UNSET_HIDDEN_COLUMN);
     m_hiddenColumnIndexes[columnType] = index;
     switch (columnType) {
-    default:
-        vassert(false);
-        return;
-    case HiddenColumn::XDCR_TIMESTAMP:
-    case HiddenColumn::VIEW_COUNT:
-        setColumnMetaDataCommon(absoluteIndex, columnInfo, VALUE_TYPE_BIGINT, 8, false);
-        return;
-    case HiddenColumn::MIGRATE_TXN:
-        setColumnMetaDataCommon(absoluteIndex, columnInfo, VALUE_TYPE_BIGINT, 8, true);
-        return;
+        default:
+            vassert(false);
+            return;
+        case HiddenColumn::XDCR_TIMESTAMP:
+        case HiddenColumn::VIEW_COUNT:
+            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::tBIGINT, 8, false);
+            return;
+        case HiddenColumn::MIGRATE_TXN:
+            setColumnMetaDataCommon(absoluteIndex, columnInfo, ValueType::tBIGINT, 8, true);
+            return;
     }
 }
 
@@ -340,7 +332,9 @@ size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
 
     for (int i = 0;i < columnCount(); ++i) {
         const TupleSchema::ColumnInfo* columnInfo = getColumnInfo(i);
-        int32_t factor = (columnInfo->type == VALUE_TYPE_VARCHAR && !columnInfo->inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+        int32_t factor =
+            columnInfo->type == static_cast<int>(ValueType::tVARCHAR) && !columnInfo->inBytes ?
+            MAX_BYTES_PER_UTF8_CHARACTER : 1;
         if (isVariableLengthType((ValueType)columnInfo->type)) {
             bytes += sizeof(int32_t); // value length placeholder for variable length columns
         }
@@ -383,8 +377,7 @@ std::string TupleSchema::debug() const {
     return ret;
 }
 
-bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const
-{
+bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const {
     if (this == other) {
         return true;
     }
@@ -417,8 +410,7 @@ bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const
     return true;
 }
 
-bool TupleSchema::equals(const TupleSchema *other) const
-{
+bool TupleSchema::equals(const TupleSchema *other) const {
     // First check for structural equality.
     if ( ! isCompatibleForMemcpy(other)) {
         return false;
@@ -433,8 +425,7 @@ bool TupleSchema::equals(const TupleSchema *other) const
         }
         // The declared column length for an out-of-line object is a behavior difference
         // that has no effect on tuple format.
-        if (( ! columnInfo->inlined) &&
-                (columnInfo->length != ocolumnInfo->length)) {
+        if (! columnInfo->inlined && columnInfo->length != ocolumnInfo->length) {
             return false;
         }
     }
@@ -456,8 +447,7 @@ bool TupleSchema::equals(const TupleSchema *other) const
 uint16_t TupleSchema::countUninlineableObjectColumns(
         const std::vector<ValueType> columnTypes,
         const std::vector<int32_t> columnSizes,
-        const std::vector<bool> columnInBytes)
-{
+        const std::vector<bool> columnInBytes) {
     const uint16_t numColumns = static_cast<uint16_t>(columnTypes.size());
     uint16_t numUninlineableObjects = 0;
     for (int ii = 0; ii < numColumns; ii++) {

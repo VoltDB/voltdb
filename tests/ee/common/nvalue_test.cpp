@@ -72,12 +72,12 @@ public:
     {
         nv = ValueFactory::getDecimalValueFromString(textValue);
         deserDecHelper();
-        NValue floatEquivalent = nv.castAs(VALUE_TYPE_DOUBLE);
+        NValue floatEquivalent = nv.castAs(ValueType::tDOUBLE);
         double floatValue = ValuePeeker::peekDouble(floatEquivalent);
         floatValue *= static_cast<double>(scale);
         scaledValue = (int64_t)floatValue;
         double floatDirect = atof(textValue);
-        viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(VALUE_TYPE_DECIMAL);
+        viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(ValueType::tDECIMAL);
         lower = ValueFactory::getDoubleValue(floatDirect - floatDelta);
         upper = ValueFactory::getDoubleValue(floatDirect + floatDelta);
         scaledDirect = (int64_t)(floatDirect * scale);
@@ -107,7 +107,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 {
     deserDecValidator("6.0000000");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -119,7 +119,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("-0");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -133,7 +133,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("0");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -144,7 +144,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("0.0");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -155,7 +155,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("1");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -166,7 +166,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("-1");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -182,7 +182,7 @@ TEST_F(NValueTest, DeserializeDecimal)
                                        "99999999");   //38 digits
     deserDecHelper();
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(value, TTInt("-9999999999"  //10 digits
             "9999999999"   //20 digits
             "9999999999"   //30 digits
@@ -199,7 +199,7 @@ TEST_F(NValueTest, DeserializeDecimal)
             "99999999");
     deserDecHelper();
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(value, TTInt("9999999999"  //10 digits
             "9999999999"   //20 digits
             "9999999999"   //30 digits
@@ -211,7 +211,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("1234");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -222,7 +222,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("12.34");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -233,7 +233,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("-1234");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -244,7 +244,7 @@ TEST_F(NValueTest, DeserializeDecimal)
 
     deserDecValidator("-12.34");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_TRUE(viaDouble.compare(nv) == 0);
     ASSERT_TRUE(lower.compare(nv) < 0);
     ASSERT_TRUE(nv.compare(lower) > 0);
@@ -256,14 +256,14 @@ TEST_F(NValueTest, DeserializeDecimal)
     // Test to see that we round down appropriately.
     deserDecValidator("0.8999999999994");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt((uint64_t)899999999999), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
     // Test to see that we round up appropriately.
     deserDecValidator("0.8999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt((uint64_t)900000000000), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -271,7 +271,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a zero decimal part.
     deserDecValidator("0.9999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(1), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -279,7 +279,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a non-zero decimal part.
     deserDecValidator("99.9999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(100), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -287,14 +287,14 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a non-zero decimal part.
     deserDecValidator("98.9999999999999");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(99), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
     // Test to see that we round down appropriately with a signed number.
     deserDecValidator("-0.8999999999994");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     TTInt sfrac = ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor);
     TTInt sexpFrac("-899999999999");
@@ -303,7 +303,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // Test to see that we round up appropriately with a signed number
     deserDecValidator("-0.8999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt("-900000000000"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -311,7 +311,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a zero decimal part with a signed number.
     deserDecValidator("-0.9999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt("-1"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -319,7 +319,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a non-zero decimal part.
     deserDecValidator("-99.9999999999995");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt("-100"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
 
@@ -327,7 +327,7 @@ TEST_F(NValueTest, DeserializeDecimal)
     // part to a non-zero decimal part.
     deserDecValidator("-98.9999999999999");
     ASSERT_FALSE(nv.isNull());
-    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(vt, ValueType::tDECIMAL);
     ASSERT_EQ(TTInt("-99"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
     ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
     // illegal deserializations
@@ -1638,16 +1638,16 @@ TEST_F(NValueTest, AddDecimal)
     lhs = ValueFactory::getDecimalValueFromString("200");
     ans = ValueFactory::getDecimalValueFromString("300");
     sum = lhs.op_add(rhs);
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
     sum = rhs.op_add(lhs);
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
 
     // add a big int and a decimal
     rhs = ValueFactory::getBigIntValue(100);
     sum = lhs.op_add(rhs);
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
 
     //Overflow
@@ -1699,18 +1699,18 @@ TEST_F(NValueTest, SubtractDecimal)
     lhs = ValueFactory::getDecimalValueFromString("200");
     ans = ValueFactory::getDecimalValueFromString("100");
     sum = lhs.op_subtract(rhs);
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
     sum = rhs.op_subtract(lhs);
     ans = ValueFactory::getDecimalValueFromString("-100");
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
 
     // Subtract a big int and a decimal
     rhs = ValueFactory::getBigIntValue(100);
     sum = lhs.op_subtract(rhs);
     ans = ValueFactory::getDecimalValueFromString("100");
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(sum));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(sum));
     ASSERT_EQ(0, ans.compare(sum));
 
     //Overflow
@@ -1762,13 +1762,13 @@ TEST_F(NValueTest, DecimalProducts)
     lhs = ValueFactory::getBigIntValue((int64_t)2);
     product = rhs.op_multiply(lhs);
     ans = ValueFactory::getDecimalValueFromString("437545.537222");
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(product));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(product));
     ASSERT_EQ(ValuePeeker::peekDecimal(product),
               ValuePeeker::peekDecimal(ans));
 
     // int * decimal
     product = lhs.op_multiply(rhs);
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(product));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(product));
     ASSERT_EQ(ValuePeeker::peekDecimal(product),
               ValuePeeker::peekDecimal(ans));
 
@@ -1776,7 +1776,7 @@ TEST_F(NValueTest, DecimalProducts)
     lhs = ValueFactory::getDecimalValueFromString("2");
     product = rhs.op_multiply(lhs);
     ans = ValueFactory::getDecimalValueFromString("437545.537222");
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(product));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(product));
     ASSERT_EQ(ValuePeeker::peekDecimal(product),
               ValuePeeker::peekDecimal(ans));
 
@@ -1784,7 +1784,7 @@ TEST_F(NValueTest, DecimalProducts)
     lhs = ValueFactory::getDecimalValueFromString("0.21");
     product = rhs.op_multiply(lhs);
     ans = ValueFactory::getDecimalValueFromString("45942.281408310");
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(product));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(product));
     ASSERT_EQ(ValuePeeker::peekDecimal(product),
               ValuePeeker::peekDecimal(ans));
 
@@ -1799,7 +1799,7 @@ TEST_F(NValueTest, DecimalProducts)
     //    cout << "sum    " << sum.debug() << endl;
 
     // can't produce the answer as a double to compare directly
-    ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(product));
+    ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(product));
     ASSERT_EQ(ValuePeeker::peekDecimal(product),
               ValuePeeker::peekDecimal(ans));
 
@@ -1845,7 +1845,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("5");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("40");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1853,7 +1853,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("20");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("200.15");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1861,7 +1861,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("3");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("3.333333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1870,7 +1870,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("6");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("47422.4660685");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1878,7 +1878,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("3000");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("0.000333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1886,7 +1886,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("300");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("0.003333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1894,7 +1894,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("30");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("0.033333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1902,7 +1902,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("-3");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("-0.333333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1910,7 +1910,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString(".0003");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("-0.333333333333");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1919,7 +1919,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("-.11");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("5.05");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1927,7 +1927,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("0.55");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("0.2");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -1935,7 +1935,7 @@ TEST_F(NValueTest, DecimalQuotients) {
    lhs = ValueFactory::getDecimalValueFromString("0.55");
    quo = rhs.op_divide(lhs);
    ans = ValueFactory::getDecimalValueFromString("0");
-   ASSERT_EQ(VALUE_TYPE_DECIMAL, ValuePeeker::peekValueType(quo));
+   ASSERT_EQ(ValueType::tDECIMAL, ValuePeeker::peekValueType(quo));
    ASSERT_EQ(ValuePeeker::peekDecimal(quo),
              ValuePeeker::peekDecimal(ans));
 
@@ -2424,8 +2424,8 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
     // This requires intimate knowledge of ARRAY wire protocol
     ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
     ReferenceSerializeInputBE input(serial_buffer, sizeof(serial_buffer));
-    setup.writeByte(VALUE_TYPE_ARRAY);
-    setup.writeByte(vt);
+    setup.writeByte(static_cast<char>(ValueType::tARRAY));
+    setup.writeByte(static_cast<char>(vt));
     setup.writeShort((short)length); // number of list elements
     for (int ii = 0; ii < length; ++ii) {
         nvalue[ii].serializeTo(setup);
@@ -2496,9 +2496,9 @@ TEST_F(NValueTest, TestInList)
     initNValueArray(int_NV_set2, int_set2, int_length2);
 
     NValue int_list1 =
-        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set1, int_length1, testPool);
+        streamNValueArrayintoInList(ValueType::tINTEGER, int_NV_set1, int_length1, testPool);
     NValue int_list2 =
-        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set2, int_length2, testPool);
+        streamNValueArrayintoInList(ValueType::tINTEGER, int_NV_set2, int_length2, testPool);
 
     for (size_t ii = 0; ii < int_length1; ++ii) {
         EXPECT_TRUE(int_NV_set1[ii].inList(int_list1));
@@ -2529,9 +2529,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+           ExpressionUtil::vectorFactory(ValueType::tINTEGER, int_constants_rhs1);
         AbstractExpression* in_list_of_int_constants2 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+           ExpressionUtil::vectorFactory(ValueType::tINTEGER, int_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
@@ -2554,9 +2554,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+           ExpressionUtil::vectorFactory(ValueType::tINTEGER, int_constants_rhs1);
         AbstractExpression* in_list_of_int_constants2 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+           ExpressionUtil::vectorFactory(ValueType::tINTEGER, int_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
@@ -2584,9 +2584,9 @@ TEST_F(NValueTest, TestInList)
     initNValueArray(string_NV_set2, string_set2, string_length2);
 
     NValue string_list1 =
-        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set1, string_length1, testPool);
+        streamNValueArrayintoInList(ValueType::tVARCHAR, string_NV_set1, string_length1, testPool);
     NValue string_list2 =
-        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set2, string_length2, testPool);
+        streamNValueArrayintoInList(ValueType::tVARCHAR, string_NV_set2, string_length2, testPool);
     for (size_t ii = 0; ii < string_length1; ++ii) {
         EXPECT_TRUE(string_NV_set1[ii].inList(string_list1));
         EXPECT_FALSE(string_NV_set1[ii].inList(string_list2));
@@ -2618,9 +2618,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+           ExpressionUtil::vectorFactory(ValueType::tVARCHAR, string_constants_rhs1);
         AbstractExpression* in_list_of_string_constants2 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+           ExpressionUtil::vectorFactory(ValueType::tVARCHAR, string_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
@@ -2643,9 +2643,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+           ExpressionUtil::vectorFactory(ValueType::tVARCHAR, string_constants_rhs1);
         AbstractExpression* in_list_of_string_constants2 =
-           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+           ExpressionUtil::vectorFactory(ValueType::tVARCHAR, string_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
@@ -2713,7 +2713,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
             }
             vectorValues.push_back(nvalue);
         }
-        arrayValue = ValueFactory::getArrayValueFromSizeAndType(len, VALUE_TYPE_BIGINT);
+        arrayValue = ValueFactory::getArrayValueFromSizeAndType(len, ValueType::tBIGINT);
         EXPECT_TRUE(vectorValues.size() == len);
         arrayValue.setArrayElements(vectorValues);
 
@@ -2721,7 +2721,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
         vectorValues.clear();
         coinFlip = (rand() % 2) == 0;
         // 50% are cast down... 50% are not
-        ValueType type = coinFlip ? VALUE_TYPE_BIGINT : VALUE_TYPE_SMALLINT;
+        ValueType type = coinFlip ? ValueType::tBIGINT : ValueType::tSMALLINT;
         arrayValue.castAndSortAndDedupArrayForInList(type, vectorValues);
 
         // verify
@@ -2750,12 +2750,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     v5 = ValueFactory::getNullStringValue();
     vectorValues.push_back(v5);
 
-    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_VARCHAR);
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, ValueType::tVARCHAR);
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
     vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_VARCHAR, vectorValues);
+    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARCHAR, vectorValues);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2787,12 +2787,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     v5 = ValueFactory::getNullValue();
     vectorValues.push_back(v5);
 
-    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_DOUBLE);
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, ValueType::tDOUBLE);
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
     vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_DOUBLE, vectorValues);
+    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDOUBLE, vectorValues);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2819,12 +2819,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     v5 = ValueFactory::getNullValue();
     vectorValues.push_back(v5);
 
-    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_DECIMAL);
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, ValueType::tDECIMAL);
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
     vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_DECIMAL, vectorValues);
+    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDECIMAL, vectorValues);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2851,12 +2851,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     v5 = ValueFactory::getNullBinaryValue();
     vectorValues.push_back(v5);
 
-    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_VARBINARY);
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, ValueType::tVARBINARY);
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
     vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_VARBINARY, vectorValues);
+    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARBINARY, vectorValues);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2989,7 +2989,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     base = NValue::parseTimestampString("2038-12-31 23:59:59.999999");
     try {
         NValue ts = ValueFactory::getTimestampValue(base);
-        NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+        NValue str = ts.castAs(ValueType::tVARCHAR);
         peekString = peekStringCopy_withoutNull(str);
         long roundtrip = NValue::parseTimestampString(peekString.c_str());
         EXPECT_EQ(base, roundtrip);
@@ -3120,7 +3120,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     for (long jj = base; jj <= top; jj+=increment) {
         try {
             NValue ts = ValueFactory::getTimestampValue(jj);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             long roundtrip = NValue::parseTimestampString(peekString.c_str());
             EXPECT_EQ(jj, roundtrip);
@@ -3156,7 +3156,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3178,7 +3178,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
             int64_t base = NValue::parseTimestampString(dateStr2);
             NValue str = ValueFactory::getStringValue(dateStr);
-            NValue ts = str.castAs(VALUE_TYPE_TIMESTAMP);
+            NValue ts = str.castAs(ValueType::tTIMESTAMP);
             int64_t value = ValuePeeker::peekTimestamp(ts);
             EXPECT_EQ(base, value);
             if (base != value) {
@@ -3212,7 +3212,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3233,7 +3233,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3255,7 +3255,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-10-29 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3276,7 +3276,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3298,7 +3298,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
@@ -3319,7 +3319,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
-            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            NValue str = ts.castAs(ValueType::tVARCHAR);
             peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {

@@ -290,8 +290,8 @@ public:
             // zero, and [de-]normalized numbers).  This is also enforced
             // in the front end.
             vassert(! isVariableLengthType(ValuePeeker::peekValueType(val))
-                    && ValuePeeker::peekValueType(val) != VALUE_TYPE_POINT
-                    && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
+                    && ValuePeeker::peekValueType(val) != ValueType::tPOINT
+                    && ValuePeeker::peekValueType(val) != ValueType::tDOUBLE);
 
             int32_t valLength = 0;
             const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
@@ -319,7 +319,7 @@ public:
 class ValsToHyperLogLogAgg : public ApproxCountDistinctAgg {
 public:
     NValue finalize(ValueType type) override {
-        vassert(type == VALUE_TYPE_VARBINARY);
+        vassert(type == ValueType::tVARBINARY);
         // serialize the hyperloglog as varbinary, to send to
         // coordinator.
         //
@@ -340,7 +340,7 @@ public:
 class HyperLogLogsToCardAgg : public ApproxCountDistinctAgg {
 public:
     void advance(const NValue& val) override {
-        vassert(ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        vassert(ValuePeeker::peekValueType(val) == ValueType::tVARBINARY);
         vassert(!val.isNull());
 
         // TODO: we're doing some unnecessary copying here to
