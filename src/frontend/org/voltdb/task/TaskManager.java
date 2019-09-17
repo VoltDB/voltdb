@@ -1877,8 +1877,16 @@ public final class TaskManager {
 
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
-                m_rawExecutor.setCorePoolSize(threadCount);
-                m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                // In JDK>=9, setCorePoolSize(poolSize) requires the poolSize <= MaximumPoolSize
+                // and setMaximumPoolSize(poolSize) requires the poolSize >= CorePoolSize.
+                // note: the order of the statements is important.
+                if (m_rawExecutor.getMaximumPoolSize() >= threadCount) {
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                } else {
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                }
             }
         }
     }
