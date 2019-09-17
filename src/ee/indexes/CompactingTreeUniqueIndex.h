@@ -280,7 +280,7 @@ class CompactingTreeUniqueIndex : public TableIndex {
         return retval;
     }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor) const {
+    TableTuple nextValueAtKey(IndexCursor& cursor) const override {
         TableTuple retval = cursor.m_match;
         cursor.m_match.move(NULL);
         return retval;

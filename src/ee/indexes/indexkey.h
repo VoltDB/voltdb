@@ -112,7 +112,7 @@ inline uint64_t convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(
     return retval;
 }
 
-template <std::size_t> struct IntsEqualityChecker;
+template <std::size_t> class IntsEqualityChecker;
 template <std::size_t> struct IntsComparator;
 template <std::size_t> struct IntsHasher;
 
@@ -196,7 +196,6 @@ struct IntsKey {
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         const int columnCount = keySchema->columnCount();
-        uint64_t keyValue;
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
                 case voltdb::ValueType::tBIGINT:
@@ -376,9 +375,9 @@ struct IntsHasher {
     }
 };
 
-template <std::size_t> struct GenericEqualityChecker;
-template <std::size_t> struct GenericComparator;
-template <std::size_t> struct GenericHasher;
+template <std::size_t> class GenericEqualityChecker;
+template <std::size_t> class GenericComparator;
+template <std::size_t> class GenericHasher;
 
 /**
  * Key object for indexes of mixed types.
@@ -563,7 +562,7 @@ public:
  * Required by CompactingMap keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericComparator {
+class GenericComparator {
 protected:
     const TupleSchema *m_keySchema;
 public:
