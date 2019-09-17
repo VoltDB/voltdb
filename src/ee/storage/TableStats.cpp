@@ -30,16 +30,24 @@
 using namespace voltdb;
 using namespace std;
 
+array<tuple<string, ValueType, int32_t, bool, bool>, 8> const TableStats::BASE_SCHEMA = {
+    make_tuple("TABLE_NAME", ValueType::tVARCHAR, 4096, false, false),
+    make_tuple("TABLE_TYPE", ValueType::tVARCHAR, 4096, false, false),
+
+    make_tuple("TUPLE_COUNT", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+    make_tuple("TUPLE_ALLOCATED_MEMORY", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+    make_tuple("TUPLE_DATA_MEMORY", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+    make_tuple("STRING_DATA_MEMORY", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+
+    make_tuple("TUPLE_LIMIT", ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
+    make_tuple("PERCENT_FULL", ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false)
+};
+
 vector<string> TableStats::generateTableStatsColumnNames() {
     vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
-    columnNames.push_back("TABLE_NAME");
-    columnNames.push_back("TABLE_TYPE");
-    columnNames.push_back("TUPLE_COUNT");
-    columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
-    columnNames.push_back("TUPLE_DATA_MEMORY");
-    columnNames.push_back("STRING_DATA_MEMORY");
-    columnNames.push_back("TUPLE_LIMIT");
-    columnNames.push_back("PERCENT_FULL");
+    for (auto const& t : BASE_SCHEMA) {
+        columnNames.emplace_back(get<0>(t));
+    }
     return columnNames;
 }
 
@@ -48,45 +56,12 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull,
         vector<bool> &inBytes) {
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
+    for (auto const& t : BASE_SCHEMA) {
+        types.emplace_back(get<1>(t));
+        columnLengths.emplace_back(get<2>(t));
+        allowNull.emplace_back(get<3>(t));
+        inBytes.emplace_back(get<4>(t));
+    }
 }
 
 TempTable* TableStats::generateEmptyTableStatsTable() {
@@ -99,7 +74,7 @@ TempTable* TableStats::generateEmptyTableStatsTable() {
     TableStats::populateTableStatsSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths,
             columnAllowNull, columnInBytes);
-    return TableFactory::buildTempTable(name, schema, columnNames, NULL);
+    return TableFactory::buildTempTable(name, schema, columnNames, nullptr);
 }
 
 /*
@@ -193,7 +168,7 @@ void TableStats::populateSchema(vector<ValueType>& types,
         vector<int32_t>& columnLengths,
         vector<bool>& allowNull,
         vector<bool>& inBytes) {
-    TableStats::populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
+    populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 
 TableStats::~TableStats() {

@@ -51,7 +51,8 @@ class StatsSource {
     bool m_interval;
     static std::vector<std::string> const STATS_COLUMN_NAMES;
     /**
-     * ValueType, column length, allow nulls, in bytes */
+     * column name, ValueType, column length, allow nulls, in bytes
+     */
     static std::array<std::tuple<ValueType, int32_t, bool, bool>, 5> const BASE_SCHEMA;
 protected:
     /**

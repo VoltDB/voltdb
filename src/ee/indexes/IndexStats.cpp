@@ -25,15 +25,23 @@
 using namespace voltdb;
 using namespace std;
 
+array<tuple<string, ValueType, int32_t, bool, bool>, 7> const IndexStats::BASE_SCHEMA = {
+    make_tuple("INDEX_NAME", ValueType::tVARCHAR, 4096, false, false),
+    make_tuple("TABLE_NAME", ValueType::tVARCHAR, 4096, false, false),
+    make_tuple("INDEX_TYPE", ValueType::tVARCHAR, 4096, false, false),
+
+    make_tuple("IS_UNIQUE",    ValueType::tTINYINT, NValue::getTupleStorageSize(ValueType::tTINYINT), false, false),
+    make_tuple("IS_COUNTABLE", ValueType::tTINYINT, NValue::getTupleStorageSize(ValueType::tTINYINT), false, false),
+
+    make_tuple("ENTRY_COUNT",     ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+    make_tuple("MEMORY_ESTIMATE", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false)
+};
+
 vector<string> IndexStats::generateIndexStatsColumnNames() {
     vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
-    columnNames.push_back("INDEX_NAME");
-    columnNames.push_back("TABLE_NAME");
-    columnNames.push_back("INDEX_TYPE");
-    columnNames.push_back("IS_UNIQUE");
-    columnNames.push_back("IS_COUNTABLE");
-    columnNames.push_back("ENTRY_COUNT");
-    columnNames.push_back("MEMORY_ESTIMATE");
+    for (auto const& t : BASE_SCHEMA) {
+        columnNames.emplace_back(get<0>(t));
+    }
     return columnNames;
 }
 
@@ -45,48 +53,12 @@ void IndexStats::populateIndexStatsSchema(
         vector<bool> &allowNull,
         vector<bool> &inBytes) {
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
-
-    // index name
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096); // This means if user's index name length exceed 4096, problem may happen.
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // table name
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // index type
-    types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // is unique
-    types.push_back(ValueType::tTINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // is countable
-    types.push_back(ValueType::tTINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // entry count
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // memory usage
-    types.push_back(ValueType::tBIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
+    for (auto const& t : BASE_SCHEMA) {
+        types.emplace_back(get<1>(t));
+        columnLengths.emplace_back(get<2>(t));
+        allowNull.emplace_back(get<3>(t));
+        inBytes.emplace_back(get<4>(t));
+    }
 }
 
 TempTable* IndexStats::generateEmptyIndexStatsTable() {
@@ -122,8 +94,8 @@ void IndexStats::configure(string const& name, string const& tableName) {
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());
-    m_isUnique = static_cast<int8_t>(m_index->isUniqueIndex() ? 1 : 0);
-    m_isCountable = static_cast<int8_t>(m_index->isCountableIndex() ? 1 : 0);
+    m_isUnique = m_index->isUniqueIndex() ? 1 : 0;
+    m_isCountable = m_index->isCountableIndex() ? 1 : 0;
 }
 
 void IndexStats::rename(std::string const& name) {
@@ -144,9 +116,9 @@ vector<string> IndexStats::generateStatsColumnNames() const {
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
 void IndexStats::updateStatsTuple(TableTuple *tuple) {
-    tuple->setNValue( StatsSource::m_columnName2Index["INDEX_NAME"], m_indexName);
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
-    tuple->setNValue( StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);
+    tuple->setNValue(StatsSource::m_columnName2Index["INDEX_NAME"], m_indexName);
+    tuple->setNValue(StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
+    tuple->setNValue(StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);
     int64_t count = static_cast<int64_t>(m_index->getSize());
     int64_t mem_estimate_kb = m_index->getMemoryEstimate() / 1024;
 
@@ -175,7 +147,7 @@ void IndexStats::populateSchema(
         vector<int32_t> &columnLengths,
         vector<bool> &allowNull,
         vector<bool> &inBytes) {
-    IndexStats::populateIndexStatsSchema(types, columnLengths, allowNull, inBytes);
+    populateIndexStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 
 IndexStats::~IndexStats() {
