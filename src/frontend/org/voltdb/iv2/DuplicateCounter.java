@@ -67,7 +67,7 @@ public class DuplicateCounter
     Map<Long, ResponseResult> m_responses = Maps.newTreeMap();
     private boolean m_allMatched = true;
     Set<Long> m_replicas = Sets.newHashSet();
-
+    Set<Long> m_misMatchedReplicas = Sets.newHashSet();
     final boolean m_forEverySite;
 
     static class ResponseResult {
@@ -130,12 +130,6 @@ public class DuplicateCounter
     public void updateReplica (Long previousMaster, Long newMaster){
         m_expectedHSIds.remove(previousMaster);
         m_expectedHSIds.add(newMaster);
-        m_replicas.remove(previousMaster);
-        m_replicas.add(newMaster);
-        ResponseResult respResult = m_responses.remove(previousMaster);
-        if (respResult != null) {
-            m_responses.put(newMaster,respResult);
-        }
     }
 
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
@@ -240,40 +234,35 @@ public class DuplicateCounter
     }
 
     private void determineResult() {
-        if (!m_forEverySite || m_responses.isEmpty()) {
+        if (m_forEverySite || m_responses.isEmpty()) {
             return;
         }
         ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
         assert (leaderResponse != null);
         m_responseHashes = leaderResponse.hashes;
         m_lastResponse = leaderResponse.message;
-        int failedCount = m_responses.size();
+        int pos = -1;
         for (Iterator<Map.Entry<Long, ResponseResult>> it = m_responses.entrySet().iterator(); it.hasNext();) {
             Map.Entry<Long, ResponseResult> entry = it.next();
+
+            // The replica is not present any more
             if (!m_replicas.contains(entry.getKey())) {
                 it.remove();
-                failedCount--;
+                continue;
             }
+
             ResponseResult res = entry.getValue();
-            if (!res.success) {
-                failedCount--;
-            }
-            int [] theHashes = res.hashes;
-            int pos = -1;
             if (leaderResponse.success != entry.getValue().success) {
                 tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                logRelevantMismatchInformation("HASH MISMATCH", theHashes, res.message, -1);
+                logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
                 m_allMatched = false;
-            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, theHashes)) >= 0) {
+                m_misMatchedReplicas.add(entry.getKey());
+            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
                 tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                logRelevantMismatchInformation("HASH MISMATCH", theHashes, res.message, pos);
+                logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
                 m_allMatched = false;
+                m_misMatchedReplicas.add(entry.getKey());
             }
-        }
-
-        // All replicas, including leader, failed
-        if (!leaderResponse.success && failedCount ==0) {
-            m_allMatched = true;
         }
     }
 
@@ -322,5 +311,9 @@ public class DuplicateCounter
                TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
+    }
+
+    Set<Long> getMisMatchedReplicas() {
+        return m_misMatchedReplicas;
     }
 }
