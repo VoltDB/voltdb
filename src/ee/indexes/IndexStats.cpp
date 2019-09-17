@@ -25,7 +25,7 @@
 using namespace voltdb;
 using namespace std;
 
-array<tuple<string, ValueType, int32_t, bool, bool>, 7> const IndexStats::BASE_SCHEMA = {
+array<StatsSource::schema_tuple_type, 7> const IndexStats::BASE_SCHEMA = {
     make_tuple("INDEX_NAME", ValueType::tVARCHAR, 4096, false, false),
     make_tuple("TABLE_NAME", ValueType::tVARCHAR, 4096, false, false),
     make_tuple("INDEX_TYPE", ValueType::tVARCHAR, 4096, false, false),
@@ -37,8 +37,8 @@ array<tuple<string, ValueType, int32_t, bool, bool>, 7> const IndexStats::BASE_S
     make_tuple("MEMORY_ESTIMATE", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false)
 };
 
-vector<string> IndexStats::generateIndexStatsColumnNames() {
-    vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
+vector<string> IndexStats::generateStatsColumnNames() {
+    vector<string> columnNames = StatsSource::generateStatsColumnNames();
     for (auto const& t : BASE_SCHEMA) {
         columnNames.emplace_back(get<0>(t));
     }
@@ -47,18 +47,20 @@ vector<string> IndexStats::generateIndexStatsColumnNames() {
 
 // make sure to update schema in frontend sources (like IndexStats.java) and tests when updating
 // the index-stats schema in here.
-void IndexStats::populateIndexStatsSchema(
-        vector<ValueType> &types,
-        vector<int32_t> &columnLengths,
-        vector<bool> &allowNull,
-        vector<bool> &inBytes) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
+StatsSource::schema_type IndexStats::populateIndexStatsSchema() {
+    vector<string> names;
+    vector<ValueType> types;
+    vector<int32_t> columnLengths;
+    vector<bool> allowNull, inBytes;
+    tie(names, types, columnLengths, allowNull, inBytes) = StatsSource::populateBaseSchema();
     for (auto const& t : BASE_SCHEMA) {
+        names.emplace_back(get<0>(t));
         types.emplace_back(get<1>(t));
         columnLengths.emplace_back(get<2>(t));
-        allowNull.emplace_back(get<3>(t));
-        inBytes.emplace_back(get<4>(t));
+        allowNull.push_back(get<3>(t));
+        inBytes.push_back(get<4>(t));
     }
+    return make_tuple(names, types, columnLengths, allowNull, inBytes);
 }
 
 TempTable* IndexStats::generateEmptyIndexStatsTable() {
@@ -66,12 +68,12 @@ TempTable* IndexStats::generateEmptyIndexStatsTable() {
     // An empty stats table isn't clearly associated with any specific
     // database ID.  Just pick something that works for now (Yes,
     // abstractplannode::databaseId(), I'm looking in your direction)
-    vector<string> columnNames = generateIndexStatsColumnNames();
+    vector<string> columnNames;
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
-    populateIndexStatsSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    tie(columnNames, columnTypes, columnLengths, columnAllowNull, columnInBytes) = populateIndexStatsSchema();
     TupleSchema *schema = TupleSchema::createTupleSchema(
             columnTypes, columnLengths, columnAllowNull, columnInBytes);
     return TableFactory::buildTempTable(name, schema, columnNames, nullptr);
@@ -104,15 +106,6 @@ void IndexStats::rename(std::string const& name) {
 }
 
 /**
- * Generates the list of column names that will be in the statTable_. Derived classes must override
- * this method and call the parent class's version to obtain the list of columns contributed by
- * ancestors and then append the columns they will be contributing to the end of the list.
- */
-vector<string> IndexStats::generateStatsColumnNames() const {
-    return generateIndexStatsColumnNames();
-}
-
-/**
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
 void IndexStats::updateStatsTuple(TableTuple *tuple) {
@@ -142,12 +135,8 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into
  * the tuple schema instead of appending to end of a list.
  */
-void IndexStats::populateSchema(
-        vector<ValueType> &types,
-        vector<int32_t> &columnLengths,
-        vector<bool> &allowNull,
-        vector<bool> &inBytes) {
-    populateIndexStatsSchema(types, columnLengths, allowNull, inBytes);
+StatsSource::schema_type IndexStats::populateSchema() {
+    return populateIndexStatsSchema();
 }
 
 IndexStats::~IndexStats() {

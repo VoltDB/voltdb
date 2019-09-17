@@ -36,80 +36,22 @@ class TableTuple;
  * row table that is updated every time it is retrieved.
  */
 class StatsSource {
-    /**
-     * Table containing the stat information. Shared pointer used as a substitute for scoped_ptr due to forward
-     * declaration.
-     */
-    std::shared_ptr<Table> m_statsTable = nullptr;
-
-    /**
-     * Tuple used to modify the stat table.
-     */
-    TableTuple m_statsTuple;
-    CatalogId m_hostId;
-    NValue m_hostname;
-    bool m_interval;
-    static std::vector<std::string> const STATS_COLUMN_NAMES;
+public:
     /**
      * column name, ValueType, column length, allow nulls, in bytes
      */
-    static std::array<std::tuple<ValueType, int32_t, bool, bool>, 5> const BASE_SCHEMA;
-protected:
-    /**
-     * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
-     * @parameter tuple TableTuple pointing to a row in the stats table.
-     */
-    virtual void updateStatsTuple(TableTuple *tuple) = 0;
-
-    /**
-     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
-     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
-     * contributing to the end of the list.
-     */
-    virtual std::vector<std::string> generateStatsColumnNames() const;
-
-    /**
-     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
-     * end of a list.
-     */
-    virtual void populateSchema(std::vector<ValueType>& types,
-            std::vector<int32_t>& columnLengths,
-            std::vector<bool>& allowNull,
-            std::vector<bool>& inBytes);
-
-    /**
-     * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the
-     * inheritance hierarchy can vary the number of columns they contribute. This removes the dependency between them.
-     */
-    std::map<std::string, int> m_columnName2Index;
-
-    NValue m_tableName;
-
-    bool interval() const {
-        return m_interval;
-    }
-public:
-
-    /**
-     * Generates the list of column names that are present for every
-     * stats table.  Derived classes should implement their own static
-     * methods to generate their column names and call this method
-     * within it to populate the column name vector before adding
-     * their stat-specific column names.
-     */
-    static std::vector<std::string> generateBaseStatsColumnNames() {
-        return STATS_COLUMN_NAMES;
-    }
-
+    using schema_tuple_type = std::tuple<std::string, ValueType, int32_t, bool, bool>;
+    using schema_type = std::tuple<std::vector<std::string>,       // column name
+          std::vector<ValueType>,          // column type
+            std::vector<int32_t>,          // column length
+            std::vector<bool>,             // allow null
+            std::vector<bool>>;            // in bytes
     /**
      * Populates the other schema information which is present for
      * every stats table.  Usage by derived classes takes the same
      * pattern as generateBaseStatsColumnNames.
      */
-    static void populateBaseSchema(std::vector<ValueType>& types,
-                                   std::vector<int32_t>& columnLengths,
-                                   std::vector<bool>& allowNull,
-                                   std::vector<bool>& inBytes);
+    static schema_type populateBaseSchema();
 
     /*
      * Do nothing constructor that initializes statTable_ and schema_ to NULL.
@@ -161,6 +103,46 @@ public:
      * @return String representation
      */
     virtual std::string toString() const;
+protected:
+    /**
+     * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
+     * @parameter tuple TableTuple pointing to a row in the stats table.
+     */
+    virtual void updateStatsTuple(TableTuple *tuple) = 0;
+    static std::vector<std::string> generateStatsColumnNames();
+
+    /**
+     * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
+     * end of a list.
+     */
+    virtual schema_type populateSchema();
+
+    /**
+     * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the
+     * inheritance hierarchy can vary the number of columns they contribute. This removes the dependency between them.
+     */
+    std::map<std::string, int> m_columnName2Index;
+
+    NValue m_tableName;
+
+    bool interval() const {
+        return m_interval;
+    }
+private:
+    /**
+     * Table containing the stat information. Shared pointer used as a substitute for scoped_ptr due to forward
+     * declaration.
+     */
+    std::shared_ptr<Table> m_statsTable = nullptr;
+
+    /**
+     * Tuple used to modify the stat table.
+     */
+    TableTuple m_statsTuple;
+    CatalogId m_hostId;
+    NValue m_hostname;
+    bool m_interval;
+    static std::array<schema_tuple_type, 5> const BASE_SCHEMA;
 };
 
 }

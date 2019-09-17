@@ -24,8 +24,7 @@
 using namespace voltdb;
 using namespace std;
 
-namespace
-{
+namespace {
     // Super-ghetto empty stats table "factory".  Should be able to
     // just replace the call to this in getStats() with a call to an
     // auto-generated stats table factory based on XML or JSON input
@@ -34,17 +33,15 @@ namespace
     // when this happens, too.
     TempTable* getEmptyStatsTable(StatisticsSelectorType sst) {
         switch (sst) {
-        case STATISTICS_SELECTOR_TYPE_TABLE:
-            return TableStats::generateEmptyTableStatsTable();
-        case STATISTICS_SELECTOR_TYPE_INDEX:
-            return IndexStats::generateEmptyIndexStatsTable();
-        default:
-            throwFatalException("Attempted to get unsupported stats type");
+            case STATISTICS_SELECTOR_TYPE_TABLE:
+                return TableStats::generateEmptyTableStatsTable();
+            case STATISTICS_SELECTOR_TYPE_INDEX:
+                return IndexStats::generateEmptyIndexStatsTable();
+            default:
+                throwFatalException("Attempted to get unsupported stats type");
         }
     }
 }
-
-StatsAgent::StatsAgent() {}
 
 /**
  * Associate the specified StatsSource with the specified CatalogId under the specified StatsSelector
@@ -55,7 +52,7 @@ StatsAgent::StatsAgent() {}
 void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
-    vassert(statsSource != NULL);
+    vassert(statsSource != nullptr);
     m_statsCategoryByStatsSelector[sst].insert(make_pair(catalogId, statsSource));
     VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
                ThreadLocalPool::getEnginePartitionId(),
@@ -77,8 +74,7 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relat
         VOLT_DEBUG("Partition %d unregistered all %s stats sources.",
                    ThreadLocalPool::getEnginePartitionId(),
                    sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "table" : "index");
-    }
-    else {
+    } else {
         it1->second.erase(relativeIndexOfTable);
         VOLT_DEBUG("Partition %d unregistered %s stats source for table at index %d.",
                    ThreadLocalPool::getEnginePartitionId(),
@@ -99,31 +95,28 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
                                 vector<CatalogId> catalogIds,
                                 bool interval, int64_t now) {
     if (catalogIds.size() < 1) {
-        return NULL;
+        return nullptr;
     }
 
     multimap<CatalogId, StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
 
     TempTable *statsTable = m_statsTablesByStatsSelector[sst];
-    if (statsTable == NULL) {
+    if (statsTable == nullptr) {
         statsTable = getEmptyStatsTable(sst);
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
     statsTable->deleteAllTempTuples();
 
-    for (int ii = 0; ii < catalogIds.size(); ii++) {
-        multimap<CatalogId, StatsSource*>::const_iterator iter;
-        for (iter = statsSources->find(catalogIds[ii]);
-             (iter != statsSources->end()) && (iter->first == catalogIds[ii]);
+    for (auto const id : catalogIds) {
+        for (auto iter = statsSources->find(id);
+             iter != statsSources->end() && iter->first == id;
              iter++) {
-
             StatsSource *ss = iter->second;
-            vassert(ss != NULL);
-            if (ss == NULL) {
+            vassert(ss != nullptr);
+            if (ss == nullptr) {           // TODO: WTF??
                 continue;
             }
-
             TableTuple *statsTuple = ss->getStatsTuple(siteId, partitionId, interval, now);
             statsTable->insertTuple(*statsTuple);
         }
@@ -132,8 +125,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
 }
 
 StatsAgent::~StatsAgent() {
-    for (map<StatisticsSelectorType, TempTable*>::iterator i = m_statsTablesByStatsSelector.begin();
-        i != m_statsTablesByStatsSelector.end(); i++) {
-        delete i->second;
+    for (auto i : m_statsTablesByStatsSelector) {
+        delete i.second;
     }
 }

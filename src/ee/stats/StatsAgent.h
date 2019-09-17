@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STATSAGENT_H_
-#define STATSAGENT_H_
+#pragma once
 
 #include "common/ids.h"
 #include "common/types.h"
@@ -33,11 +32,20 @@ class TempTable;
  * could be extended to include stats about plan fragments and the temp tables connecting them.
  */
 class StatsAgent {
+    /**
+     * Map from a statistics selector to a map of CatalogIds to StatsSources.
+     */
+    std::map<StatisticsSelectorType, std::multimap<CatalogId, StatsSource*>> m_statsCategoryByStatsSelector;
+
+    /**
+     * Temporary tables for aggregating the results of table statistics keyed by type of statistic
+     */
+    std::map<StatisticsSelectorType, TempTable*> m_statsTablesByStatsSelector;
 public:
     /**
      * Do nothing constructor
      */
-    StatsAgent();
+    StatsAgent() = default;
 
     /**
      * Associate the specified StatsSource with the specified CatalogId under the specified StatsSelector
@@ -45,12 +53,12 @@ public:
      * @param catalogId CatalogId of the resource
      * @param statsSource statsSource containing statistics for the resource
      */
-    void registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb::CatalogId catalogId, voltdb::StatsSource* statsSource);
+    void registerStatsSource(StatisticsSelectorType sst, CatalogId catalogId, StatsSource* statsSource);
 
     /**
      * Unassociate all instances of this selector type
      */
-    void unregisterStatsSource(voltdb::StatisticsSelectorType sst, int32_t relativeIndexOfTable = -1);
+    void unregisterStatsSource(StatisticsSelectorType sst, int32_t relativeIndexOfTable = -1);
 
     /**
      * Get statistics for the specified resources
@@ -60,26 +68,14 @@ public:
      * @param now Timestamp to return with each row
      */
     TempTable* getStats(
-            voltdb::StatisticsSelectorType sst,
+            StatisticsSelectorType sst,
             int64_t m_siteId, int32_t m_partitionId,
-            std::vector<voltdb::CatalogId> catalogIds,
+            std::vector<CatalogId> catalogIds,
             bool interval,
             int64_t now);
 
     ~StatsAgent();
-
-private:
-    /**
-     * Map from a statistics selector to a map of CatalogIds to StatsSources.
-     */
-    std::map<voltdb::StatisticsSelectorType, std::multimap<voltdb::CatalogId, voltdb::StatsSource*> > m_statsCategoryByStatsSelector;
-
-    /**
-     * Temporary tables for aggregating the results of table statistics keyed by type of statistic
-     */
-    std::map<voltdb::StatisticsSelectorType, voltdb::TempTable*> m_statsTablesByStatsSelector;
 };
 
 }
 
-#endif /* STATSAGENT_H_ */

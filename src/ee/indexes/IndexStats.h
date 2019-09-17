@@ -40,50 +40,37 @@ class IndexStats : public StatsSource {
     int64_t m_lastTupleCount = 0;
     int64_t m_lastMemEstimate = 0;
 
-    static std::array<std::tuple<std::string, ValueType, int32_t, bool, bool>, 7> const BASE_SCHEMA;
+    static std::array<schema_tuple_type, 7> const BASE_SCHEMA;
 protected:
     /**
      * Update the stats tuple with the latest statistics available to this StatsSource.
      */
-    virtual void updateStatsTuple(TableTuple *tuple);
-
-    /**
-     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
-     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
-     * contributing to the end of the list.
-     */
-    std::vector<std::string> generateStatsColumnNames() const override;
+    virtual void updateStatsTuple(TableTuple *tuple) override;
 
     /**
      * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
      * end of a list.
      */
-    void populateSchema(std::vector<ValueType> &types,
-            std::vector<int32_t> &columnLengths,
-            std::vector<bool> &allowNull,
-            std::vector<bool> &inBytes) override;
+    schema_type populateSchema() override;
 public:
     /**
      * Static method to generate the column names for the tables which
      * contain index stats.
      */
-    static std::vector<std::string> generateIndexStatsColumnNames();
+    static std::vector<std::string> generateStatsColumnNames();
 
     /**
      * Static method to generate the remaining schema information for
      * the tables which contain index stats.
      */
-    static void populateIndexStatsSchema(std::vector<ValueType>& types,
-                                         std::vector<int32_t>& columnLengths,
-                                         std::vector<bool>& allowNull,
-                                         std::vector<bool>& inBytes);
+    static schema_type populateIndexStatsSchema();
 
     static TempTable* generateEmptyIndexStatsTable();
 
     /*
      * Constructor caches reference to the table that will be generating the statistics
      */
-    IndexStats(voltdb::TableIndex* index);
+    IndexStats(TableIndex* index);
 
     ~IndexStats();
 

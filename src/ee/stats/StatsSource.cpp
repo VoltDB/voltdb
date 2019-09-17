@@ -24,28 +24,27 @@
 using namespace voltdb;
 using namespace std;
 
-std::vector<std::string> const StatsSource::STATS_COLUMN_NAMES = {
-    "TIMESTAMP", "HOST_ID", "HOSTNAME", "SITE_ID", "PARTITION_ID"
+array<tuple<string, ValueType, int32_t, bool, bool>, 5> const StatsSource::BASE_SCHEMA = {
+    make_tuple("TIMESTAMP", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
+        make_tuple("HOST_ID", ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
+        make_tuple("HOSTNAME", ValueType::tVARCHAR, 4096,                                           false, false),
+        make_tuple("SITE_ID", ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
+        make_tuple("PARTITION_ID", ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false)
 };
 
-array<tuple<ValueType, int32_t, bool, bool>, 5> const StatsSource::BASE_SCHEMA = {
-    make_tuple(ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false),
-        make_tuple(ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
-        make_tuple(ValueType::tVARCHAR, 4096,                                           false, false),
-        make_tuple(ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false),
-        make_tuple(ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), false, false)
-};
-
-void StatsSource::populateBaseSchema(vector<ValueType>& types,
-        vector<int32_t>& columnLengths,
-        vector<bool>& allowNull,
-        vector<bool>& inBytes) {
+StatsSource::schema_type StatsSource::populateBaseSchema() {
+    vector<string> names;
+    vector<ValueType> types;
+    vector<int32_t> columnLengths;
+    vector<bool> allowNull, inBytes;
     for (auto const& t : BASE_SCHEMA) {
-        types.emplace_back(get<0>(t));
-        columnLengths.emplace_back(get<1>(t));
-        allowNull.emplace_back(get<2>(t));
-        inBytes.emplace_back(get<3>(t));
+        names.emplace_back(get<0>(t));
+        types.emplace_back(get<1>(t));
+        columnLengths.emplace_back(get<2>(t));
+        allowNull.emplace_back(get<3>(t));
+        inBytes.emplace_back(get<4>(t));
     }
+    return make_tuple(names, types, columnLengths, allowNull, inBytes);
 }
 
 /**
@@ -62,13 +61,12 @@ void StatsSource::configure(string const& name) {
     m_hostId = executorContext->m_hostId;
     m_hostname = ValueFactory::getStringValue(executorContext->m_hostname);
 
-    vector<string> columnNames = generateStatsColumnNames();
-
+    vector<string> columnNames;
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
-    populateSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    tie(columnNames, columnTypes, columnLengths, columnAllowNull, columnInBytes) = populateSchema();
     TupleSchema *schema = TupleSchema::createTupleSchema(
             columnTypes, columnLengths, columnAllowNull, columnInBytes);
 
@@ -132,8 +130,12 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     return &m_statsTuple;
 }
 
-vector<string> StatsSource::generateStatsColumnNames() const {
-    return generateBaseStatsColumnNames();
+vector<string> StatsSource::generateStatsColumnNames() {
+    std::vector<string> names;
+    for(auto const& t : BASE_SCHEMA) {
+        names.emplace_back(std::get<0>(t));
+    }
+    return names;
 }
 
 /**
@@ -150,9 +152,6 @@ string StatsSource::toString() const {
 }
 
 
-void StatsSource::populateSchema(vector<ValueType>& types,
-        vector<int32_t>& columnLengths,
-        vector<bool>& allowNull,
-        vector<bool>& inBytes) {
-    populateBaseSchema(types, columnLengths, allowNull, inBytes);
+StatsSource::schema_type StatsSource::populateSchema() {
+    return populateBaseSchema();
 }

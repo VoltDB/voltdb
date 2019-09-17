@@ -39,22 +39,19 @@ class TableStats : public StatsSource {
     int64_t m_lastOccupiedTupleMemory = 0;
     int64_t m_lastStringDataMemory = 0;
 
-    static std::array<std::tuple<std::string, ValueType, int32_t, bool, bool>, 8> const BASE_SCHEMA;
-public:
+    static std::array<schema_tuple_type, 8> const BASE_SCHEMA;
     /**
      * Static method to generate the column names for the tables which
      * contain persistent table stats.
      */
-    static std::vector<std::string> generateTableStatsColumnNames();
+    static std::vector<std::string> generateStatsColumnNames();
+public:
 
     /**
      * Static method to generate the remaining schema information for
      * the tables which contain persistent table stats.
      */
-    static void populateTableStatsSchema(std::vector<ValueType>& types,
-            std::vector<int32_t>& columnLengths,
-            std::vector<bool>& allowNull,
-            std::vector<bool>& inBytes);
+    static schema_type populateTableStatsSchema();
 
     /**
      * Return an empty TableStats table
@@ -81,20 +78,10 @@ protected:
     void updateStatsTuple(TableTuple *tuple) override;
 
     /**
-     * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
-     * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
-     * contributing to the end of the list.
-     */
-    std::vector<std::string> generateStatsColumnNames() const override;
-
-    /**
      * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
      * end of a list.
      */
-    void populateSchema(std::vector<ValueType>& types,
-            std::vector<int32_t>& columnLengths,
-            std::vector<bool>& allowNull,
-            std::vector<bool>& inBytes) override;
+    schema_type populateSchema() override;
 };
 
 }

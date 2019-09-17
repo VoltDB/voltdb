@@ -30,7 +30,7 @@
 using namespace voltdb;
 using namespace std;
 
-array<tuple<string, ValueType, int32_t, bool, bool>, 8> const TableStats::BASE_SCHEMA = {
+array<StatsSource::schema_tuple_type, 8> const TableStats::BASE_SCHEMA = {
     make_tuple("TABLE_NAME", ValueType::tVARCHAR, 4096, false, false),
     make_tuple("TABLE_TYPE", ValueType::tVARCHAR, 4096, false, false),
 
@@ -43,8 +43,8 @@ array<tuple<string, ValueType, int32_t, bool, bool>, 8> const TableStats::BASE_S
     make_tuple("PERCENT_FULL", ValueType::tINTEGER, NValue::getTupleStorageSize(ValueType::tINTEGER), false, false)
 };
 
-vector<string> TableStats::generateTableStatsColumnNames() {
-    vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
+vector<string> TableStats::generateStatsColumnNames() {
+    vector<string> columnNames = StatsSource::generateStatsColumnNames();
     for (auto const& t : BASE_SCHEMA) {
         columnNames.emplace_back(get<0>(t));
     }
@@ -53,27 +53,33 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 
 // make sure to update schema in frontend sources (like TableStats.java) and tests when updating
 // the table-stats schema in here.
-void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull,
-        vector<bool> &inBytes) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
+StatsSource::schema_type TableStats::populateTableStatsSchema() {
+    vector<string> names;
+    vector<ValueType> types;
+    vector<int32_t> columnLengths;
+    vector<bool> allowNull, inBytes;
+    tie(names, types, columnLengths, allowNull, inBytes) = StatsSource::populateBaseSchema();
     for (auto const& t : BASE_SCHEMA) {
+        names.emplace_back(get<0>(t));
         types.emplace_back(get<1>(t));
         columnLengths.emplace_back(get<2>(t));
-        allowNull.emplace_back(get<3>(t));
-        inBytes.emplace_back(get<4>(t));
+        allowNull.push_back(get<3>(t));
+        inBytes.push_back(get<4>(t));
     }
+    return make_tuple(names, types, columnLengths, allowNull, inBytes);
 }
 
 TempTable* TableStats::generateEmptyTableStatsTable() {
     string name = "Persistent Table aggregated table stats temp table";
-    vector<string> columnNames = TableStats::generateTableStatsColumnNames();
+    vector<string> columnNames;
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     vector<bool> columnInBytes;
-    TableStats::populateTableStatsSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths,
-            columnAllowNull, columnInBytes);
+    tie(columnNames, columnTypes, columnLengths, columnAllowNull, columnInBytes) =
+        populateTableStatsSchema();
+    TupleSchema *schema = TupleSchema::createTupleSchema(
+            columnTypes, columnLengths, columnAllowNull, columnInBytes);
     return TableFactory::buildTempTable(name, schema, columnNames, nullptr);
 }
 
@@ -96,15 +102,6 @@ void TableStats::configure(std::string const& name) {
     StatsSource::configure(name);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
-}
-
-/**
- * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call
- * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
- * contributing to the end of the list.
- */
-vector<string> TableStats::generateStatsColumnNames() const {
-    return generateTableStatsColumnNames();
 }
 
 /**
@@ -164,11 +161,8 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
  * end of a list.
  */
-void TableStats::populateSchema(vector<ValueType>& types,
-        vector<int32_t>& columnLengths,
-        vector<bool>& allowNull,
-        vector<bool>& inBytes) {
-    populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
+StatsSource::schema_type TableStats::populateSchema() {
+    return populateTableStatsSchema();
 }
 
 TableStats::~TableStats() {
