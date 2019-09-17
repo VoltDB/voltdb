@@ -275,6 +275,8 @@ public class MeshArbiter {
      */
     public Map<Long, Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
         boolean proceed = false;
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
         do {
             Discard ignoreIt = mayIgnore(hsIds, fm);
             if (Discard.DoNot == ignoreIt) {
@@ -289,6 +291,13 @@ public class MeshArbiter {
                 unknownFaultedSites.add(fm.failedSite);
             }
             fm = (FaultMessage) m_mailbox.recv(justFailures);
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 2000) {
+                    lastReportTime = now;
+                    m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for reporting" );
+                }
+            }
         } while (fm != null);
 
         if (!proceed) {
@@ -310,6 +319,13 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(hsIds);
 
         while (discoverGlobalFaultData_rcv(hsIds)) {
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 2000) {
+                    lastReportTime = now;
+                    m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for global resolution." );
+                }
+            }
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
                 return ImmutableMap.of();
@@ -530,7 +546,7 @@ public class MeshArbiter {
 
         m_recoveryLog.info("Agreement, Sending survivors " + sfm);
         if (m_recoveryLog.isDebugEnabled()) {
-            m_recoveryLog.info(String.format("\n %s\n %s\n %s\n %s\n %s",
+            m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                dumpInTrouble()));
@@ -577,12 +593,12 @@ public class MeshArbiter {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
 
             /*
-             * If fault resolution takes longer then 10 seconds start logging
+             * If fault resolution takes longer then 10 seconds start logging for every 2 seconds
              */
             final long now = System.currentTimeMillis();
             if (now - blockedOnReceiveStart > 10000) {
-                if (now - lastReportTime > 60000) {
-                    lastReportTime = System.currentTimeMillis();
+                if (now - lastReportTime > 2000) {
+                    lastReportTime = now;
                     haveNecessaryFaultInfo(m_seeker.getSurvivors(), true);
                 }
             }
@@ -611,7 +627,7 @@ public class MeshArbiter {
 
                 m_recoveryLog.info("Agreement, Received " + sfm);
                 if (m_recoveryLog.isDebugEnabled()) {
-                    m_recoveryLog.info(String.format("\n %s\n %s\n %s\n %s\n %s",
+                    m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                        m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                        m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                        dumpInTrouble()));
