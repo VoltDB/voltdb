@@ -296,7 +296,7 @@ public class MeshArbiter {
             // If fault resolution takes longer then 10 seconds start logging for every second
             final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
             if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-                REJOIN_LOGGER.warn("Agreement, Failure resolution reporting stalled for " + blockedTime + "ms.");
+                REJOIN_LOGGER.warn("Agreement, Failure resolution reporting stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
                reportCount++;
             }
         } while (fm != null);
@@ -322,7 +322,7 @@ public class MeshArbiter {
         while (discoverGlobalFaultData_rcv(hsIds)) {
             final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
             if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-                REJOIN_LOGGER.warn("Agreement, Failure global resolution stalled for " + blockedTime + "ms.");
+                REJOIN_LOGGER.warn("Agreement, Failure global resolution stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
                reportCount++;
             }
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
@@ -429,17 +429,19 @@ public class MeshArbiter {
 
         long start = System.currentTimeMillis();
         boolean allDecisionsMatch = true;
+        int reportCount = 0;
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
                 // Send a heartbeat to keep the dead host timeout active.
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
-                final long duration = System.currentTimeMillis() - start;
-                if (duration > 20000) {
-                    REJOIN_LOGGER.error("Agreement, Still waiting for decisions from " +
-                                        CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
-                                        " after " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds");
-                    start = System.currentTimeMillis();
+                // If fault resolution takes longer then 10 seconds start logging for every second
+                final long blockedTime = System.currentTimeMillis() - start;
+                if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
+                    REJOIN_LOGGER.warn("Agreement, Still waiting for decisions from " +
+                            CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
+                            " after " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
+                   reportCount++;
                 }
                 continue;
             }
