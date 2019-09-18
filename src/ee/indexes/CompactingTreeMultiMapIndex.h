@@ -106,6 +106,8 @@ class CompactingTreeMultiMapIndex : public TableIndex {
         if (iter.isEnd()) {
             return false;
         } else {
+            printf("Deleting tuple %s: found\n", tuple->debug().c_str());
+            fflush(stdout);
             return m_entries.erase(iter);
         }
     }

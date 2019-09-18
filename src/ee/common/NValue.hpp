@@ -909,10 +909,12 @@ private:
         if (getSourceInlined()) {
             const char* storage = *reinterpret_cast<const char* const*>(m_data);
             lengthOut = storage[0]; // one-byte length prefix for inline
+            //printf("getObject_withoutNull: inlined: %d\n", lengthOut);
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
         } else {
            char const* retVal = getObjectPointer()->getObject(lengthOut);
            vassert(lengthOut >= 0);
+            //printf("getObject_withoutNull: outlined: %d\n", lengthOut);
            return retVal;
         }
     }
@@ -1546,6 +1548,7 @@ private:
                     NValue retval(ValueType::tVARCHAR);
                     retval.setSourceInlined(getSourceInlined());
                     memcpy(retval.m_data, m_data, sizeof(m_data));
+                    //printf("<<< castAsString: %s : %s\n", getSourceInlined() ? "inlined" : "outlined", m_data);
                     return retval;
                 }
             case ValueType::tTIMESTAMP:
@@ -1993,7 +1996,9 @@ private:
         const char* left = getObject_withoutNull(leftLength);
         int32_t rightLength;
         const char* right = rhs.getObject_withoutNull(rightLength);
-
+        printf("compareStringValue: lhs length=%d (%p), rhs length=%d, empty string at %p\n : %s. ",
+                leftLength, left, rightLength, StringRef::EMPTY_STRING,
+                StackTrace::stringStackTrace("? ").c_str());
         int result = ::strncmp(left, right, std::min(leftLength, rightLength));
         if (result == 0) {
             result = leftLength - rightLength;
@@ -2772,13 +2777,16 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
 
                 // If it isn't inlined the storage area contains a pointer to the
                 // StringRef object containing the string's memory
-                StringRef* sref = *reinterpret_cast<StringRef**>(const_cast<void*>(storage));
+                auto const* sref = *reinterpret_cast<StringRef const* const*>(storage);
                 // If the StringRef pointer is null, that's because this
                 // was a null value; otherwise get the right char* from the StringRef
-                if (sref == NULL) {
+                if (sref == nullptr) {
                     retval.setNullObjectPointer();
                 } else {
                     retval.setObjectPointer(sref);
+                    if (sref->getObjectLength() > 800) {
+                        printf("!!!! %p : %p ~~ %p\n", sref, &retval, StringRef::EMPTY_STRING);
+                    }
                 }
                 break;
             }

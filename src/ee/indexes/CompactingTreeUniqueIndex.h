@@ -82,15 +82,26 @@ class CompactingTreeUniqueIndex : public TableIndex {
 
     void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) override {
         ++m_inserts;
-        const void* const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
-        if (conflictEntry != NULL && conflictTuple != NULL) {
+        auto const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        bool moved = false;
+        if (conflictEntry != nullptr && conflictTuple != nullptr) {
             conflictTuple->move(const_cast<void*>(*conflictEntry));
+            moved = true;
         }
+        printf("&& Added tuple %s : %s :: %s\n", tuple->debug().c_str(), moved ? "moved" : "not moved",
+                debug().c_str());
+        fflush(stdout);
     }
 
     bool deleteEntryDo(const TableTuple *tuple) override {
         ++m_deletes;
-        return m_entries.erase(setKeyFromTuple(tuple));
+        printf("&& Deleting tuple %s from index %s\n", tuple->debug().c_str(),
+                debug().c_str());
+        fflush(stdout);
+        bool retcode = m_entries.erase(setKeyFromTuple(tuple));
+        printf("&&! Deleted tuple %s: %s\n", tuple->debug().c_str(), retcode ? "Found" : "Not Found");
+        fflush(stdout);
+        return retcode;
     }
 
     /**

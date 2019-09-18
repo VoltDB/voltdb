@@ -46,6 +46,7 @@ std::mutex ThreadLocalPool::s_sharedMemoryMutex;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
+ThreadLocalPool::Sized const ThreadLocalPool::EMPTY_STRING(0);
 ThreadLocalPool::ThreadLocalPool() {
     if (m_key == nullptr) {
         m_allocated = new size_t(0);

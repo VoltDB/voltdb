@@ -25,6 +25,7 @@
 using namespace voltdb;
 
 inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
+    printf("asSizedObject(%p); empty string(%p)\n", stringPtr, StringRef::EMPTY_STRING);
    return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
 }
 
@@ -86,19 +87,27 @@ int32_t StringRef::getAllocatedSizeInTempStorage() const {
 // StringRef class so that it can call a proper accessor method.
 // An earlier implementation taking this approach proved hard to follow.
 inline StringRef::StringRef(int32_t sz):
-    m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) { }
+    m_stringPtr(sz == 0 ? const_cast<char*>(EMPTY_STRING) :
+            reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz))) { }
 
 // Temporary strings are allocated in one piece with their referring
 // StringRefs -- the string data starts just past the StringRef object,
 // which by the rules of object pointer math is just "this+1".
-inline StringRef::StringRef(Pool* unused, int32_t sz) : m_stringPtr(reinterpret_cast<char*>(this+1)) {
-    asSizedObject(m_stringPtr)->m_size = sz;
+inline StringRef::StringRef(Pool* unused, int32_t sz) :
+    m_stringPtr(sz == 0 ? const_cast<char*>(EMPTY_STRING) : reinterpret_cast<char*>(this+1)) {
+        if (sz > 0) {
+            asSizedObject(m_stringPtr)->m_size = sz;
+        }
 }
 
 // The destroy method keeps this from getting run on temporary strings.
 inline StringRef::~StringRef() {
-    ThreadLocalPool::freeRelocatable(asSizedObject(m_stringPtr));
+    if (m_stringPtr != EMPTY_STRING) {
+        ThreadLocalPool::freeRelocatable(asSizedObject(m_stringPtr));
+    }
 }
+
+StringRef const* EMPTY_STRING_REF = StringRef::create(0, nullptr, (Pool*)nullptr);
 
 StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     /*/ enable to debug
@@ -113,12 +122,15 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     StringRef* result;
     if (tempPool) {
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(tempPool, sz);
-    } else {
+    } else if (sz > 0) {
 #ifdef MEMCHECK
         result = new StringRef(sz);
 #else
         result = new (ThreadLocalPool::allocateExactSizedObject(sizeof(StringRef))) StringRef(sz);
 #endif
+    } else {                               // singleton empty string
+        static StringRef* emptyStringRef = new StringRef(0);
+        result = emptyStringRef;
     }
     if (source && sz > 0) {
         ::memcpy(result->getObjectValue(), source, sz);

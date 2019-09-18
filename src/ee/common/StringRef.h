@@ -34,14 +34,16 @@ class StringRef {
     StringRef(int32_t size);
     // Signature used internally for temporary strings
     StringRef(Pool* tempPool, int32_t size);
-    // Only called from destroy and only for persistent strings.
-    ~StringRef();
 
     // Only called from destroy and only for persistent strings.
     void operator delete(void* object);
 
     char* m_stringPtr;
 public:
+    static char const* EMPTY_STRING;
+    // Only called from destroy and only for persistent strings.
+    ~StringRef();
+
     /// Utility method to extract the amount of memory that was
     /// used by non-inline storage for this string/varbinary.
     /// Includes the size of the pooled StringRef object,

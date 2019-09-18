@@ -128,13 +128,8 @@ public:
      * backing store
      */
     inline void move(void *address) {
-#ifndef  NDEBUG
-        if (m_schema == NULL && address != NULL) {
-            StackTrace::printStackTrace();
-        }
-#endif
-        vassert(m_schema != NULL || address == NULL);
-        m_data = reinterpret_cast<char*> (address);
+        vassert(m_schema != nullptr || address == nullptr);
+        m_data = reinterpret_cast<char*>(address);
     }
 
     inline void moveNoHeader(void *address) {

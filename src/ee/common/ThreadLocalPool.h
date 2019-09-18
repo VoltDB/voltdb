@@ -96,6 +96,7 @@ public:
         char m_data[0];
         Sized(int32_t requested_size) : m_size(requested_size) { }
     };
+    static Sized const EMPTY_STRING;
 
     // This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
     // The rationale for making it any larger would be to allow calculating wider "temp"
