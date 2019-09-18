@@ -626,8 +626,9 @@ CREATE PROCEDURE export_op_summary AS
 END_OF_BATCH
 
 -- following SQL can't be in a batch, so initialize this convenience table after the batch is complete.
-INSERT INTO export_op_type VALUES('INSERT', 1);
-INSERT INTO export_op_type VALUES('DELETE', 2);
-INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
-INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
-INSERT INTO export_op_type VALUES('MIGRATION', 5);
+-- the following dml is commented out since it causes a problem with "voltdb init --schema ...
+-- INSERT INTO export_op_type VALUES('INSERT', 1);
+-- INSERT INTO export_op_type VALUES('DELETE', 2);
+-- INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
+-- INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
+-- INSERT INTO export_op_type VALUES('MIGRATION', 5);
