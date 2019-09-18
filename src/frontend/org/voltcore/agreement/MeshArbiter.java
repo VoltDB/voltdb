@@ -435,19 +435,22 @@ public class MeshArbiter {
 
         long start = System.currentTimeMillis();
         boolean allDecisionsMatch = true;
-        int reportCount = 0;
+        long lastReportTime = 0;
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
                 // Send a heartbeat to keep the dead host timeout active.
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
                 // If fault resolution takes longer then 10 seconds start logging for every second
-                final long blockedTime = System.currentTimeMillis() - start;
-                if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-                    REJOIN_LOGGER.warn("Agreement, Still waiting for decisions from " +
-                            CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
-                            " after " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
-                   reportCount++;
+                final long now = System.currentTimeMillis();
+                final long blockedTime = now - start;
+                if (blockedTime > LOGGING_START) {
+                    if (now - lastReportTime > 1000) {
+                        REJOIN_LOGGER.warn("Agreement, Still waiting for decisions from " +
+                                CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
+                                " after " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
+                        lastReportTime = now;
+                    }
                 }
                 continue;
             }
