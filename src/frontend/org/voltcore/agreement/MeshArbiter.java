@@ -52,7 +52,8 @@ public class MeshArbiter {
 
     protected static final int FORWARD_STALL_COUNT = 20 * 5; // 5 seconds
 
-    protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
+    protected static final VoltLogger REJOIN_LOGGER = new VoltLogger("REJOIN");
+    private static final long LOGGING_START = 10000;
 
     protected static final Subject [] justFailures = new Subject [] { Subject.FAILURE };
     protected static final Subject [] receiveSubjects = new Subject [] {
@@ -131,7 +132,7 @@ public class MeshArbiter {
         Suicide {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name()
+                REJOIN_LOGGER.info("Agreement, Discarding " + name()
                         + " reporter: "
                         + CoreUtils.hsIdToString(fm.reportingSite));
             }
@@ -139,49 +140,49 @@ public class MeshArbiter {
         AlreadyFailed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.failedSite));
             }
         },
         ReporterFailed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
         Unknown {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.failedSite));
             }
         },
         ReporterUnknown {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
         ReporterWitnessed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
         SelfUnwitnessed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.failedSite));
             }
         },
         AlreadyKnow {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                REJOIN_LOGGER.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.failedSite)
                         + " reporter: "
                         + CoreUtils.hsIdToString(fm.reportingSite)
@@ -191,7 +192,7 @@ public class MeshArbiter {
         OtherUnwitnessed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name()
+                REJOIN_LOGGER.info("Agreement, Discarding " + name()
                         + " other: "
                         + CoreUtils.hsIdToString(fm.failedSite)
                         + ", repoter: "
@@ -204,7 +205,7 @@ public class MeshArbiter {
         SoleSurvivor {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name()
+                REJOIN_LOGGER.info("Agreement, Discarding " + name()
                         + " repoter: "
                         + CoreUtils.hsIdToString(fm.reportingSite));
             }
@@ -276,12 +277,12 @@ public class MeshArbiter {
     public Map<Long, Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
         boolean proceed = false;
         long blockedOnReceiveStart = System.currentTimeMillis();
-        long lastReportTime = 0;
+        int reportCount = 0;
         do {
             Discard ignoreIt = mayIgnore(hsIds, fm);
             if (Discard.DoNot == ignoreIt) {
                 m_inTrouble.put(fm.failedSite, fm.witnessed || fm.decided);
-                m_recoveryLog.info("Agreement, Processing " + fm);
+                REJOIN_LOGGER.info("Agreement, Processing " + fm);
                 proceed = true;
             } else {
                 ignoreIt.log(fm);
@@ -291,12 +292,12 @@ public class MeshArbiter {
                 unknownFaultedSites.add(fm.failedSite);
             }
             fm = (FaultMessage) m_mailbox.recv(justFailures);
-            final long now = System.currentTimeMillis();
-            if (now - blockedOnReceiveStart > 10000) {
-                if (now - lastReportTime > 2000) {
-                    lastReportTime = now;
-                    m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for reporting" );
-                }
+
+            // If fault resolution takes longer then 10 seconds start logging for every second
+            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
+            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
+                REJOIN_LOGGER.warn("Agreement, Failure resolution reporting stalled for " + blockedTime + "ms.");
+               reportCount++;
             }
         } while (fm != null);
 
@@ -309,8 +310,8 @@ public class MeshArbiter {
         // we are here if failed site was not previously recorded
         // or it was previously recorded but it became witnessed from unwitnessed
         m_seeker.startSeekingFor(Sets.difference(hsIds, m_failedSites), m_inTrouble);
-        if (m_recoveryLog.isDebugEnabled()) {
-            m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+        if (REJOIN_LOGGER.isDebugEnabled()) {
+            REJOIN_LOGGER.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                 m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                 m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                 dumpInTrouble()));
@@ -319,12 +320,10 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(hsIds);
 
         while (discoverGlobalFaultData_rcv(hsIds)) {
-            final long now = System.currentTimeMillis();
-            if (now - blockedOnReceiveStart > 10000) {
-                if (now - lastReportTime > 2000) {
-                    lastReportTime = now;
-                    m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for global resolution." );
-                }
+            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
+            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
+                REJOIN_LOGGER.warn("Agreement, Failure global resolution stalled for " + blockedTime + "ms.");
+               reportCount++;
             }
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
@@ -334,7 +333,7 @@ public class MeshArbiter {
             Set<Long> witnessed = Maps.filterValues(m_inTrouble, equalTo(Boolean.TRUE)).keySet();
             Set<Long> notClosed = Sets.difference(witnessed, lastTxnIdByFailedSite.keySet());
             if ( !notClosed.isEmpty()) {
-                m_recoveryLog.warn("Agreement, witnessed but not decided: ["
+                REJOIN_LOGGER.warn("Agreement, witnessed but not decided: ["
                         + CoreUtils.hsIdCollectionToString(notClosed)
                         + "] seeker: " + m_seeker);
             }
@@ -346,7 +345,7 @@ public class MeshArbiter {
             m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
             m_failedSitesCount = m_failedSites.size();
 
-            m_recoveryLog.info(
+            REJOIN_LOGGER.info(
                     "Agreement, Adding "
                   + CoreUtils.hsIdCollectionToString(lastTxnIdByFailedSite.keySet())
                   + " to failed sites history");
@@ -383,7 +382,7 @@ public class MeshArbiter {
         SiteFailureMessage sfm = sfmb.build();
         m_mailbox.send(Longs.toArray(dests), sfm);
 
-        m_recoveryLog.info("Agreement, Sending ["
+        REJOIN_LOGGER.info("Agreement, Sending ["
                 + CoreUtils.hsIdCollectionToString(dests) + "]  " + sfm);
 
         // Check to see we've made the same decision before, if so, it's likely
@@ -392,14 +391,14 @@ public class MeshArbiter {
             // Too many decisions have been made without converging
             RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
                                                10, TimeUnit.SECONDS,
-                                               m_recoveryLog,
+                                               REJOIN_LOGGER,
                                                Level.WARN,
                                                "Agreement, %d local decisions have been made without converging",
                                                m_localHistoricDecisions.size());
         }
         for (SiteFailureMessage lhd : m_localHistoricDecisions) {
             if (lhd.m_survivors.equals(sfm.m_survivors)) {
-                m_recoveryLog.info("Agreement, detected decision loop. Exiting");
+                REJOIN_LOGGER.info("Agreement, detected decision loop. Exiting");
                 return true;
             }
         }
@@ -409,7 +408,7 @@ public class MeshArbiter {
         // If one of the host's decision conflicts with ours, remove that host's link
         // and repeat the decision process.
         final Set<Long> expectedSurvivors = Sets.filter(sfm.m_survivors, not(equalTo(m_hsId)));
-        m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
+        REJOIN_LOGGER.info("Agreement, Waiting for agreement on decision from survivors " +
                            CoreUtils.hsIdCollectionToString(expectedSurvivors));
 
         final Iterator<SiteFailureMessage> iter = m_decidedSurvivors.values().iterator();
@@ -418,7 +417,7 @@ public class MeshArbiter {
             if (expectedSurvivors.contains(remoteDecision.m_sourceHSId)) {
                 if (remoteDecision.m_decision.contains(m_hsId)) {
                     iter.remove();
-                    m_recoveryLog.info("Agreement, Received inconsistent decision from " +
+                    REJOIN_LOGGER.info("Agreement, Received inconsistent decision from " +
                                        CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
                     final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
                     localFault.m_sourceHSId = m_hsId;
@@ -437,7 +436,7 @@ public class MeshArbiter {
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
                 final long duration = System.currentTimeMillis() - start;
                 if (duration > 20000) {
-                    m_recoveryLog.error("Agreement, Still waiting for decisions from " +
+                    REJOIN_LOGGER.error("Agreement, Still waiting for decisions from " +
                                         CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
                                         " after " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds");
                     start = System.currentTimeMillis();
@@ -544,9 +543,9 @@ public class MeshArbiter {
 
         m_mailbox.send(Longs.toArray(dests), sfm);
 
-        m_recoveryLog.info("Agreement, Sending survivors " + sfm);
-        if (m_recoveryLog.isDebugEnabled()) {
-            m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+        REJOIN_LOGGER.info("Agreement, Sending survivors " + sfm);
+        if (REJOIN_LOGGER.isDebugEnabled()) {
+            REJOIN_LOGGER.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                dumpInTrouble()));
@@ -585,22 +584,18 @@ public class MeshArbiter {
     private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds) {
 
         long blockedOnReceiveStart = System.currentTimeMillis();
-        long lastReportTime = 0;
+        int reportCount = 0;
         boolean haveEnough = false;
         int [] forwardStallCount = new int[] {FORWARD_STALL_COUNT};
 
         do {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
 
-            /*
-             * If fault resolution takes longer then 10 seconds start logging for every 2 seconds
-             */
-            final long now = System.currentTimeMillis();
-            if (now - blockedOnReceiveStart > 10000) {
-                if (now - lastReportTime > 2000) {
-                    lastReportTime = now;
-                    haveNecessaryFaultInfo(m_seeker.getSurvivors(), true);
-                }
+            // If fault resolution takes longer then 10 seconds start logging for every second
+            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
+            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
+               haveNecessaryFaultInfo(m_seeker.getSurvivors(), true);
+               reportCount++;
             }
 
             if (m == null) {
@@ -625,9 +620,9 @@ public class MeshArbiter {
                 m_seeker.add(sfm);
                 addForwardCandidate(new SiteFailureForwardMessage(sfm));
 
-                m_recoveryLog.info("Agreement, Received " + sfm);
-                if (m_recoveryLog.isDebugEnabled()) {
-                    m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+                REJOIN_LOGGER.info("Agreement, Received " + sfm);
+                if (REJOIN_LOGGER.isDebugEnabled()) {
+                    REJOIN_LOGGER.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                        m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                        m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                        dumpInTrouble()));
@@ -646,9 +641,9 @@ public class MeshArbiter {
 
                 m_seeker.add(fsfm);
 
-                m_recoveryLog.info("Agreement, Received forward " + fsfm);
-                if (m_recoveryLog.isDebugEnabled()) {
-                    m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+                REJOIN_LOGGER.info("Agreement, Received forward " + fsfm);
+                if (REJOIN_LOGGER.isDebugEnabled()) {
+                    REJOIN_LOGGER.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
                                         m_seeker.dumpAlive(), m_seeker.dumpDead(),
                                         m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
                                         dumpInTrouble()));
@@ -666,11 +661,11 @@ public class MeshArbiter {
                 Discard ignoreIt = mayIgnore(hsIds, fm);
                 if (Discard.DoNot == ignoreIt) {
                     m_mailbox.deliverFront(m);
-                    m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
+                    REJOIN_LOGGER.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
                     return false;
                 } else {
-                    if (m_recoveryLog.isDebugEnabled()) {
+                    if (REJOIN_LOGGER.isDebugEnabled()) {
                         ignoreIt.log(fm);
                     }
                 }
@@ -687,7 +682,7 @@ public class MeshArbiter {
                     Set<Long> unseenBy = m_seeker.forWhomSiteIsDead(e.getKey());
                     if (unseenBy.size() > 0) {
                         m_mailbox.send(Longs.toArray(unseenBy), e.getValue());
-                        m_recoveryLog.info("Agreement, fowarding to "
+                        REJOIN_LOGGER.info("Agreement, fowarding to "
                                 + CoreUtils.hsIdCollectionToString(unseenBy)
                                 + " " + e.getValue());
                     }
@@ -728,7 +723,7 @@ public class MeshArbiter {
                 sb.append(m_seeker);
             }
 
-            m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for (Reporter +> Failed) " +
+            REJOIN_LOGGER.warn("Agreement, Failure resolution stalled waiting for (Reporter +> Failed) " +
                                 "information: " + sb.toString());
         }
         return missingMessages.isEmpty();
@@ -742,7 +737,7 @@ public class MeshArbiter {
 
         Set<Long> toBeKilled = m_seeker.nextKill();
         if (toBeKilled.isEmpty()) {
-            m_recoveryLog.warn("Agreement, seeker failed to yield a kill set: "+m_seeker);
+            REJOIN_LOGGER.warn("Agreement, seeker failed to yield a kill set: "+m_seeker);
         }
 
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
