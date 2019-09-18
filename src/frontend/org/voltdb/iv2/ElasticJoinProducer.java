@@ -60,6 +60,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             RejoinMessage rm = new RejoinMessage(m_mailbox.getHSId(),
                                                  RejoinMessage.Type.REPLAY_FINISHED);
             m_mailbox.send(m_coordinatorHsId, rm);
+            VoltDB.instance().getTaskManager().siteJoinCompleted(m_partitionId);
         }
     }
 
