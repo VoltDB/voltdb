@@ -277,7 +277,7 @@ public class MeshArbiter {
     public Map<Long, Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
         boolean proceed = false;
         long blockedOnReceiveStart = System.currentTimeMillis();
-        int reportCount = 0;
+        long lastReportTime = 0;
         do {
             Discard ignoreIt = mayIgnore(hsIds, fm);
             if (Discard.DoNot == ignoreIt) {
@@ -294,10 +294,13 @@ public class MeshArbiter {
             fm = (FaultMessage) m_mailbox.recv(justFailures);
 
             // If fault resolution takes longer then 10 seconds start logging for every second
-            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
-            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-                REJOIN_LOGGER.warn("Agreement, Failure resolution reporting stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
-               reportCount++;
+            final long now = System.currentTimeMillis();
+            final long blockedTime = now - blockedOnReceiveStart;
+            if (blockedTime > LOGGING_START) {
+                if (now - lastReportTime > 1000) {
+                    REJOIN_LOGGER.warn("Agreement, Failure resolution reporting stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
+                    lastReportTime = now;
+                }
             }
         } while (fm != null);
 
@@ -320,10 +323,13 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(hsIds);
 
         while (discoverGlobalFaultData_rcv(hsIds)) {
-            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
-            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-                REJOIN_LOGGER.warn("Agreement, Failure global resolution stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
-               reportCount++;
+            final long now = System.currentTimeMillis();
+            final long blockedTime = now - blockedOnReceiveStart;
+            if (blockedTime > LOGGING_START) {
+                if (now - lastReportTime > 1000) {
+                    REJOIN_LOGGER.warn("Agreement, Failure global resolution stalled for " + TimeUnit.MILLISECONDS.toSeconds(blockedTime) + " seconds");
+                    lastReportTime = now;
+                }
             }
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
@@ -586,7 +592,7 @@ public class MeshArbiter {
     private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds) {
 
         long blockedOnReceiveStart = System.currentTimeMillis();
-        int reportCount = 0;
+        long lastReportTime = 0;
         boolean haveEnough = false;
         int [] forwardStallCount = new int[] {FORWARD_STALL_COUNT};
 
@@ -594,10 +600,13 @@ public class MeshArbiter {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
 
             // If fault resolution takes longer then 10 seconds start logging for every second
-            final long blockedTime = System.currentTimeMillis() - blockedOnReceiveStart;
-            if ( blockedTime >= (LOGGING_START + (1000 * reportCount))) {
-               haveNecessaryFaultInfo(m_seeker.getSurvivors(), true);
-               reportCount++;
+            final long now = System.currentTimeMillis();
+            final long blockedTime = now - blockedOnReceiveStart;
+            if (blockedTime > LOGGING_START) {
+                if (now - lastReportTime > 1000) {
+                    haveNecessaryFaultInfo(m_seeker.getSurvivors(), true);
+                    lastReportTime = now;
+                }
             }
 
             if (m == null) {
