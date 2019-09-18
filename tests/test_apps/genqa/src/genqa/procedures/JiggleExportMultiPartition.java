@@ -34,6 +34,7 @@ public class JiggleExportMultiPartition extends VoltProcedure {
     public final SQLStmt insert_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
     public final SQLStmt insert_file = new SQLStmt(template.replace("BASE", "file"));
     public final SQLStmt insert_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
+    public final SQLStmt insert = new SQLStmt(template.replace("export_replicated_table_BASE", "export_mirror_replicated_table"));
 
     public long run(long rowid, long ignore)
     {
@@ -46,7 +47,7 @@ public class JiggleExportMultiPartition extends VoltProcedure {
 
         // Insert a new record
         SampleRecord record = new SampleRecord(rowid, rand);
-        SQLStmt [] statements = {insert_kafka, insert_rabbit, insert_file, insert_jdbc};
+        SQLStmt [] statements = {insert, insert_kafka, insert_rabbit, insert_file, insert_jdbc};
         for (SQLStmt stmt: statements) {
             voltQueueSQL(
                       stmt
