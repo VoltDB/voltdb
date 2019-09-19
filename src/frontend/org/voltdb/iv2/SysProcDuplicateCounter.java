@@ -64,11 +64,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     @Override
     int offer(FragmentResponseMessage message)
     {
-        FragmentResponseMessage msg = (FragmentResponseMessage)message;
         long hash = 0;
-        for (int i = 0; i < msg.getTableCount(); i++) {
-            int depId = msg.getTableDependencyIdAtIndex(i);
-            VoltTable dep = msg.getTableAtIndex(i);
+        for (int i = 0; i < message.getTableCount(); i++) {
+            int depId = message.getTableDependencyIdAtIndex(i);
+            VoltTable dep = message.getTableAtIndex(i);
             List<VoltTable> tables = m_alldeps.get(depId);
             if (tables == null)
             {
@@ -76,7 +75,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
                 m_alldeps.put(depId, tables);
             }
 
-            if (!msg.isRecovering()) {
+            if (!message.isRecovering()) {
                 /*
                  * If the current table is a real response, check if
                  * any previous responses were dummy, if so, replace
@@ -106,7 +105,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
         // needs to be a three long array to work
         int[] hashes = new int[] { (int) hash, 0, 0 };
 
-        return checkCommon(hashes, msg.isRecovering(), message, false);
+        return checkCommon(hashes, message.isRecovering(), message, false);
     }
 
     @Override
