@@ -248,6 +248,7 @@ public class TestJDBCSecurityEnabled {
 
     @Test
     public void testAuthentication(){
+        System.out.println("Starting testAuthentication");
         Properties props = new Properties();
         boolean threw;
         // Test failed auth with wrong username
@@ -291,10 +292,9 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
-    @Flaky(description="TestJDBCSecurityEnabled.testJDBCLoaderWithCredentialsFile")
     public void testJDBCLoaderWithCredentialsFile()
             throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
-
+        System.out.println("Starting testJDBCLoaderWithCredentialsFile");
         // write username / password to csv
         String[] authData = {"username: userWithAdminPerm", "password: password"};
         try {
@@ -364,7 +364,7 @@ public class TestJDBCSecurityEnabled {
     @Test
     public void testUsingCrendentialFileIncludingSpecialCharactersInPassword()
             throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
-
+        System.out.println("Starting testUsingCrendentialFileIncludingSpecialCharactersInPassword");
         // write username / password to csv
         String[] authData = {"username: userWithAdminPerm2", "password: password!!!"};
         try {
@@ -433,6 +433,7 @@ public class TestJDBCSecurityEnabled {
 
     @Test
     public void testPerms() throws Exception {
+        System.out.println("Starting testPerms");
         Properties props = new Properties();
         props.setProperty("password", "password");
 
