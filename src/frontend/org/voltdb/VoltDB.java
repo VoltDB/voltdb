@@ -32,7 +32,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -1177,15 +1176,10 @@ public class VoltDB {
         }
 
         writer.println("****** All Threads ******");
-        Iterator<Thread> it = traces.keySet().iterator();
-        while (it.hasNext()) {
-            Thread key = it.next();
-            writer.println();
-            StackTraceElement[] st = traces.get(key);
-            writer.println("****** " + key + " ******");
-            for (StackTraceElement ste : st) {
-                writer.println(ste);
-            }
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
+        for (ThreadInfo t : threadInfos) {
+            writer.println(t);
         }
     }
 
