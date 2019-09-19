@@ -64,9 +64,7 @@ using std::string;
 namespace voltdb {
 
 Table::Table(int tableAllocationTargetSize) :
-    m_tableAllocationTargetSize(tableAllocationTargetSize)
-{
-}
+    m_tableAllocationTargetSize(tableAllocationTargetSize) { }
 
 Table::~Table() {
     // not all tables are reference counted but this should be invariant
@@ -401,26 +399,18 @@ void Table::serializeTupleTo(SerializeOutput &serialOutput, voltdb::TableTuple *
 bool Table::equals(voltdb::Table *other) {
     if (columnCount() != other->columnCount()) {
         return false;
-    }
-
-    if (activeTupleCount() != other->activeTupleCount()) {
+    } else if (activeTupleCount() != other->activeTupleCount()) {
         return false;
-    }
-
-    if (databaseId() != other->databaseId()) {
+    } else if (databaseId() != other->databaseId()) {
         return false;
-    }
-
-    if (name() != other->name()) {
+    } else if (name() != other->name()) {
         return false;
-    }
-
-    if (tableType() != other->tableType()) {
+    } else if (tableType() != other->tableType()) {
         return false;
     }
 
     const voltdb::TupleSchema *otherSchema = other->schema();
-    if ( ! m_schema->equals(otherSchema)) {
+    if (! m_schema->equals(otherSchema)) {
         return false;
     }
 
@@ -429,11 +419,9 @@ bool Table::equals(voltdb::Table *other) {
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while (firstTI.next(firstTuple)) {
-        if ( ! secondTI.next(secondTuple)) {
+        if (! secondTI.next(secondTuple)) {
             return false;
-        }
-
-        if ( ! firstTuple.equals(secondTuple)) {
+        } else if (! firstTuple.equals(secondTuple)) {
             return false;
         }
     }
@@ -457,12 +445,11 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
 
         target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
 
-        processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
+        processLoadedTuple(target, nullptr, serializedTupleCount, tupleCountPosition);
     }
 }
 
-void Table::loadTuplesFrom(SerializeInputBE &serialInput,
-                           Pool *stringPool) {
+void Table::loadTuplesFrom(SerializeInputBE &serialInput, Pool *stringPool) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]

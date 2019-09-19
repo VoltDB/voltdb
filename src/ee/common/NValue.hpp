@@ -666,9 +666,6 @@ class NValue {
 
     static inline int32_t getCharLength(const char *valueChars, const size_t length) {
         printf("getCharLength(): %p\n", valueChars);
-        if (valueChars - StringRef::EMPTY_STRING == 0x4) {             // hack: hack!!
-            return 0;
-        }
         // very efficient code to count characters in UTF string and ASCII string
         int32_t j = 0;
         size_t i = length;
@@ -723,7 +720,7 @@ class NValue {
         if (isNull()) {
             return 0;
         }
-        vassert( ! getSourceInlined());
+        vassert(! getSourceInlined());
         const StringRef* sref = getObjectPointer();
         return sref->getAllocatedSizeInPersistentStorage();
     }
@@ -894,7 +891,7 @@ private:
     }
 
     const StringRef* getObjectPointer() const {
-       return *reinterpret_cast<const StringRef* const*>(m_data);
+       return *reinterpret_cast<StringRef const*const*>(m_data);
     }
 
     StringRef* getObjectPointer() {
@@ -909,17 +906,7 @@ private:
         }
     }
 
-    const char* getObject_withoutNull(int32_t& lengthOut) const {
-        if (getSourceInlined()) {
-            const char* storage = *reinterpret_cast<const char* const*>(m_data);
-            lengthOut = storage[0]; // one-byte length prefix for inline
-            return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
-        } else {
-           char const* retVal = getObjectPointer()->getObject(lengthOut);
-           vassert(lengthOut >= 0);
-           return retVal;
-        }
-    }
+    const char* getObject_withoutNull(int32_t& lengthOut) const;
 
     // getters
     const int8_t& getTinyInt() const {
@@ -1711,9 +1698,6 @@ private:
 //        printf("Calling validVarcharSize(?, %lu, %d): %s\n", length, maxLength,
 //                StackTrace::stringStackTrace(". ").c_str());
 
-        if (valueChars - StringRef::EMPTY_STRING == 0x4) {     // Hack! hack!
-            return true;
-        }
         int32_t min_continuation_bytes = static_cast<int32_t>(length) - maxLength;
         if (min_continuation_bytes <= 0) {
             return true;
@@ -2789,9 +2773,6 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
                     retval.setNullObjectPointer();
                 } else {
                     retval.setObjectPointer(sref);
-                    if (sref->getObjectLength() > 800) {
-                        printf("!!!! %p : %p ~~ %p\n", sref, &retval, StringRef::EMPTY_STRING);
-                    }
                 }
                 break;
             }

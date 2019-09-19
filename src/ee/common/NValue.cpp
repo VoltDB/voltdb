@@ -188,6 +188,22 @@ std::string NValue::debug() const {
     return buffer.str();
 }
 
+inline char const* NValue::getObject_withoutNull(int32_t& lengthOut) const {
+    if (getSourceInlined()) {
+        const char* storage = *reinterpret_cast<const char* const*>(m_data);
+        lengthOut = storage[0]; // one-byte length prefix for inline
+        return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
+    } else {
+        char const* retVal = getObjectPointer()->getObject(lengthOut);
+//        cout << "[" << lengthOut << "]"
+//            << "\"" << string(retVal, lengthOut) << "\"[@" << static_cast<const void*>(retVal) << "]"
+//            << endl;
+        vassert(lengthOut >= 0);
+        return retVal;
+    }
+}
+
+
 int32_t NValue::serializedSize() const {
     switch (m_valueType) {
         case ValueType::tVARCHAR:
@@ -475,17 +491,16 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
             StlFriendlyNValue stlValue;
             stlValue = value.castAs(outputType);
             uniques.insert(stlValue);
+        } catch (SQLException &sqlException) {
+            // cast exceptions mean the in-list test is redundant
+            // don't include these values in the materialized table
+            // TODO: make this less hacky
         }
-        // cast exceptions mean the in-list test is redundant
-        // don't include these values in the materialized table
-        // TODO: make this less hacky
-        catch (SQLException &sqlException) {}
     }
 
     // insert all items in the set in order
-    std::set<StlFriendlyNValue>::const_iterator iter;
-    for (iter = uniques.begin(); iter != uniques.end(); iter++) {
-        outList.push_back(*iter);
+    for (auto const& iter : uniques) {
+        outList.push_back(iter);
     }
 }
 

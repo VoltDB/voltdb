@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETABLE_H
-#define HSTORETABLE_H
+#pragma once
 
 #include "common/ids.h"
 #include "common/LargeTempTableBlockId.hpp"
@@ -98,11 +97,12 @@ class Table {
      * zero. This allows longer running processes to complete
      * gracefully after a table has been removed from the catalog.
      */
-    void incrementRefcount() { m_refcount += 1; }
+    void incrementRefcount() {
+        ++m_refcount;
+    }
 
     void decrementRefcount() {
-        m_refcount -= 1;
-        if (m_refcount == 0) {
+        if (--m_refcount == 0) {
             delete this;
         }
     }
@@ -127,7 +127,7 @@ class Table {
     virtual size_t allocatedBlockCount() const = 0;
 
     TableTuple& tempTuple() {
-        vassert(m_tempTuple.m_data);
+        vassert(m_tempTuple.address());
         m_tempTuple.resetHeader();
         m_tempTuple.setActiveTrue();
         // Temp tuples are typically re-used so their data can change frequently.
@@ -144,36 +144,54 @@ class Table {
      * Includes tuples that are pending any kind of delete.
      * Used by iterators to determine how many tuples to expect while scanning
      */
-    virtual int64_t activeTupleCount() const { return m_tupleCount; }
+    virtual int64_t activeTupleCount() const {
+        return m_tupleCount;
+    }
 
     virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
     }
 
     // Only counts persistent table usage, currently
-    int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
+    int64_t nonInlinedMemorySize() const {
+        return m_nonInlinedMemorySize;
+    }
 
-    virtual int tupleLimit() const { return INT_MIN; }
+    virtual int tupleLimit() const {
+        return INT_MIN;
+    }
 
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
     int columnIndex(std::string const& name) const;
 
-    std::vector<std::string> const& getColumnNames() const { return m_columnNames; }
+    std::vector<std::string> const& getColumnNames() const {
+        return m_columnNames;
+    }
 
-    TupleSchema const* schema() const { return m_schema; }
+    TupleSchema const* schema() const {
+        return m_schema;
+    }
 
-    std::string const& columnName(int index) const { return m_columnNames[index]; }
+    std::string const& columnName(int index) const {
+        return m_columnNames[index];
+    }
 
-    int columnCount() const { return m_columnCount; }
+    int columnCount() const {
+        return m_columnCount;
+    }
 
     // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
-    std::string const& name() const { return m_name; }
+    std::string const& name() const {
+        return m_name;
+    }
 
-    CatalogId databaseId() const { return m_databaseId; }
+    CatalogId databaseId() const {
+        return m_databaseId;
+    }
 
     virtual std::string tableType() const = 0;
 
@@ -208,15 +226,13 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
-                                Pool* stringPool = NULL);
+    void loadTuplesFromNoHeader(SerializeInputBE& serialInput, Pool* stringPool = nullptr);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInputBE& serialInput,
-                        Pool* stringPool = NULL);
+    void loadTuplesFrom(SerializeInputBE& serialInput, Pool* stringPool = nullptr);
 
 
     // ------------------------------------------------------------------
@@ -371,4 +387,3 @@ protected:
 };
 
 }
-#endif

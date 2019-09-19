@@ -393,7 +393,7 @@ public:
     std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple& source) {
-        vassert(m_tempTuple.m_data);
+        vassert(m_tempTuple.address());
         m_tempTuple.copy(source);
         return m_tempTuple;
     }

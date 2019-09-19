@@ -40,7 +40,6 @@ class StringRef {
 
     char* m_stringPtr;
 public:
-    static char const* EMPTY_STRING;
     // Only called from destroy and only for persistent strings.
     ~StringRef();
 

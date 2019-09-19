@@ -61,9 +61,6 @@
 #include <vector>
 #include <json/json.h>
 
-class CopyOnWriteTest_TestTableTupleFlags;
-class TableTupleTest_HeaderDefaults;
-
 namespace voltdb {
 
 #define TUPLE_HEADER_SIZE 1
@@ -87,27 +84,15 @@ namespace voltdb {
 
 class TableColumn;
 class TupleIterator;
-class ElasticScanner;
-class StandAloneTupleStorage;
-class SetAndRestorePendingDeleteFlag;
-
 
 class TableTuple {
-    // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
-    friend class Table;
-    friend class TempTable;
-    friend class LargeTempTable;
-    friend class LargeTempTableBlock;
-    friend class PersistentTable;
-    friend class ElasticScanner;
-    friend class PoolBackedTupleStorage;
-    friend class CopyOnWriteIterator;
-    friend class CopyOnWriteContext;
-    friend class ::CopyOnWriteTest_TestTableTupleFlags;
-    friend class ::TableTupleTest_HeaderDefaults;
-    friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
-    friend class SetAndRestorePendingDeleteFlag;
-
+    /** The types of the columns in the tuple */
+    const TupleSchema *m_schema = nullptr;
+    /**
+     * The column data, padded at the front by 8 bytes
+     * representing whether the tuple is active or deleted
+     */
+    char *m_data = nullptr;
 public:
     TableTuple() = default;
 
@@ -130,6 +115,76 @@ public:
     void move(void *address) {
         vassert(m_schema != nullptr || address == nullptr);
         m_data = reinterpret_cast<char*>(address);
+    }
+
+    void resetHeader() {
+        // treat the first "value" as a boolean flag
+        *m_data = 0;
+    }
+
+    void setActiveTrue() {
+        // treat the first "value" as a boolean flag
+        *m_data |= static_cast<char>(ACTIVE_MASK);
+    }
+
+    void setActiveFalse() {
+        *m_data &= static_cast<char>(~ACTIVE_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as subject to
+        change or deallocation. */
+    void setInlinedDataIsVolatileTrue() {
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        *m_data &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as not subject
+        to change or deallocation. */
+    void setInlinedDataIsVolatileFalse() {
+        // Set the bit to 1, indicating that inlined variable-length
+        // data is NOT volatile.
+        *m_data |= static_cast<char>(INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as subject to change or deallocation. */
+    void setNonInlinedDataIsVolatileTrue() {
+        *m_data |= static_cast<char>(NONINLINED_VOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as not subject to change or deallocation. */
+    void setNonInlinedDataIsVolatileFalse() {
+        *m_data &= static_cast<char>(~NONINLINED_VOLATILE_MASK);
+    }
+
+    void setPendingDeleteTrue() {
+        // treat the first "value" as a boolean flag
+        *m_data |= static_cast<char>(PENDING_DELETE_MASK);
+    }
+    void setPendingDeleteFalse() {
+        // treat the first "value" as a boolean flag
+        *m_data &= static_cast<char>(~PENDING_DELETE_MASK);
+    }
+
+    void setPendingDeleteOnUndoReleaseTrue() {
+        // treat the first "value" as a boolean flag
+        *m_data |= static_cast<char>(PENDING_DELETE_ON_UNDO_RELEASE_MASK);
+    }
+    void setPendingDeleteOnUndoReleaseFalse() {
+        // treat the first "value" as a boolean flag
+        *m_data &= static_cast<char>(~PENDING_DELETE_ON_UNDO_RELEASE_MASK);
+    }
+
+    void setDirtyTrue() {
+        // treat the first "value" as a boolean flag
+        *m_data |= static_cast<char>(DIRTY_MASK);
+    }
+    void setDirtyFalse() {
+        // treat the first "value" as a boolean flag
+        *m_data &= static_cast<char>(~DIRTY_MASK);
     }
 
     void moveNoHeader(void *address) {
@@ -212,7 +267,6 @@ public:
                 bytes += getNValue(idx).getAllocationSizeForObjectInPersistentStorage();
             }
         }
-
         return bytes;
     }
 
@@ -231,7 +285,6 @@ public:
                 bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
             }
         }
-
         return bytes;
     }
 
@@ -340,20 +393,20 @@ public:
 
     /** Is the tuple deleted or active? */
     bool isActive() const {
-        return *(reinterpret_cast<const char*> (m_data)) & ACTIVE_MASK;
+        return *m_data & ACTIVE_MASK;
     }
 
     /** Is the tuple deleted or active? */
     bool isDirty() const {
-        return *(reinterpret_cast<const char*> (m_data)) & DIRTY_MASK;
+        return *m_data & DIRTY_MASK;
     }
 
     bool isPendingDelete() const {
-        return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_MASK;
+        return *m_data & PENDING_DELETE_MASK;
     }
 
     bool isPendingDeleteOnUndoRelease() const {
-        return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK;
+        return *m_data & PENDING_DELETE_ON_UNDO_RELEASE_MASK;
     }
 
     /** Is variable-length data stored inside the tuple volatile (could data
@@ -362,13 +415,13 @@ public:
         // This is a little counter-intuitive: If this bit is set to
         // zero, then the inlined variable length data should be
         // considered volatile.
-        return !(*(reinterpret_cast<const char*> (m_data)) & INLINED_NONVOLATILE_MASK);
+        return !(*m_data & INLINED_NONVOLATILE_MASK);
     }
 
     /** Is variable-length data stored outside the tuple volatile
         (could data change, or could storage be freed)? */
     bool nonInlinedDataIsVolatile() const {
-        return *(reinterpret_cast<const char*> (m_data)) & NONINLINED_VOLATILE_MASK;
+        return *m_data & NONINLINED_VOLATILE_MASK;
     }
 
     /** Is the column value null? */
@@ -382,7 +435,7 @@ public:
     }
 
     bool isNullTuple() const {
-        return m_data == NULL;
+        return m_data == nullptr;
     }
 
     /** Get the value of a specified column (const). */
@@ -396,7 +449,6 @@ public:
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
         const bool isVolatile = inferVolatility(columnInfo);
-
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
@@ -405,11 +457,9 @@ public:
         vassert(m_schema);
         vassert(m_data);
         vassert(idx < m_schema->hiddenColumnCount());
-
         const TupleSchema::HiddenColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         const ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
-
         return NValue::initFromTupleStorage(dataPtr, columnType, false, false);
     }
 
@@ -417,7 +467,7 @@ public:
         return m_schema;
     }
 
-    void setSchema(const TupleSchema * schema) {
+    void setSchema(const TupleSchema* schema) {
         m_schema = schema;
     }
 
@@ -462,13 +512,13 @@ public:
     /** Similar to the above method except that any non-inlined objects
         will be allocated in persistent, relocatable storage. */
     void copyForPersistentInsert(const TableTuple &source) {
-        copyForPersistentInsert(source, static_cast<Pool*>(NULL));
+        copyForPersistentInsert(source, static_cast<Pool*>(nullptr));
     }
 
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
-                                 std::vector<char*> &oldObjects, std::vector<char*> &newObjects);
+            std::vector<char*> &oldObjects, std::vector<char*> &newObjects);
     void copy(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
@@ -479,7 +529,8 @@ public:
     void relocateNonInlinedFields(std::ptrdiff_t offset);
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other, const HiddenColumnFilter *hiddenColumnFilter = NULL) const;
+    bool equalsNoSchemaCheck(const TableTuple &other,
+            const HiddenColumnFilter *hiddenColumnFilter = nullptr) const;
 
     int compare(const TableTuple &other) const;
     int compareNullAsMax(const TableTuple &other) const;
@@ -488,8 +539,7 @@ public:
             const LoadTableCaller &caller);
     void deserializeFromDR(SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(SerializeOutput& output, const HiddenColumnFilter *filter = NULL) const;
-    size_t serializeToExport(ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray) const;
+    size_t serializeToExport(ExportSerializeOutput &io, int colOffset, uint8_t *nullArray) const;
     void serializeToDR(ExportSerializeOutput &io, int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns() const;
@@ -502,71 +552,6 @@ private:
        Json::FastWriter writer;
        writer.omitEndingLineFeed();
        return writer.write(val);
-    }
-    void setActiveTrue() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
-    }
-
-    void setActiveFalse() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
-    }
-
-    void setPendingDeleteOnUndoReleaseTrue() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_ON_UNDO_RELEASE_MASK);
-    }
-    void setPendingDeleteOnUndoReleaseFalse() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_ON_UNDO_RELEASE_MASK);
-    }
-
-    void setPendingDeleteTrue() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_MASK);
-    }
-    void setPendingDeleteFalse() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_MASK);
-    }
-
-    void setDirtyTrue() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(DIRTY_MASK);
-    }
-    void setDirtyFalse() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
-    }
-
-    /** Mark inlined variable length data in the tuple as subject to
-        change or deallocation. */
-    void setInlinedDataIsVolatileTrue() {
-        // This is a little counter-intuitive: If this bit is set to
-        // zero, then the inlined variable length data should be
-        // considered volatile.
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
-    }
-
-    /** Mark inlined variable length data in the tuple as not subject
-        to change or deallocation. */
-    void setInlinedDataIsVolatileFalse() {
-        // Set the bit to 1, indicating that inlined variable-length
-        // data is NOT volatile.
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(INLINED_NONVOLATILE_MASK);
-    }
-
-    /** Mark non-inlined variable length data referenced from the
-        tuple as subject to change or deallocation. */
-    void setNonInlinedDataIsVolatileTrue() {
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(NONINLINED_VOLATILE_MASK);
-    }
-
-    /** Mark non-inlined variable length data referenced from the
-        tuple as not subject to change or deallocation. */
-    void setNonInlinedDataIsVolatileFalse() {
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~NONINLINED_VOLATILE_MASK);
     }
 
     bool inferVolatility(const TupleSchema::ColumnInfo *colInfo) const {
@@ -583,20 +568,6 @@ private:
             return nonInlinedDataIsVolatile();
         }
     }
-
-    void resetHeader() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) = 0;
-    }
-
-    /** The types of the columns in the tuple */
-    const TupleSchema *m_schema = nullptr;
-
-    /**
-     * The column data, padded at the front by 8 bytes
-     * representing whether the tuple is active or deleted
-     */
-    char *m_data = nullptr;
 
     char* getWritableDataPtr(const TupleSchema::ColumnInfoBase* colInfo) const {
         vassert(m_schema);
@@ -741,8 +712,6 @@ private:
         if (value.getVolatile() && !isInlined && !allocateObjects) {
             setNonInlinedDataIsVolatileTrue();
         }
-        printf("setNValue(): dataPtr=%p, StringRef::empty=%p: %s\n", dataPtr, StringRef::EMPTY_STRING,
-                value.debug().c_str());
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                 allocateObjects, tempPool);
     }
@@ -796,62 +765,62 @@ public:
 // go away in the event of TRUNCATE TABLE).
 class StandAloneTupleStorage {
     std::unique_ptr<char[]> m_tupleStorage{};
-        TableTuple m_tuple{};
-        TupleSchema* m_tupleSchema = nullptr;
-    public:
-        /** Creates an uninitialized tuple */
-        StandAloneTupleStorage() = default;
+    TableTuple m_tuple{};
+    TupleSchema* m_tupleSchema = nullptr;
+public:
+    /** Creates an uninitialized tuple */
+    StandAloneTupleStorage() = default;
 
-        /** Allocates enough memory for a given schema
-         * and initialies tuple to point to this memory
-         */
-        explicit StandAloneTupleStorage(const TupleSchema* schema) :
-            m_tupleStorage(), m_tuple(), m_tupleSchema(nullptr) {
+    /** Allocates enough memory for a given schema
+     * and initialies tuple to point to this memory
+     */
+    explicit StandAloneTupleStorage(const TupleSchema* schema) :
+        m_tupleStorage(), m_tuple(), m_tupleSchema(nullptr) {
             init(schema);
         }
 
-        ~StandAloneTupleStorage() {
+    ~StandAloneTupleStorage() {
+        TupleSchema::freeTupleSchema(m_tupleSchema);
+    }
+
+    /** Allocates enough memory for a given schema
+     * and initializes tuple to point to this memory
+     */
+    void init(const TupleSchema* schema) {
+        vassert(schema != nullptr);
+
+        // TupleSchema can go away, so copy it here and keep it with our tuple.
+        if (m_tupleSchema != nullptr) {
             TupleSchema::freeTupleSchema(m_tupleSchema);
         }
+        m_tupleSchema = TupleSchema::createTupleSchema(schema);
 
-        /** Allocates enough memory for a given schema
-         * and initializes tuple to point to this memory
-         */
-        void init(const TupleSchema* schema) {
-            vassert(schema != NULL);
+        // note: apparently array new of the form
+        //   new char[N]()
+        // will zero-initialize the allocated memory.
+        m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
+        m_tuple.setSchema(m_tupleSchema);
+        m_tuple.move(m_tupleStorage.get());
+        m_tuple.setAllNulls();
+        m_tuple.setActiveTrue();
+        m_tuple.setInlinedDataIsVolatileTrue();
+    }
 
-            // TupleSchema can go away, so copy it here and keep it with our tuple.
-            if (m_tupleSchema != NULL) {
-                TupleSchema::freeTupleSchema(m_tupleSchema);
-            }
-            m_tupleSchema = TupleSchema::createTupleSchema(schema);
-
-            // note: apparently array new of the form
-            //   new char[N]()
-            // will zero-initialize the allocated memory.
-            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
-            m_tuple.m_schema = m_tupleSchema;
-            m_tuple.move(m_tupleStorage.get());
-            m_tuple.setAllNulls();
-            m_tuple.setActiveTrue();
-            m_tuple.setInlinedDataIsVolatileTrue();
-        }
-
-        /** Get the tuple that this object is wrapping.
-         * Returned const ref to avoid corrupting the tuples data and schema pointers
-         */
-        TableTuple& tuple() {
-            return m_tuple;
-        }
+    /** Get the tuple that this object is wrapping.
+     * Returned const ref to avoid corrupting the tuples data and schema pointers
+     */
+    TableTuple& tuple() {
+        return m_tuple;
+    }
 };
 
-inline TableTuple::TableTuple(const TupleSchema *schema) : m_schema(schema), m_data(NULL) {
+inline TableTuple::TableTuple(const TupleSchema *schema) : m_schema(schema) {
     vassert(m_schema);
 }
 
 /** Setup the tuple given the specified data location and schema **/
 inline TableTuple::TableTuple(char *data, const TupleSchema *schema) :
-            m_schema(schema), m_data(data){
+            m_schema(schema), m_data(data) {
     vassert(data);
     vassert(schema);
 }
@@ -905,88 +874,6 @@ inline void TableTuple::copyForPersistentInsert(const TableTuple &source, POOL *
     }
 }
 
-/*
- * With a persistent update the copy should only do an allocation for
- * a string if the source and destination pointers are different.
- */
-inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
-        std::vector<char*> &oldObjects, std::vector<char*> &newObjects) {
-    vassert(m_schema);
-    vassert(m_schema->equals(source.m_schema));
-    const int columnCount = m_schema->columnCount();
-    const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
-    /*
-     * The source and target tuple have the same policy WRT to
-     * inlining strings because a TableTuple used for updating a
-     * persistent table uses the same schema as the persistent table.
-     */
-    if (uninlineableObjectColumnCount > 0) {
-        uint16_t uninlineableObjectColumnIndex = 0;
-        uint16_t nextUninlineableObjectColumnInfoIndex = m_schema->getUninlinedObjectColumnInfoIndex(0);
-        /*
-         * Copy each column doing an allocation for string
-         * copies. Compare the source and target pointer to see if it
-         * is changed in this update. If it is changed then free the
-         * old string and copy/allocate the new one from the source.
-         */
-        for (uint16_t ii = 0; ii < columnCount; ii++) {
-            if (ii == nextUninlineableObjectColumnInfoIndex) {
-                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
-                char *       *mPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-                const TupleSchema::ColumnInfo *sourceColumnInfo = source.getSchema()->getColumnInfo(ii);
-                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(sourceColumnInfo));
-                if (*mPtr != *oPtr) {
-                    // Make a copy of the input string. Don't want to delete the old string
-                    // because it's either from the temp pool or persistently referenced elsewhere.
-                    oldObjects.push_back(*mPtr);
-                    // TODO: Here, it's known that the column is an object type, and yet
-                    // setNValueAllocateForObjectCopies is called to figure this all out again.
-                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
-                    // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
-                    newObjects.push_back(*mPtr);
-                }
-                uninlineableObjectColumnIndex++;
-                if (uninlineableObjectColumnIndex < uninlineableObjectColumnCount) {
-                    nextUninlineableObjectColumnInfoIndex =
-                      m_schema->getUninlinedObjectColumnInfoIndex(uninlineableObjectColumnIndex);
-                } else {
-                    // This is completely optional -- the value from here on has to be one that can't
-                    // be reached by incrementing from the current value.
-                    // Zero works, but then again so does the current value.
-                    nextUninlineableObjectColumnInfoIndex = 0;
-                }
-            } else {
-                // TODO: Here, it's known that the column value is some kind of scalar or inline, yet
-                // setNValueAllocateForObjectCopies is called to figure this all out again.
-                // This seriously complicated function is going to boil down to an incremental
-                // memcpy of a few more bytes of the tuple.
-                // Solution? It would likely be faster even for object-heavy tuples to work in three passes:
-                // 1) collect up all the "changed object pointer" offsets.
-                // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
-                // 3) replace the object pointer at each "changed object pointer offset"
-                //    with a pointer to an object copy of its new referent.
-                setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
-            }
-        }
-
-        // Copy any hidden columns that follow normal visible ones.
-        if (m_schema->hiddenColumnCount() > 0) {
-            // If we ever add support for uninlined hidden columns,
-            // we'll need to do update this code.
-            vassert(m_schema->getUninlinedObjectHiddenColumnCount() == 0);
-            ::memcpy(m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
-                     source.m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
-                     m_schema->lengthOfAllHiddenColumns());
-        }
-
-        // This obscure assignment is propagating the tuple flags rather than leaving it to the caller.
-        // TODO: It would be easier for the caller to simply set the values it wants upon return.
-        m_data[0] = source.m_data[0];
-    } else {
-        // copy the tuple flags and the data (all inline/scalars)
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-    }
-}
 
 inline void TableTuple::copy(const TableTuple &source) {
     vassert(m_schema);
@@ -1007,132 +894,6 @@ inline void TableTuple::copy(const TableTuple &source) {
     ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
 }
 
-inline void TableTuple::deserializeFrom(SerializeInputBE &tupleIn, Pool *dataPool,
-        const LoadTableCaller &caller) {
-    vassert(m_schema);
-    vassert(m_data);
-
-    const int32_t columnCount  = m_schema->columnCount();
-    const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
-    tupleIn.readInt();
-
-    // ENG-14346, we may throw SQLException because of a too-wide VARCHAR column.
-    // In some systems, the uninitialized StringRef* is not NULL, which may result in
-    // unexpected errors during cleanup.
-    // This can only happen in the loadTable path, because we check the value length
-    // in Java for the normal transaction path.
-    // We explicitly initialize the StringRefs for those non-inlined columns here to
-    // prevent any surprises.
-    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
-    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
-        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        char *dataPtr = getWritableDataPtr(columnInfo);
-        *reinterpret_cast<StringRef**>(dataPtr) = NULL;
-    }
-
-    for (int j = 0; j < columnCount; ++j) {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
-
-        /**
-         * Hack hack. deserializeFrom is only called when we serialize
-         * and deserialize tables. The serialization format for
-         * Strings/Objects in a serialized table happens to have the
-         * same in memory representation as the Strings/Objects in a
-         * tabletuple. The goal here is to wrap the serialized
-         * representation of the value in an NValue and then serialize
-         * that into the tuple from the NValue. This makes it possible
-         * to push more value specific functionality out of
-         * TableTuple. The memory allocation will be performed when
-         * serializing to tuple storage.
-         */
-        char *dataPtr = getWritableDataPtr(columnInfo);
-        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
-                columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
-    }
-
-    for (int j = 0; j < hiddenColumnCount; ++j) {
-        const TupleSchema::HiddenColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
-
-        if (caller.useDefaultValue(columnInfo->columnType)) {
-            VOLT_DEBUG("Using default value for caller %d and hidden column %d", caller.getId(), columnInfo->columnType);
-            setHiddenNValue(columnInfo, HiddenColumn::getDefaultValue(columnInfo->columnType));
-        } else { // tupleIn may not have hidden column
-            if (!tupleIn.hasRemaining()) {
-                throwSerializableEEException(
-                        "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
-                        "(index=%d) hidden column count=%d\n", j, m_schema->hiddenColumnCount());
-            }
-            char *dataPtr = getWritableDataPtr(columnInfo);
-            NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(), false, -1, false);
-        }
-    }
-}
-
-inline void TableTuple::deserializeFromDR(SerializeInputLE &tupleIn,  Pool *dataPool) {
-    vassert(m_schema);
-    vassert(m_data);
-    const int32_t columnCount  = m_schema->columnCount();
-    int nullMaskLength = ((columnCount + 7) & -8) >> 3;
-    const uint8_t *nullArray = reinterpret_cast<const uint8_t*>(tupleIn.getRawPointer(nullMaskLength));
-
-    for (int j = 0; j < columnCount; j++) {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
-
-        const uint32_t index = j >> 3;
-        const uint32_t bit = j % 8;
-        const uint8_t mask = (uint8_t) (0x80u >> bit);
-        const bool isNull = (nullArray[index] & mask);
-
-        if (isNull) {
-            NValue value = NValue::getNullValue(columnInfo->getVoltType());
-            setNValue(j, value);
-        } else {
-            char *dataPtr = getWritableDataPtr(columnInfo);
-            NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
-                    tupleIn, dataPool, dataPtr,
-                    columnInfo->getVoltType(), columnInfo->inlined,
-                    static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
-        }
-    }
-
-    int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
-
-    for (int i = 0; i < hiddenColumnCount; i++) {
-        const TupleSchema::HiddenColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        if (hiddenColumnInfo->columnType == HiddenColumn::MIGRATE_TXN) {
-            // Set the hidden column for persistent table to null
-            NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
-            setHiddenNValue(i, value);
-        } else {
-            char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
-            NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
-                    tupleIn, dataPool, dataPtr, hiddenColumnInfo->getVoltType(), false, -1, false);
-        }
-    }
-}
-
-inline void TableTuple::serializeTo(SerializeOutput &output, const HiddenColumnFilter *filter) const {
-    size_t start = output.reserveBytes(4);
-
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
-        //int fieldStart = output.position();
-        NValue value = getNValue(j);
-        value.serializeTo(output);
-    }
-
-    if (filter) {
-        for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
-            if (filter->include(j)) {
-                NValue value = getHiddenNValue(j);
-                value.serializeTo(output);
-            }
-        }
-    }
-    // write the length of the tuple
-    output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
-}
-
 inline size_t TableTuple::serializeToExport(ExportSerializeOutput &io,
         int colOffset, uint8_t *nullArray) const {
     size_t sz = 0;
@@ -1150,96 +911,9 @@ inline void TableTuple::serializeToDR(ExportSerializeOutput &io, int colOffset, 
 inline bool TableTuple::equals(const TableTuple &other) const {
     if (!m_schema->equals(other.m_schema)) {
         return false;
+    } else {
+        return equalsNoSchemaCheck(other);
     }
-    return equalsNoSchemaCheck(other);
-}
-
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other,
-        const HiddenColumnFilter *hiddenColumnFilter) const {
-    for (int ii = 0; ii < m_schema->columnCount(); ii++) {
-        const NValue lhs = getNValue(ii);
-        const NValue rhs = other.getNValue(ii);
-        if (lhs.op_notEquals(rhs).isTrue()) {
-            return false;
-        }
-    }
-    if (hiddenColumnFilter != NULL) {
-        for (int ii = 0; ii < m_schema->hiddenColumnCount(); ii++) {
-            if (hiddenColumnFilter->include(ii)) {
-                const NValue lhs = getHiddenNValue(ii);
-                const NValue rhs = other.getHiddenNValue(ii);
-                if (lhs.op_notEquals(rhs).isTrue()) {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
-inline void TableTuple::setAllNulls() {
-    vassert(m_schema);
-    vassert(m_data);
-
-    for (int ii = 0; ii < m_schema->columnCount(); ++ii) {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
-        NValue value = NValue::getNullValue(columnInfo->getVoltType());
-        setNValue(columnInfo, value, false);
-    }
-
-    for (int jj = 0; jj < m_schema->hiddenColumnCount(); ++jj) {
-        const TupleSchema::HiddenColumnInfo *hiddenColumnInfo = m_schema->getHiddenColumnInfo(jj);
-        NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
-        setHiddenNValue(hiddenColumnInfo, value);
-    }
-}
-
-inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
-    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
-    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
-        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        vassert(isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
-
-        char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-        if (*dataPtr != NULL) {
-            (*dataPtr) += offset;
-            NValue value = getNValue(idx);
-            value.relocateNonInlined(offset);
-        }
-    }
-}
-
-inline int TableTuple::compare(const TableTuple &other) const {
-    const int columnCount = m_schema->columnCount();
-    int diff;
-    for (int ii = 0; ii < columnCount; ii++) {
-        const NValue lhs = getNValue(ii);
-        const NValue rhs = other.getNValue(ii);
-        diff = lhs.compare(rhs);
-        if (diff) {
-            return diff;
-        }
-    }
-    return VALUE_COMPARE_EQUAL;
-}
-
-/**
- * Compare two tuples. Null value in the rhs tuple will be treated as maximum.
- */
-inline int TableTuple::compareNullAsMax(const TableTuple &other) const {
-    const int columnCount = m_schema->columnCount();
-    assert(columnCount == other.m_schema->columnCount());
-    int diff;
-    for (int ii = 0; ii < columnCount; ii++) {
-        const NValue& lhs = getNValue(ii);
-        const NValue& rhs = other.getNValue(ii);
-        diff = lhs.compareNullAsMax(rhs);
-        if (diff) {
-            return diff;
-        }
-    }
-    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {
@@ -1254,21 +928,6 @@ inline size_t TableTuple::hashCode(size_t seed) const {
 inline size_t TableTuple::hashCode() const {
     size_t seed = 0;
     return hashCode(seed);
-}
-
-/**
- * Release to the heap any memory allocated for any uninlined columns.
- */
-inline void TableTuple::freeObjectColumns() const {
-    const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
-    std::vector<char*> oldObjects;
-    for (int ii = 0; ii < unlinlinedColumnCount; ii++) {
-        int idx = m_schema->getUninlinedObjectColumnInfoIndex(ii);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        char** dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-        oldObjects.push_back(*dataPtr);
-    }
-    NValue::freeObjectsFromTupleStorage(oldObjects);
 }
 
 /**
