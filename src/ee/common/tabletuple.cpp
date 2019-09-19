@@ -43,7 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
 #include <sstream>
 #include "common/tabletuple.h"
 

@@ -25,20 +25,25 @@
 using namespace voltdb;
 
 inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
-    printf("asSizedObject(%p); empty string(%p)\n", stringPtr, StringRef::EMPTY_STRING);
+   /*printf("asSizedObject(%p); empty string(%p) : %s\n",
+           stringPtr, StringRef::EMPTY_STRING, StackTrace::stringStackTrace("/ ").c_str());*/
    return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
 }
 
 char* StringRef::getObjectValue() {
-   return asSizedObject(m_stringPtr)->m_data;
+    return m_stringPtr == EMPTY_STRING ?
+        const_cast<char*>(EMPTY_STRING) :
+        asSizedObject(m_stringPtr)->m_data;
 }
 
 const char* StringRef::getObjectValue() const {
-   return asSizedObject(m_stringPtr)->m_data;
+    return m_stringPtr == EMPTY_STRING ?
+        EMPTY_STRING : asSizedObject(m_stringPtr)->m_data;
 }
 
 int32_t StringRef::getObjectLength() const {
-   return asSizedObject(m_stringPtr)->m_size;
+   return m_stringPtr == EMPTY_STRING ? 0 :
+       asSizedObject(m_stringPtr)->m_size;
 }
 
 const char* StringRef::getObject(int32_t& lengthOut) const {

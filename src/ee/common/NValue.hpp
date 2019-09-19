@@ -665,6 +665,10 @@ class NValue {
     static int64_t parseTimestampString(const std::string &txt);
 
     static inline int32_t getCharLength(const char *valueChars, const size_t length) {
+        printf("getCharLength(): %p\n", valueChars);
+        if (valueChars - StringRef::EMPTY_STRING == 0x4) {             // hack: hack!!
+            return 0;
+        }
         // very efficient code to count characters in UTF string and ASCII string
         int32_t j = 0;
         size_t i = length;
@@ -909,12 +913,10 @@ private:
         if (getSourceInlined()) {
             const char* storage = *reinterpret_cast<const char* const*>(m_data);
             lengthOut = storage[0]; // one-byte length prefix for inline
-            //printf("getObject_withoutNull: inlined: %d\n", lengthOut);
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
         } else {
            char const* retVal = getObjectPointer()->getObject(lengthOut);
            vassert(lengthOut >= 0);
-            //printf("getObject_withoutNull: outlined: %d\n", lengthOut);
            return retVal;
         }
     }
@@ -1548,7 +1550,6 @@ private:
                     NValue retval(ValueType::tVARCHAR);
                     retval.setSourceInlined(getSourceInlined());
                     memcpy(retval.m_data, m_data, sizeof(m_data));
-                    //printf("<<< castAsString: %s : %s\n", getSourceInlined() ? "inlined" : "outlined", m_data);
                     return retval;
                 }
             case ValueType::tTIMESTAMP:
@@ -1707,7 +1708,13 @@ private:
     }
 
     static inline bool validVarcharSize(const char *valueChars, size_t length, int32_t maxLength) {
-        int32_t min_continuation_bytes = static_cast<int32_t>(length - maxLength);
+//        printf("Calling validVarcharSize(?, %lu, %d): %s\n", length, maxLength,
+//                StackTrace::stringStackTrace(". ").c_str());
+
+        if (valueChars - StringRef::EMPTY_STRING == 0x4) {     // Hack! hack!
+            return true;
+        }
+        int32_t min_continuation_bytes = static_cast<int32_t>(length) - maxLength;
         if (min_continuation_bytes <= 0) {
             return true;
         }
@@ -1765,6 +1772,7 @@ private:
                          msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
              } else if (!validVarcharSize(ptr, objLength, maxLength)) {
+                 printf("!!!! Too late ????\n");
                 const int32_t charLength = getCharLength(ptr, objLength);
                 char msg[1024];
                 std::string inputValue;
@@ -1996,9 +2004,6 @@ private:
         const char* left = getObject_withoutNull(leftLength);
         int32_t rightLength;
         const char* right = rhs.getObject_withoutNull(rightLength);
-        printf("compareStringValue: lhs length=%d (%p), rhs length=%d, empty string at %p\n : %s. ",
-                leftLength, left, rightLength, StringRef::EMPTY_STRING,
-                StackTrace::stringStackTrace("? ").c_str());
         int result = ::strncmp(left, right, std::min(leftLength, rightLength));
         if (result == 0) {
             result = leftLength - rightLength;
@@ -2863,7 +2868,6 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
                 checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
-
                 const StringRef* sref;
                 if (allocateObjects) {
                     // Need to copy a StringRef pointer.
