@@ -39,9 +39,9 @@ class StringRef {
     void operator delete(void* object);
 
     char* m_stringPtr;
-public:
     // Only called from destroy and only for persistent strings.
     ~StringRef();
+public:
 
     /// Utility method to extract the amount of memory that was
     /// used by non-inline storage for this string/varbinary.

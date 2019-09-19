@@ -665,7 +665,6 @@ class NValue {
     static int64_t parseTimestampString(const std::string &txt);
 
     static inline int32_t getCharLength(const char *valueChars, const size_t length) {
-        printf("getCharLength(): %p\n", valueChars);
         // very efficient code to count characters in UTF string and ASCII string
         int32_t j = 0;
         size_t i = length;
@@ -1695,9 +1694,6 @@ private:
     }
 
     static inline bool validVarcharSize(const char *valueChars, size_t length, int32_t maxLength) {
-//        printf("Calling validVarcharSize(?, %lu, %d): %s\n", length, maxLength,
-//                StackTrace::stringStackTrace(". ").c_str());
-
         int32_t min_continuation_bytes = static_cast<int32_t>(length) - maxLength;
         if (min_continuation_bytes <= 0) {
             return true;
@@ -1756,7 +1752,6 @@ private:
                          msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
              } else if (!validVarcharSize(ptr, objLength, maxLength)) {
-                 printf("!!!! Too late ????\n");
                 const int32_t charLength = getCharLength(ptr, objLength);
                 char msg[1024];
                 std::string inputValue;

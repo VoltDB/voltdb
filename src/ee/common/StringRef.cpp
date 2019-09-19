@@ -55,7 +55,6 @@ const char* StringRef::getObject(int32_t& lengthOut) const {
 
 int32_t StringRef::getAllocatedSizeInPersistentStorage() const {
     // The CompactingPool allocated a chunk of this size for storage.
-    printf("getAllocatdSizeInPersistentStorage(): '%s'\n", m_stringPtr); fflush(stdout);
     int32_t const alloc_size =
         ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
     //cout << "Pool allocation size: " << alloc_size << endl;
@@ -115,7 +114,7 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     if (tempPool) {
         result = new (tempPool->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz))
             StringRef(tempPool, sz);
-    } else if (sz > 0) {
+    } else {
 #ifdef MEMCHECK
         result = new StringRef(sz);
 #else

@@ -195,9 +195,6 @@ inline char const* NValue::getObject_withoutNull(int32_t& lengthOut) const {
         return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
     } else {
         char const* retVal = getObjectPointer()->getObject(lengthOut);
-//        cout << "[" << lengthOut << "]"
-//            << "\"" << string(retVal, lengthOut) << "\"[@" << static_cast<const void*>(retVal) << "]"
-//            << endl;
         vassert(lengthOut >= 0);
         return retVal;
     }
