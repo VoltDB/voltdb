@@ -46,23 +46,16 @@ namespace voltdb {
      * 4. It allocates over a megabyte when it only contains a single value. It's not as useful for
      *    smaller, more general usage.
      */
-    template<class K, class T, class H = std::hash<K>, class EK = std::equal_to<K>, class ET = std::equal_to<T> >
+    template<typename Key, typename Data, typename Hasher = std::hash<Key>,
+        typename KeyEqChecker = std::equal_to<Key>, typename DataEqChecker = std::equal_to<Data>>
     class CompactingHashTable {
     public:
-        // typefefs just reduce the endless templating boilerplate
-        typedef K Key;            // key type
-        typedef T Data;           // value type
-        typedef H Hasher;         // hash a value to a uint64_t
-        typedef EK KeyEqChecker;  // compare two keys
-        typedef ET DataEqChecker; // compare two values
-
         // grow when the hash table is 75% full
         // (new hash will be 37.5% full)
         static const uint64_t MAX_LOAD_FACTOR = 75; // %
         // shrink when the hash table is 15% full
         // (new hash will be 30% full)
         static const uint64_t MIN_LOAD_FACTOR = 15; // %
-
         static const uint64_t TABLE_SIZES[];
 
 #ifndef MEMCHECK
@@ -113,17 +106,15 @@ namespace voltdb {
 
         HashNode **m_buckets;             // the array holding the buckets
         bool m_unique;                    // support unique
-        uint64_t m_count;                 // number of items in the hash
-        uint64_t m_uniqueCount;           // number of unique keys
-        int m_sizeIndex;                  // current bucket count (from array)
+        uint64_t m_count = 0;                 // number of items in the hash
+        uint64_t m_uniqueCount = 0;           // number of unique keys
+        int m_sizeIndex = BUCKET_INITIAL_INDEX;                  // current bucket count (from array)
         ContiguousAllocator m_allocator;  // allocator supporting compaction
         Hasher m_hasher;                  // instance of the hashing function
         KeyEqChecker m_keyEq;             // instance of the key eq checker
         DataEqChecker m_dataEq;           // instance of the value eq checker
 
-
     public:
-
         /**
          * Iterator class that will only iterate
          */
@@ -131,30 +122,43 @@ namespace voltdb {
             friend class CompactingHashTable;
         protected:
             // pointer to the actual value node
-            HashNode *m_node;
+            HashNode *m_node = nullptr;
 
             // protected constuctor just assigns values
             iterator(const HashNode *node) : m_node(const_cast<HashNode*>(node)) {}
 
         public:
-            iterator() : m_node(NULL) {}
+            iterator() = default;
             iterator(const iterator &iter) : m_node(iter.m_node) {}
 
-            Key &key() const { return m_node->key; }
-            Data &value() const { return m_node->value; }
-            void setValue(const Data &value) { m_node->value = value; }
+            Key &key() const {
+                return m_node->key;
+            }
+            Data &value() const {
+                return m_node->value;
+            }
+            void setValue(const Data &value) {
+                m_node->value = value;
+            }
 
             // move to the next hash node with the same key or make isEnd() true
             // (note: different than many other STL-ish implementations)
-            void moveNext() { m_node = m_node->nextWithKey; }
+            void moveNext() {
+                m_node = m_node->nextWithKey;
+            }
             // equivalent to == containter.end() in STL-speak
-            bool isEnd() const { return (!m_node); }
+            bool isEnd() const {
+                return ! m_node;
+            }
             // do two iterators point to the same node
-            bool equals(iterator &iter) const { return m_node == iter.m_node; }
+            bool equals(iterator &iter) const {
+                return m_node == iter.m_node;
+            }
         };
 
         /** Constructor allows passing in instances for the hasher and eq checkers */
-        CompactingHashTable(bool unique, Hasher hasher = Hasher(), KeyEqChecker keyEq = KeyEqChecker(), DataEqChecker dataEq = DataEqChecker());
+        CompactingHashTable(bool unique, Hasher hasher = Hasher(),
+                KeyEqChecker keyEq = KeyEqChecker(), DataEqChecker dataEq = DataEqChecker());
         ~CompactingHashTable();
 
         /** simple find */
@@ -162,7 +166,11 @@ namespace voltdb {
         /** find an exact key/value match (optionaly searching by value first) */
         iterator find(const Key &key, const Data &value) const;
         /** simple insert */
-        const Data *insert(const Key &key, const Data &value);
+        const Data* insert(const Key &key, const Data &value) {
+            uint64_t hash = m_hasher(key);
+            uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
+            return insert(&m_buckets[bucketOffset], hash, key, value);
+        }
         /** delete by key (unique only) */
         bool erase(const Key &key);
         /** delete by kv pair */
@@ -170,25 +178,68 @@ namespace voltdb {
         /** delete from iterator */
         bool erase(iterator &iter);
         /** STL-ish size() method */
-        size_t size() const { return m_count; }
+        size_t size() const {
+            return m_count;
+        }
 
         /** Return bytes used for this index */
-        size_t bytesAllocated() const { return m_allocator.bytesAllocated() + TABLE_SIZES[m_sizeIndex] * sizeof(HashNode*); }
+        size_t bytesAllocated() const {
+            return m_allocator.bytesAllocated() + TABLE_SIZES[m_sizeIndex] * sizeof(HashNode*);
+        }
 
         /** verification for debugging and testing */
         bool verify();
         /** Do we have a cached last buffer?  This is used in testing. */
-        bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
-
+        bool hasCachedLastBuffer() const {
+            return (m_allocator.hasCachedLastBuffer());
+        }
     protected:
         /** find, given a bucket/key */
         HashNode *find(const HashNode *bucket, const Key &key) const;
         /** find and exact match, given a bucket */
         HashNode *find(const HashNode *bucket, const Key &key, const Data &value) const;
         /** insert, given a bucket */
-        const Data *insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value);
+        const Data *insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value) {
+            HashNode *existing = find(*bucket, key);
+            // protect unique constraint
+            if (existing && m_unique) {
+                return &existing->value;
+            }
+
+            // create a new node
+            void *memory = m_allocator.alloc();
+            vassert(memory);
+            HashNode *newNode;
+            // placement new
+            if (m_unique) {
+                newNode = reinterpret_cast<HashNode*>(new(memory) HashNodeSmall());
+            } else {
+                newNode = new(memory) HashNode();
+                newNode->nextWithKey = nullptr;
+            }
+
+            newNode->hash = hash;
+            newNode->key = key;
+            newNode->value = value;
+            m_count++;
+
+            if (existing) {
+                // note if here, using non-unique path
+                newNode->nextWithKey = existing->nextWithKey;
+                existing->nextWithKey = newNode;
+                newNode->nextInBucket = nullptr;
+            } else {
+                newNode->nextInBucket = *bucket;
+                *bucket = newNode;
+                m_uniqueCount++;
+            }
+
+            checkLoadFactor();
+            return nullptr;
+        }
         /** remove, given a bucket and an exact node */
-        bool remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node);
+        bool remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode,
+                HashNode *prevKeyNode, HashNode *node);
         bool removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node);
 
         /** after remove, ensure memory for hashnodes is contiguous */
@@ -200,7 +251,7 @@ namespace voltdb {
         void resize(int newSizeIndex);
     };
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     const uint64_t CompactingHashTable<K, T, H, EK, ET>::TABLE_SIZES[] = {
         3,
         7,
@@ -243,37 +294,36 @@ namespace voltdb {
     //
     ///////////////////////////////////////////
 
-    template<class K, class T, class H, class EK, class ET>
-    CompactingHashTable<K, T, H, EK, ET>::CompactingHashTable(bool unique, Hasher hasher, KeyEqChecker keyEq, DataEqChecker dataEq)
-    : m_unique(unique),
-    m_count(0),
-    m_uniqueCount(0),
-    m_sizeIndex(BUCKET_INITIAL_INDEX),
-    m_allocator((int32_t)(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)), ALLOCATOR_CHUNK_SIZE),
-    m_hasher(hasher),
-    m_keyEq(keyEq),
-    m_dataEq(dataEq)
-    {
-        // allocate the hash table and bzero it (bzero is crucial)
-        void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    template<typename Key, typename T, typename Hasher, typename KeyEqChecker, typename DataEqChecker>
+    CompactingHashTable<Key, T, Hasher, KeyEqChecker, DataEqChecker>::CompactingHashTable(
+            bool unique, Hasher hasher, KeyEqChecker keyEq, DataEqChecker dataEq) :
+        m_unique(unique),
+        m_allocator(unique ? sizeof(HashNodeSmall) : sizeof(HashNode), ALLOCATOR_CHUNK_SIZE),
+        m_hasher(hasher),
+        m_keyEq(keyEq),
+        m_dataEq(dataEq) {
+            // allocate the hash table and bzero it (bzero is crucial)
+        void *memory = mmap(nullptr, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex],
+                PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
         vassert(memory);
         m_buckets = reinterpret_cast<HashNode**>(memory);
         memset(m_buckets, 0, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex]);
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     CompactingHashTable<K, T, H, EK, ET>::~CompactingHashTable() {
         // unlink all of the nodes, which will call destructors correctly
         for (size_t i = 0; i < TABLE_SIZES[m_sizeIndex]; ++i) {
             while (m_buckets[i]) {
                 HashNode *node = m_buckets[i];
-                if (m_unique)
-                    removeUnique(&(m_buckets[i]), NULL, node);
-                else
-                    remove(&(m_buckets[i]), NULL, node, NULL, node);
+                if (m_unique) {
+                    removeUnique(&(m_buckets[i]), nullptr, node);
+                } else {
+                    remove(&m_buckets[i], nullptr, node, nullptr, node);
+                }
                 // safe to call the small destructor because the extra field
                 //  for the larger HashNode isn't involved
-                (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+                reinterpret_cast<HashNodeSmall*>(node)->~HashNodeSmall();
             }
         }
 
@@ -284,32 +334,26 @@ namespace voltdb {
         // free the memory used for nodes
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    typename CompactingHashTable<K, T, H, EK, ET>::iterator CompactingHashTable<K, T, H, EK, ET>::find(const Key &key) const {
+    template<typename Key, typename T, typename H, typename EK, typename ET>
+    typename CompactingHashTable<Key, T, H, EK, ET>::iterator
+    CompactingHashTable<Key, T, H, EK, ET>::find(const Key &key) const {
         uint64_t hash = m_hasher(key);
         uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
         const HashNode *foundNode = find(m_buckets[bucketOffset], key);
         return iterator(foundNode);
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    typename CompactingHashTable<K, T, H, EK, ET>::iterator CompactingHashTable<K, T, H, EK, ET>::find(const Key &key, const Data &value) const {
+    template<typename Key, typename Data, typename H, typename EK, typename ET>
+    typename CompactingHashTable<Key, Data, H, EK, ET>::iterator
+    CompactingHashTable<Key, Data, H, EK, ET>::find(const Key &key, const Data &value) const {
         uint64_t hash = m_hasher(key);
         uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
         const HashNode *foundNode = find(m_buckets[bucketOffset], key, value);
         return iterator(foundNode);
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    const typename CompactingHashTable<K, T, H, EK, ET>::Data *CompactingHashTable<K, T, H, EK, ET>::insert(const Key &key, const Data &value) {
-        uint64_t hash = m_hasher(key);
-
-        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
-        return insert(&(m_buckets[bucketOffset]), hash, key, value);
-    }
-
-    template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::erase(const Key &key) {
+    template<typename Key, typename T, typename H, typename EK, typename ET>
+    bool CompactingHashTable<Key, T, H, EK, ET>::erase(const Key &key) {
         vassert(m_unique);
         HashNode *prevBucketNode = NULL;
         uint64_t hash = m_hasher(key);
@@ -317,7 +361,7 @@ namespace voltdb {
 
         for (HashNode *node = m_buckets[bucketOffset]; node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
-                removeUnique(&(m_buckets[bucketOffset]), prevBucketNode, node);
+                removeUnique(&m_buckets[bucketOffset], prevBucketNode, node);
                 deleteAndFixup(node);
                 checkLoadFactor();
                 return true;
@@ -328,8 +372,8 @@ namespace voltdb {
         return false;
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::erase(const Key &key, const Data &value) {
+    template<typename Key, typename Data, typename H, typename EK, typename ET>
+    bool CompactingHashTable<Key, Data, H, EK, ET>::erase(const Key &key, const Data &value) {
         HashNode *prevBucketNode = NULL, *keyHeadNode = NULL, *prevKeyNode = NULL;
         uint64_t hash = m_hasher(key);
         uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
@@ -338,7 +382,7 @@ namespace voltdb {
             if (m_keyEq(node->key, key)) {
                 if (m_unique) {
                     if (!m_dataEq(node->value, value)) return false;
-                    removeUnique(&(m_buckets[bucketOffset]), prevBucketNode, node);
+                    removeUnique(&m_buckets[bucketOffset], prevBucketNode, node);
                     deleteAndFixup(node);
                     checkLoadFactor();
                     return true;
@@ -346,7 +390,8 @@ namespace voltdb {
                 keyHeadNode = node;
                 for (node = keyHeadNode; node; node = node->nextWithKey) {
                     if (m_dataEq(node->value, value)) {
-                        remove(&(m_buckets[bucketOffset]), prevBucketNode, keyHeadNode, prevKeyNode, node);
+                        remove(&m_buckets[bucketOffset], prevBucketNode,
+                                keyHeadNode, prevKeyNode, node);
                         deleteAndFixup(node);
                         checkLoadFactor();
                         return true;
@@ -357,26 +402,33 @@ namespace voltdb {
             }
             prevBucketNode = node;
         }
-
         return false;
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     bool CompactingHashTable<K, T, H, EK, ET>::erase(iterator &iter) {
-        if (m_unique) return erase(iter.key());
-        else return erase(iter.key(), iter.value());
-    }
-
-    template<class K, class T, class H, class EK, class ET>
-    typename CompactingHashTable<K, T, H, EK, ET>::HashNode *CompactingHashTable<K, T, H, EK, ET>::find(const HashNode *bucket, const Key &key) const {
-        for (HashNode *node = const_cast<HashNode*>(bucket); node; node = node->nextInBucket) {
-            if (m_keyEq(node->key, key)) return node;
+        if (m_unique) {
+            return erase(iter.key());
+        } else {
+            return erase(iter.key(), iter.value());
         }
-        return NULL;
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    typename CompactingHashTable<K, T, H, EK, ET>::HashNode *CompactingHashTable<K, T, H, EK, ET>::find(const HashNode *bucket, const Key &key, const Data &value) const {
+    template<typename Key, typename T, typename H, typename EK, typename ET>
+    typename CompactingHashTable<Key, T, H, EK, ET>::HashNode*
+    CompactingHashTable<Key, T, H, EK, ET>::find(const HashNode *bucket, const Key &key) const {
+        for (HashNode *node = const_cast<HashNode*>(bucket); node; node = node->nextInBucket) {
+            if (m_keyEq(node->key, key)) {
+                return node;
+            }
+        }
+        return nullptr;
+    }
+
+    template<typename Key, typename Data, typename H, typename EK, typename ET>
+    typename CompactingHashTable<Key, Data, H, EK, ET>::HashNode*
+    CompactingHashTable<Key, Data, H, EK, ET>::find(
+            const HashNode *bucket, const Key &key, const Data &value) const {
         for (HashNode *node = const_cast<HashNode*>(bucket); node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
                 for (HashNode *node2 = node; node2; node2 = node2->nextWithKey) {
@@ -386,52 +438,13 @@ namespace voltdb {
                 }
             }
         }
-        return NULL;
+        return nullptr;
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    const typename CompactingHashTable<K, T, H, EK, ET>::Data *
-    CompactingHashTable<K, T, H, EK, ET>::insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value) {
-        HashNode *existing = find(*bucket, key);
-        // protect unique constraint
-        if (existing && m_unique) return &existing->value;
-
-        // create a new node
-        void *memory = m_allocator.alloc();
-        vassert(memory);
-        HashNode *newNode;
-        // placement new
-        if (m_unique) {
-            newNode = reinterpret_cast<HashNode*>(new(memory) HashNodeSmall());
-        }
-        else {
-            newNode = new(memory) HashNode();
-            newNode->nextWithKey = NULL;
-        }
-
-        newNode->hash = hash;
-        newNode->key = key;
-        newNode->value = value;
-        m_count++;
-
-        if (existing) {
-            // note if here, using non-unique path
-            newNode->nextWithKey = existing->nextWithKey;
-            existing->nextWithKey = newNode;
-            newNode->nextInBucket = NULL;
-        }
-        else {
-            newNode->nextInBucket = *bucket;
-            *bucket = newNode;
-            m_uniqueCount++;
-        }
-
-        checkLoadFactor();
-        return NULL;
-    }
-
-    template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node) {
+    template<typename Key, typename T, typename H, typename EK, typename ET>
+    bool CompactingHashTable<Key, T, H, EK, ET>::remove(
+            HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode,
+            HashNode *prevKeyNode, HashNode *node) {
         vassert(!m_unique);
 
         // if not in the main list from the bucket
@@ -444,10 +457,9 @@ namespace voltdb {
 
         // if nothing is linked from this key
         if (node->nextWithKey == NULL) {
-            if (*bucket == node)
+            if (*bucket == node) {
                 *bucket = node->nextInBucket;
-            else {
-                // remove a node in the chain
+            } else { // remove a node in the chain
                 prevBucketNode->nextInBucket = node->nextInBucket;
             }
             m_uniqueCount--;
@@ -456,9 +468,9 @@ namespace voltdb {
         }
 
         // if this is the head of a set of unique values
-        if (*bucket == node)
+        if (*bucket == node) {
             *bucket = node->nextWithKey;
-        else {
+        } else {
             // remove a node in the chain
             prevBucketNode->nextInBucket = node->nextWithKey;
         }
@@ -468,14 +480,14 @@ namespace voltdb {
         return true;
     }
 
-    template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node) {
+    template<typename K, typename T, typename H, typename EK, typename ET>
+    bool CompactingHashTable<K, T, H, EK, ET>::removeUnique(
+            HashNode **bucket, HashNode *prevBucketNode, HashNode *node) {
         vassert(m_unique);
 
-        if (*bucket == node)
+        if (*bucket == node) {
             *bucket = node->nextInBucket;
-        else {
-            // remove a node in the chain
+        } else { // remove a node in the chain
             prevBucketNode->nextInBucket = node->nextInBucket;
         }
         m_uniqueCount--;
@@ -483,7 +495,7 @@ namespace voltdb {
         return true;
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     void CompactingHashTable<K, T, H, EK, ET>::deleteAndFixup(HashNode *node) {
         vassert(node);
 
@@ -491,7 +503,7 @@ namespace voltdb {
         if (!m_count) {
             // safe to call the small destructor because the extra field
             //  for the larger HashNode isn't involved
-            (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+            reinterpret_cast<HashNodeSmall*>(node)->~HashNodeSmall();
 
             m_allocator.trim();
             vassert(m_allocator.count() == m_count);
@@ -505,7 +517,7 @@ namespace voltdb {
         if (last == node) {
             // safe to call the small destructor because the extra field
             //  for the larger HashNode isn't involved
-            (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+            reinterpret_cast<HashNodeSmall*>(node)->~HashNodeSmall();
 
             m_allocator.trim();
             vassert(m_allocator.count() == m_count);
@@ -529,8 +541,7 @@ namespace voltdb {
                 // update things that point to the last node
                 if (prevBucketNode) {
                     prevBucketNode->nextInBucket = node;
-                }
-                else {
+                } else {
                     m_buckets[bucketOffset] = node;
                 }
 
@@ -541,15 +552,13 @@ namespace voltdb {
                 node->value = last->value;
 
                 // destructor and memory release
-                (reinterpret_cast<HashNodeSmall*>(last))->~HashNodeSmall();
+                reinterpret_cast<HashNodeSmall*>(last)->~HashNodeSmall();
                 m_allocator.trim();
                 vassert(m_allocator.count() == m_count);
 
                 // done
                 return;
-
-            }
-            else {
+            } else {
                 for (HashNode *n2 = keyHeadNode; n2; n2 = n2->nextWithKey) {
                     if (n2 != last) {
                         prevKeyNode = n2;
@@ -559,14 +568,10 @@ namespace voltdb {
                     // update things that point to the last node
                     if (prevKeyNode) {
                         prevKeyNode->nextWithKey = node;
-                    }
-                    else {
-                        if (prevBucketNode) {
-                            prevBucketNode->nextInBucket = node;
-                        }
-                        else {
-                            m_buckets[bucketOffset] = node;
-                        }
+                    } else if (prevBucketNode) {
+                        prevBucketNode->nextInBucket = node;
+                    } else {
+                        m_buckets[bucketOffset] = node;
                     }
 
                     // copy the last node over the deleted node
@@ -580,7 +585,6 @@ namespace voltdb {
                     last->~HashNode();
                     m_allocator.trim();
                     vassert(m_allocator.count() == m_count);
-
                     // done
                     return;
                 }
@@ -592,31 +596,29 @@ namespace voltdb {
         vassert(false);
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     void CompactingHashTable<K, T, H, EK, ET>::checkLoadFactor() {
         uint64_t lf = (m_uniqueCount * 100) / TABLE_SIZES[m_sizeIndex];
         int newSizeIndex = m_sizeIndex;
         if (lf > MAX_LOAD_FACTOR) {
             newSizeIndex++;
-        }
-        else if(lf < MIN_LOAD_FACTOR) {
-            // make sure the hash doesn't over-shrink
-            if (newSizeIndex != BUCKET_INITIAL_INDEX) {
-                newSizeIndex--;
-            }
+        } else if(lf < MIN_LOAD_FACTOR && // make sure the hash doesn't over-shrink
+                newSizeIndex != BUCKET_INITIAL_INDEX) {
+            newSizeIndex--;
         }
         if (newSizeIndex != m_sizeIndex) {
             resize(newSizeIndex);
         }
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     void CompactingHashTable<K, T, H, EK, ET>::resize(int newSizeIndex) {
         //std::cout << "DEBUG SIZING BUFFER" << newSizeIndex << std::endl;
         //std::cout.flush();
 
         // create new double size buffer
-        void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[newSizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[newSizeIndex],
+                PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
         vassert(memory);
         HashNode **newBuckets = reinterpret_cast<HashNode**>(memory);
         memset(newBuckets, 0, TABLE_SIZES[newSizeIndex] * sizeof(HashNode*));
@@ -639,7 +641,7 @@ namespace voltdb {
         m_sizeIndex = newSizeIndex;
     }
 
-    template<class K, class T, class H, class EK, class ET>
+    template<typename K, typename T, typename H, typename EK, typename ET>
     bool CompactingHashTable<K, T, H, EK, ET> ::verify() {
         size_t manualCount = 0;
 
@@ -650,22 +652,19 @@ namespace voltdb {
                     if (hash != node->hash) {
                         printf("Node hash doesn't match expected value.\n");
                         return false;
-                    }
-                    if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
+                    } else if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
                         printf("Node hash doesn't match expected bucket index.\n");
                         return false;
                     }
 
                     ++manualCount;
-                }
-                else {
+                } else {
                     for (HashNode *node2 = node; node2; node2 = node2->nextWithKey) {
                         uint64_t hash = m_hasher(node2->key);
                         if (hash != node2->hash) {
                             printf("Node hash doesn't match expected value.\n");
                             return false;
-                        }
-                        if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
+                        } else if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
                             printf("Node hash doesn't match expected bucket index.\n");
                             return false;
                         }
@@ -680,8 +679,9 @@ namespace voltdb {
             printf("Found %d nodes by walking all buffers, but expected %d nodes.\n",
                    (int) manualCount, (int) m_count);
             return false;
+        } else {
+            return true;
         }
-        return true;
     }
 }
 

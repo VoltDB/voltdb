@@ -285,6 +285,7 @@ public:
                 bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
             }
         }
+//        printf("getNonInlinedMemorySizeForTempTable() -> %lu\n", bytes);
         return bytes;
     }
 
