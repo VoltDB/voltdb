@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltcore.messaging.VoltMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -63,7 +62,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
      * that dependency.
      */
     @Override
-    int offer(VoltMessage message)
+    int offer(FragmentResponseMessage message)
     {
         if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage msg = (FragmentResponseMessage)message;
