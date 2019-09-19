@@ -427,9 +427,8 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
-    // FIXME: ENG-17720 instrumentation
-    public void testDiscards() throws Exception{
-        System.out.println("Running testDiscards");
+    public void testOutOfOrderDiscards() throws Exception{
+        System.out.println("Running testOutOfOrderDiscards");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
@@ -468,6 +467,75 @@ public class TestExportDataSource extends TestCase {
             // Discard out of order
             cont1.discard();
             cont0.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testOutOfOrderAck() throws Exception{
+        System.out.println("Running testOutOfOrderAck");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            // Push 4 buffers with seqNo [1 .. 4]
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, foo1);
+
+            ByteBuffer foo2 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, foo2);
+
+            ByteBuffer foo3 = ByteBuffer.allocateDirect(buffSize);
+            foo3.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 3, 1, 0, foo3);
+
+            ByteBuffer foo4 = ByteBuffer.allocateDirect(buffSize);
+            foo4.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(4, 4, 1, 0, foo4);
+
+            // Poll the first buffer: creates a read-only copy and
+            // increments refcount on StreamBlock
+            AckingContainer cont1 = s.poll().get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            // Simulate a remote ack of the second buffer
+            // The log file should show:
+            // INFO  [main] EXPORT: Unable to release buffers to seqNo: 2, buffer [1, 1] is still in use
+            s.localAck(2, 2);
+
+            // Verify we can poll past the ack point
+            AckingContainer cont3 = s.poll().get();
+            cont3.updateStartTime(System.currentTimeMillis());
+            assertEquals(3, cont3.m_lastSeqNo);
+
+            // Discard first polled buffers
+            cont1.discard();
+            cont3.discard();
+
+            // Verify we can poll the last buffer
+            AckingContainer cont4 = s.poll().get();
+            cont4.updateStartTime(System.currentTimeMillis());
+            assertEquals(4, cont4.m_lastSeqNo);
+
+            cont4.discard();
 
         } finally {
             s.close();
