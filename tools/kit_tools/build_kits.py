@@ -85,7 +85,8 @@ def buildCommunity():
 # BUILD THE ENTERPRISE VERSION
 ################################################
 
-def buildEnterprise():
+def buildEnterprise(version):
+    licensee="VoltDB Enterprise Trial User " + version
     if build_mac:
         packageMacLib="true"
     else:
@@ -94,7 +95,13 @@ def buildEnterprise():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=%s %s clean dist.pro" % (defaultlicensedays, packageMacLib, build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml \
+        -Djmemcheck=NO_MEMCHECK \
+        -Dallowreplication=true -DallowDrActiveActive=true \
+        -Dlicensedays=%d -Dlicensee='%s' \
+        -Dkitbuild=%s %s \
+        clean dist.pro" \
+            % (defaultlicensedays, licensee, packageMacLib, build_args))
 
 ################################################
 # BUILD THE PRO VERSION
@@ -103,7 +110,8 @@ def buildEnterprise():
 #
 def packagePro(version):
     print "Making license"
-    makeTrialLicense(days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
+    licensee="VoltDB Pro Trial User " + version
+    makeTrialLicense(licensee=licensee, days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
     print "Repacking pro kit"
     with cd(builddir + "/pro/obj/pro"):
         run("mkdir pro_kit_staging")
@@ -146,11 +154,15 @@ def buildRabbitMQExport(version, dist_type):
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
 ################################################
+#This creates a trial license to put in the
+#downloads for internal use only
 
 # Must be called after buildEnterprise has been done
-def makeTrialLicense(days=30, dr_and_xdcr="true", nodes=12):
-    with cd(builddir + "/pro/tools"):
-        run("./make_trial_licenses.pl -t %d -H %d -W %s" % (days, nodes, dr_and_xdcr ))
+def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
+    with cd(builddir + "/pro"):
+        run("ant -f licensetool.xml createlicense \
+        -Dallowreplication=true -DallowDrActiveActive=true\
+                     -Dlicensdays=%d -Dlicensee='%s'" % (days, licensee))
 
 ################################################
 # MAKE A SHA256 checksum
@@ -333,19 +345,19 @@ if __name__ == "__main__":
             else:
                 releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
             makeReleaseDir(releaseDir)
-            print "VERSION: " + versionCentos
+            #print "VERSION: " + versionCentos
             if build_community:
                 buildCommunity()
                 buildRabbitMQExport(versionCentos, "community")
                 copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
-            buildEnterprise()
+            buildEnterprise(versionCentos)
             buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
             copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
             packagePro(versionCentos)
             makeSHA256SUM(versionCentos,"pro")
             copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
-            makeTrialLicense()
+            makeTrialLicense(licensee="VoltDB Internal Use Only V" + centosVersion)
             copyTrialLicenseToReleaseDir(releaseDir)
             makeMavenJars()
             copyMavenJarsToReleaseDir(releaseDir, versionCentos)
