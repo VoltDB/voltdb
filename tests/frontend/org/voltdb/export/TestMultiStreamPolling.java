@@ -215,11 +215,6 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
             list.add(streamName);
         }
         TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
-
-        // I noticed there were a small number of rows missing intermittently.
-        // HACK The more rows inserted, the more we need to wait for the sockets to drain?
-        System.out.println("Sleep 10 before verifying... ");
-        Thread.sleep(10_000);
         m_verifier.verifyRows();
     }
 
@@ -256,11 +251,6 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
         List<String> list = new ArrayList<>(1);
         list.add(checkStream);
         TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
-
-        // I noticed there were a small number of rows missing intermittently.
-        // HACK The more rows inserted, the more we need to wait for the sockets to drain?
-        System.out.println("Sleep 10 before verifying... ");
-        Thread.sleep(10_000);
         m_verifier.verifyRows();
     }
 }
