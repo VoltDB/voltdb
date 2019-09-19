@@ -27,12 +27,11 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
 
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 
 public class TransactionTaskQueue
@@ -63,7 +62,8 @@ public class TransactionTaskQueue
     private static class RelativeSiteOffset {
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
-        private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newHashMap();
+        private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap();
+        private List<Scoreboard> m_scoreBoards = Lists.newArrayList();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_scoreboardContainers.clear();
             m_lowestSiteId = firstSiteId;
@@ -74,10 +74,14 @@ public class TransactionTaskQueue
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             m_scoreboardContainers.put(siteId, new ScoreboardContainer(queue, scoreboard));
+            m_scoreBoards.add(scoreboard);
         }
 
         void removeScoreboard(int siteId) {
-            m_scoreboardContainers.remove(siteId);
+            ScoreboardContainer con = m_scoreboardContainers.remove(siteId);
+            assert(con != null);
+            m_scoreBoards.remove(con.siteScoreboard);
+            m_siteCount--;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -134,8 +138,7 @@ public class TransactionTaskQueue
         }
 
         List<Scoreboard> getScoreboards() {
-            return m_scoreboardContainers.values().stream().map(s-> {return s.siteScoreboard;})
-                    .collect(Collectors.toList());
+            return m_scoreBoards;
         }
 
         int getSiteCount() {
