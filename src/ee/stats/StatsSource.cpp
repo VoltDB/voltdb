@@ -41,8 +41,8 @@ StatsSource::schema_type StatsSource::populateBaseSchema() {
         names.emplace_back(get<0>(t));
         types.emplace_back(get<1>(t));
         columnLengths.emplace_back(get<2>(t));
-        allowNull.emplace_back(get<3>(t));
-        inBytes.emplace_back(get<4>(t));
+        allowNull.push_back(get<3>(t));
+        inBytes.push_back(get<4>(t));
     }
     return make_tuple(names, types, columnLengths, allowNull, inBytes);
 }
