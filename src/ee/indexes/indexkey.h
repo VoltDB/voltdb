@@ -117,16 +117,16 @@ template <std::size_t> struct IntsComparator;
 template <std::size_t> struct IntsHasher;
 
 /**
- *  Integer key that will pack all key data into keySize number of uint64_t.
+ *  Integer key that will pack all key data into KeySize number of uint64_t.
  *  The minimum number of uint64_ts necessary to pack all the integers is used.
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 struct IntsKey {
-    using KeyEqualityChecker = IntsEqualityChecker<keySize>;
-    using KeyComparator = IntsComparator<keySize> ;
-    using KeyHasher = IntsHasher<keySize>;
+    using KeyEqualityChecker = IntsEqualityChecker<KeySize>;
+    using KeyComparator = IntsComparator<KeySize> ;
+    using KeyHasher = IntsHasher<KeySize>;
     // actual location of data
-    uint64_t data[keySize];
+    uint64_t data[KeySize];
 
     static inline bool keyDependsOnTupleAddress() {
         return false;
@@ -195,8 +195,7 @@ struct IntsKey {
         std::ostringstream buffer;
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
-        const int columnCount = keySchema->columnCount();
-        for (int ii = 0; ii < columnCount; ii++) {
+        for (int ii = 0; ii < keySchema->columnCount(); ii++) {
             switch(keySchema->columnType(ii)) {
                 case voltdb::ValueType::tBIGINT:
                     buffer << convertUnsignedValueToSignedValue<int64_t, INT64_MAX>(
@@ -225,7 +224,7 @@ struct IntsKey {
     }
 
     IntsKey() {
-        ::memset(data, 0, keySize * sizeof(uint64_t));
+        ::memset(data, 0, KeySize * sizeof(uint64_t));
     }
 
     template<typename signed_type>
@@ -257,15 +256,16 @@ struct IntsKey {
     }
 
     IntsKey(const TableTuple *tuple) {
-        ::memset(data, 0, keySize * sizeof(uint64_t));
+        ::memset(data, 0, KeySize * sizeof(uint64_t));
         vassert(tuple);
         const TupleSchema *keySchema = tuple->getSchema();
-        const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
-        for (int ii = 0; ii < columnCount; ii++) {
-            if (! insertIntegralVal(keySchema->columnType(ii), keyOffset, intraKeyOffset, tuple->getNValue(ii))) {
-                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)",
+        for (int ii = 0; ii < keySchema->columnCount(); ii++) {
+            if (! insertIntegralVal(keySchema->columnType(ii), keyOffset,
+                        intraKeyOffset, tuple->getNValue(ii))) {
+                throwFatalException(
+                        "We currently only support a specific set of column index types/sizes for IntsKeys (%s)",
                         getTypeName(keySchema->columnType(ii)).c_str());
             }
         }
@@ -274,12 +274,11 @@ struct IntsKey {
     IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
             const std::vector<AbstractExpression*> &indexed_expressions,
             const TupleSchema *keySchema) {
-        ::memset(data, 0, keySize * sizeof(uint64_t));
-        const int columnCount = keySchema->columnCount();
+        ::memset(data, 0, KeySize * sizeof(uint64_t));
         int keyOffset = 0;
         int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         if (! indexed_expressions.empty()) {
-            for (int ii = 0; ii < columnCount; ii++) {
+            for (int ii = 0; ii < keySchema->columnCount(); ii++) {
                 AbstractExpression* ae = indexed_expressions[ii];
                 if (! insertIntegralVal(ae->getValueType(), keyOffset, intraKeyOffset, ae->eval(tuple, nullptr))) {
                     throwFatalException(
@@ -288,12 +287,12 @@ struct IntsKey {
                 }
             }
         } else {
-            for (int ii = 0; ii < columnCount; ii++) {
+            for (int ii = 0; ii < keySchema->columnCount(); ii++) {
                 if (! insertIntegralVal(keySchema->columnType(ii), keyOffset, intraKeyOffset,
                             tuple->getNValue(indices[ii]))) {
                     throwFatalException(
                             "We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
-                            getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
+                            getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, keySchema->columnCount());
                 }
             }
         }
@@ -303,16 +302,16 @@ struct IntsKey {
 /** comparator for Int specialized indexes.
  * Required by CompactingMap keyed by IntsKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 struct IntsComparator {
     IntsComparator(const TupleSchema *unused_keySchema) : m_keySchema(unused_keySchema) {}
 
-    int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+    int operator()(const IntsKey<KeySize> &lhs, const IntsKey<KeySize> &rhs) const {
         // lexographical compare could be faster for fixed N
         /*
          * Hopefully the compiler can unroll this loop
          */
-        for (unsigned int ii = 0; ii < keySize; ii++) {
+        for (unsigned int ii = 0; ii < KeySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
             const uint64_t *rvalue = &rhs.data[ii];
             if (*lvalue < *rvalue) {
@@ -325,7 +324,7 @@ struct IntsComparator {
     }
 
     // This method is provided to be compatible with ComparatorWithPointer.
-    int compareWithoutPointer(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+    int compareWithoutPointer(const IntsKey<KeySize> &lhs, const IntsKey<KeySize> &rhs) const {
         return operator()(lhs, rhs);
     }
 
@@ -342,13 +341,13 @@ protected:
 /**
  * Required by CompactingHashTable keyed by IntsKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 class IntsEqualityChecker {
     const TupleSchema *m_keySchema;
 public:
     IntsEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
-    bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
-        for (unsigned int ii = 0; ii < keySize; ii++) {
+    bool operator()(const IntsKey<KeySize> &lhs, const IntsKey<KeySize> &rhs) const {
+        for (unsigned int ii = 0; ii < KeySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
             const uint64_t *rvalue = &rhs.data[ii];
 
@@ -363,12 +362,12 @@ public:
 /**
  * Required by CompactingHashTable keyed by IntsKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 struct IntsHasher {
     IntsHasher(const TupleSchema*) {}
-    size_t operator()(IntsKey<keySize> const& p) const {
+    size_t operator()(IntsKey<KeySize> const& p) const {
         size_t seed = 0;
-        for (int ii = 0; ii < keySize; ii++) {
+        for (int ii = 0; ii < KeySize; ii++) {
             boost::hash_combine(seed, p.data[ii]);
         }
         return seed;
@@ -383,13 +382,15 @@ template <std::size_t> class GenericHasher;
  * Key object for indexes of mixed types.
  * Using TableTuple to store columns.
  */
-template <std::size_t keySize>
-struct GenericKey {
-    using KeyEqualityChecker = GenericEqualityChecker<keySize>;
-    using KeyComparator = GenericComparator<keySize>;
-    using KeyHasher = GenericHasher<keySize>;
+template <std::size_t KeySize>
+class GenericKey {
     // actual location of data, extends past the end.
-    char data[keySize];
+    char data[KeySize];
+    void const* m_tupleAddr;
+public:
+    using KeyEqualityChecker = GenericEqualityChecker<KeySize>;
+    using KeyComparator = GenericComparator<KeySize>;
+    using KeyHasher = GenericHasher<KeySize>;
 
     static inline bool keyDependsOnTupleAddress() {
         return false;
@@ -399,30 +400,37 @@ struct GenericKey {
     }
 
     GenericKey() {
-        ::memset(data, 0, keySize * sizeof(char));
+        ::memset(data, 0, KeySize * sizeof(char));
     }
 
-    GenericKey(const TableTuple *tuple) {
+    GenericKey(const TableTuple *tuple) : m_tupleAddr(tuple) {
         vassert(tuple);
-        ::memcpy(data, tuple->address() + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
+        ::memcpy(data, tuple->address() + TUPLE_HEADER_SIZE,
+                tuple->getSchema()->tupleLength());
     }
 
     GenericKey(const TableTuple *tuple, const std::vector<int> &indices,
-            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *keySchema) {
         vassert(tuple);
         TableTuple keyTuple(keySchema);
-        keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
-        const int columnCount = keySchema->columnCount();
+        keyTuple.moveNoHeader(data);
         if (! indexed_expressions.empty()) {
-            for (int ii = 0; ii < columnCount; ++ii) {
+            for (int ii = 0; ii < keySchema->columnCount(); ++ii) {
                 AbstractExpression* ae = indexed_expressions[ii];
-                keyTuple.setNValue(ii, ae->eval(tuple, NULL));
+                keyTuple.setNValue(ii, ae->eval(tuple, nullptr));
             }
         } else {    // take advantage of columns-only optimization
-            for (int ii = 0; ii < columnCount; ++ii) {
+            for (int ii = 0; ii < keySchema->columnCount(); ++ii) {
                 keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
             }
         }
+    }
+    inline char const* getData() const {
+        return data;
+    }
+    inline bool equals(GenericKey<KeySize> const& other) const {
+        return m_tupleAddr == other.m_tupleAddr;
     }
 };
 
@@ -435,34 +443,35 @@ struct GenericKey {
  * It's only the edge case of non-inline-typed non-column expressions that need this class for
  * its ability to persist the indexed expression values using pooled storage.
  */
-template <std::size_t keySize>
-class GenericPersistentKey : public GenericKey<keySize> {
+template <std::size_t KeySize>
+class GenericPersistentKey : public GenericKey<KeySize> {
     // The keySchema is only retained for object memory reclaim purposes.
     // If NULL, this was either constructed as an ephemeral search key,
     // or it has been "demoted" in the process of shuffling keys around
     // in the map, passing its memory management responsibilities
     // to another key, so no reclaim is required.
     const TupleSchema *m_keySchema = nullptr;
+    using super = GenericKey<KeySize>;
 public:
     // These keys Compare and Hash as GenericKeys
     GenericPersistentKey() = default;
 
          // This is just an ephemeral search key -- it doesn't need to persist.
-    GenericPersistentKey(const TableTuple *tuple) : GenericKey<keySize>(tuple) { }
+    GenericPersistentKey(const TableTuple *tuple) : GenericKey<KeySize>(tuple) { }
 
     GenericPersistentKey(const TableTuple *tuple, const std::vector<int> &notUsedIndices,
-                         const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) :
+                         const std::vector<AbstractExpression*> &indexed_expressions,
+                         const TupleSchema *keySchema) :
         // Not bothering to delegate to the full-blown GenericKey constructor,
         // since in some ways the special case processing here is simpler.
-        GenericKey<keySize>(), m_keySchema(keySchema) {
+        GenericKey<KeySize>(), m_keySchema(keySchema) {
         vassert(tuple);
         // Assume that there are indexed expressions.
         // Columns-only indexes don't use GenericPersistentKey
         vassert(! indexed_expressions.empty());
         TableTuple keyTuple(keySchema);
-        keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
-        const int columnCount = keySchema->columnCount();
-        for (int ii = 0; ii < columnCount; ++ii) {
+        keyTuple.moveNoHeader(super::getData());
+        for (int ii = 0; ii < keySchema->columnCount(); ++ii) {
             AbstractExpression* ae = indexed_expressions[ii];
             NValue indexedValue;
             try {
@@ -488,9 +497,9 @@ public:
     // and/or prevent the in-map key from properly freeing its referenced objects when it got
     // deleted from the map.
     GenericPersistentKey(const GenericPersistentKey& other)
-        : GenericKey<keySize>() // Copying the inherited member explicitly.
-        , m_keySchema(other.m_keySchema) {
-        ::memcpy(this->data, other.data, keySize);
+        : GenericKey<KeySize>(), // Copying the inherited member explicitly.
+        m_keySchema(other.m_keySchema) {
+        ::memcpy(const_cast<char*>(super::getData()), other.getData(), KeySize);
         // Only one key, this, can own the tuple and its objects.
         const_cast<GenericPersistentKey&>(other).m_keySchema = nullptr;
     }
@@ -502,8 +511,8 @@ public:
         // its previous value (presumably obsolete) will go out of scope with other!
         // This data memory management is only a concern for "full-blown" keys
         // that have m_keySchema -- not a problem for ephemeral search keys that just "borrow" memory.
-        const TupleSchema *keptKeySchema = this->m_keySchema;
-        this->m_keySchema = other.m_keySchema;
+        const TupleSchema *keptKeySchema = m_keySchema;
+        m_keySchema = other.m_keySchema;
 
         // Exactly one full-blown key must own each tuple and its objects.
         // So either use other as a lifeboat for the prior value of *this.
@@ -514,16 +523,15 @@ public:
         if (keptKeySchema) {
             writableOther.m_keySchema = keptKeySchema;
             // Other needs to lifeboat the original value of *this.
-            char keptData[keySize];
-            ::memcpy(keptData, this->data, keySize);
-            ::memcpy(this->data, other.data, keySize);
-            ::memcpy(writableOther.data, keptData, keySize);
+            char keptData[KeySize];
+            ::memcpy(keptData, super::getData(), KeySize);
+            ::memcpy(const_cast<char*>(super::getData()), other.getData(), KeySize);
+            ::memcpy(const_cast<char*>(writableOther.getData()), keptData, KeySize);
         } else {
             // *this was ephemeral, so other must become ephemeral.
             // The state of its data on exit does not matter.
             writableOther.m_keySchema = nullptr;
-
-            ::memcpy(this->data, other.data, keySize);
+            ::memcpy(const_cast<char*>(super::getData()), other.getData(), KeySize);
         }
         return *this;
     }
@@ -531,28 +539,34 @@ public:
     ~GenericPersistentKey() {
         if (m_keySchema != nullptr) {
             TableTuple keyTuple(m_keySchema);
-            keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
+            keyTuple.moveNoHeader(super::getData());
             keyTuple.freeObjectColumns();
         }
     }
 };
 
-template <std::size_t keySize>
+template <std::size_t KeySize>
 class GenericNullAsMaxComparator {
     const TupleSchema *m_keySchema;
 public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
-    inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        // lexographical compare could be faster for fixed N
-        return lhTuple.compareNullAsMax(rhTuple);
+    inline int operator()(const GenericKey<KeySize> &lhs, const GenericKey<KeySize> &rhs) const {
+//        if (lhs.equals(rhs)) {
+//            return VALUE_COMPARE_EQUAL;
+//        } else {
+            TableTuple lhTuple(m_keySchema);
+            lhTuple.moveNoHeader(reinterpret_cast<const void*>(&lhs));
+            TableTuple rhTuple(m_keySchema);
+            rhTuple.moveNoHeader(reinterpret_cast<const void*>(&rhs));
+            // lexographical compare could be faster for fixed N
+            return lhTuple.compareNullAsMax(rhTuple);
+//        }
     }
 
     // This method is provided to be compatible with ComparatorWithPointer.
-    int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+    int compareWithoutPointer(const GenericKey<KeySize> &lhs, const GenericKey<KeySize> &rhs) const {
         return operator()(lhs, rhs);
     }
 };
@@ -561,7 +575,7 @@ public:
  * Function object returns -1/0/1 if lhs </==/> rhs.
  * Required by CompactingMap keyed by GenericKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 class GenericComparator {
 protected:
     const TupleSchema *m_keySchema;
@@ -569,22 +583,27 @@ public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
-    inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema);
-        lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema);
-        rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        // lexographical compare could be faster for fixed N
-        return lhTuple.compare(rhTuple);
+    inline int operator()(const GenericKey<KeySize> &lhs, const GenericKey<KeySize> &rhs) const {
+//        if (lhs.equals(rhs)) {
+//            return VALUE_COMPARE_EQUAL;
+//        } else {
+            TableTuple lhTuple(m_keySchema);
+            lhTuple.moveNoHeader(reinterpret_cast<const void*>(&lhs));
+            TableTuple rhTuple(m_keySchema);
+            rhTuple.moveNoHeader(reinterpret_cast<const void*>(&rhs));
+            // lexographical compare could be faster for fixed N
+            return lhTuple.compare(rhTuple);
+//        }
     }
 
     // This method is provided to be compatible with ComparatorWithPointer.
-    int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+    int compareWithoutPointer(const GenericKey<KeySize> &lhs,
+            const GenericKey<KeySize> &rhs) const {
         return operator()(lhs, rhs);
     }
 
-    const GenericNullAsMaxComparator<keySize> getNullAsMaxComparator() const {
-        return GenericNullAsMaxComparator<keySize>(m_keySchema);
+    const GenericNullAsMaxComparator<KeySize> getNullAsMaxComparator() const {
+        return GenericNullAsMaxComparator<KeySize>(m_keySchema);
     }
 };
 
@@ -592,18 +611,22 @@ public:
  * Equality-checking function object
  * Required by CompactingHashTable keyed by GenericKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 class GenericEqualityChecker {
     const TupleSchema *m_keySchema;
 public:
     /** Type information passed to the constuctor as it's not in the key itself */
     GenericEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
-    inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema);
-        lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema);
-        rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        return lhTuple.equalsNoSchemaCheck(rhTuple);
+    inline bool operator()(const GenericKey<KeySize> &lhs, const GenericKey<KeySize> &rhs) const {
+//        if (lhs.equals(rhs)) {
+//            return VALUE_COMPARE_EQUAL;
+//        } else {
+            TableTuple lhTuple(m_keySchema);
+            lhTuple.moveNoHeader(reinterpret_cast<const void*>(&lhs));
+            TableTuple rhTuple(m_keySchema);
+            rhTuple.moveNoHeader(reinterpret_cast<const void*>(&rhs));
+            return lhTuple.equalsNoSchemaCheck(rhTuple);
+//        }
     }
 };
 
@@ -611,7 +634,7 @@ public:
  * Hash function object for Generic Keys in tuple data format.
  * Required by CompactingHashTable keyed by GenericKey<>
  */
-template <std::size_t keySize>
+template <std::size_t KeySize>
 class GenericHasher {
     const TupleSchema *m_keySchema;
 public:
@@ -619,9 +642,9 @@ public:
     GenericHasher(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     /** Generate a 64-bit number for the key value */
-    inline size_t operator()(GenericKey<keySize> const &p) const {
+    inline size_t operator()(GenericKey<KeySize> const &p) const {
         TableTuple pTuple(m_keySchema);
-        pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
+        pTuple.moveNoHeader(reinterpret_cast<const void*>(&p));
         return pTuple.hashCode();
     }
 };

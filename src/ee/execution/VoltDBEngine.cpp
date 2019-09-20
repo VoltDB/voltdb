@@ -459,11 +459,11 @@ int VoltDBEngine::executePlanFragments(
                 drBufferChange += drReplicatedStreamBufferChange- DRTupleStream::BEGIN_RECORD_SIZE;
             }
         }
-        m_resultOutput.writeIntAt(m_startOfResultBuffer + 1, static_cast<int32_t> (drBufferChange));
+        m_resultOutput.writeIntAt(m_startOfResultBuffer + 1, drBufferChange);
         VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog,
                    static_cast<int32_t> (drBufferChange));
         m_resultOutput.writeIntAt(m_startOfResultBuffer + 5,
-                static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) -
+                m_resultOutput.position() - m_startOfResultBuffer -
                 sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
 
     }
@@ -2440,7 +2440,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     if (resultTable != NULL) {
         resultTable->serializeTo(m_resultOutput);
         m_resultOutput.writeIntAt(lengthPosition,
-                static_cast<int32_t>(m_resultOutput.size() - sizeof(int32_t)));
+                m_resultOutput.size() - sizeof(int32_t));
         return 1;
     } else {
         return 0;

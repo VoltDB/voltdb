@@ -66,7 +66,7 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
     } else {
         m_table->serializeTupleTo(*output, tuples, 2);
     }
-    output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
+    output->writeIntAt(tableSizePosition, output->position() - tableSizePosition - 4);
 }
 
 ConstraintFailureException::~ConstraintFailureException() throw () {

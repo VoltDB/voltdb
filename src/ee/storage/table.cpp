@@ -393,7 +393,7 @@ void Table::serializeTupleTo(SerializeOutput &serialOutput, voltdb::TableTuple *
         tuples[ii].serializeTo(serialOutput);
     }
 
-    serialOutput.writeIntAt(pos, static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t)));
+    serialOutput.writeIntAt(pos, serialOutput.position() - pos - sizeof(int32_t));
 }
 
 bool Table::equals(voltdb::Table *other) {

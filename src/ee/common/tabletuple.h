@@ -187,21 +187,11 @@ public:
         *m_data &= static_cast<char>(~DIRTY_MASK);
     }
 
-    void moveNoHeader(void *address) {
+    void moveNoHeader(void const*address) {
         vassert(m_schema);
         // isActive() and all the other methods expect a header
-        m_data = reinterpret_cast<char*> (address) - TUPLE_HEADER_SIZE;
-    }
-
-    // Used to wrap read only tuples in indexing code. TODO Remove
-    // constedeness from indexing code so this cast isn't necessary.
-    void moveToReadOnlyTuple(const void *address) {
-        vassert(m_schema);
-        vassert(address);
-        //Necessary to move the pointer back TUPLE_HEADER_SIZE
-        // artificially because Tuples used as keys for indexes do not
-        // have the header.
-        m_data = reinterpret_cast<char*>(const_cast<void*>(address)) - TUPLE_HEADER_SIZE;
+        m_data = reinterpret_cast<char*>(const_cast<void*>(address)) -
+                TUPLE_HEADER_SIZE;
     }
 
     /** Get the address of this tuple in the table's backing store */
@@ -221,8 +211,7 @@ public:
     */
     size_t maxExportSerializationSize() const {
         size_t bytes = 0;
-        int cols = columnCount();
-        for (int i = 0; i < cols; ++i) {
+        for (int i = 0; i < columnCount(); ++i) {
             bytes += maxExportSerializedColumnSize(i);
         }
         return bytes;
@@ -230,10 +219,9 @@ public:
 
     size_t maxDRSerializationSize() const {
         size_t bytes = maxExportSerializationSize();
-
-        int hiddenCols = m_schema->hiddenColumnCount();
-        HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
-        for (int i = 0; i < hiddenCols; ++i) {
+        HiddenColumnFilter filter = HiddenColumnFilter::create(
+                HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
+        for (int i = 0; i < m_schema->hiddenColumnCount(); ++i) {
             if (filter.include(i)) {
                 bytes += maxExportSerializedHiddenColumnSize(i);
             }
@@ -337,7 +325,6 @@ public:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, false);
     }
-
 
     void setHiddenNValue(const TupleSchema::HiddenColumnInfo *columnInfo,
             NValue const& value) {
@@ -544,8 +531,7 @@ public:
     void serializeToDR(ExportSerializeOutput &io, int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns() const;
-    size_t hashCode(size_t seed) const;
-    size_t hashCode() const;
+    size_t hashCode(size_t seed = 0) const;
 
 private:
     static string writeJson(Json::Value const& val) {
@@ -813,6 +799,9 @@ public:
     TableTuple& tuple() {
         return m_tuple;
     }
+    TableTuple const& tuple() const {
+        return m_tuple;
+    }
 };
 
 inline TableTuple::TableTuple(const TupleSchema *schema) : m_schema(schema) {
@@ -924,11 +913,6 @@ inline size_t TableTuple::hashCode(size_t seed) const {
         value.hashCombine(seed);
     }
     return seed;
-}
-
-inline size_t TableTuple::hashCode() const {
-    size_t seed = 0;
-    return hashCode(seed);
 }
 
 /**

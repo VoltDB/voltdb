@@ -319,11 +319,14 @@ void TableTuple::serializeTo(SerializeOutput &output, const HiddenColumnFilter *
         }
     }
     // write the length of the tuple
-    output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
+    output.writeIntAt(start, output.position() - start - sizeof(int32_t));
 }
 
 bool TableTuple::equalsNoSchemaCheck(const TableTuple &other,
         const HiddenColumnFilter *hiddenColumnFilter) const {
+//    if (address() == other.address()) {
+//        return true;
+//    }
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
