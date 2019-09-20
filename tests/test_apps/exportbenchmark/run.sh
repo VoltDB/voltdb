@@ -88,6 +88,16 @@ function srccompile-ifneeded() {
 function server() {
     srccompile-ifneeded
     voltdb init --force --config=deployment.xml
+    server_common
+}
+
+function server_e3() {
+    srccompile-ifneeded
+    voltdb init --force --config=deployment_e3.xml
+    server_common
+}
+
+function server_common() {
     echo
     echo "Installing exportbenchmark-exporter.jar to ${VOLTDB_LIB}/extension"
     echo
@@ -158,7 +168,7 @@ function shutdown() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|init|run-benchmark|run-benchmark-help|shutdown}"
+    echo "Usage: ./run.sh {clean|jars|server|server_e3|init|run_benchmark|run_benchmark_10x|run_benchmark_100x|run_benchmark_help|shutdown}"
 }
 
 parse_command_line $@
