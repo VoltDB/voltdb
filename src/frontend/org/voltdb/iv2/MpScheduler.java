@@ -268,7 +268,6 @@ public class MpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-
         /*
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
@@ -325,7 +324,9 @@ public class MpScheduler extends Scheduler
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters,
-                    message);
+                    message,
+                    localId,
+                    true);
             safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
@@ -511,7 +512,6 @@ public class MpScheduler extends Scheduler
             }
             return;
         }
-
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
@@ -519,15 +519,10 @@ public class MpScheduler extends Scheduler
                 advanceRepairTruncationHandle(message);
                 m_outstandingTxns.remove(message.getTxnId());
                 m_mailbox.send(counter.m_destinationId, message);
-            }
-            else if (result == DuplicateCounter.MISMATCH) {
+            } else if (result == DuplicateCounter.MISMATCH || result == DuplicateCounter.ABORT) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
-            } else if (result == DuplicateCounter.ABORT) {
-                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT running every-site system procedure.", true, null);
             }
-            // doing duplicate suppresion: all done.
-        }
-        else {
+        } else {
             advanceRepairTruncationHandle(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
             assert(txn != null);
