@@ -194,6 +194,56 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testMJWithTwoIndexColumns() {
+        m_tester.sql("SELECT RI2.I, RI2.si, RI2.BI, RI5.I, RI5.II FROM RI2 FULL JOIN RI5 " +
+                     " ON RI2.I = RI5.I AND RI5.II = RI2.BI")
+        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..4=[{exprs}], split=[1])\n" +
+                    "  VoltPhysicalMergeJoin(condition=[AND(=($0, $3), =($5, $2))], joinType=[full], split=[1], outerIndex=[RI2_IND2], innerIndex=[RI5_IND_I_II_III])\n" +
+                    "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..2=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
+                    "    VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[CAST($t1):BIGINT], proj#0..1=[{exprs}], II0=[$t3], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":"
+                + "[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
+                + "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},"
+                + "{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":2}},"
+                + "{\"COLUMN_NAME\":\"I0\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":3}},"
+                + "{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":4}}]},"
+                + "{\"ID\":2,\"PLAN_NODE_TYPE\":\"MERGEJOIN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":"
+                + "[{\"ID\":6,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\","
+                + "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"II\","
+                + "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"II0\",\"EXPRESSION\":"
+                + "{\"TYPE\":7,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}}}]}],"
+                + "\"TARGET_TABLE_NAME\":\"RI5\",\"TARGET_TABLE_ALIAS\":\"RI5\",\"LOOKUP_TYPE\":\"EQ\","
+                + "\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI5_IND_I_II_III\"}],\"CHILDREN_IDS\""
+                + ":[3],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5"
+                + ",\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,"
+                + "\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,"
+                + "\"COLUMN_IDX\":2}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                + "\"COLUMN_IDX\":0,\"TABLE_IDX\":1}},{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,"
+                + "\"VALUE_TYPE\":5,\"COLUMN_IDX\":1,\"TABLE_IDX\":1}},{\"COLUMN_NAME\":\"II0\",\"EXPRESSION\":"
+                + "{\"TYPE\":7,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1,"
+                + "\"TABLE_IDX\":1}}}],\"JOIN_TYPE\":\"FULL\",\"PRE_JOIN_PREDICATE\":null,\"JOIN_PREDICATE\":"
+                + "{\"TYPE\":20,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":"
+                + "{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                + "\"COLUMN_IDX\":0,\"TABLE_IDX\":1}},\"RIGHT\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":"
+                + "{\"TYPE\":7,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1,\"TABLE_IDX\":1}},"
+                + "\"RIGHT\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":2}}},\"WHERE_PREDICATE\":null,\"LESS_JOIN_PREDICATE\":"
+                + "{\"TYPE\":21,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":12,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                + "\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0,\"TABLE_IDX\":1}},\"RIGHT\":"
+                + "{\"TYPE\":20,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                + "\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0,\"TABLE_IDX\":1}},\"RIGHT\":"
+                + "{\"TYPE\":12,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":2},\"RIGHT\":{\"TYPE\":7,"
+                + "\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1,\"TABLE_IDX\":1}}}}}},"
+                + "{\"ID\":3,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":"
+                + "\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
+                + "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},"
+                + "{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":2}}]}],"
+                + "\"TARGET_TABLE_NAME\":\"RI2\",\"TARGET_TABLE_ALIAS\":\"RI2\",\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\","
+                + "\"TARGET_INDEX_NAME\":\"RI2_IND2\"}],\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
+        .pass();
+
+    }
+
+
     public void testFullMJ() {
         // TODO: ambiguous plan generated
         m_tester.sql("SELECT RI1.SI, RI2.I FROM RI1 FULL JOIN RI2 ON RI2.TI = RI1.TI")
@@ -256,4 +306,5 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         + "\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
                 .pass();
     }
+
 }
