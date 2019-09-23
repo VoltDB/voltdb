@@ -127,7 +127,7 @@ public class TestTaskManager {
         when(m_clientInterface.getInternalConnectionHandler()).thenReturn(m_internalConnectionHandler);
         when(m_clientInterface.getProcedureFromName(eq(PROCEDURE_NAME))).thenReturn(m_procedure);
 
-        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0);
+        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, false);
 
         s_firstActionSchedulerCallCount.set(0);
         s_postRunActionSchedulerCallCount.set(0);
@@ -677,6 +677,35 @@ public class TestTaskManager {
         assertTrue(validateTask(task).isValid());
     }
 
+    /*
+     * Test that during elastic join partition tasks are not started until after the partition is actually ready
+     */
+    @Test
+    public void delayPartitionStartDuringJoin() throws Exception {
+        m_taskManager.shutdown();
+        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, true);
+
+        Task task = createTask(TestActionSchedule.class, TaskScope.PARTITIONS, 10, 100);
+        m_procedure.setSinglepartition(true);
+        m_procedure.setPartitionparameter(-1);
+
+        startSync(task);
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+
+        promotedPartitionsSync(0, 1, 2, 3);
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+
+        enableTasksOnPartitionsSync();
+        Thread.sleep(50);
+        assertEquals(4, s_firstActionSchedulerCallCount.get());
+
+        promotedPartitionsSync(4);
+        Thread.sleep(5);
+        assertEquals(5, s_firstActionSchedulerCallCount.get());
+
+        validateStats(5);
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
@@ -782,6 +811,10 @@ public class TestTaskManager {
             futures.add(m_taskManager.promotedPartition(partitionId));
         }
         Futures.whenAllSucceed(futures).call(() -> null).get();
+    }
+
+    private void enableTasksOnPartitionsSync() throws InterruptedException, ExecutionException {
+        m_taskManager.enableTasksOnPartitions().get();
     }
 
     private void demotedPartitionsSync(int... partitionIds) throws InterruptedException, ExecutionException {
