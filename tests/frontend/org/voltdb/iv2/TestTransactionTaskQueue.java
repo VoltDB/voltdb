@@ -32,6 +32,7 @@ import java.util.Deque;
 import java.util.List;
 
 import org.junit.Test;
+import org.voltcore.messaging.MockMailbox;
 import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -251,7 +252,7 @@ public class TestTransactionTaskQueue extends TestCase
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
             TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue, true);
-            txnTaskQueue.initializeScoreboard(i);
+            txnTaskQueue.initializeScoreboard(i, new MockMailbox());
             m_txnTaskQueues.add(txnTaskQueue);
             Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
             m_expectedOrders.add(expectedOrder);
