@@ -237,7 +237,9 @@ public class DuplicateCounter
             return WAITING;
         }
 
-        determineResult();
+        if (!rejoining) {
+            determineResult();
+        }
         return DONE;
     }
 
@@ -252,7 +254,9 @@ public class DuplicateCounter
 
         // Compare the hash from partition leader with those from partition replicas
         ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
-        assert (leaderResponse != null);
+        if (leaderResponse == null || leaderResponse.hashes == null) {
+            return;
+        }
         m_responseHashes = leaderResponse.hashes;
         m_lastResponse = leaderResponse.message;
         int pos = -1;
@@ -269,17 +273,20 @@ public class DuplicateCounter
             if (leaderResponse.success != entry.getValue().success) {
                 if (!m_allMatched) {
                     tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, -1);
                     m_allMatched = false;
                 }
                 m_misMatchedReplicas.add(entry.getKey());
-            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
-                if (!m_allMatched) {
-                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+            } else if (res.hashes != null) {
+                pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes);
+                if (pos >=0) {
+                    if (!m_allMatched) {
+                        tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
+                        logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    }
+                    m_allMatched = false;
+                    m_misMatchedReplicas.add(entry.getKey());
                 }
-                m_allMatched = false;
-                m_misMatchedReplicas.add(entry.getKey());
             }
         }
     }
