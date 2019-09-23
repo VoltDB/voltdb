@@ -288,13 +288,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException
     {
-        //TODO: Remove temporary debug for ENG-18013
-        if (message instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) message;
-            ELASTICLOG.warn("Received unexpected Iv2InitiateTaskMessage for procedure " + itm.getStoredProcedureName() +
-                    " for partition " + itm.getStoredProcedureInvocation().getPartitionDestination() +
-                    ". isSinglePartition=" + itm.isSinglePartition());
-        }
         assert(!(message instanceof Iv2InitiateTaskMessage));
         if (message instanceof FragmentTaskMessage) {
             if (ELASTICLOG.isTraceEnabled()) {
