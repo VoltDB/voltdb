@@ -49,8 +49,8 @@ template <typename Key, typename Data = const void*>
 class NormalKeyValuePair : public std::pair<Key, Data> {
     using super = std::pair<Key, Data>;
 public:
-    NormalKeyValuePair() {}
-    NormalKeyValuePair(const Key &key, const Data &value) : std::pair<Key, Data>(key, value) {}
+    NormalKeyValuePair() = default;
+    NormalKeyValuePair(const Key &key, const Data &value) : super(key, value) {}
 
     const Key& getKey() const {
         return super::first;
@@ -218,7 +218,9 @@ public:
     ~CompactingMap();
 
     // TODO: remove this. But two eecheck depend on this.
-    bool insert(std::pair<Key, Data> value) { return (insert(value.first, value.second) == NULL); };
+    bool insert(std::pair<Key, Data> value) {
+        return insert(value.first, value.second) == NULL;
+    };
     // A syntactically convenient analog to CompactingHashTable's insert function
     const Data *insert(const Key &key, const Data &data);
     bool erase(const Key &key);
@@ -402,7 +404,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
     }
     m_count++;
     vassert(m_allocator.count() == m_count);
-    return NULL;
+    return nullptr;
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>

@@ -90,7 +90,8 @@ class CompactingTreeUniqueIndex : public TableIndex {
 
     bool deleteEntryDo(const TableTuple *tuple) override {
         ++m_deletes;
-        return m_entries.erase(setKeyFromTuple(tuple));
+        bool result = m_entries.erase(setKeyFromTuple(tuple));
+        return result;
     }
 
     /**

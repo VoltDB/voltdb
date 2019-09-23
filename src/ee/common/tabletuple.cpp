@@ -66,8 +66,7 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
         buffer << "(";
         const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
         if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-            StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-            buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
+            buffer << "<non-inlined value *" << reinterpret_cast<void const*>(getWritableDataPtr(colInfo)) << ">";
         } else {
             buffer << getNValue(ctr).debug();
         }
@@ -85,7 +84,7 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
         }
     }
 
-    buffer << " @" << static_cast<const void*>(address());
+    buffer << " *" << reinterpret_cast<void const*>(address());
 
     return buffer.str();
 }
@@ -321,6 +320,201 @@ void TableTuple::serializeTo(SerializeOutput &output, const HiddenColumnFilter *
     // write the length of the tuple
     output.writeIntAt(start, output.position() - start - sizeof(int32_t));
 }
+
+size_t TableTuple::maxSerializedColumnSize(int colIndex) const {
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+    ValueType columnType = columnInfo->getVoltType();
+
+    if (isVariableLengthType(columnType)) {
+        // Null variable length value doesn't take any bytes in
+        // export table.
+        if (isNull(colIndex)) {
+            return sizeof(int32_t);
+        }
+    } else if (columnType == ValueType::tDECIMAL) {
+        // Other than export and DR table, decimal column in regular table
+        // doesn't contain scale and precision bytes.
+        return 16;
+    }
+    return maxExportSerializedColumnSize(colIndex);
+}
+
+void TableTuple::serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
+    // Exclude the hidden column for persistent table with stream
+    uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
+    uint8_t migrateColumn = m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
+    for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
+        if (colIdx != migrateColumn) {
+            getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
+        }
+    }
+}
+
+size_t TableTuple::getNonInlinedMemorySizeForPersistentTable() const {
+    size_t bytes = 0;
+    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        ValueType columnType = columnInfo->getVoltType();
+        if (isVariableLengthType(columnType) && !columnInfo->inlined) {
+            bytes += getNValue(idx).getAllocationSizeForObjectInPersistentStorage();
+        }
+    }
+    return bytes;
+}
+
+size_t TableTuple::maxExportSerializationSize() const {
+    size_t bytes = 0;
+    for (int i = 0; i < columnCount(); ++i) {
+        bytes += maxExportSerializedColumnSize(i);
+    }
+    return bytes;
+}
+
+size_t TableTuple::maxDRSerializationSize() const {
+    size_t bytes = maxExportSerializationSize();
+    HiddenColumnFilter filter = HiddenColumnFilter::create(
+            HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
+    for (int i = 0; i < m_schema->hiddenColumnCount(); ++i) {
+        if (filter.include(i)) {
+            bytes += maxExportSerializedHiddenColumnSize(i);
+        }
+    }
+    return bytes;
+}
+
+size_t TableTuple::serializationSize() const {
+    size_t bytes = sizeof(int32_t);
+    for (int colIdx = 0; colIdx < columnCount(); ++colIdx) {
+        bytes += maxSerializedColumnSize(colIdx);
+    }
+    return bytes;
+}
+
+size_t TableTuple::serializeToExport(ExportSerializeOutput &io,
+        int colOffset, uint8_t *nullArray) const {
+    size_t sz = 0;
+    for (int i = 0; i < columnCount(); i++) {
+        sz += serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
+    }
+    return sz;
+}
+
+/** Return the amount of memory needed to store the non-inlined
+  objects in this tuple in temporary storage.  Note that this
+  tuple may be in a temp table, or in a persistent table, or not
+  in a table at all. */
+size_t TableTuple::getNonInlinedMemorySizeForTempTable() const {
+    size_t bytes = 0;
+    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        ValueType columnType = columnInfo->getVoltType();
+        if (isVariableLengthType(columnType) && !columnInfo->inlined) {
+            bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
+        }
+    }
+    //        printf("getNonInlinedMemorySizeForTempTable() -> %lu\n", bytes);
+    return bytes;
+}
+
+void TableTuple::shrinkAndSetNValue(const int idx, const NValue& value) {
+    vassert(m_schema);
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    vassert(columnInfo);
+    const ValueType valueType = columnInfo->getVoltType();
+    // shrink is permissible only on variable length column and currently only for varchar and varbinary
+    vassert(valueType == ValueType::tVARBINARY || valueType == ValueType::tVARCHAR);
+    bool isColumnLngthInBytes = valueType == ValueType::tVARBINARY ? true : columnInfo->inBytes;
+    uint32_t columnLength = columnInfo->length;
+
+    // For the given NValue, compute the shrink length in bytes to shrink the nvalue based on
+    // current column length. Use the computed shrink length to create new NValue based so that
+    // it can fits in current tuple's column
+
+    int32_t nValueLength = 0;
+    const char* candidateValueBuffPtr = ValuePeeker::peekObject_withoutNull(value, &nValueLength);
+    // compute length for shrinked candidate key
+    int32_t neededLength;
+    if (isColumnLngthInBytes) {
+        neededLength = columnLength;
+    } else {
+        // column length is defined in characters. Obtain the number of bytes needed for those many characters
+        neededLength = static_cast<int32_t> (NValue::getIthCharPosition(
+                    candidateValueBuffPtr, nValueLength, columnLength + 1) - candidateValueBuffPtr);
+    }
+    // create new nvalue using the computed length
+    NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
+    setNValue(columnInfo, shrinkedNValue, false);
+}
+
+string TableTuple::toJsonArray() const {
+    int totalColumns = columnCount();
+    Json::Value array;
+    for (int i = 0; i < totalColumns; i++) {
+        array.append({getNValue(i).toString()});
+    }
+    return writeJson(array);
+}
+
+string TableTuple::toJsonString(const vector<string>& columnNames) const {
+    Json::Value object;
+    for (int i = 0; i < columnCount(); i++) {
+        object[columnNames[i]] = getNValue(i).toString();
+    }
+    return writeJson(object);
+}
+
+size_t TableTuple::maxExportSerializedColumnSizeCommon(int colIndex, bool isHidden) const {
+    const TupleSchema::ColumnInfoBase *columnInfo;
+    if (isHidden) {
+        columnInfo = m_schema->getHiddenColumnInfo(colIndex);
+    } else {
+        columnInfo = m_schema->getColumnInfo(colIndex);
+    }
+    ValueType columnType = columnInfo->getVoltType();
+    switch (columnType) {
+        case ValueType::tTINYINT:
+            return sizeof (int8_t);
+        case ValueType::tSMALLINT:
+            return sizeof (int16_t);
+        case ValueType::tINTEGER:
+            return sizeof (int32_t);
+        case ValueType::tBIGINT:
+        case ValueType::tTIMESTAMP:
+        case ValueType::tDOUBLE:
+            return sizeof (int64_t);
+        case ValueType::tDECIMAL:
+            //1-byte scale, 1-byte precision, 16 bytes all the time right now
+            return 18;
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tGEOGRAPHY:
+            {
+                bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
+                if (isNullCol) {
+                    return 0;
+                }
+                // 32 bit length preceding value and
+                // actual character data without null string terminator.
+                const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+                int32_t length;
+                ValuePeeker::peekObject_withoutNull(value, &length);
+                return sizeof(int32_t) + length;
+            }
+        case ValueType::tPOINT:
+            return sizeof (GeographyPointValue);
+        default:
+            // let caller handle this error
+            throwDynamicSQLException(
+                    "Unknown ValueType %s found during Export serialization.",
+                    valueToString(columnType).c_str() );
+            return 0;
+    }
+}
+
 
 bool TableTuple::equalsNoSchemaCheck(const TableTuple &other,
         const HiddenColumnFilter *hiddenColumnFilter) const {

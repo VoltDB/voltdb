@@ -152,14 +152,14 @@ std::string NValue::debug() const {
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]"
-              << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]"
+              << "\"" << out_val << "\"[*" << static_cast<const void*>(ptr) << "]"
               << (getSourceInlined() ? "inlined" : "not inlined");
           break;
         case ValueType::tVARBINARY:
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]"
-              << "-bin[@" << static_cast<const void*>(ptr) << "]";
+              << "-bin[*" << static_cast<const void*>(ptr) << "]";
           break;
         case ValueType::tDECIMAL:
           buffer << createStringFromDecimal();
