@@ -54,7 +54,6 @@ import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.SimpleClientResponseAdapter;
-import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
@@ -99,7 +98,10 @@ public final class TaskManager {
     private volatile boolean m_leader = false;
     private AuthSystem m_authSystem;
     volatile ManagerState m_managerState = ManagerState.SHUTDOWN;
+    // Set of partitions which are being led by this host
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
+    // Partition tasks are disabled while a host is performing the initial join work
+    private boolean m_enableTasksOnPartitions;
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
             ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
 
@@ -121,7 +123,6 @@ public final class TaskManager {
 
     final ClientInterface m_clientInterface;
     final StatsAgent m_statsAgent;
-    private final Set<Integer> m_joinedReadySites = new HashSet<Integer>();
 
     static String generateLogMessage(String name, String body) {
         return String.format("%s: %s", name, body);
@@ -136,10 +137,17 @@ public final class TaskManager {
         return lastParam.getType() == String[].class || lastParam.getType() == Object[].class;
     }
 
-    public TaskManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId) {
+    /**
+     * @param clientInterface {@link ClientInterface} instance to use for starting transactions
+     * @param statsAgent      {@link StatsAgent} instance used to capture statistics about tasks
+     * @param hostId          ID of this host
+     * @param isElasticJoin   If {@code true} this host is in the process of an elastic join
+     */
+    public TaskManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId, boolean isElasticJoin) {
         m_clientInterface = clientInterface;
         m_statsAgent = statsAgent;
         m_hostId = hostId;
+        m_enableTasksOnPartitions = !isElasticJoin;
 
         m_clientInterface.bindAdapter(m_adapter, new ClientInterfaceRepairCallback() {
             Map<Integer, Future<Boolean>> m_migratingPartitions = Collections.synchronizedMap(new HashMap<>());
@@ -193,9 +201,20 @@ public final class TaskManager {
         });
     }
 
-    public void siteJoinCompleted(int partitionId) {
-        m_joinedReadySites.add(partitionId);
-        promotedPartition(partitionId);
+    /**
+     * Enable running tasks on partitions. Only needs to be called by elastic join once all hosts have completed the
+     * initial snapshot
+     *
+     * @return {@link ListenableFuture} which will be completed once the async task completes
+     */
+    public ListenableFuture<?> enableTasksOnPartitions() {
+        return execute(() -> {
+            log.debug("MANAGER: Enabling partitioned tasks");
+            if (!m_enableTasksOnPartitions) {
+                m_enableTasksOnPartitions = true;
+                m_locallyLedPartitions.forEach(this::handleLocallyLedPartition);
+            }
+        });
     }
 
     /**
@@ -316,17 +335,29 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> promotedPartition(int partitionId) {
-        if (log.isDebugEnabled()) {
-            log.debug("MANAGER: Promoting partition: " + partitionId);
-        }
         return execute(() -> {
-            if (m_locallyLedPartitions.add(partitionId) && m_managerState != ManagerState.SHUTDOWN) {
-                updatePartitionedThreadPoolSize();
-                for (TaskHandler sd : m_handlers.values()) {
-                    sd.promotedPartition(partitionId);
-                }
+            // During join partitions are promoted before they are ready so wait until they are ready
+            if (m_locallyLedPartitions.add(partitionId) && m_enableTasksOnPartitions) {
+                handleLocallyLedPartition(partitionId);
+            } else if (log.isDebugEnabled()) {
+                log.debug("MANAGER: Not calling handleLocallyLedPartition for promoted partition: " + partitionId + ". "
+                        + " Tasks on partitions are " + (m_enableTasksOnPartitions ? "enabled" : "disabled"));
             }
         });
+    }
+
+    private void handleLocallyLedPartition(int partitionId) {
+        if (m_managerState != ManagerState.SHUTDOWN) {
+            if (log.isDebugEnabled()) {
+                log.debug("MANAGER: Handling locally led partition: " + partitionId);
+            }
+            updatePartitionedThreadPoolSize();
+            for (TaskHandler sd : m_handlers.values()) {
+                sd.promotedPartition(partitionId);
+            }
+        } else if (log.isDebugEnabled()) {
+            log.debug("MANAGER: Ignoring locally led partition since manager is shutdown: " + partitionId);
+        }
     }
 
     /**
@@ -359,7 +390,6 @@ public final class TaskManager {
     }
 
     private int calculatePartitionedThreadPoolSize() {
-
         return DoubleMath.roundToInt(m_locallyLedPartitions.size() / 2.0, RoundingMode.UP);
     }
 
@@ -738,7 +768,7 @@ public final class TaskManager {
                 }
 
                 if (log.isDebugEnabled()) {
-                    log.debug(generateLogMessage(task.getName(), "Creating handler for scope: " + task.getScope()));
+                    log.debug(generateLogMessage(task.getName(), "Creating handler for scope: " + scope));
                 }
 
                 TaskHandler definition;
@@ -752,7 +782,11 @@ public final class TaskManager {
                 case PARTITIONS:
                     definition = new PartitionedTaskHandler(task, result.m_factory,
                             m_partitionedExecutor.getExecutor());
-                    m_locallyLedPartitions.forEach(definition::promotedPartition);
+                    if (m_enableTasksOnPartitions) {
+                        for (Integer partitionId : m_locallyLedPartitions) {
+                            definition.promotedPartition(partitionId.intValue());
+                        }
+                    }
                     hasPartitionedSchedule = true;
                     break;
                 default:
@@ -1122,13 +1156,10 @@ public final class TaskManager {
 
         @Override
         void promotedPartition(int partitionId) {
-            log.info("Promoting partition: " + partitionId + ". StartAction=" + VoltDB.instance().getConfig().m_startAction);
             assert !m_wrappers.containsKey(partitionId);
-            if (VoltDB.instance().getConfig().m_startAction != StartAction.JOIN || m_joinedReadySites.contains(partitionId)) {
-                PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
-                m_wrappers.put(partitionId, wrapper);
-                wrapper.start();
-            }
+            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
+            m_wrappers.put(partitionId, wrapper);
+            wrapper.start();
         }
 
         @Override
@@ -1418,9 +1449,9 @@ public final class TaskManager {
                         return;
                     }
                 }
-            } else if (log.isTraceEnabled()) {
+            } else if (log.isTraceEnabled() && response instanceof ClientResponseImpl) {
                 log.trace(generateLogMessage("Received response: " + ((ClientResponseImpl) response).toJSONString()));
-            } else if (log.isDebugEnabled()) {
+            } else if (log.isDebugEnabled() && response instanceof ClientResponseImpl) {
                 log.debug(generateLogMessage(
                         "Received response: " + ((ClientResponseImpl) response).toStatusJSONString()));
             }
