@@ -4756,7 +4756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_producerDRGateway.completeInitialization();
             }
         } catch (Exception ex) {
-            CoreUtils.printPortsInUse(hostLog);
+            MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR producer", false, ex);
         }
     }
@@ -4778,7 +4778,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                    VoltDB.getDefaultReplicationInterface());
             }
         } catch (Exception ex) {
-            CoreUtils.printPortsInUse(hostLog);
+            MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
         }
     }
