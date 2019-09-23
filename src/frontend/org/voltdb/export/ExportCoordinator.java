@@ -1119,7 +1119,7 @@ public class ExportCoordinator {
             if (rgap != null) {
                 assert (exportSeqNo <= rgap.getSecond());
             }
-            if (rgap == null || exportSeqNo < (rgap.getFirst() - 1)) {
+            if (rgap == null || exportSeqNo <= (rgap.getFirst() - 1)) {
                 replicaId = hostId;
                 if (rgap == null) {
                     replicaSafePoint = ExportSequenceNumberTracker.INFINITE_SEQNO;
