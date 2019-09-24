@@ -1333,6 +1333,12 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         return;
     }
 
+    char errMsg[1024];
+    snprintf(errMsg, sizeof errMsg, "delete tuple. %p.",
+            target.address());
+    errMsg[sizeof errMsg - 1] = '\0';
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, errMsg);
+
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
     deleteTupleFinalize(target);
 }
@@ -1347,6 +1353,11 @@ void PersistentTable::deleteTupleRelease(char* tupleData) {
     target.setPendingDeleteOnUndoReleaseFalse();
     --m_tuplesPinnedByUndo;
     --m_invisibleTuplesPendingDeleteCount;
+    char errMsg[1024];
+    snprintf(errMsg, sizeof errMsg, "delete tuple release %p.",
+            target.address());
+    errMsg[sizeof errMsg - 1] = '\0';
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, errMsg);
     deleteTupleFinalize(target);
 }
 
@@ -1382,8 +1393,18 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
 
         ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
+        char errMsg[1024];
+        snprintf(errMsg, sizeof errMsg, "delete tuple %p, later.",
+                target.address());
+        errMsg[sizeof errMsg - 1] = '\0';
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, errMsg);
         return;
     }
+    char errMsg[1024];
+    snprintf(errMsg, sizeof errMsg, "delete tuple %p, yes.",
+            target.address());
+    errMsg[sizeof errMsg - 1] = '\0';
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, errMsg);
 
     // No snapshot in progress cares, just whack it.
     deleteTupleStorage(target); // also frees object columns
@@ -1443,6 +1464,11 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
+    char errMsg[1024];
+    snprintf(errMsg, sizeof errMsg, "delete tuple for undo %p.",
+            target.address());
+    errMsg[sizeof errMsg - 1] = '\0';
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, errMsg);
     deleteTupleFinalize(target); // also frees object columns
 }
 

@@ -96,9 +96,10 @@ function async-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
-        --usecompression=false
+        --usecompression=false \
+        --multisingleratio=1.0
 #        --latencyreport=true \
-#        --ratelimit=100000
+#        --ratelimit=100000 \
 }
 
 # Multi-threaded synchronous benchmark sample
