@@ -95,9 +95,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool
-OrderByExecutor::p_execute(const NValueArray &params)
-{
+bool OrderByExecutor::p_execute(const NValueArray &params) {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     vassert(node);
     AbstractTempTable* output_table = dynamic_cast<AbstractTempTable*>(node->getOutputTable());
@@ -111,9 +109,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
     //
     int limit = -1;
     int offset = -1;
-    if (limit_node != NULL)
-    {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    if (limit_node != NULL) {
+        std::tie(limit, offset) = limit_node->getLimitAndOffset(params);
     }
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
@@ -128,8 +125,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
         vector<TableTuple> xs;
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableIterator iterator = input_table->iterator();
-        while (iterator.next(tuple))
-        {
+        while (iterator.next(tuple)) {
             pmp.countdownProgress();
             vassert(tuple.isActive());
             xs.push_back(tuple);
