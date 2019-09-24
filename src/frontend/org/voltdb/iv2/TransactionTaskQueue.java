@@ -19,7 +19,6 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -32,8 +31,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
 
-import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Collections2;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 
 public class TransactionTaskQueue
@@ -65,10 +64,10 @@ public class TransactionTaskQueue
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap();
-        private Collection<Scoreboard> m_scoreBoards = Lists.newArrayList();
+        private ImmutableSet<Scoreboard> m_scoreBoards = ImmutableSet.of();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_scoreboardContainers.clear();
-            m_scoreBoards.clear();
+            m_scoreBoards = ImmutableSet.of();
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
         }
@@ -77,12 +76,17 @@ public class TransactionTaskQueue
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             m_scoreboardContainers.put(siteId, new ScoreboardContainer(queue, scoreboard));
+            ImmutableSet.Builder<Scoreboard> builder = ImmutableSet.builder();
+            builder.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
+            m_scoreBoards = builder.build();
         }
 
         void removeScoreboard(int siteId) {
             ScoreboardContainer con = m_scoreboardContainers.remove(siteId);
             assert(con != null);
-            m_scoreBoards.remove(con.siteScoreboard);
+            ImmutableSet.Builder<Scoreboard> builder = ImmutableSet.builder();
+            builder.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
+            m_scoreBoards = builder.build();
             m_siteCount--;
         }
 
@@ -139,10 +143,7 @@ public class TransactionTaskQueue
             }
         }
 
-        Collection<Scoreboard> getScoreboards() {
-            if (m_scoreBoards.isEmpty()) {
-                m_scoreBoards.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
-            }
+        ImmutableSet<Scoreboard> getScoreboards() {
             return m_scoreBoards;
         }
 
