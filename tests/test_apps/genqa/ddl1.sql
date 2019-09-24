@@ -247,6 +247,33 @@ CREATE TABLE export_mirror_partitioned_table
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
+CREATE TABLE export_mirror_replicated_table
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+, rowid_group               TINYINT       NOT NULL
+, type_null_tinyint         TINYINT
+, type_not_null_tinyint     TINYINT       NOT NULL
+, type_null_smallint        SMALLINT
+, type_not_null_smallint    SMALLINT      NOT NULL
+, type_null_integer         INTEGER
+, type_not_null_integer     INTEGER       NOT NULL
+, type_null_bigint          BIGINT
+, type_not_null_bigint      BIGINT        NOT NULL
+, type_null_timestamp       TIMESTAMP
+, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
+, type_null_float           FLOAT
+, type_not_null_float       FLOAT         NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
+, type_null_varchar128      VARCHAR(128)
+, type_not_null_varchar128  VARCHAR(128)  NOT NULL
+, type_null_varchar1024     VARCHAR(1024)
+, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
+);
+
 CREATE STREAM export_done_table_kafka PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
@@ -599,8 +626,9 @@ CREATE PROCEDURE export_op_summary AS
 END_OF_BATCH
 
 -- following SQL can't be in a batch, so initialize this convenience table after the batch is complete.
-INSERT INTO export_op_type VALUES('INSERT', 1);
-INSERT INTO export_op_type VALUES('DELETE', 2);
-INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
-INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
-INSERT INTO export_op_type VALUES('MIGRATION', 5);
+-- the following dml is commented out since it causes a problem with "voltdb init --schema ...
+-- INSERT INTO export_op_type VALUES('INSERT', 1);
+-- INSERT INTO export_op_type VALUES('DELETE', 2);
+-- INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
+-- INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
+-- INSERT INTO export_op_type VALUES('MIGRATION', 5);

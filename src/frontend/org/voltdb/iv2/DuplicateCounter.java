@@ -18,15 +18,16 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-
+import java.util.Map;
+import java.util.Set;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -34,12 +35,18 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
+
 /**
  * Track responses from each partition. This should be subsumed
  * by proper response tracking for the usual replication case?
  */
 public class DuplicateCounter
 {
+    private final static String FAIL_MSG = "Stored procedure %s succeeded on one partition but failed on another partition.";
+    private final static String MISMATCH_MSG = "Stored procedure %s generated different SQL queries at different partitions.";
+
     static final int MISMATCH = 0;
     static final int DONE = 1;
     static final int WAITING = 2;
@@ -48,47 +55,83 @@ public class DuplicateCounter
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     static final int[] ZERO_HASHES = new int[] { 0, 0, 0 };
-
     final long m_destinationId;
     int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
-    protected VoltTable m_lastResultTables[] = null;
     // if any response shows the transaction aborted
     boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
+    final long m_leaderHSID;
     final TransactionInfoBaseMessage m_openMessage;
+    Map<Long, ResponseResult> m_responses = Maps.newTreeMap();
+
+    // Flag indicating that the the hashes from replicas match with the hash from partition master
+    private boolean m_allMatched = true;
+
+    Set<Long> m_replicas = Sets.newHashSet();
+
+    // A placeholder for HSIDs of replicas whose hashes do not match with the one from partition master.
+    Set<Long> m_misMatchedReplicas = Sets.newHashSet();
+
+    // Track InitiateResponseMessage for run-every-site system procedure on MPI
+    // Their hashes are compared between partitions, not between replicas of the same partition
+    final boolean m_forMPEverySiteSysProc;
+
+    static class ResponseResult {
+        final int[] hashes;
+        final boolean success;
+        final VoltMessage message;
+        public ResponseResult(int[] respHashes, boolean status, VoltMessage msg) {
+            hashes = respHashes;
+            success = status;
+            message = msg;
+        }
+    }
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            TransactionInfoBaseMessage openMessage)
-    {
+            TransactionInfoBaseMessage openMessage,
+            long leaderHSID,
+            boolean forEverySite) {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
         m_openMessage = openMessage;
+        m_leaderHSID = leaderHSID;
+        m_forMPEverySiteSysProc = forEverySite;
+        m_replicas.addAll(expectedHSIds);
     }
 
-    long getTxnId()
-    {
+    DuplicateCounter(
+            long destinationHSId,
+            long realTxnId,
+            List<Long> expectedHSIds,
+            TransactionInfoBaseMessage openMessage,
+            long leaderHSID) {
+        this(destinationHSId, realTxnId, expectedHSIds, openMessage, leaderHSID, false);
+    }
+
+    long getTxnId() {
         return m_txnId;
     }
 
     int updateReplicas(List<Long> replicas) {
         m_expectedHSIds.retainAll(replicas);
-        if (m_expectedHSIds.size() == 0) {
+        m_replicas.retainAll(replicas);
+        if (m_expectedHSIds.isEmpty()) {
+            determineResult();
             return DONE;
         }
-        else {
-            return WAITING;
-        }
+        return WAITING;
     }
 
     void addReplicas(long[] newReplicas) {
         for (long replica : newReplicas) {
             m_expectedHSIds.add(replica);
+            m_replicas.add(replica);
         }
     }
 
@@ -155,30 +198,28 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-            int pos = -1;
-            if (m_responseHashes == null) {
-                m_responseHashes = hashes;
-                m_txnSucceed = txnSucceed;
-            }
-            else if (m_txnSucceed != txnSucceed) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
-                + " succeeded on one partition but failed on another partition."
-                + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
-                return ABORT;
-            }
-            else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
-                        + " generated different SQL queries at different partitions."
-                        + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
-                return MISMATCH;
-            }
             m_lastResponse = message;
-            m_lastResultTables = resultTables;
+            // Every partition sys proc InitiateResponseMessage
+            if (m_forMPEverySiteSysProc) {
+                int pos = -1;
+                if (m_responseHashes == null) {
+                    m_responseHashes = hashes;
+                    m_txnSucceed = txnSucceed;
+                } else if (m_txnSucceed != txnSucceed) {
+                    tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
+                    return ABORT;
+                } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
+                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
+                    return MISMATCH;
+                }
+            } else {
+                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes,txnSucceed, message));
+            }
         }
 
         /*
@@ -189,50 +230,93 @@ public class DuplicateCounter
          */
         if (m_lastResponse == null) {
             m_lastResponse = message;
-            m_lastResultTables = resultTables;
         }
 
         m_expectedHSIds.remove(message.m_sourceHSId);
-        if (m_expectedHSIds.size() == 0) {
-            return DONE;
-        }
-        else {
+        if (!m_expectedHSIds.isEmpty()) {
             return WAITING;
         }
+
+        determineResult();
+        return DONE;
     }
 
-    int offer(InitiateResponseMessage message)
-    {
-        ClientResponseImpl r = message.getClientResponseData();
-        // get the hash of sql run
-        int[] hashes = r.getHashes();
 
-        boolean txnAbort = true;
-        if (ClientResponseImpl.isTransactionallySuccessful(message.getClientResponseData().getStatus())) {
-            txnAbort = false;
+    private void determineResult() {
+
+        // If the DuplicateCounter is used from MP run-every-site system procedure, hash mismatch is checked as responses come
+        // in from every partition.
+        if (m_forMPEverySiteSysProc || m_responses.isEmpty()) {
+            return;
         }
 
-        return checkCommon(hashes, message.isRecovering(), r.getResults(), message, txnAbort);
+        // Compare the hash from partition leader with those from partition replicas
+        ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
+        assert (leaderResponse != null);
+        m_responseHashes = leaderResponse.hashes;
+        m_lastResponse = leaderResponse.message;
+        int pos = -1;
+        for (Iterator<Map.Entry<Long, ResponseResult>> it = m_responses.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<Long, ResponseResult> entry = it.next();
+
+            // The replica is not present any more
+            if (!m_replicas.contains(entry.getKey())) {
+                it.remove();
+                continue;
+            }
+
+            ResponseResult res = entry.getValue();
+            if (leaderResponse.success != entry.getValue().success) {
+                if (!m_allMatched) {
+                    tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    m_allMatched = false;
+                }
+                m_misMatchedReplicas.add(entry.getKey());
+            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
+                if (!m_allMatched) {
+                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                }
+                m_allMatched = false;
+                m_misMatchedReplicas.add(entry.getKey());
+            }
+        }
     }
 
-    int offer(FragmentResponseMessage message)
-    {
-        // No check on fragment message
-        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
+    public boolean allResponsesMatched() {
+        return m_allMatched;
     }
 
-    int offer(CompleteTransactionResponseMessage message)
-    {
-        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
+    int checkCommon(VoltMessage message) {
+        if (m_lastResponse == null) {
+            m_lastResponse = message;
+        }
+
+        m_expectedHSIds.remove(message.m_sourceHSId);
+        return (m_expectedHSIds.isEmpty()) ? DONE : WAITING;
     }
 
-    int offer(DummyTransactionResponseMessage message)
-    {
-        return checkCommon(ZERO_HASHES, false, null, message, false);
+    int offer(FragmentResponseMessage message) {
+        return checkCommon(message);
     }
 
-    VoltMessage getLastResponse()
-    {
+    int offer(CompleteTransactionResponseMessage message) {
+        return checkCommon(message);
+    }
+    int offer(DummyTransactionResponseMessage message) {
+        return checkCommon(message);
+    }
+
+    int offer(InitiateResponseMessage message) {
+        ClientResponseImpl r = message.getClientResponseData();
+        return checkCommon(r.getHashes(),
+                message.isRecovering(),
+                message,
+                !(ClientResponseImpl.isTransactionallySuccessful(r.getStatus())));
+    }
+
+    VoltMessage getLastResponse() {
         return m_lastResponse;
     }
 
@@ -251,5 +335,9 @@ public class DuplicateCounter
                TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
+    }
+
+    Set<Long> getMisMatchedReplicas() {
+        return m_misMatchedReplicas;
     }
 }

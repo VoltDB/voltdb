@@ -27,7 +27,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -168,10 +167,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Export coordinator manages Export Leadership, Mastership, and gap correction.
     // Made package private for JUnit test support
     ExportCoordinator m_coordinator;
-
-    // FIXME: ENG-17720 instrumentation
-    private final static int MAX_DISCARD_CNT = 10;
-    private final LinkedList<Pair<Long, Throwable>> m_discards = new LinkedList<>();
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 
@@ -416,34 +411,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public void registerDiscard(long seqNo) {
-        final Throwable t = new Throwable("discard");
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                // Report out-of-order discards
-                // FIXME: we don't crash on this
-                boolean bad = false;
-                for (Pair<Long, Throwable> p : m_discards) {
-                    if (p.getFirst().longValue() > seqNo) {
-                        bad = true;
-                        exportLog.warn(p.getFirst() + " was discarded before " + seqNo
-                                +", tracing ooo discard ", p.getSecond());
-                    }
-                }
-                if (bad) {
-                    exportLog.warn("current discard ", t);
-                }
-
-                // Register this discard, keep it limited
-                m_discards.addLast(new Pair<Long, Throwable>(seqNo, t));
-                if (m_discards.size() > MAX_DISCARD_CNT) {
-                    m_discards.pollFirst();
-                }
-            }
-        });
-    }
-
     /**
      * Set the {@code ExportCoordinator} - we expect this just after the constructor.
      *
@@ -550,6 +517,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Release buffers
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
+            if (!sb.canRelease()) {
+                exportLog.info("Unable to release buffers to seqNo: " + releaseSeqNo
+                        + ", buffer [" + sb.startSequenceNumber() + ", "
+                        + sb.lastSequenceNumber() + "] is still in use");
+                break;
+            }
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
                     assert sb.canRelease();

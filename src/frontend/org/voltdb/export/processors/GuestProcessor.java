@@ -479,10 +479,6 @@ public class GuestProcessor implements ExportDataProcessor {
                             source.setPendingContainer(cont);
                             cont = null;
                         }
-                    } catch(Throwable t) {
-                        // FIXME: temporary instrumentation on double-free failure in finally block
-                        EXPORTLOG.error("Caught unexpected ", t);
-                        throw(t);
                     } finally {
                         if (cont != null) {
                             cont.discard();
