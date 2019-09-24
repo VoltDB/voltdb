@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
 
 import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Collections2;
 import com.google_voltpatches.common.collect.Maps;
 
 public class TransactionTaskQueue
@@ -63,7 +65,7 @@ public class TransactionTaskQueue
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap();
-        private List<Scoreboard> m_scoreBoards = Lists.newArrayList();
+        private Collection<Scoreboard> m_scoreBoards = Lists.newArrayList();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_scoreboardContainers.clear();
             m_scoreBoards.clear();
@@ -75,7 +77,6 @@ public class TransactionTaskQueue
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             m_scoreboardContainers.put(siteId, new ScoreboardContainer(queue, scoreboard));
-            m_scoreBoards.add(scoreboard);
         }
 
         void removeScoreboard(int siteId) {
@@ -138,7 +139,10 @@ public class TransactionTaskQueue
             }
         }
 
-        List<Scoreboard> getScoreboards() {
+        Collection<Scoreboard> getScoreboards() {
+            if (m_scoreBoards.isEmpty()) {
+                m_scoreBoards.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
+            }
             return m_scoreBoards;
         }
 
