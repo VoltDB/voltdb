@@ -273,7 +273,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      *         exist return null
      */
     public Pair<Long, Long> getFirstGap() {
-        return (getFirstGap(0L));
+        return (getFirstGap(MIN_SEQNO));
     }
 
     /**
@@ -283,9 +283,30 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * @return
      */
     public Pair<Long, Long> getFirstGap(long afterSeqNo) {
-        if (m_map.isEmpty() || size() < 2) {
+        if (m_map.isEmpty()) {
             return null;
         }
+
+        // Handle corner cases
+        if (afterSeqNo < getFirstSeqNo()) {
+            // Initial gap
+            return new Pair<Long, Long>(MIN_SEQNO, getFirstSeqNo() - 1);
+        }
+        else if (getLastSeqNo() < afterSeqNo) {
+            // Trailing gap
+            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+        }
+        else if (size() < 2) {
+            // Only one segment
+            if (getLastSeqNo() < INFINITE_SEQNO) {
+                // Next gap will be trailing
+                return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+            }
+            // No gaps
+            return null;
+        }
+
+        // Search for next gap
         Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         Range<Long> current = iter.next();
         assert current != null;
@@ -299,6 +320,10 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
                 continue;
             }
             return new Pair<Long, Long>(start, end);
+        }
+        if (getLastSeqNo() < INFINITE_SEQNO) {
+            // Next gap will be trailing
+            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
         }
         return null;
     }

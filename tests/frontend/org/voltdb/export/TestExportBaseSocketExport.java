@@ -77,6 +77,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static List<String> m_streamNames = new ArrayList<>();
     protected static boolean m_verbose = false;
 
+    // Default wait is 10 mins
+    private static final long DEFAULT_DELAY_MS = (10 * 60 * 1000);
+
     public static class ServerListener extends Thread {
 
         private ServerSocket ssocket;
@@ -334,6 +337,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @throws Exception
      */
     public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
+        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS);
+    }
+
+    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames, long delayMs) throws Exception {
         boolean passed = false;
         assertFalse(streamNames.isEmpty());
         Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
@@ -347,7 +354,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         long ftime = 0;
         long st = System.currentTimeMillis();
         // Wait 10 mins only
-        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        long end = System.currentTimeMillis() + delayMs;
         while (true) {
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
@@ -466,8 +473,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester) throws Exception {
+        quiesceAndVerifyTarget(client, streamNames, tester, DEFAULT_DELAY_MS);
+    }
+    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
+            ExportTestExpectedData tester, long delayMs) throws Exception {
         client.drain();
-        waitForExportAllRowsDelivered(client, streamNames);
+        waitForExportAllRowsDelivered(client, streamNames, delayMs);
         tester.verifyRows();
         System.out.println("Passed!");
     }

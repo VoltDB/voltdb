@@ -748,7 +748,7 @@ public class ExportCoordinator {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Initial tracker has trailing gap: " + m_initialTracker);
                     }
-                } else {
+                } else if (lastSeqNo < ExportSequenceNumberTracker.INFINITE_SEQNO){
                     m_initialTracker.addRange(lastSeqNo + 1, ExportSequenceNumberTracker.INFINITE_SEQNO);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Initial tracker has no trailing gap: " + m_initialTracker);
@@ -1119,7 +1119,7 @@ public class ExportCoordinator {
             if (rgap != null) {
                 assert (exportSeqNo <= rgap.getSecond());
             }
-            if (rgap == null || exportSeqNo < (rgap.getFirst() - 1)) {
+            if (rgap == null || exportSeqNo <= (rgap.getFirst() - 1)) {
                 replicaId = hostId;
                 if (rgap == null) {
                     replicaSafePoint = ExportSequenceNumberTracker.INFINITE_SEQNO;
@@ -1199,8 +1199,9 @@ public class ExportCoordinator {
         }
 
         // Normalize all trackers to start at lowest seqNo with potential leading gaps
+        // Check against (lowestSeqNo) to avoid inadvertently closing a 1-tuple initial gap.
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
-            if (tracker.getFirstSeqNo() > lowestSeqNo) {
+            if (tracker.getFirstSeqNo() > lowestSeqNo + 1) {
                 // Create a leading gap on tracker
                 tracker.addRange(lowestSeqNo, lowestSeqNo);
             }
