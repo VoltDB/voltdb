@@ -43,6 +43,8 @@ import com.google_voltpatches.common.base.Preconditions;
 public class ExportToSocketTestVerifier {
     private final ArrayDeque<String[]> m_data = new ArrayDeque<String[]>();
     private int m_sequenceNumber = 1;
+    // Debug flag to enable verbose output
+    private static boolean ENABLE_DEBUG = false;
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {
@@ -82,6 +84,14 @@ public class ExportToSocketTestVerifier {
             } else {
                 row[i] = cval.toString();
             }
+        }
+        if (ENABLE_DEBUG) {
+            StringBuilder sb = new StringBuilder();
+            for (String part : row) {
+                sb.append(part).append(" ");
+            }
+            System.out.println("RowVerifier received on partition "
+                    + m_partitionId + ":" + sb.toString());
         }
         m_data.offer(row);
     }
@@ -134,6 +144,17 @@ public class ExportToSocketTestVerifier {
                            gotten, ExportDecoderBase.INTERNAL_FIELD_COUNT - 1,
                            gotten.length
                            );
+                        if (ENABLE_DEBUG) {
+                            StringBuilder sb = new StringBuilder();
+                            for (String matched : toBeMatched) {
+                                sb.append(matched).append(" ");
+                            }
+                            StringBuilder anotherSb = new StringBuilder();
+                            for (String expect: expected) {
+                                anotherSb.append(expect).append(" ");
+                            }
+                            System.out.println("Comparing " + sb.toString() + "(received) to " + anotherSb.toString() + "(expected)");
+                        }
                         rowMatcher = arrayContaining(expected);
                     } else {
                         toBeMatched = Arrays.copyOfRange(
@@ -151,7 +172,9 @@ public class ExportToSocketTestVerifier {
                     }
                 }
                 d.appendText("]");
-                System.out.println("Validated table " + m_tableName + " partition id " + m_partitionId + " sequence " + matchSequenceNumber);
+                if (ENABLE_DEBUG) {
+                    System.out.println("Validated table " + m_tableName + " partition id " + m_partitionId + " sequence " + matchSequenceNumber);
+                }
                 return match;
             }
         };

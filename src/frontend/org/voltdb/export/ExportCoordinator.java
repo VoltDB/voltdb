@@ -682,10 +682,6 @@ public class ExportCoordinator {
     private static final VoltLogger ssmLog = new VoltLogger("SSM");
     public static final String s_coordinatorTaskName = "coordinator";
 
-    // ExportSequenceNumberTracker uses closed ranges and using
-    // Long.MAX_VALUE throws IllegalStateException in Range.java.
-    private static final long INFINITE_SEQNO = Long.MAX_VALUE - 1;
-
     private final ZooKeeper m_zk;
     private final String m_rootPath;
     private final Integer m_hostId;
@@ -741,19 +737,19 @@ public class ExportCoordinator {
         if (m_initialTracker == null) {
             m_initialTracker = m_eds.getTracker();
             if (m_initialTracker.isEmpty()) {
-                m_initialTracker.addRange(m_initialSeqNo + 1, INFINITE_SEQNO);
+                m_initialTracker.addRange(m_initialSeqNo + 1, ExportSequenceNumberTracker.INFINITE_SEQNO);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Initial tracker was empty: " + m_initialTracker);
                 }
             } else {
                 long lastSeqNo = m_initialTracker.getLastSeqNo();
                 if (lastSeqNo < m_initialSeqNo) {
-                    m_initialTracker.addRange(m_initialSeqNo + 1, INFINITE_SEQNO);
+                    m_initialTracker.addRange(m_initialSeqNo + 1, ExportSequenceNumberTracker.INFINITE_SEQNO);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Initial tracker has trailing gap: " + m_initialTracker);
                     }
-                } else {
-                    m_initialTracker.addRange(lastSeqNo + 1, INFINITE_SEQNO);
+                } else if (lastSeqNo < ExportSequenceNumberTracker.INFINITE_SEQNO) {
+                    m_initialTracker.addRange(lastSeqNo + 1, ExportSequenceNumberTracker.INFINITE_SEQNO);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Initial tracker has no trailing gap: " + m_initialTracker);
                     }
@@ -1089,7 +1085,7 @@ public class ExportCoordinator {
 
             m_isMaster = isPartitionLeader();
             if (gap == null) {
-                m_safePoint = INFINITE_SEQNO;
+                m_safePoint = ExportSequenceNumberTracker.INFINITE_SEQNO;
             } else {
                 m_safePoint = gap.getFirst() - 1;
             }
@@ -1126,10 +1122,10 @@ public class ExportCoordinator {
             if (rgap != null) {
                 assert (exportSeqNo <= rgap.getSecond());
             }
-            if (rgap == null || exportSeqNo < (rgap.getFirst() - 1)) {
+            if (rgap == null || exportSeqNo <= (rgap.getFirst() - 1)) {
                 replicaId = hostId;
                 if (rgap == null) {
-                    replicaSafePoint = INFINITE_SEQNO;
+                    replicaSafePoint = ExportSequenceNumberTracker.INFINITE_SEQNO;
                 } else {
                     // The next safe point of the replica is the last before the
                     // replica gap
@@ -1199,15 +1195,16 @@ public class ExportCoordinator {
                 continue;
             }
             lowestSeqNo = Math.min(lowestSeqNo, tracker.getFirstSeqNo());
-            assert tracker.getLastSeqNo() == INFINITE_SEQNO;
+            assert tracker.getLastSeqNo() == ExportSequenceNumberTracker.INFINITE_SEQNO;
         }
         if (lowestSeqNo == Long.MAX_VALUE) {
             lowestSeqNo = 1L;
         }
 
         // Normalize all trackers to start at lowest seqNo with potential leading gaps
+        // Check against (lowestSeqNo) to avoid inadvertently closing a 1-tuple initial gap.
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
-            if (tracker.getFirstSeqNo() > lowestSeqNo) {
+            if (tracker.getFirstSeqNo() > lowestSeqNo + 1) {
                 // Create a leading gap on tracker
                 tracker.addRange(lowestSeqNo, lowestSeqNo);
             }

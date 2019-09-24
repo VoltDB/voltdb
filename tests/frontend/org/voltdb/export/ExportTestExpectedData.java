@@ -25,6 +25,7 @@ package org.voltdb.export;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -74,6 +75,31 @@ public class ExportTestExpectedData {
          else {
             m_expectedRowCount.put(tableName,count+1);
         }
+    }
+
+    // All export tests using verifiers should ensure their clients have
+    // an initialized hashinator, otherwise some calls to addRow() will be directed to
+    // a partitionId of -1
+    private long getPartitionFromHashinator(Client client, Object partitionHash) {
+        long partition = ((ClientImpl) client).getPartitionForParameter(
+                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+        if (partition != -1) {
+            return partition;
+        }
+        int sleptTimes = 0;
+        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
+            try {
+                Thread.sleep(1);
+                sleptTimes++;
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        assertTrue(sleptTimes < 60000);
+        partition = ((ClientImpl) client).getPartitionForParameter(
+                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+        assertTrue(partition != -1);
+        return partition;
     }
 
     public synchronized void verifyRows() throws Exception {
