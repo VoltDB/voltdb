@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
@@ -118,6 +119,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     };
 
     private String m_methodName;
+    private boolean m_cleanupAfterTest = false;
 
     private final Set<Long> m_generatedKeys = new HashSet<>();
 
@@ -158,8 +160,19 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
     }
 
+    @After
+    public void optionalCleanUp() {
+        if (m_cleanupAfterTest) {
+            shutdownAllClustersAndClients();
+        }
+    }
+
     public String getMethodName() {
         return m_methodName;
+    }
+
+    protected void cleanupAfterTest() {
+        m_cleanupAfterTest = true;
     }
 
     /**
