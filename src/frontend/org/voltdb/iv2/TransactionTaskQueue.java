@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -63,7 +64,9 @@ public class TransactionTaskQueue
     private static class RelativeSiteOffset {
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
-        private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap();
+
+        // Reverse order to release countdown latch in EE to avoid context switch
+        private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap(Collections.reverseOrder());
         private ImmutableSet<Scoreboard> m_scoreBoards = ImmutableSet.of();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_scoreboardContainers.clear();
