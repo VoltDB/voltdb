@@ -50,10 +50,11 @@ namespace voltdb {
 
 IndexScanPlanNode::~IndexScanPlanNode() { }
 
-PlanNodeType IndexScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXSCAN; }
+PlanNodeType IndexScanPlanNode::getPlanNodeType() const {
+    return PLAN_NODE_TYPE_INDEXSCAN;
+}
 
-std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
@@ -95,8 +96,7 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
     return buffer.str();
 }
 
-void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();

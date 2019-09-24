@@ -87,7 +87,6 @@ public class AckingContainer extends BBContainer {
         if (checkDoubleFree) {
             checkDoubleFree();
         }
-        m_source.registerDiscard(m_startSeqNo);
         m_backingCont.discard();
     }
 

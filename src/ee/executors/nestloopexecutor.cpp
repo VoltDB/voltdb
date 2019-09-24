@@ -62,9 +62,8 @@ using namespace voltdb;
 const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
 const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
-bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
-                              const ExecutorVector& executorVector)
-{
+bool NestLoopExecutor::p_init(
+        AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init NLJ Executor");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);

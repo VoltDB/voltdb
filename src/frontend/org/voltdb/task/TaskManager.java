@@ -54,6 +54,7 @@ import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.SimpleClientResponseAdapter;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
@@ -120,6 +121,7 @@ public final class TaskManager {
 
     final ClientInterface m_clientInterface;
     final StatsAgent m_statsAgent;
+    private final Set<Integer> m_joinedReadySites = new HashSet<Integer>();
 
     static String generateLogMessage(String name, String body) {
         return String.format("%s: %s", name, body);
@@ -189,6 +191,11 @@ public final class TaskManager {
                 return CoreUtils.getHostIdFromHSId(hsId) == m_hostId;
             }
         });
+    }
+
+    public void siteJoinCompleted(int partitionId) {
+        m_joinedReadySites.add(partitionId);
+        promotedPartition(partitionId);
     }
 
     /**
@@ -1115,10 +1122,13 @@ public final class TaskManager {
 
         @Override
         void promotedPartition(int partitionId) {
+            log.info("Promoting partition: " + partitionId + ". StartAction=" + VoltDB.instance().getConfig().m_startAction);
             assert !m_wrappers.containsKey(partitionId);
-            PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
-            m_wrappers.put(partitionId, wrapper);
-            wrapper.start();
+            if (VoltDB.instance().getConfig().m_startAction != StartAction.JOIN || m_joinedReadySites.contains(partitionId)) {
+                PartitionSchedulerWrapper wrapper = new PartitionSchedulerWrapper(this, partitionId, m_executor);
+                m_wrappers.put(partitionId, wrapper);
+                wrapper.start();
+            }
         }
 
         @Override
@@ -1877,8 +1887,16 @@ public final class TaskManager {
 
         private void setCorePoolSize(int threadCount) {
             if (threadCount != m_rawExecutor.getCorePoolSize()) {
-                m_rawExecutor.setCorePoolSize(threadCount);
-                m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                // In JDK>=9, setCorePoolSize(poolSize) requires the poolSize <= MaximumPoolSize
+                // and setMaximumPoolSize(poolSize) requires the poolSize >= CorePoolSize.
+                // note: the order of the statements is important.
+                if (m_rawExecutor.getMaximumPoolSize() >= threadCount) {
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                } else {
+                    m_rawExecutor.setMaximumPoolSize(Math.max(threadCount, 1));
+                    m_rawExecutor.setCorePoolSize(threadCount);
+                }
             }
         }
     }

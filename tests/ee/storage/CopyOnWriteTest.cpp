@@ -164,30 +164,30 @@ public:
         m_columnNames.push_back("8");
         m_columnNames.push_back("9");
 
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tINTEGER);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tINTEGER);
 
         //Filler columns
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
 
         m_tupleWidth = (sizeof(int32_t) * 2) + (sizeof(int64_t) * 7);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
@@ -579,7 +579,7 @@ public:
    static Json::Value expr_value_base(const std::string& type) {
         Json::Value value;
         value["TYPE"] = EXPRESSION_TYPE_VALUE_CONSTANT;
-        value["VALUE_TYPE"] = stringToValue(type);
+        value["VALUE_TYPE"] = static_cast<int>(stringToValue(type));
         value["VALUE_SIZE"] = 0;
         value["ISNULL"] = false;
         return value;
@@ -603,7 +603,7 @@ public:
     {
         Json::Value value;
         value["TYPE"] = EXPRESSION_TYPE_VALUE_TUPLE;
-        value["VALUE_TYPE"] = stringToValue(type);
+        value["VALUE_TYPE"] = static_cast<int>(stringToValue(type));
         value["VALUE_SIZE"] = 0;
         value["TABLE_NAME"] = tblname;
         value["COLUMN_IDX"] = colidx;
@@ -619,7 +619,7 @@ public:
     {
         Json::Value value;
         value["TYPE"] = stringToExpression(op);
-        value["VALUE_TYPE"] = stringToValue(type);
+        value["VALUE_TYPE"] = static_cast<int>(stringToValue(type));
         value["VALUE_SIZE"] = 0;
         value["LEFT"] = left;
         value["RIGHT"] = right;
@@ -900,7 +900,7 @@ public:
         int colidx = m_table->partitionColumn();
         Json::Value json;
         json["TYPE"] = EXPRESSION_TYPE_HASH_RANGE;
-        json["VALUE_TYPE"] = VALUE_TYPE_BIGINT;
+        json["VALUE_TYPE"] = static_cast<int>(ValueType::tBIGINT);
         json["VALUE_SIZE"] = 8;
         json["HASH_COLUMN"] = colidx;
         Json::Value array;

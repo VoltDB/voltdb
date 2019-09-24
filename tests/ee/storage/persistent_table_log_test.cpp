@@ -61,23 +61,23 @@ public:
         m_columnNames.push_back("9");
         m_columnNames.push_back("10");
 
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_TINYINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_SMALLINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_DOUBLE);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tTINYINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tINTEGER);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tSMALLINT);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tDOUBLE);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tVARCHAR);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tVARCHAR);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tVARCHAR);
+        m_tableSchemaTypes.push_back(voltdb::ValueType::tVARCHAR);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_DOUBLE));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tTINYINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tINTEGER));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tSMALLINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tDOUBLE));
         m_tableSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(10);
         m_tableSchemaColumnSizes.push_back(500);
@@ -103,10 +103,10 @@ public:
         m_narrowColumnNames.push_back("1");
         m_narrowColumnNames.push_back("2");
 
-        m_narrowTableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_narrowTableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
+        m_narrowTableSchemaTypes.push_back(voltdb::ValueType::tBIGINT);
+        m_narrowTableSchemaTypes.push_back(voltdb::ValueType::tVARCHAR);
 
-        m_narrowTableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_narrowTableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT));
         m_narrowTableSchemaColumnSizes.push_back(15);
 
         m_narrowTableSchemaAllowNull.push_back(false);
