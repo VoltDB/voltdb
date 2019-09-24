@@ -25,20 +25,14 @@
 #include <limits>
 #include <common/debuglog.h>
 
-typedef u_int32_t NodeCount;
+using NodeCount = u_int32_t;
 
-#ifndef SUBCTMAX
-#define SUBCTMAX INT32_MAX
-#endif
+constexpr auto SUBCTMAX = INT32_MAX;
 
-#ifndef INVALIDCT
-#define INVALIDCT 0
-#endif
+constexpr auto INVALIDCT = 0;
 
 // MAXPOINTER will be reinterpret_cast back to UINTPTR_MAX
-#ifndef MAXPOINTER
-#define MAXPOINTER (reinterpret_cast<const void *>(UINTPTR_MAX))
-#endif
+const auto MAXPOINTER = reinterpret_cast<const void *>(UINTPTR_MAX);
 
 namespace voltdb {
 
@@ -100,21 +94,13 @@ public:
  *    compare them using ==. Compare keys and values instead.
  */
 
-/* Some older compilers apparently do not allow static const data members
- * (of templates?) to be referenced by nested classes, so, for example,
- * TreeNode methods could not see the definition of CompactingMap::RED.
- * as a workaround, define these uglier qualified names outside the class.
- */
-static const char COMPACTING_MAP_RED = 0;
-static const char COMPACTING_MAP_BLACK = 1;
-
 template<typename KeyValuePair, typename Compare, bool hasRank=false>
 class CompactingMap {
     using Key = typename KeyValuePair::first_type;
     using Data = typename KeyValuePair::second_type;
 protected:
-    static const char RED = COMPACTING_MAP_RED;
-    static const char BLACK = COMPACTING_MAP_BLACK;
+    static constexpr char RED = 0;
+    static constexpr char BLACK = 1;
 
     struct TreeNode {
         KeyValuePair kv;
@@ -145,8 +131,8 @@ protected:
         // end of the allocation. (!?)
         // Define an explicit constructor for safety.
         TreeNode(TreeNode* toNIL, TreeNode* toParent, NodeCount count = 1)
-          : parent(toParent) , left(toNIL) , right(toNIL) ,
-          color(toParent == toNIL ? COMPACTING_MAP_BLACK : COMPACTING_MAP_RED) {
+          : parent(toParent), left(toNIL), right(toNIL),
+          color(toParent == toNIL ? BLACK : RED) {
             if (hasRank) {
                 subct = count;
             }
@@ -162,7 +148,8 @@ protected:
 
     int64_t m_count;
     TreeNode *m_root;
-    ContiguousAllocator m_allocator;
+    ContiguousAllocator m_allocator{
+        sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount)), 10000};
     bool m_unique;
 
     // rather than NULL, most tree pointers that don't point
@@ -178,14 +165,14 @@ public:
     class iterator {
         friend class CompactingMap<KeyValuePair, Compare, hasRank>;
     protected:
-        const CompactingMap *m_map;
-        TreeNode *m_node;
-        iterator(const CompactingMap *m, TreeNode* x) : m_map(m), m_node(x) {}
+        CompactingMap const* m_map = nullptr;
+        TreeNode* m_node = nullptr;
+        iterator(CompactingMap const* m, TreeNode* x) : m_map(m), m_node(x) {}
         const KeyValuePair& pair() {
             return m_node->kv;
         }
     public:
-        iterator() : m_map(nullptr), m_node(nullptr) {}
+        iterator() = default;
         iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
         const Key &key() const {
             return m_node->key();
@@ -219,7 +206,7 @@ public:
 
     // TODO: remove this. But two eecheck depend on this.
     bool insert(std::pair<Key, Data> value) {
-        return insert(value.first, value.second) == NULL;
+        return insert(value.first, value.second) == nullptr;
     };
     // A syntactically convenient analog to CompactingHashTable's insert function
     const Data *insert(const Key &key, const Data &data);
@@ -235,16 +222,16 @@ public:
     int64_t size() const { return m_count; }
     iterator begin() const {
         if (m_count == 0) {
-            return iterator();
+            return {};
         } else {
-            return iterator(this, minimum(m_root));
+            return {this, minimum(m_root)};
         }
     }
     iterator rbegin() const {
         if (m_count == 0) {
-            return iterator();
+            return {};
         } else {
-            return iterator(this, maximum(m_root));
+            return {this, maximum(m_root)};
         }
     }
 
@@ -282,10 +269,10 @@ protected:
     inline void decSubct(TreeNode* x);
     inline void updateSubct(TreeNode* x);
 
-    TreeNode *minimum(const TreeNode *subRoot) const;
-    TreeNode *maximum(const TreeNode *subRoot) const;
-    TreeNode *successor(const TreeNode *x) const;
-    TreeNode *predecessor(const TreeNode *x) const;
+    TreeNode* minimum(const TreeNode *subRoot) const;
+    TreeNode* maximum(const TreeNode *subRoot) const;
+    TreeNode* successor(const TreeNode *x) const;
+    TreeNode* predecessor(const TreeNode *x) const;
 
     // sub functions to make the magic happen
     void leftRotate(TreeNode *x);
@@ -308,7 +295,6 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 CompactingMap<KeyValuePair, Compare, hasRank>::CompactingMap(bool unique, Compare comper)
     : m_count(0),
       m_root(&NIL),
-      m_allocator(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount)), 10000),
       m_unique(unique),
       NIL(&NIL, &NIL, INVALIDCT),
       m_comper(comper)
@@ -359,7 +345,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
                 // For non-unique indexes -- not really being used since unique tuple addresses
                 // were added to keys -- new duplicates are (needlessly) forced to insert
                 // after (to the right of) existing duplicates by falling through here.
-                if (m_unique && (cmp == 0)) {
+                if (m_unique && cmp == 0) {
                     // Inserting exact matches fails for unique indexes.
                     // Undo the optimistic bumping of subcounts done already on the way down.
                     const Data *collidingData = &x->value();
@@ -440,7 +426,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBound(const Key &key) const 
             x = x->left;
         }
     }
-    return iterator(this, y);
+    return {this, y};
 
 }
 
@@ -450,7 +436,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBoundNullAsMax(const Key &ke
     Key tmpKey(key);
     setPointerValue(tmpKey, MAXPOINTER);
     TreeNode *x = m_root;
-    TreeNode *y = const_cast<TreeNode *>(&NIL);
+    TreeNode *y = const_cast<TreeNode*>(&NIL);
     while (x != &NIL) {
         int cmp = m_comper.getNullAsMaxComparator()(x->key(), tmpKey);
         if (cmp <= 0) {
@@ -460,14 +446,14 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBoundNullAsMax(const Key &ke
             x = x->left;
         }
     }
-    return iterator(this, y);
+    return {this, y};
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
 typename std::pair<typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator,
                    typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator>
 CompactingMap<KeyValuePair, Compare, hasRank>::equalRange(const Key &key) const {
-    return std::pair<iterator, iterator>(lowerBound(key), upperBound(key));
+    return {lowerBound(key), upperBound(key)};
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -638,7 +624,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::insertFixup(TreeNode *z) {
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
 void CompactingMap<KeyValuePair, Compare, hasRank>::deleteFixup(TreeNode *x) {
-    while ((x != m_root) && (x->color == BLACK)) {
+    while (x != m_root && x->color == BLACK) {
         if (x == x->parent->left) {
             TreeNode *w = x->parent->right;
             if (w->color == RED) {
@@ -648,7 +634,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::deleteFixup(TreeNode *x) {
                 w = x->parent->right;
             }
 
-            if ((w->left->color == BLACK) && (w->right->color == BLACK)) {
+            if (w->left->color == BLACK && w->right->color == BLACK) {
                 w->color = RED;
                 x = x->parent;
             } else {
@@ -673,7 +659,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::deleteFixup(TreeNode *x) {
                 w = x->parent->left;
             }
 
-            if ((w->right->color == BLACK) && (w->left->color == BLACK)) {
+            if (w->right->color == BLACK && w->left->color == BLACK) {
                 w->color = RED;
                 x = x->parent;
             } else {
@@ -780,7 +766,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::successor(const TreeNode *x) cons
         return minimum(x->right);
     } else {
         TreeNode *y = x->parent;
-        while ((y != &NIL) && (x == y->right)) {
+        while (y != &NIL && x == y->right) {
             x = y;
             y = y->parent;
         }
@@ -795,7 +781,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::predecessor(const TreeNode *x) co
         return maximum(x->left);
     } else {
         TreeNode *y = x->parent;
-        while ((y != &NIL) && (x == y->left)) {
+        while (y != &NIL && x == y->left) {
             x = y;
             y = y->parent;
         }
@@ -804,12 +790,13 @@ CompactingMap<KeyValuePair, Compare, hasRank>::predecessor(const TreeNode *x) co
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
-bool CompactingMap<KeyValuePair, Compare, hasRank>::isReachableNode(const TreeNode* start, const TreeNode *dest) const {
+bool CompactingMap<KeyValuePair, Compare, hasRank>::isReachableNode(
+        const TreeNode* start, const TreeNode *dest) const {
     if (start == dest) {
         return true;
-    } else if ((start->left) && (isReachableNode(start->left, dest))) {
+    } else if ((start->left) && isReachableNode(start->left, dest)) {
         return true;
-    } else if ((start->right) && (isReachableNode(start->right, dest))) {
+    } else if ((start->right) && isReachableNode(start->right, dest)) {
         return true;
     } else {
         return false;
@@ -1099,7 +1086,7 @@ int CompactingMap<KeyValuePair, Compare, hasRank>::inOrderCounterChecking(const 
 template<typename KeyValuePair, typename Compare, bool hasRank>
 int CompactingMap<KeyValuePair, Compare, hasRank>::verify(const TreeNode *n) const {
     // recursive stopping case
-    if (n == NULL) {
+    if (n == nullptr) {
         //TODO: This SHOULD return -1.
         return 0; // This should not happen. All leaves should terminate with &NIL.
     } else if (n == &NIL) {
@@ -1118,17 +1105,17 @@ int CompactingMap<KeyValuePair, Compare, hasRank>::verify(const TreeNode *n) con
 
     // check for no two consecutive red nodes
     if (n->color == RED) {
-        if ((n->left != &NIL) && (n->left->color == RED)) {
+        if (n->left != &NIL && n->left->color == RED) {
             return -1;
-        } else if ((n->right != &NIL) && (n->right->color == RED)) {
+        } else if (n->right != &NIL && n->right->color == RED) {
             return -1;
         }
     }
 
     // check for strict ordering
-    if ((n->left != &NIL) && (m_comper(n->key(), n->left->key()) < 0)) {
+    if (n->left != &NIL && m_comper(n->key(), n->left->key()) < 0) {
         return -1;
-    } else if ((n->right != &NIL) && (m_comper(n->key(), n->right->key()) > 0)) {
+    } else if (n->right != &NIL && m_comper(n->key(), n->right->key()) > 0) {
         return -1;
     }
 

@@ -518,9 +518,6 @@ size_t TableTuple::maxExportSerializedColumnSizeCommon(int colIndex, bool isHidd
 
 bool TableTuple::equalsNoSchemaCheck(const TableTuple &other,
         const HiddenColumnFilter *hiddenColumnFilter) const {
-//    if (address() == other.address()) {
-//        return true;
-//    }
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);

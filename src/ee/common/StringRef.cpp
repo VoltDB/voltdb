@@ -125,9 +125,6 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool) {
     if (source && sz > 0) {
         ::memcpy(result->getObjectValue(), source, sz);
     }
-//    if (sz == 0) {
-//        printf("Empty string (1) at %p\n", result);
-//    }
     return result;
 }
 
@@ -140,17 +137,11 @@ StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock
     if (source && sz > 0) {
         ::memcpy(result->getObjectValue(), source, sz);
     }
-//    if (sz == 0) {
-//        printf("Empty string (2) at %p\n", result);
-//    }
     return result;
 }
 
 void StringRef::relocate(std::ptrdiff_t offset) {
     m_stringPtr += offset;
-//    if (getObjectLength() == 0) {
-//        printf("Relocating empty string %p -> %p\n", m_stringPtr - offset, m_stringPtr);
-//    }
 }
 
 // The destroy method keeps this from getting run on temporary strings.

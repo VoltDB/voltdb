@@ -188,7 +188,7 @@ std::string NValue::debug() const {
     return buffer.str();
 }
 
-inline char const* NValue::getObject_withoutNull(int32_t& lengthOut) const {
+char const* NValue::getObject_withoutNull(int32_t& lengthOut) const {
     if (getSourceInlined()) {
         const char* storage = *reinterpret_cast<const char* const*>(m_data);
         lengthOut = storage[0]; // one-byte length prefix for inline
