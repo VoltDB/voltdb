@@ -66,6 +66,7 @@ public class TransactionTaskQueue
         private List<Scoreboard> m_scoreBoards = Lists.newArrayList();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_scoreboardContainers.clear();
+            m_scoreBoards.clear();
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
         }
