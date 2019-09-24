@@ -2692,50 +2692,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + m_config.m_pathToDeployment, false, null);
             }
 
-            /*
-             * Check for invalid deployment file settings (enterprise-only) in the community edition.
-             * Trick here is to print out all applicable problems and then stop, rather than stopping
-             * after the first one is found.
-             */
-            if (!m_config.m_isEnterprise) {
-                boolean shutdownDeployment = false;
-                boolean shutdownAction = false;
-
-                // check license features for community version
-                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
-                    consoleLog.error("Command logging is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if (deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
-                    consoleLog.warn("Database Replication is not supported " +
-                            "in the community edition of VoltDB.");
-                }
-                // check the start action for the community edition
-                if (m_config.m_startAction == StartAction.JOIN) {
-                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
-                            "\" is not supported in the community edition of VoltDB.");
-                    shutdownAction = true;
-                }
-
-                // if the process needs to stop, try to be helpful
-                if (shutdownAction || shutdownDeployment) {
-                    String msg = "This process will exit. Please run VoltDB with ";
-                    if (shutdownDeployment) {
-                        msg += "a deployment file compatible with the community edition";
-                    }
-                    if (shutdownDeployment && shutdownAction) {
-                        msg += " and ";
-                    }
-
-                    if (shutdownAction && !shutdownDeployment) {
-                        msg += "the CREATE start action";
-                    }
-                    msg += ".";
-
-                    VoltDB.crashLocalVoltDB(msg, false, null);
-                }
-            }
+            checkForEnterpriseFeatures(deployment, true);
 
             // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = deployment.getHeartbeat();
@@ -2919,45 +2876,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 config.m_hostCount = deployment.getCluster().getHostcount();
             }
-            /*
-             * Check for invalid deployment file settings (enterprise-only) in the community edition.
-             * Trick here is to print out all applicable problems and then stop, rather than stopping
-             * after the first one is found.
-             */
-            if (!config.m_isEnterprise) {
-                boolean shutdownDeployment = false;
-                boolean shutdownAction = false;
 
-                // check license features for community version
-                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
-                    consoleLog.error("Command logging is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if (m_config.m_startAction == StartAction.JOIN) {
-                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
-                            "\" is not supported in the community edition of VoltDB.");
-                    shutdownAction = true;
-                }
-
-                // if the process needs to stop, try to be helpful
-                if (shutdownAction || shutdownDeployment) {
-                    String msg = "This process will exit. Please run VoltDB with ";
-                    if (shutdownDeployment) {
-                        msg += "a deployment file compatible with the community edition";
-                    }
-                    if (shutdownDeployment && shutdownAction) {
-                        msg += " and ";
-                    }
-
-                    if (shutdownAction && !shutdownDeployment) {
-                        msg += "the CREATE start action";
-                    }
-                    msg += ".";
-
-                    VoltDB.crashLocalVoltDB(msg, false, null);
-                }
-            }
+            checkForEnterpriseFeatures(deployment, false);
             return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
             /*
@@ -2967,6 +2887,50 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.fatal(e.getMessage());
             VoltDB.crashLocalVoltDB(e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Check for invalid deployment file settings (enterprise-only) in the community edition. Trick here is to print out
+     * all applicable problems and then stop, rather than stopping after the first one is found.
+     */
+    private void checkForEnterpriseFeatures(DeploymentType deployment, boolean checkForDr) {
+        if (!m_config.m_isEnterprise) {
+            boolean shutdownDeployment = false;
+            boolean shutdownAction = false;
+
+            // check license features for community version
+            if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
+                consoleLog.error("Command logging is not supported in the community edition of VoltDB.");
+                shutdownDeployment = true;
+            }
+            if (checkForDr && deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
+                consoleLog.warn("Database Replication is not supported in the community edition of VoltDB.");
+            }
+            // check the start action for the community edition
+            if (m_config.m_startAction == StartAction.JOIN) {
+                consoleLog.error("Start action \"" + m_config.m_startAction.name()
+                        + "\" is not supported in the community edition of VoltDB.");
+                shutdownAction = true;
+            }
+
+            // if the process needs to stop, try to be helpful
+            if (shutdownAction || shutdownDeployment) {
+                String msg = "This process will exit. Please run VoltDB with ";
+                if (shutdownDeployment) {
+                    msg += "a deployment file compatible with the community edition";
+                }
+                if (shutdownDeployment && shutdownAction) {
+                    msg += " and ";
+                }
+
+                if (shutdownAction && !shutdownDeployment) {
+                    msg += "the CREATE start action";
+                }
+                msg += ".";
+
+                VoltDB.crashLocalVoltDB(msg, false, null);
+            }
         }
     }
 
