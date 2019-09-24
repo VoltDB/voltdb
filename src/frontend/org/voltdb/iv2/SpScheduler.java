@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -201,8 +200,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
     }
 
-    public void initializeScoreboard(int siteId, Mailbox mailBox) {
-        m_pendingTasks.initializeScoreboard(siteId, mailBox);
+    public void initializeScoreboard(int siteId) {
+        m_pendingTasks.initializeScoreboard(siteId);
     }
 
     @Override

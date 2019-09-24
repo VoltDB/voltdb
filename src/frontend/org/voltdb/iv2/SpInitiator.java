@@ -125,7 +125,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor,
                         startAction != StartAction.JOIN),
                 "SP", agent, startAction);
-        m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
+        m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()));
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_scheduler.m_repairLog = m_repairLog;
