@@ -64,6 +64,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class LoopbackExportClient extends ExportClientBase {
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
+    private static final int ACQUIRE_TIMEOUT_MS = 8_000;
 
     private String m_procedure;
     private String m_failureLog;
@@ -208,7 +209,10 @@ public class LoopbackExportClient extends ExportClientBase {
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             if (m_ctx.invokes > 0) {
                 try {
-                    m_ctx.m_done.acquire(m_ctx.invokes);
+                    // the ACQUIRE_TIMEOUT_MS timeout is to exit the deadlock during the
+                    // catalog update. Because catalog update is a MP transaction that will
+                    // block the loopback insertion procedures and the Semaphore won't get release.
+                    m_ctx.m_done.tryAcquire(m_ctx.invokes, ACQUIRE_TIMEOUT_MS,TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     throw new LoopbackExportException("failed to wait for block callback", e);
                 }
