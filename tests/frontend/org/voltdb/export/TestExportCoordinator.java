@@ -915,4 +915,145 @@ public class TestExportCoordinator extends ZKTestBase {
             fail();
         }
     }
+
+    // Contrived corner case where the initial row is missing
+    @Test
+    public void testENG17776() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(2, ExportSequenceNumberTracker.INFINITE_SEQNO);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(1, ExportSequenceNumberTracker.INFINITE_SEQNO);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            // the initial sequence number would be restored from snapshot, so the initial gap can be detected
+            ec0.setInitialSequenceNumber(1);
+
+            ec0.initialize();
+            ec1.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            assertFalse(ec0.isExportMaster(1L));
+            assertTrue(ec1.isExportMaster(1L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+
+            // Simulate ack at 1
+            assertTrue(ec0.isSafePoint(1L));
+            assertTrue(ec1.isSafePoint(1L));
+
+            // Leader is back to master
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertTrue(ec0.isExportMaster(2L));
+            assertFalse(ec1.isExportMaster(2L));
+
+            ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    // Contrived corner case where the second row is missing
+    @Test
+    public void testENG17776_2() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(2, ExportSequenceNumberTracker.INFINITE_SEQNO);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(1, 1);
+            tracker1.append(3, ExportSequenceNumberTracker.INFINITE_SEQNO);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            // the initial sequence number would be restored from snapshot, so the initial gap can be detected
+            ec0.setInitialSequenceNumber(1);
+
+            ec0.initialize();
+            ec1.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            assertFalse(ec0.isExportMaster(1L));
+            assertTrue(ec1.isExportMaster(1L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+
+            // Simulate ack at 1
+            assertTrue(ec0.isSafePoint(1L));
+            assertTrue(ec1.isSafePoint(1L));
+
+            // Leader is back to master
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertTrue(ec0.isExportMaster(2L));
+            assertFalse(ec1.isExportMaster(2L));
+
+            ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
 }

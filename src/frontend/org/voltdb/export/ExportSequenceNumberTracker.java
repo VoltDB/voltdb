@@ -20,6 +20,7 @@ package org.voltdb.export;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.Set;
 
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
@@ -34,6 +35,10 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
     protected RangeSet<Long> m_map;
     // Is the first sequence a sentinel? Sentinel doesn't count into the total sequence size of tracker.
     private boolean m_hasSentinel = false;
+
+    // using Long.MAX_VALUE throws IllegalStateException in Range.java.
+    public static final long INFINITE_SEQNO = Long.MAX_VALUE - 1;
+    public static final long MIN_SEQNO = 1L;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -166,6 +171,10 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
         return truncated;
     }
 
+    public Set<Range<Long>> getRanges() {
+        return m_map.asRanges();
+    }
+
     /**
      * Truncate the tracker to the given truncation point. After truncation,
      * any ranges after the new truncation point will be removed.
@@ -252,17 +261,59 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      *         exist return null
      */
     public Pair<Long, Long> getFirstGap() {
-        if (m_map.isEmpty() || size() < 2) {
-            return null;
-        }
-        Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-        long start = end(iter.next()) + 1;
-        long end = start(iter.next()) - 1;
-        return new Pair<Long, Long>(start, end);
+        return (getFirstGap(MIN_SEQNO));
     }
 
-    RangeSet<Long> getRanges() {
-        return m_map;
+    /**
+     * Find first gap after or including a sequence number if it exists
+     *
+     * @param afterSeqNo find first gap after (or including) this seqNo
+     * @return
+     */
+    public Pair<Long, Long> getFirstGap(long afterSeqNo) {
+        if (m_map.isEmpty()) {
+            return null;
+        }
+
+        // Handle corner cases
+        if (afterSeqNo < getFirstSeqNo()) {
+            // Initial gap
+            return new Pair<Long, Long>(MIN_SEQNO, getFirstSeqNo() - 1);
+        }
+        else if (getLastSeqNo() < afterSeqNo) {
+            // Trailing gap
+            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+        }
+        else if (size() < 2) {
+            // Only one segment
+            if (getLastSeqNo() < INFINITE_SEQNO) {
+                // Next gap will be trailing
+                return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+            }
+            // No gaps
+            return null;
+        }
+
+        // Search for next gap
+        Iterator<Range<Long>> iter = m_map.asRanges().iterator();
+        Range<Long> current = iter.next();
+        assert current != null;
+
+        while (iter.hasNext()) {
+            Range<Long> next = iter.next();
+            long start = end(current) + 1;
+            long end = start(next) - 1;
+            if (end < afterSeqNo) {
+                current = next;
+                continue;
+            }
+            return new Pair<Long, Long>(start, end);
+        }
+        if (getLastSeqNo() < INFINITE_SEQNO) {
+            // Next gap will be trailing
+            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+        }
+        return null;
     }
 
     /**
