@@ -46,6 +46,8 @@ import org.voltdb.tasktest.CustomTestActionGenerator;
 import org.voltdb.tasktest.CustomTestActionScheduler;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 public class TestTasksEnd2End extends LocalClustersTestBase {
     private static final String s_userName = "TestUser";
 
@@ -396,6 +398,55 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
             String status = e.getClientResponse().getStatusString();
             assertTrue(status, status.contains("Custom action scheduler class not allowed in tasks"));
         }
+    }
+
+    /*
+     * Test that partition tasks can run concurrently with an elastic join operation and that if one of the new hosts
+     * goes down the tasks will fail over to the remaining new host
+     */
+    @Test(timeout = 60_000)
+    public void elasticJoinAndFailOver() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+
+        cleanupAfterTest();
+
+        Client client = getClient(0);
+
+        String tableName = getTableName(0, TableType.PARTITIONED);
+
+        String procName = getMethodName() + "_prune";
+        client.callProcedure("@AdHoc",
+                "CREATE PROCEDURE " + procName + " DIRECTED AS DELETE FROM " + tableName + " ORDER BY key OFFSET 10");
+
+        String schedule = getMethodName();
+        client.callProcedure("@AdHoc", "CREATE TASK " + schedule + " ON SCHEDULE DELAY 10 MILLISECONDS PROCEDURE "
+                + procName + " RUN ON PARTITIONS");
+
+        Thread.sleep(200);
+        VoltTable table = getTaskStats(client);
+        assertEquals(6, table.getRowCount());
+
+        getCluster(0).join(ImmutableSet.of(3, 4));
+
+        // Wait for rebalance to start so the kill doesn't kill all hosts
+        int rowCount;
+        do {
+            rowCount = client.callProcedure("@Statistics", "REBALANCE", 0).getResults()[0].getRowCount();
+            if (rowCount != 0) {
+                break;
+            }
+            Thread.sleep(500);
+        } while (true);
+
+        table = getTaskStats(client);
+        assertEquals(10, table.getRowCount());
+
+        getCluster(0).killSingleHost(3);
+        Thread.sleep(500);
+        table = getTaskStats(client);
+        assertEquals(10, table.getRowCount());
     }
 
     private static VoltTable getTaskStats(Client client)
