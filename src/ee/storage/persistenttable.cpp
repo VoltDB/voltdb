@@ -1041,7 +1041,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
         size_t drMark = drStream->appendUpdateRecord(m_signature, m_partitionColumn, currentSpHandle,
-                                                     currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
+                currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
@@ -1062,20 +1062,18 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     if (someIndexGotUpdated) {
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex* index = indexesToUpdate[i];
-            if (!index->keyUsesNonInlinedMemory() || index->isPartialIndex()) {
-                if (!index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
-                    indexRequiresUpdate[i] = false;
-                    continue;
+            if (!index->keyUsesNonInlinedMemory() &&
+                    !index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
+                indexRequiresUpdate[i] = false;
+                continue;
+            } else {
+                indexRequiresUpdate[i] = true;
+                if (!index->deleteEntry(&targetTupleToUpdate)) {
+                    throwFatalException(
+                            "Failed to remove tuple (%s) from index (during update) in Table: %s Index %s:\n%s",
+                            targetTupleToUpdate.debug().c_str(), m_name.c_str(), index->getName().c_str(),
+                            index->debug().c_str());
                 }
-            }
-            indexRequiresUpdate[i] = true;
-            if (!index->deleteEntry(&targetTupleToUpdate)) {
-                // TODO: ENG-17091; (undeterminstic reproducer: TestAdHocQueries.java)
-                //throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
-                throwSerializableEEException(
-                        "Failed to remove tuple (%s) from index (during update) in Table: %s Index %s:\n%s",
-                        targetTupleToUpdate.debug().c_str(), m_name.c_str(), index->getName().c_str(),
-                        index->debug().c_str());
             }
         }
     }
@@ -1089,11 +1087,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        for (auto viewHandler: m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
         // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
+        for (auto view: m_views) {
             view->processTupleDelete(targetTupleToUpdate, fallible);
         }
     }
@@ -1142,7 +1140,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
          * Create and register an undo action with copies of the "before" and "after" tuple storage
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
-       char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
+        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
@@ -1176,12 +1174,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // Note that inserting into the delta table is guaranteed to
     // succeed, since we checked constraints above.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+    for (auto viewHandler: m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
 
     // handle any materialized views
-    BOOST_FOREACH (auto view, m_views) {
+    for (auto view: m_views) {
         view->processTupleInsert(targetTupleToUpdate, fallible);
     }
 }
@@ -1740,10 +1738,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
             uniqueViolationOutput->writeIntAt(lengthPosition, 0);
         } else {
             uniqueViolationOutput->writeIntAt(lengthPosition,
-                                              static_cast<int32_t>(uniqueViolationOutput->position() -
-                                                                   lengthPosition - sizeof(int32_t)));
-            uniqueViolationOutput->writeIntAt(tupleCountPosition,
-                                              serializedTupleCount);
+                    uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition, serializedTupleCount);
         }
     }
 }
