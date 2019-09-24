@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -41,6 +42,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * @author rdykiel
@@ -52,7 +54,8 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
     private static final int HOST_COUNT = 2;
     private static final int KFACTOR = 1;
 
-    private static final int STREAM_COUNT = 10;
+    private static final int STREAM_COUNT_COMMUNITY = 2;
+    private static final int STREAM_COUNT_PRO = 10;
     private static final int LOOP_COUNT = 100;
     private static final int ROW_BATCH = 100;
 
@@ -71,9 +74,15 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
     private VoltProjectBuilder m_builder;
     private LocalCluster m_cluster;
     private Client m_client;
+    private int m_streamCount;
 
     @Rule
     public final TestName m_name = new TestName();
+
+    @Before
+    public void setUp() throws Exception {
+        m_streamCount = MiscUtils.isPro() ? STREAM_COUNT_PRO : STREAM_COUNT_COMMUNITY;
+    }
 
     @After
     public void tearDown() throws Exception {
@@ -188,7 +197,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
     @Test(timeout = 600_000)
     public void testPollMultipleParallelStreams() throws Exception {
 
-        setupMultipleParallelStreams(STREAM_COUNT);
+        setupMultipleParallelStreams(m_streamCount);
         int rowCount = 0;
 
         // MUST CALL getClient because verifier requires
@@ -200,7 +209,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
         Arrays.fill(data, 1);
 
         for (int i = 0; i < LOOP_COUNT; i++) {
-            for (int j = 0; j < STREAM_COUNT; j++) {
+            for (int j = 0; j < m_streamCount; j++) {
                 String streamName = String.format(STREAM_TEMPLATE, j);
                 insertToStream(streamName, rowCount, ROW_BATCH, m_client, data);
             }
@@ -210,7 +219,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
 
         // Wait for exports to drain
         List<String> list = new ArrayList<>(1);
-        for (int i = 0; i < STREAM_COUNT; i++) {
+        for (int i = 0; i < m_streamCount; i++) {
             String streamName = String.format(STREAM_TEMPLATE, i);
             list.add(streamName);
         }
@@ -221,7 +230,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
     @Test(timeout = 600_000)
     public void testPollMultipleStreamsToOneTarget() throws Exception {
 
-        String checkStream = setupMultipleStreamsToOneTarget(STREAM_COUNT, ONE_TARGET_NAME);
+        String checkStream = setupMultipleStreamsToOneTarget(m_streamCount, ONE_TARGET_NAME);
         int rowCount = 0;
 
         // MUST CALL getClient because verifier requires
@@ -235,7 +244,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
         // Insert rows on different streams but since they all go thru one export
         // track them thru the checkStream
         for (int i = 0; i < LOOP_COUNT; i++) {
-            for (int j = 0; j < STREAM_COUNT; j++) {
+            for (int j = 0; j < m_streamCount; j++) {
                 String streamName = String.format(STREAM_TEMPLATE, j);
                 for (int k = rowCount; k < rowCount + ROW_BATCH; k++) {
                     data[1] = k; // Pkey column
