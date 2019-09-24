@@ -14,4 +14,7 @@
    <httpd enabled="true">
       <jsonapi enabled="true" />
    </httpd>
+   <features>
+     <feature name="export" option="advanced" />
+   </features>
 </deployment>

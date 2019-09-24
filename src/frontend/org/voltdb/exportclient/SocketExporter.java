@@ -225,10 +225,16 @@ public class SocketExporter extends ExportClientBase {
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             try {
                 for (OutputStream writer : haplist.values()) {
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug("Flushing " + writer + " for source " + source);
+                    }
+                    writer.flush();
                     writer.close();
                 }
                 haplist.clear();
-            } catch (IOException ignore) {}
+            } catch (IOException e) {
+                m_logger.error("Failed to close writers for " + source, e);
+            }
             if (m_es != null) {
                 m_es.shutdown();
                 try {
