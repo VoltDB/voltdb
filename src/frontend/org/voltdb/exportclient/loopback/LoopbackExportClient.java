@@ -32,8 +32,8 @@ import java.util.BitSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 import org.aeonbits.owner.Accessible;
@@ -207,23 +207,21 @@ public class LoopbackExportClient extends ExportClientBase {
 
         @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
-            if (m_ctx.invokes > 0) {
-                try {
-                    // the ACQUIRE_WAIT_TIME_MS timeout is to exit the deadlock during the
-                    // catalog update. Because catalog update is a MP transaction that will
-                    // block the loopback insertion procedures and the Semaphore won't get release.
-                    do {
-                        if (m_ctx.m_done.tryAcquire(m_ctx.invokes, ACQUIRE_WAIT_TIME_MS, TimeUnit.MILLISECONDS)) {
-                            break;
-                        }
-                    } while (!m_isShutDown); // keep trying if it is not in catalog update or shut down state
-                } catch (InterruptedException e) {
-                    throw new LoopbackExportException("failed to wait for block callback", e);
+            if (m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
+                return;
+            }
+            synchronized (this) {
+                if (m_ctx.m_outstandingTransactions.get() > 0 && !m_isShutDown) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        throw new LoopbackExportException("failed to wait for block callback", e);
+                    }
                 }
             }
             m_restarted = !m_ctx.m_rq.isEmpty();
 
-            if (m_restarted && !m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
+            if (m_restarted) {
                 m_failed = new BitSet(m_ctx.recs);
                 m_resubmit = new BitSet(m_ctx.recs);
 
@@ -265,12 +263,10 @@ public class LoopbackExportClient extends ExportClientBase {
             }
             int firstFieldOffset = m_skipInternals ? INTERNAL_FIELD_COUNT : 0;
             LoopbackCallback cb = m_ctx.createCallback(bix);
-            if (m_invoker.callProcedure(m_user, false,
+            if (!m_invoker.callProcedure(m_user, false,
                     BatchTimeoutOverrideType.NO_TIMEOUT,
                     cb, false, m_shouldContinue, m_procedure,
                     Arrays.copyOfRange(rd.values, firstFieldOffset, rd.values.length))) {
-                ++m_ctx.invokes;
-            } else {
                 LOG.error("failed to Invoke procedure: " + m_procedure);
             }
 
@@ -284,7 +280,10 @@ public class LoopbackExportClient extends ExportClientBase {
                     m_rejs.get().close();
                 } catch (IOException ignoreIt) {}
             }
-            m_isShutDown = true;
+            synchronized(this) {
+                m_isShutDown = true;
+                notifyAll();
+            }
             if (m_es != null) {
                 m_es.shutdown();
                 try {
@@ -302,14 +301,14 @@ public class LoopbackExportClient extends ExportClientBase {
 
         class LoopbackCallback implements ProcedureCallback {
 
-            private final Semaphore m_done;
+            private final AtomicInteger m_outstandingTransactions;
             private final ConcurrentLinkedDeque<Reject> m_rq;
             private final int m_bix;
 
-            LoopbackCallback(Semaphore done,
+            LoopbackCallback(AtomicInteger oustandingTransactions,
                     ConcurrentLinkedDeque<Reject> rq,
                     int bix) {
-                this.m_done = done;
+                this.m_outstandingTransactions = oustandingTransactions;
                 this.m_rq = rq;
                 this.m_bix = bix;
             }
@@ -328,19 +327,22 @@ public class LoopbackExportClient extends ExportClientBase {
                         LOG.error("Loopback Invocation failed: %s", cr.getStatusString());
                     }
                 } finally {
-                    m_done.release();
+                    if (m_outstandingTransactions.decrementAndGet() == 0) {
+                        synchronized(LoopbackExportDecoder.this) {
+                            LoopbackExportDecoder.this.notifyAll();
+                        }
+                    }
                 }
             }
         }
 
         class BlockContext {
-            final Semaphore m_done = new Semaphore(0);
             final ConcurrentLinkedDeque<Reject> m_rq = new ConcurrentLinkedDeque<>();
             int recs = 0;
-            int invokes = 0;
+            final AtomicInteger m_outstandingTransactions = new AtomicInteger();
 
             LoopbackCallback createCallback(int bix) {
-                return new LoopbackCallback(m_done, m_rq, bix);
+                return new LoopbackCallback(m_outstandingTransactions, m_rq, bix);
             }
         }
 
