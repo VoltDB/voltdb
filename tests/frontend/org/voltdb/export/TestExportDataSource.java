@@ -762,10 +762,12 @@ public class TestExportDataSource extends TestCase {
             // Do a release
             System.out.println("Do a manual release");
             assertTrue(s.processStreamControl(OperationMode.RELEASE));
-            // Verify we can poll the 2 buffers past the gap
+
+            // Verify we can poll the 2 buffers past the gap,
+            // but wait for long enough to allow the runnable to get
+            // past the gap.
             try {
-                // cont = fut1.get(100,TimeUnit.MILLISECONDS);
-                cont = fut1.get(100,TimeUnit.DAYS);
+                cont = fut1.get(100, TimeUnit.MILLISECONDS);
             }
             catch( TimeoutException to) {
                 fail("did not expect timeout");
