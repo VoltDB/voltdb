@@ -64,7 +64,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class LoopbackExportClient extends ExportClientBase {
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
-    private static final int ACQUIRE_TIMEOUT_MS = 8_000;
+    private static final int ACQUIRE_WAIT_TIME_MS = 5_000;
 
     private String m_procedure;
     private String m_failureLog;
@@ -209,10 +209,14 @@ public class LoopbackExportClient extends ExportClientBase {
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             if (m_ctx.invokes > 0) {
                 try {
-                    // the ACQUIRE_TIMEOUT_MS timeout is to exit the deadlock during the
+                    // the ACQUIRE_WAIT_TIME_MS timeout is to exit the deadlock during the
                     // catalog update. Because catalog update is a MP transaction that will
                     // block the loopback insertion procedures and the Semaphore won't get release.
-                    m_ctx.m_done.tryAcquire(m_ctx.invokes, ACQUIRE_TIMEOUT_MS,TimeUnit.MILLISECONDS);
+                    do {
+                        if (m_ctx.m_done.tryAcquire(m_ctx.invokes, ACQUIRE_WAIT_TIME_MS, TimeUnit.MILLISECONDS)) {
+                            break;
+                        }
+                    } while (!m_isShutDown); // keep trying if it is not in catalog update or shut down state
                 } catch (InterruptedException e) {
                     throw new LoopbackExportException("failed to wait for block callback", e);
                 }
@@ -281,6 +285,7 @@ public class LoopbackExportClient extends ExportClientBase {
                     m_rejs.get().close();
                 } catch (IOException ignoreIt) {}
             }
+            m_isShutDown = true;
             if (m_es != null) {
                 m_es.shutdown();
                 try {
@@ -289,7 +294,6 @@ public class LoopbackExportClient extends ExportClientBase {
                     LOG.error("Interrupted while awaiting executor shutdown", e);
                 }
             }
-            m_isShutDown = true;
         }
 
         @Override
