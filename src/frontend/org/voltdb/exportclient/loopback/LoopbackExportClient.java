@@ -263,10 +263,12 @@ public class LoopbackExportClient extends ExportClientBase {
             }
             int firstFieldOffset = m_skipInternals ? INTERNAL_FIELD_COUNT : 0;
             LoopbackCallback cb = m_ctx.createCallback(bix);
-            if (!m_invoker.callProcedure(m_user, false,
+            if (m_invoker.callProcedure(m_user, false,
                     BatchTimeoutOverrideType.NO_TIMEOUT,
                     cb, false, m_shouldContinue, m_procedure,
                     Arrays.copyOfRange(rd.values, firstFieldOffset, rd.values.length))) {
+                m_ctx.m_outstandingTransactions.getAndIncrement();
+            } else {
                 LOG.error("failed to Invoke procedure: " + m_procedure);
             }
 
