@@ -1612,11 +1612,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     public void run() {
                         try {
                             if (isMaster() && m_pollTask != null) {
-                                long firstUnpolledSeqNo;
-                                if (m_gapTracker.getFirstGap() != null) {
-                                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
-                                            "] and cluster is complete. Skipping to next available transaction for " + ExportDataSource.this.toShortString());
+                                long firstUnpolledSeqNo = m_firstUnpolledSeqNo;
+                                Pair<Long, Long> gap = m_gapTracker.getFirstGap(m_firstUnpolledSeqNo);
+                                if (gap != null) {
+                                    firstUnpolledSeqNo = gap.getSecond() + 1;
+                                    exportLog.warn("Export data is missing [" + gap.getFirst() + ", " + gap.getSecond() +
+                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                                 } else {
                                     firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
                                     exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
