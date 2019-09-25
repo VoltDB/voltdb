@@ -422,7 +422,7 @@ public class TestTaskManager {
         VoltTable table = getScheduleStats();
         Map<String, Long> invocationCounts = new HashMap<>();
         while (table.advanceRow()) {
-            invocationCounts.put(table.getString("NAME"), table.getLong("SCHEDULER_INVOCATIONS"));
+            invocationCounts.put(table.getString("TASK_NAME"), table.getLong("SCHEDULER_INVOCATIONS"));
         }
 
         // No schedules should restart since class and deps did not change
@@ -431,7 +431,7 @@ public class TestTaskManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString("NAME");
+            String scheduleName = table.getString("TASK_NAME");
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             assertTrue("Count decreased for " + scheduleName,
                     invocationCounts.put(scheduleName, currentCount) < currentCount);
@@ -445,7 +445,7 @@ public class TestTaskManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString("NAME");
+            String scheduleName = table.getString("TASK_NAME");
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             long previousCount = invocationCounts.put(scheduleName, currentCount);
             if (scheduleName.equals("TestActionScheduler")) {
@@ -468,7 +468,7 @@ public class TestTaskManager {
 
         table = getScheduleStats();
         while (table.advanceRow()) {
-            String scheduleName = table.getString("NAME");
+            String scheduleName = table.getString("TASK_NAME");
             long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
             long previousCount = invocationCounts.put(scheduleName, currentCount);
             assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,

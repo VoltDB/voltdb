@@ -147,7 +147,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         table = getTaskStats(client);
         assertEquals(3, table.getRowCount());
         while (table.advanceRow()) {
-            String scheduleName = table.getString("NAME");
+            String scheduleName = table.getString("TASK_NAME");
             int id = -1;
             if (schedule1.equalsIgnoreCase(scheduleName)) {
                 id = 1;
