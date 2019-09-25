@@ -223,7 +223,7 @@ public class LoopbackExportClient extends ExportClientBase {
             }
             m_restarted = !m_ctx.m_rq.isEmpty();
 
-            if (m_restarted) {
+            if (m_restarted && !m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
                 m_failed = new BitSet(m_ctx.recs);
                 m_resubmit = new BitSet(m_ctx.recs);
 
@@ -272,7 +272,6 @@ public class LoopbackExportClient extends ExportClientBase {
                 ++m_ctx.invokes;
             } else {
                 LOG.error("failed to Invoke procedure: " + m_procedure);
-                m_ctx.m_done.release();
             }
 
             return true;
