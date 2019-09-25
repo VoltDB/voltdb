@@ -206,9 +206,6 @@ public class LoopbackExportClient extends ExportClientBase {
 
         @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
-            if (m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
-                return;
-            }
             synchronized (this) {
                 if (m_ctx.m_outstandingTransactions.get() > 0 && !m_isShutDown) {
                     try {
@@ -217,6 +214,9 @@ public class LoopbackExportClient extends ExportClientBase {
                         throw new LoopbackExportException("failed to wait for block callback", e);
                     }
                 }
+            }
+            if (m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
+                return;
             }
             m_restarted = !m_ctx.m_rq.isEmpty();
 
