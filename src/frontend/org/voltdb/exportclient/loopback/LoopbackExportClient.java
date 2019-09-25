@@ -64,7 +64,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class LoopbackExportClient extends ExportClientBase {
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
-    private static final int ACQUIRE_WAIT_TIME_MS = 5_000;
 
     private String m_procedure;
     private String m_failureLog;
