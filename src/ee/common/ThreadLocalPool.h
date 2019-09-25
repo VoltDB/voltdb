@@ -20,8 +20,8 @@
 #include "structures/CompactingPool.h"
 #ifdef VOLT_POOL_CHECKING
 #include "common/StackTrace.h"
-#endif
 #include <mutex>
+#endif
 #include <memory>
 #include "debuglog.h"
 #include "boost/pool/pool.hpp"
@@ -63,22 +63,6 @@ struct PoolLocals {
  * instance of pools will be freed once the last ThreadLocalPool reference in the thread is destructed.
  */
 class ThreadLocalPool {
-    #ifdef VOLT_POOL_CHECKING
-        friend class SynchronizedThreadLock;
-        static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
-
-        int32_t m_allocatingEngine;
-        int32_t m_allocatingThread;
-    #ifdef VOLT_TRACE_ALLOCATIONS
-        using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
-    #else
-        using AllocTraceMap_t = std::unordered_set<void*>;
-    #endif
-        using SizeBucketMap_t = std::unordered_map<std::size_t, AllocTraceMap_t>;
-        using PartitionBucketMap_t = std::unordered_map<int32_t, SizeBucketMap_t>;
-        static PartitionBucketMap_t s_allocations;
-    #endif
-    static std::mutex s_sharedMemoryMutex;
 public:
     ThreadLocalPool();
     ~ThreadLocalPool();
@@ -193,9 +177,27 @@ public:
      * relocating some other allocation.
      */
     static void freeRelocatable(Sized* string);
+
     static void resetStateForTest();
     static int32_t* getThreadPartitionIdForTest();
     static void setThreadPartitionIdForTest(int32_t* partitionId);
+private:
+    #ifdef VOLT_POOL_CHECKING
+        friend class SynchronizedThreadLock;
+        static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
+
+        int32_t m_allocatingEngine;
+        int32_t m_allocatingThread;
+        static std::mutex s_sharedMemoryMutex;
+    #ifdef VOLT_TRACE_ALLOCATIONS
+        using AllocTraceMap_t = std::unordered_map<void*, StackTrace*>;
+    #else
+        using AllocTraceMap_t = std::unordered_set<void*> ;
+    #endif
+        using SizeBucketMap_t = std::unordered_map<std::size_t, AllocTraceMap_t> ;
+        using PartitionBucketMap_t = std::unordered_map<int32_t, SizeBucketMap_t> ;
+        static PartitionBucketMap_t s_allocations;
+    #endif
 };
 }
 
