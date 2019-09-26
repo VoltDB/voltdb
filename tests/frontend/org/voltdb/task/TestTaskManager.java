@@ -94,6 +94,7 @@ public class TestTaskManager {
     @Rule
     public final TestName m_name = new TestName();
 
+    private boolean m_readOnly;
     private AuthSystem m_authSystem;
     private ClientInterface m_clientInterface;
     private InternalConnectionHandler m_internalConnectionHandler;
@@ -127,7 +128,7 @@ public class TestTaskManager {
         when(m_clientInterface.getInternalConnectionHandler()).thenReturn(m_internalConnectionHandler);
         when(m_clientInterface.getProcedureFromName(eq(PROCEDURE_NAME))).thenReturn(m_procedure);
 
-        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, false);
+        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, false, () -> m_readOnly);
 
         s_firstActionSchedulerCallCount.set(0);
         s_postRunActionSchedulerCallCount.set(0);
@@ -210,7 +211,7 @@ public class TestTaskManager {
                 s_postRunActionSchedulerCallCount.get() > 0);
 
         demotedPartitionsSync(0, 4);
-        assertCountsAfterScheduleCanceled(2);
+        assertCountsAfterScheduleCanceled(2, 0);
 
         int previousCount = s_postRunActionSchedulerCallCount.get();
         promotedPartitionsSync(0);
@@ -539,7 +540,8 @@ public class TestTaskManager {
         assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
                 s_postRunActionSchedulerCallCount.get() > 0);
 
-        dropScheduleAndAssertCounts(1);
+        // SingleProcGenerator does a procedure lookup so include it
+        dropScheduleAndAssertCounts(1, 1);
     }
 
     /*
@@ -596,45 +598,6 @@ public class TestTaskManager {
     }
 
     /*
-     * Test starting the manager in paused mode and then unpause and pause
-     */
-    @Test
-    public void pausedMode() throws Exception {
-        Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
-        Task task2 = createTask(TestActionScheduler.class,
-                TaskScope.PARTITIONS);
-
-        startSync(true, task1, task2);
-
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
-        validateStats(0);
-
-        promoteToLeaderSync(task1, task2);
-        validateStats(1, "PAUSED", null);
-
-        promotedPartitionsSync(0, 1, 2, 3);
-        validateStats(5, "PAUSED", null);
-
-        // Make sure a paused task can be set to running
-        m_taskManager.setPaused(false).get();
-        validateStats(5);
-
-        // Make sure a running task can be paused
-        m_taskManager.setPaused(true).get();
-        validateStats(5, "PAUSED", null);
-
-        // Make sure a paused task can be disabled
-        task1.setEnabled(false);
-        task2.setEnabled(false);
-        processUpdateSync(task1, task2);
-        validateStats(5, "DISABLED", null);
-
-        // DISABLED task should stay disabled
-        m_taskManager.setPaused(false).get();
-        validateStats(5, "DISABLED", null);
-    }
-
-    /*
      * Test stats when a manager starts with disabled tasks
      */
     @Test
@@ -683,7 +646,7 @@ public class TestTaskManager {
     @Test
     public void delayPartitionStartDuringJoin() throws Exception {
         m_taskManager.shutdown();
-        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, true);
+        m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, true, () -> m_readOnly);
 
         Task task = createTask(TestActionSchedule.class, TaskScope.PARTITIONS, 10, 100);
         m_procedure.setSinglepartition(true);
@@ -706,17 +669,151 @@ public class TestTaskManager {
         validateStats(5);
     }
 
+    /*
+     * Test that tasks which are not read only are PAUSED in read only mode
+     */
+    @Test
+    public void readOnlyMode() throws Exception {
+        m_readOnly = true;
+
+        Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
+        Task task2 = createTask(TestReadOnlyScheduler.class, TaskScope.DATABASE);
+
+        startSync(task1, task2);
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+
+        promoteToLeaderSync(task1, task2);
+        Thread.sleep(50);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("PAUSED", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("RUNNING", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+
+        // DISABLE task should convert state to DISABLED
+        task1.setEnabled(false);
+        processUpdateSync(getClass().getClassLoader(), false, task1, task2);
+        Thread.sleep(5);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("DISABLED", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("RUNNING", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+
+        // ENABLE should have state go back to PAUSED
+        task1.setEnabled(true);
+        processUpdateSync(getClass().getClassLoader(), false, task1, task2);
+        Thread.sleep(5);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("PAUSED", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("RUNNING", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+
+        // Disable the second task and then come out of R/O mode and make sure it stays disabled
+        task2.setEnabled(false);
+        processUpdateSync(task1, task2);
+        Thread.sleep(5);
+        assertEquals(1, s_firstActionSchedulerCallCount.get());
+
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("PAUSED", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("DISABLED", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+
+        // Make the system read/write and everything should run
+        m_readOnly = false;
+        m_taskManager.evaluateReadOnlyMode().get();
+        Thread.sleep(5);
+        assertEquals(2, s_firstActionSchedulerCallCount.get());
+
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("RUNNING", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("DISABLED", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+
+        task2.setEnabled(true);
+        processUpdateSync(task1, task2);
+        Thread.sleep(5);
+        assertEquals(3, s_firstActionSchedulerCallCount.get());
+        validateStats(2);
+
+        // Go back to read only mode
+        m_readOnly = true;
+        m_taskManager.evaluateReadOnlyMode().get();
+        Thread.sleep(5);
+        validateStats(2, null, r -> {
+            String name = r.getString("TASK_NAME");
+            String state = r.getString("STATE");
+
+            if (task1.getName().equalsIgnoreCase(name)) {
+                assertEquals("PAUSED", state);
+            } else if (task2.getName().equalsIgnoreCase(name)) {
+                assertEquals("RUNNING", state);
+            } else {
+                fail("Unknown task: " + name);
+            }
+        });
+    }
+
     private void dropScheduleAndAssertCounts() throws Exception {
         dropScheduleAndAssertCounts(1);
     }
 
     private void dropScheduleAndAssertCounts(int startCount) throws Exception {
-        validateStats(1);
-        processUpdateSync();
-        assertCountsAfterScheduleCanceled(startCount);
+        dropScheduleAndAssertCounts(startCount, 0);
     }
 
-    private void assertCountsAfterScheduleCanceled(int startCount)
+    private void dropScheduleAndAssertCounts(int startCount, int extraProcLookups) throws Exception {
+        validateStats(1);
+        processUpdateSync();
+        assertCountsAfterScheduleCanceled(startCount, extraProcLookups);
+    }
+
+    private void assertCountsAfterScheduleCanceled(int startCount, int extraProcLookups)
             throws InterruptedException {
         int previousCount = s_postRunActionSchedulerCallCount.get();
         Thread.sleep(10);
@@ -728,6 +825,7 @@ public class TestTaskManager {
         verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), any(), eq(false),
                 any(), eq(m_procedure), any(), eq(false), any());
 
+        previousCount += extraProcLookups * startCount;
         verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
         verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
@@ -780,11 +878,7 @@ public class TestTaskManager {
     }
 
     private void startSync(Task... tasks) throws InterruptedException, ExecutionException {
-        startSync(false, tasks);
-    }
-
-    private void startSync(boolean paused, Task... tasks) throws InterruptedException, ExecutionException {
-        m_taskManager.start(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, getClass().getClassLoader(), paused)
+        m_taskManager.start(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, getClass().getClassLoader())
                 .get();
     }
 
@@ -800,8 +894,7 @@ public class TestTaskManager {
 
     private void processUpdateSync(ClassLoader classLoader, boolean classesUpdated, Task... tasks)
             throws InterruptedException, ExecutionException {
-        m_taskManager
-                .processUpdate(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, classLoader, classesUpdated)
+        m_taskManager.processUpdate(m_schedulesConfig, Arrays.asList(tasks), m_authSystem, classLoader, classesUpdated)
                 .get();
     }
 
@@ -842,7 +935,9 @@ public class TestTaskManager {
             if (validator != null) {
                 validator.accept(table);
             }
-            assertEquals(state, table.getString("STATE"));
+            if (state != null) {
+                assertEquals(state, table.getString("STATE"));
+            }
             totalActionSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
             totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
         }
@@ -974,6 +1069,24 @@ public class TestTaskManager {
             s_postRunActionSchedulerCallCount.getAndIncrement();
             return (++m_count & 0x1) == 0 ? Action.createProcedure(this::getNextAction, PROCEDURE_NAME)
                     : Action.createCallback(this::getNextAction);
+        }
+    }
+
+    public static class TestReadOnlyScheduler implements ActionScheduler {
+        @Override
+        public DelayedAction getFirstDelayedAction() {
+            s_firstActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+        }
+
+        private DelayedAction getNextAction(ActionResult result) {
+            s_postRunActionSchedulerCallCount.getAndIncrement();
+            return DelayedAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+        }
+
+        @Override
+        public boolean isReadOnly() {
+            return true;
         }
     }
 }
