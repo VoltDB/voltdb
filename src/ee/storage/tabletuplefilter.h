@@ -53,21 +53,32 @@
 #include <limits>
 
 namespace voltdb {
+    namespace __private__ {     // In a different namespace since we already have ValueType enum from "common/types.h"
+        template<bool Const> using ValueType =
+            typename std::conditional<Const, uint64_t const, uint64_t>::type;
+    }
 
 class TableTupleFilter;
+
 /**
- * Non-const TableTupleFilter Iterator. Implements FORWARD ITERATOR Concept.
+ * Non-const or constant TableTupleFilter Iterator. Implements FORWARD ITERATOR Concept.
  * Iterates over the tuples that have a certain value set in
  * underline TableTupleFilter.
+ *
+ * Whether this iterator is const or not depends on the value of second
+ * template parameter.
  *
  * Parameter MARKER specifies the value to look for. Only tuples that have
  * their value set to MARKER will be iterated over
  */
-template<int8_t Marker, typename ValueType>
-class TableTupleFilterIterType :
-    public boost::iterator_facade<TableTupleFilterIterType<Marker, ValueType>,
-    ValueType,
-    boost::forward_traversal_tag> {
+template<int8_t Marker, bool Const>
+class TableTupleFilterIterType : public boost::iterator_facade<
+                                 TableTupleFilterIterType<Marker, Const>,
+                                 __private__::ValueType<Const>,
+                                 boost::forward_traversal_tag> {
+public:
+    using ValueType = __private__::ValueType<Const>;
+private:
     const TableTupleFilter* m_tableFilter = nullptr;
     mutable ValueType m_tupleIdx{};
 public:
@@ -89,7 +100,7 @@ public:
     // Forward Iteration Support
     void increment();
 
-    bool equal(TableTupleFilterIterType<Marker, ValueType> const& other) const {
+    bool equal(TableTupleFilterIterType<Marker, Const> const& other) const {
         // Shouldn't compare iterators from different tables
         vassert(m_tableFilter == other.m_tableFilter);
         return m_tupleIdx == other.m_tupleIdx;
@@ -103,9 +114,9 @@ public:
 };
 
 template<int8_t Marker>
-using TableTupleFilter_iter = TableTupleFilterIterType<Marker, uint64_t>;
+using TableTupleFilter_iter = TableTupleFilterIterType<Marker, false>;
 template<int8_t Marker>
-using TableTupleFilter_const_iter = TableTupleFilterIterType<Marker, uint64_t const>;
+using TableTupleFilter_const_iter = TableTupleFilterIterType<Marker, true>;
 
 class Table;
 /**
@@ -273,8 +284,8 @@ public:
     }
 };
 
-template<int8_t Marker, typename ValueType>
-TableTupleFilterIterType<Marker, ValueType>::TableTupleFilterIterType(
+template<int8_t Marker, bool Const>
+TableTupleFilterIterType<Marker, Const>::TableTupleFilterIterType(
         TableTupleFilter* m_tableFilter) :
     m_tableFilter(m_tableFilter), m_tupleIdx(TableTupleFilter::INVALID_INDEX) {
     if (!m_tableFilter->empty()) {
@@ -282,9 +293,9 @@ TableTupleFilterIterType<Marker, ValueType>::TableTupleFilterIterType(
     }
 }
 
-template<int8_t Marker, typename ValueType>
-void TableTupleFilterIterType<Marker, ValueType>::increment() {
-    ValueType lastActiveTupleIndex = m_tableFilter->getLastActiveTupleIndex();
+template<int8_t Marker, bool Const>
+void TableTupleFilterIterType<Marker, Const>::increment() {
+    auto const lastActiveTupleIndex = m_tableFilter->getLastActiveTupleIndex();
     do {
         ++m_tupleIdx;
     } while(m_tupleIdx <= lastActiveTupleIndex &&
