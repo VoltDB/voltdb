@@ -229,13 +229,11 @@ public class ExportGeneration {
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
-            if (conn.getEnabled()) {
-                for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                    Table stream = ti.getTable();
-                    addDataSourcesFromCatalog(stream, hostId, localPartitionsToSites, partitionsInUse, processor);
-                    exportedTables.add(stream.getTypeName());
-                    createdSources = true;
-                }
+            for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                Table stream = ti.getTable();
+                addDataSourcesFromCatalog(stream, hostId, localPartitionsToSites, partitionsInUse, processor);
+                exportedTables.add(stream.getTypeName());
+                createdSources = true;
             }
         }
 
