@@ -162,7 +162,7 @@ def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
         -Dallowreplication=true -DallowDrActiveActive=true\
-                     -Dlicensdays=%d -Dlicensee='%s'" % (days, licensee))
+                     -Dlicensedays=%d -Dlicensee='%s'" % (days, licensee))
 
 ################################################
 # MAKE A SHA256 checksum
