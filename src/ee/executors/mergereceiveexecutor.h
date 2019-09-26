@@ -43,16 +43,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREORDERBYMERGEEXECUTOR_H
-#define HSTOREORDERBYMERGEEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
-
-#include <boost/scoped_ptr.hpp>
-
 #include <vector>
 
 namespace voltdb {
@@ -62,7 +58,7 @@ namespace voltdb {
     class LimitPlanNode;
     class AggregateExecutorBase;
     class ProgressMonitorProxy;
-    struct CountingPostfilter;
+    class CountingPostfilter;
 
     /**
      * The optimized replacement for an ORDER BY executor to be used at the coordinator node
@@ -71,6 +67,9 @@ namespace voltdb {
      * specified by the inlined OrderByPlanNode
      */
     class MergeReceiveExecutor : public AbstractExecutor {
+        OrderByPlanNode* m_orderby_node;
+        LimitPlanNode* m_limit_node;
+        AggregateExecutorBase* m_agg_exec;
     public:
         MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
@@ -86,14 +85,7 @@ namespace voltdb {
         bool p_init(AbstractPlanNode* abstract_node,
                     const ExecutorVector& executorVector);
         bool p_execute(const NValueArray &params);
-
-    private:
-        OrderByPlanNode* m_orderby_node;
-        LimitPlanNode* m_limit_node;
-
-        AggregateExecutorBase* m_agg_exec;
     };
 
 }
 
-#endif
