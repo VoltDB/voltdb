@@ -252,7 +252,13 @@ public class SocketExporterLegacy extends ExportClientBase {
         }
 
         @Override
+        public void onBlockStart() throws RestartBlockException {
+            assert isLegacy();
+        }
+
+        @Override
         public void onBlockCompletion() {
+            assert isLegacy();
             try {
                 for (OutputStream hap : haplist.values()) {
                     hap.flush();
@@ -261,6 +267,16 @@ public class SocketExporterLegacy extends ExportClientBase {
                 m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to flush to export socket endpoint %s, some servers may be down.", host);
                 haplist.clear();
             }
+        }
+
+        @Override
+        public void onBlockStart(ExportRow row) {
+            throw new UnsupportedOperationException("onBlockStart(ExportRow row) must not be used on legacy export.");
+        }
+
+        @Override
+        public void onBlockCompletion(ExportRow row) {
+            throw new UnsupportedOperationException("onBlockCompletion(ExportRow row) must not be used on legacy export.");
         }
     }
 
