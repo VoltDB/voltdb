@@ -234,6 +234,21 @@ public final class TaskHelper {
         }
     }
 
+    /**
+     * Test if a procedure is read only. If a procedure cannot be found with {@code procedureName} then {@code false} is
+     * returned
+     *
+     * @param procedureName Name of procedure.
+     * @return {@code true} if {@code procedureName} is read only
+     */
+    public boolean isProcedureReadOnly(String procedureName) {
+        if (m_procedureGetter == null) {
+            return false;
+        }
+        Procedure procedure = m_procedureGetter.apply(procedureName);
+        return procedure == null ? false : procedure.getReadonly();
+    }
+
     private String generateLogMessage(String body) {
         return m_generateLogMessage.apply(body);
     }

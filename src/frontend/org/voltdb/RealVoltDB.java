@@ -1521,7 +1521,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
-                    m_config.m_startAction == StartAction.JOIN);
+                    m_config.m_startAction == StartAction.JOIN,
+                    // Task manager is read only if db is paused or this is a replica
+                    () -> m_mode == OperationMode.PAUSED || getReplicationRole() == ReplicationRole.REPLICA);
             m_globalServiceElector.registerService(() -> m_taskManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
@@ -4009,9 +4011,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // Update the NT procedure service AFTER stats are cleared in the previous step
                 m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
 
-                // 4.6 Update scheduler (asynchronously)
-                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
-
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
@@ -4051,6 +4050,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_producerDRGateway.updateCatalog(m_catalogContext,
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
+
+                // 7 Update tasks (asynchronously) after replica change if it occurred
+                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
@@ -4417,16 +4419,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             {
                 m_config.m_isPaused = true;
                 m_statusTracker.set(NodeState.PAUSED);
-                m_taskManager.setPaused(true);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = false;
                 m_statusTracker.set(NodeState.UP);
-                m_taskManager.setPaused(false);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
+            m_taskManager.evaluateReadOnlyMode();
         }
         m_mode = mode;
     }
@@ -4607,7 +4608,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
 
-        m_taskManager.start(m_catalogContext, m_mode == OperationMode.PAUSED);
+        m_taskManager.start(m_catalogContext);
 
         if (m_elasticService != null) {
             try {
