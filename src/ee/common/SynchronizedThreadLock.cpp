@@ -32,7 +32,7 @@
 namespace voltdb {
 
 // Initialized when executor context is created.
-std::mutex SynchronizedThreadLock::s_sharedEngineMutex{};
+pthread_mutex_t SynchronizedThreadLock::s_sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition;
 pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
 
@@ -185,16 +185,11 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
     vassert(ThreadLocalPool::getEnginePartitionId() != 16383);
     vassert(!isInSingleThreadMode());
     if (lowestSite) {
-        {
-            std::unique_lock<std::mutex> g(s_sharedEngineMutex);
-            if (--s_globalTxnStartCountdownLatch != 0) {
-                // NOTE: using std::condition_variable::wait()
-                // methods would hang TestImportSuite. So we have
-                // to use pthread_ methods.
-                pthread_cond_wait(&s_wakeLowestEngineCondition,
-                        s_sharedEngineMutex.native_handle());
-            }
+        pthread_mutex_lock(&s_sharedEngineMutex);
+        if (--s_globalTxnStartCountdownLatch != 0) {
+            pthread_cond_wait(&s_wakeLowestEngineCondition, &s_sharedEngineMutex);
         }
+        pthread_mutex_unlock(&s_sharedEngineMutex);
         VOLT_DEBUG("Switching context to MP partition on thread %d",
                 ThreadLocalPool::getThreadPartitionId());
         setIsInSingleThreadMode(true);
@@ -202,14 +197,12 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
     } else {
         VOLT_DEBUG("Waiting for MP partition work to complete on thread %d",
                 ThreadLocalPool::getThreadPartitionId());
-        {
-            std::unique_lock<std::mutex> g(s_sharedEngineMutex);
-            if (--s_globalTxnStartCountdownLatch == 0) {
-                pthread_cond_broadcast(&s_wakeLowestEngineCondition);
-            }
-            pthread_cond_wait(&s_sharedEngineCondition,
-                    s_sharedEngineMutex.native_handle());
+        pthread_mutex_lock(&s_sharedEngineMutex);
+        if (--s_globalTxnStartCountdownLatch == 0) {
+            pthread_cond_broadcast(&s_wakeLowestEngineCondition);
         }
+        pthread_cond_wait(&s_sharedEngineCondition, &s_sharedEngineMutex);
+        pthread_mutex_unlock(&s_sharedEngineMutex);
         VOLT_DEBUG("Other SP partition thread released on thread %d",
                 ThreadLocalPool::getThreadPartitionId());
         vassert(!isInSingleThreadMode());
@@ -218,12 +211,13 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
 }
 
 void SynchronizedThreadLock::signalLowestSiteFinished() {
-    std::lock_guard<std::mutex> g(s_sharedEngineMutex);
+    pthread_mutex_lock(&s_sharedEngineMutex);
     s_globalTxnStartCountdownLatch = s_SITES_PER_HOST;
     VOLT_DEBUG("Restore context to lowest SP partition on thread %d",
             ThreadLocalPool::getThreadPartitionId());
     setIsInSingleThreadMode(false);
     pthread_cond_broadcast(&s_sharedEngineCondition);
+    pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
@@ -296,11 +290,11 @@ void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantu
 
 // Special call for before we initialize ThreadLocalPool partitionIds
 void SynchronizedThreadLock::lockReplicatedResourceForInit() {
-    s_sharedEngineMutex.lock();
+    pthread_mutex_lock(&s_sharedEngineMutex);
 }
 
 void SynchronizedThreadLock::unlockReplicatedResourceForInit() {
-    s_sharedEngineMutex.unlock();
+    pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
 void SynchronizedThreadLock::lockReplicatedResource() {
@@ -311,7 +305,7 @@ void SynchronizedThreadLock::lockReplicatedResource() {
     vassert(!isInSingleThreadMode());
     VOLT_DEBUG("Attempting to acquire replicated resource lock on engine %d...",
             ThreadLocalPool::getThreadPartitionId());
-    s_sharedEngineMutex.lock();
+    pthread_mutex_lock(&s_sharedEngineMutex);
 #ifndef  NDEBUG
     vassert(! s_holdingReplicatedTableLock);
     s_holdingReplicatedTableLock = true;
@@ -326,7 +320,7 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
 #ifndef  NDEBUG
     s_holdingReplicatedTableLock = false;
 #endif
-    s_sharedEngineMutex.unlock();
+    pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
 #ifdef NDEBUG
