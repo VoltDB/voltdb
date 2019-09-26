@@ -875,6 +875,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         # Pass the SQL statement to the sqlcmd sub-process
         sqlcmd_proc.stdin.write(sql + '\n')
         sql_was_echoed_as_output = False
+        sql_partially_echoed_as_output = False
 
         # Kludge for certain 'exec @Statistics' commands, which return multiple
         # '(Returned N rows in X.XXs)' messages
@@ -961,14 +962,25 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print "\nDEBUG: Found 'ERROR' before SQL echoed (rare condition), with:\n" + \
                               get_last_n_sql_statements(last_n_sql_statements)
 
+                # Special case, for the first line of multi-statement SQL
+                elif ';' in sql and sql.startswith(output.rstrip(';')):
+                    sql_partially_echoed_as_output = True
+
+                # Special case, for a line (not the first) of multi-statement SQL
+                elif sql_partially_echoed_as_output and output.rstrip(';') in sql:
+                    # For the last line of multi-statement SQL
+                    if sql.rstrip(';').endswith(output.rstrip(';')):
+                        sql_was_echoed_as_output = True
+
                 # Invalid 'exec', 'explainproc' & 'explainview' commands (etc.) sometimes
                 # respond with various messages that do not include 'ERROR'
                 elif any( all(err_msg in output for err_msg in kem) for kem in known_error_messages):
-                    if sql_was_echoed_as_output:
+                    if sql_was_echoed_as_output or sql_partially_echoed_as_output:
                         increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
                                                       sql_contains_echo_substring)
-                        break
-                    elif debug > 2:
+                        if sql_was_echoed_as_output:
+                            break
+                    elif debug > 1:
                         # this can happen, though it's uncommon, when there is a multi-line
                         # error message, which uses the word 'ERROR' on one line and one of
                         # the known_error_messages, on another
@@ -1413,8 +1425,11 @@ if __name__ == "__main__":
                             ['Invalid use of PRIMARY KEY'],
                             ['Invalid use of UNIQUE'],
                             ['Stream configured with materialized view without partitioned column'],
-                            ['Invalid parameter count for procedure'],
                             ['Schema file ended mid-statement'],
+                            ['Object not found'],
+                            ['View does not support COUNT(DISTINCT) expression'],
+                            ['Table', 'cannot be swapped since it is used for exporting'],
+                            ['DDL Error'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
