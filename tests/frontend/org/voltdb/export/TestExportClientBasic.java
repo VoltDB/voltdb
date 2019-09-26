@@ -29,9 +29,9 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -113,6 +113,15 @@ public class TestExportClientBasic extends JUnit4LocalClusterTest {
     @Parameterized.Parameters
     public static Collection<ExportConfig> exportConfigs() {
        return Arrays.asList(
+        /*
+         * To start kafka server:
+         *  - Download and untar kafka release
+         *  - go to kafka directory
+         *  - start zookeeper: bin/zookeeper-server-start.sh config/zookeeper.properties
+         *  - start kafka server: bin/kafka-server-start.sh config/server.properties
+        new ExportConfig(TestType.KAFKA, "org.voltdb.exportclient.kafka.KafkaExportClient",
+                         new Pair<String, String>("bootstrap.servers", "localhost:9092")),
+         */
         new ExportConfig(TestType.FILE, "org.voltdb.exportclient.ExportToFileClient",
                          new Pair<String, String>("type", "csv"),
                          new Pair<String, String>("nonce", "basic1")),
@@ -123,15 +132,6 @@ public class TestExportClientBasic extends JUnit4LocalClusterTest {
                          new Pair<String, String>("jdbcdriver", HSQL_DRIVER),
                          new Pair<String, String>("jdbcurl", JDBC_URL),
                          new Pair<String, String>("jdbcuser", JDBC_USER))
-        /*
-         * To start kafka server:
-         *  - Download and untar kafka release
-         *  - go to kafka directory
-         *  - start zookeeper: bin/zookeeper-server-start.sh config/zookeeper.properties
-         *  - start kafka server: bin/kafka-server-start.sh config/server.properties
-        new ExportConfig(TestType.KAFKA, "org.voltdb.exportclient.kafka.KafkaExportClient",
-                         new Pair<String, String>("bootstrap.servers", "localhost:9092")),
-         */
        );
     }
 
