@@ -173,7 +173,7 @@ public class KafkaExportClient extends ExportClientBase {
 
         String acksVal = config.getProperty(ProducerConfig.ACKS_CONFIG, "").trim();
         if (acksVal.isEmpty()) {
-            m_producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "0");
+            m_producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "-1");
         }
         m_pollFutures = !"0".equals(m_producerConfig.get(ProducerConfig.ACKS_CONFIG));
 
