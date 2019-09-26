@@ -97,7 +97,7 @@ function async-benchmark() {
         --maxvaluesize=1024 \
         --entropy=127 \
         --usecompression=false \
-        --multisingleratio=1.0
+        --multisingleratio=0.0
 #        --latencyreport=true \
 #        --ratelimit=100000 \
 }

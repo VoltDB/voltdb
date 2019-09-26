@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.VoltTableUtil;
@@ -78,9 +79,16 @@ public class UpdateSettings extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context) {
 
         if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
+            log.warn("First fragment " + context.getPartitionId() + " " + CoreUtils.hsIdToString(context.getSiteId()));
 
             DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                //  Auto-generated catch block
+                e.printStackTrace();
+            }
             if (log.isInfoEnabled()) {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " reached settings update barrier.");
@@ -92,7 +100,7 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
+            log.warn("First aggregation " + context.getPartitionId() + " " + CoreUtils.hsIdToString(context.getSiteId()) + " version:" + version);
             ZooKeeper zk = getHostMessenger().getZK();
             Stat stat = null;
             try {
@@ -101,6 +109,12 @@ public class UpdateSettings extends VoltSystemProcedure {
                 String msg = "Failed to update cluster settings";
                 log.error(msg,e);
                 throw new SettingsException(msg, e);
+            }
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                //  Auto-generated catch block
+                e.printStackTrace();
             }
             log.info("Saved new cluster settings state");
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrierAggregate,
@@ -111,20 +125,32 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
+            log.warn("Second fragment " + context.getPartitionId() + " " + CoreUtils.hsIdToString(context.getSiteId()) + " version:" + version);
             ClusterSettings settings = ClusterSettings.create(settingsBytes);
             CatalogContext catalogContext =
                     getVoltDB().settingsUpdate(settings, version);
 
             context.updateSettings(catalogContext);
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                //  Auto-generated catch block
+                e.printStackTrace();
+            }
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
-
+            log.warn("Second aggregation " + context.getPartitionId() + " " + CoreUtils.hsIdToString(context.getSiteId()) );
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateSettings));
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                //  Auto-generated catch block
+                e.printStackTrace();
+            }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsAggregate, result);
 
         } else {
@@ -150,6 +176,14 @@ public class UpdateSettings extends VoltSystemProcedure {
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] settingsBytes) {
+        log.warn("@UpdateSettings start " + TxnEgo.txnIdToString(m_runner.getTxnState().txnId));
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            //  Auto-generated catch block
+            e.printStackTrace();
+        }
+        try {
         ZooKeeper zk = getHostMessenger().getZK();
         Stat stat = null;
         try {
@@ -160,9 +194,13 @@ public class UpdateSettings extends VoltSystemProcedure {
             throw new VoltAbortException(msg);
         }
         final int version = stat.getVersion();
+        log.warn("version=" + version);
 
         executeSysProcPlanFragments(
                 createBarrierFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsBarrierAggregate);
         return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateSettings,  SysProcFragmentId.PF_updateSettingsAggregate, settingsBytes, version);
+        } finally {
+            log.warn("@UpdateSettings end");
+        }
     }
 }
