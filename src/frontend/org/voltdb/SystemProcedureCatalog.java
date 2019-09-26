@@ -312,6 +312,11 @@ public class SystemProcedureCatalog {
                         false, false, true,  0, VoltType.INVALID,
                         false, false, true,false,
                         false, true, false));
+        builder.put("@QueryStats",
+                new Config("org.voltdb.sysprocs.QueryStats",
+                        false, true, false, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, false, false));
         builder.put("@Resume",
                 new Config("org.voltdb.sysprocs.Resume",
                         false, false, true,  0, VoltType.INVALID,
@@ -627,7 +632,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_MP",
                         false, false, false, 0, VoltType.VARBINARY,
                         false, false, false, true,
-                        true, true, false));
+                        true, true, true));
         builder.put("@MigrateRowsSP",
                 new Config("org.voltdb.sysprocs.MigrateRowsSP",
                         true, false, false, 0, VoltType.INVALID,
@@ -637,7 +642,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.MigrateRowsMP",
                         false, false, false, 0, VoltType.VARBINARY,
                         false, false, false, true,
-                        false, true,false));
+                        false, true, true));
         builder.put("@MigrateRowsNT",
                 new Config("org.voltdb.sysprocs.MigrateRowsNT",
                         true, false, false, 0, VoltType.INVALID,

@@ -80,18 +80,6 @@ public class Insert extends InsertBase {
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
                          a_geography_point, a_geography);
         }
-        else if (tablename.equals("NO_NULLS_GRP")) {
-            voltQueueSQL(i_no_nulls_grp, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
-        else if (tablename.equals("ALLOW_NULLS_GRP")) {
-            voltQueueSQL(i_allow_nulls_grp, pkey, a_tinyint, a_smallint, a_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal,
-                         a_geography_point, a_geography);
-        }
         else if (tablename.equals("ALLOW_NULLS and use sql.Timestamp")) {
             java.sql.Timestamp a_sqltimestamp = new java.sql.Timestamp(a_timestamp.getTime()/1000);
             a_sqltimestamp.setNanos(((int) (a_timestamp.getTime() % 1000000)) * 1000);

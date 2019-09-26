@@ -40,8 +40,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
     , m_supportSnapshot(true)
-    , m_enabled(true)
-{
+    , m_enabled(true) {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
     m_mvInfo = mvInfo;
@@ -85,9 +84,7 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
         // If this view should not respond to any view status toggle requests
         // (because the view is implicitly partitioned), ignore them.
         return;
-    }
-    // If the value is not changed, no action needs to be taken.
-    if (m_enabled == enabled) {
+    } else if (m_enabled == enabled) { // If the value is not changed, no action needs to be taken.
         return;
     }
     // Only views that can be snapshotted are allowed to be disabled.
@@ -99,14 +96,14 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
         // we need to use a delta table to hold the view content restored from
         // the snapshot and do a manual merge afterwards.
         m_dest->instantiateDeltaTable(noNeedToCheckMemoryContext);
-    }
-    else if (m_enabled && m_dest->deltaTable()) {
+    } else if (m_enabled && m_dest->deltaTable()) {
         // When we turn on the maintenance, if a delta table exists, it means that the view table was
         // not empty at the time when we paused it.
         // In this case, we need to do a merge. Log a message for it.
         char msg[256];
         snprintf(msg, sizeof(msg), "Merging the pre-existing content in view %s with the snapshot data.",
                  m_dest->name().c_str());
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
         PersistentTable* delta = m_dest->deltaTable();
@@ -151,8 +148,7 @@ void MaterializedViewTriggerForInsert::mergeTupleForInsert(const TableTuple &del
         NValue newValue = deltaTuple.getNValue(columnIndex);
         if (newValue.isNull()) {
             newValue = existingValue;
-        }
-        else {
+        } else {
             switch(m_aggTypes[aggIndex]) {
                 case EXPRESSION_TYPE_AGGREGATE_SUM:
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
@@ -350,8 +346,7 @@ void MaterializedViewTriggerForInsert::allocateBackedTuples() {
     // In this case, we will not allocate space for m_searchKeyBackingStore (ENG-7872)
     if (m_groupByColumnCount == 0) {
         m_searchKeyBackingStore.reset();
-    }
-    else {
+    } else {
         m_searchKeyTuple = TableTuple(m_index->getKeySchema());
         storeLength = m_index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE;
         backingStore = new char[storeLength];
@@ -490,8 +485,7 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
         if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT ||
             m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
             newValue = ValueFactory::getBigIntValue(0);
-        }
-        else {
+        } else {
             newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(aggOffset+aggIndex));
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);

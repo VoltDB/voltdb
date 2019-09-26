@@ -57,6 +57,7 @@ static const std::string catalogPayload =
     "set $PREV drProducerPort 5555\n"
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 1000\n"
+    "set $PREV exportFlushInterval 4000\n"
     "set $PREV preferredSource 0\n"
     "add /clusters#cluster databases database\n"
     "set /clusters#cluster/databases#database schema \"sQFUNjM3MjY1NjE3NDY1MjA3NDYxNjI2QwkMLDIwMjg2OTIwNjk2RQEgNDY3NjU3MjIwNkU2Rjc0AQgcNzU2QzZDMkMJJHQ2QzY5NkU2NTVGNzY2MzMwMzAyMDc2NjE3MjYzNjgBCCwyODM2MzMyMDYyNzkBUgw3MzI5AT4BJgg2QzIFCDIuAAA1AUYwMzAzMDMwMjkyOTNCCg==\"\n"
@@ -551,9 +552,9 @@ TEST_F(ExecutorVectorTest, Large) {
     // Again send node has no output table.
     ASSERT_EQ(NULL, tbl.get());
 
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
+    ASSERT_EQ(0, lttBlockCache.allocatedMemory());
 }
 
 int main() {

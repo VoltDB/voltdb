@@ -104,6 +104,8 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.util.Objects;
 
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 
 import static org.voltdb.utils.HDFSUtils.OctetStreamContentTypeHeader;
 
@@ -914,8 +916,12 @@ public class HttpExportClient extends ExportClientBase {
             }
 
             m_exportPath = null;
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "HTTP Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "HTTP Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         @Override
@@ -985,11 +991,13 @@ public class HttpExportClient extends ExportClientBase {
             if ( (m_isHdfs || m_decodeType == DecodeType.AVRO) && m_rollingDecoder != null) {
                 m_tableDecoders.remove(m_rollingDecoder);
             }
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 

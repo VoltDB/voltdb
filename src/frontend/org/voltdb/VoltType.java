@@ -644,7 +644,7 @@ public enum VoltType {
     /**
      * Return the java class that is matched to the given value.
      *
-     * @param value
+     * @param value of a VoltType as returned by {@link #getValue()}
      * @return The java class.
      */
     public static Class<?> classFromByteValue(byte value) {
@@ -943,8 +943,9 @@ public enum VoltType {
      * initialization */
     public boolean canExactlyRepresentAnyValueOf(VoltType otherType) {
         // self to self conversion is obviously fine.
-        if (this == otherType)
+        if (this == otherType) {
             return true;
+        }
 
         if (otherType.isBackendIntegerType()) {
             if (this.isBackendIntegerType()) {

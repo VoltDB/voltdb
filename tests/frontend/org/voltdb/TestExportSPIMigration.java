@@ -123,6 +123,8 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             assertTrue(!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0]));
 
             cluster.killSingleHost(1);
+            client = ClientFactory.createClient(config);
+            client.createConnection(cluster.getListenerAddress(0));
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO after kill:");
             System.out.println(vt.toFormattedString());
@@ -166,8 +168,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                     break;
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
             m_serverSocket.close();
             cleanup(client, cluster);

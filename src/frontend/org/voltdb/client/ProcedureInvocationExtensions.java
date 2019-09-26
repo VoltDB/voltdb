@@ -47,8 +47,9 @@ import java.nio.ByteBuffer;
 public abstract class ProcedureInvocationExtensions {
     public static final byte BATCH_TIMEOUT = 1;  // batch timeout
     public static final byte ALL_PARTITION = 2; // whether proc is part of run-everywhere
+    public static final byte PARTITION_DESTINATION = 3; // Which partition this procedure is targeting
 
-    private static final int INTEGER_SIZE = 4;
+    private static final int INTEGER_SIZE = Integer.BYTES;
 
     public static byte readNextType(ByteBuffer buf) {
         return buf.get();
@@ -61,12 +62,7 @@ public abstract class ProcedureInvocationExtensions {
     }
 
     public static int readBatchTimeout(ByteBuffer buf) {
-        int len = readLength(buf);
-        if (len != INTEGER_SIZE) {
-            throw new IllegalStateException(
-                    "Batch timeout extension serialization length expected to be 4");
-        }
-        int timeout = buf.getInt();
+        int timeout = readInt(buf, "Batch timeout");
         if ((timeout < 0) && (timeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
             throw new IllegalStateException("Invalid timeout value deserialized: " + timeout);
         }
@@ -85,6 +81,20 @@ public abstract class ProcedureInvocationExtensions {
                     "All-Partition extension serialization length expected to be 0");
         }
         return true;
+    }
+
+    public static void writePartitionDestinationWithTypeByte(ByteBuffer buf, int partitionDestination) {
+        buf.put(PARTITION_DESTINATION);
+        writeLength(buf, INTEGER_SIZE);
+        buf.putInt(partitionDestination);
+    }
+
+    public static int readPartitionDestination(ByteBuffer buf) {
+        int partitionDestination = readInt(buf, "Partition destination");
+        if (partitionDestination < 0) {
+            throw new IllegalStateException("Invalid partition destination deserialized: " + partitionDestination);
+        }
+        return partitionDestination;
     }
 
     public static void skipUnknownExtension(ByteBuffer buf) {
@@ -114,5 +124,13 @@ public abstract class ProcedureInvocationExtensions {
         else {
             return 1 << (log2size - 1);
         }
+    }
+
+    private static int readInt(ByteBuffer buf, String extenstion) {
+        int len = readLength(buf);
+        if (len != INTEGER_SIZE) {
+            throw new IllegalStateException(extenstion + " extension serialization length expected to be 4");
+        }
+        return buf.getInt();
     }
 }

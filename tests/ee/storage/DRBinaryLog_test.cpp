@@ -190,18 +190,18 @@ public:
         m_exportColumnAllowNull[8] = true;
         m_exportColumnAllowNull[11] = true;
         // See DDLCompiler.java to find conflict export table schema
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(3); //row type
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1); // action type
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(4); // conflict type
-        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // conflicts on PK
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1); // action decision
-        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // remote cluster id
-        m_exportColumnType.push_back(VALUE_TYPE_BIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // remote timestamp
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1);  // flag of divergence
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1024); // table name
-        m_exportColumnType.push_back(VALUE_TYPE_TINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // local cluster id
-        m_exportColumnType.push_back(VALUE_TYPE_BIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // local timestamp
-        m_exportColumnType.push_back(VALUE_TYPE_VARCHAR);     m_exportColumnLength.push_back(1048576); // tuple data
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(3); //row type
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(1); // action type
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(4); // conflict type
+        m_exportColumnType.push_back(ValueType::tTINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT)); // conflicts on PK
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(1); // action decision
+        m_exportColumnType.push_back(ValueType::tTINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT)); // remote cluster id
+        m_exportColumnType.push_back(ValueType::tBIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT)); // remote timestamp
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(1);  // flag of divergence
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(1024); // table name
+        m_exportColumnType.push_back(ValueType::tTINYINT);     m_exportColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT)); // local cluster id
+        m_exportColumnType.push_back(ValueType::tBIGINT);      m_exportColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT)); // local timestamp
+        m_exportColumnType.push_back(ValueType::tVARCHAR);     m_exportColumnLength.push_back(1048576); // tuple data
 
         m_exportSchema = TupleSchema::createTupleSchemaForTest(m_exportColumnType, m_exportColumnLength, m_exportColumnAllowNull);
 
@@ -321,13 +321,13 @@ public:
         std::vector<bool> columnAllowNull(COLUMN_COUNT, true);
         const std::vector<bool> columnInBytes (columnAllowNull.size(), false);
 
-        columnTypes.push_back(VALUE_TYPE_TINYINT);   columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        columnTypes.push_back(VALUE_TYPE_BIGINT);    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        columnTypes.push_back(VALUE_TYPE_DECIMAL);   columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);   columnLengths.push_back(15);
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);   columnLengths.push_back(300);
-        columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
-        columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
+        columnTypes.push_back(ValueType::tTINYINT);   columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+        columnTypes.push_back(ValueType::tBIGINT);    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
+        columnTypes.push_back(ValueType::tDECIMAL);   columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDECIMAL));
+        columnTypes.push_back(ValueType::tVARCHAR);   columnLengths.push_back(15);
+        columnTypes.push_back(ValueType::tVARCHAR);   columnLengths.push_back(300);
+        columnTypes.push_back(ValueType::tTIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTIMESTAMP));
+        columnTypes.push_back(ValueType::tVARBINARY); columnLengths.push_back(300);
 
         std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT,HiddenColumn::XDCR_TIMESTAMP);
 
@@ -385,8 +385,8 @@ public:
         std::vector<ValueType> otherColumnTypes;
         std::vector<int32_t> otherColumnLengths;
         std::vector<bool> otherColumnAllowNull(2, false);
-        otherColumnTypes.push_back(VALUE_TYPE_TINYINT); otherColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        otherColumnTypes.push_back(VALUE_TYPE_BIGINT);  otherColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        otherColumnTypes.push_back(ValueType::tTINYINT); otherColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+        otherColumnTypes.push_back(ValueType::tBIGINT);  otherColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
         otherColumnAllowNull[1] = true;
 
         m_otherSchemaWithIndex = TupleSchema::createTupleSchemaForTest(otherColumnTypes, otherColumnLengths, otherColumnAllowNull);
@@ -437,7 +437,7 @@ public:
         std::vector<ValueType> singleColumnType;
         std::vector<int32_t> singleColumnLength;
         std::vector<bool> singleColumnAllowNull(1, false);
-        singleColumnType.push_back(VALUE_TYPE_TINYINT); singleColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        singleColumnType.push_back(ValueType::tTINYINT); singleColumnLength.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
         m_singleColumnSchema = TupleSchema::createTupleSchemaForTest(singleColumnType, singleColumnLength, singleColumnAllowNull);
         string singleColumnNameArray[1] = { "NOTHING" };
         const vector<string> singleColumnName(singleColumnNameArray, singleColumnNameArray + 1);
@@ -594,7 +594,7 @@ public:
             const std::string& short_varchar, const std::string& long_varchar, int64_t timestamp) {
         TableTuple temp_tuple = table->tempTuple();
         if (table->schema()->hiddenColumnCount() > 0) {
-            temp_tuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));
+            temp_tuple.setHiddenNValue(0, NValue::getNullValue(ValueType::tBIGINT));
         }
         temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(tinyint));
         temp_tuple.setNValue(1, ValueFactory::getBigIntValue(bigint));
@@ -670,7 +670,7 @@ public:
                  uniqueId); // fake uniqueid
         m_spHandleReplica++;
 
-        boost::unordered_map<int64_t, PersistentTable*> tables;
+        std::unordered_map<int64_t, PersistentTable*> tables;
         tables[42] = m_tableReplica;
         tables[43] = m_otherTableWithIndexReplica;
         tables[44] = m_otherTableWithoutIndexReplica;
@@ -744,9 +744,9 @@ public:
 
     TableTuple firstTupleWithNulls(PersistentTable* table, bool indexFriendly = false) {
         TableTuple temp_tuple = table->tempTuple();
-        temp_tuple.setNValue(0, (indexFriendly ? ValueFactory::getTinyIntValue(99) : NValue::getNullValue(VALUE_TYPE_TINYINT)));
+        temp_tuple.setNValue(0, (indexFriendly ? ValueFactory::getTinyIntValue(99) : NValue::getNullValue(ValueType::tTINYINT)));
         temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
-        temp_tuple.setNValue(2, NValue::getNullValue(VALUE_TYPE_DECIMAL));
+        temp_tuple.setNValue(2, NValue::getNullValue(ValueType::tDECIMAL));
         temp_tuple.setNValue(3, ValueFactory::getStringValue("whatever", &m_longLivedPool));
         temp_tuple.setNValue(4, ValueFactory::getNullStringValue());
         temp_tuple.setNValue(5, ValueFactory::getTimestampValue(3495));
@@ -756,11 +756,11 @@ public:
     TableTuple secondTupleWithNulls(PersistentTable* table, bool indexFriendly = false) {
         TableTuple temp_tuple = table->tempTuple();
         temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(42));
-        temp_tuple.setNValue(1, (indexFriendly ? ValueFactory::getBigIntValue(31241) : NValue::getNullValue(VALUE_TYPE_BIGINT)));
+        temp_tuple.setNValue(1, (indexFriendly ? ValueFactory::getBigIntValue(31241) : NValue::getNullValue(ValueType::tBIGINT)));
         temp_tuple.setNValue(2, ValueFactory::getDecimalValueFromString("234234.243"));
         temp_tuple.setNValue(3, ValueFactory::getNullStringValue());
         temp_tuple.setNValue(4, ValueFactory::getStringValue("whatever and ever and ever and ever", &m_longLivedPool));
-        temp_tuple.setNValue(5, NValue::getNullValue(VALUE_TYPE_TIMESTAMP));
+        temp_tuple.setNValue(5, NValue::getNullValue(ValueType::tTIMESTAMP));
         temp_tuple.setNValue(6, ValueFactory::getBinaryValue("DEADBEEF", &m_longLivedPool));
         return temp_tuple;
     }
@@ -1395,7 +1395,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNullColumn) {
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(0));
-    temp_tuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
+    temp_tuple.setNValue(1, NValue::getNullValue(ValueType::tBIGINT));
     TableTuple tuple = insertTuple(m_otherTableWithIndex, temp_tuple);
     endTxn(m_engine, true);
 

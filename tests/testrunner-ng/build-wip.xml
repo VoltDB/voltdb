@@ -360,7 +360,7 @@ DISTRIBUTION
 
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
-        destdir="${dist.dir}/doc/procedure-api"
+        destdir="${dist.dir}/doc/server-api"
         Public="true"
         version="true"
         use="true"

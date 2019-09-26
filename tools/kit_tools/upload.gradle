@@ -94,8 +94,8 @@ uploadClientArchives {
 
                licenses {
                    license {
-                       name 'GNU Affero General Public License Version 3'
-                       url 'http://www.gnu.org/licenses/agpl.txt'
+                       name 'The MIT License'
+                       url 'https://opensource.org/licenses/mit-license.php'
                        distribution 'repo'
                    }
                }

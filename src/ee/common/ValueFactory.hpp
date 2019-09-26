@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VALUEFACTORY_HPP_
-#define VALUEFACTORY_HPP_
+#pragma once
 
 #include "common/NValue.hpp"
 
@@ -60,13 +59,13 @@ public:
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     static NValue getStringValue(const char *value, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, (size_t)(value ? strlen(value) : 0), pool);
+        return NValue::getAllocatedValue(ValueType::tVARCHAR, value, (size_t)(value ? strlen(value) : 0), pool);
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     static NValue getStringValue(const std::string& value, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), pool);
+        return NValue::getAllocatedValue(ValueType::tVARCHAR, value.c_str(), value.length(), pool);
     }
 
     /// Constructs a value copied into temporary thread-local storage.
@@ -106,7 +105,7 @@ public:
     /// pool.  Arguments provide a pointer to the raw bytes and the
     /// size of the value.
     static NValue getTempBinaryValue(const char* rawBuf, int32_t rawLength) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, rawBuf, rawLength,
+        return NValue::getAllocatedValue(ValueType::tVARBINARY, rawBuf, rawLength,
                                          NValue::getTempStringPool());
     }
 
@@ -114,7 +113,7 @@ public:
     /// that will require an explicit NValue::free.
     /// Assumes raw byte input
     static NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+        return NValue::getAllocatedValue(ValueType::tVARBINARY,
                                          reinterpret_cast<const char*>(rawBuf),
                                          (size_t)rawLength,
                                          pool);
@@ -126,12 +125,12 @@ public:
 
     /// Returns an NValue of type Geography that points to an uninitialized temp buffer of the given size
     static inline NValue getUninitializedTempGeographyValue(int32_t length) {
-        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        NValue retval(ValueType::tGEOGRAPHY);
         retval.allocateValueStorage(length, NValue::getTempStringPool());
         return retval;
     }
 
-    /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */
+    /** Returns valuetype = tNULL. Careful with this! */
     static NValue getNullValue() {
         return NValue::getNullValue();
     }
@@ -153,14 +152,14 @@ public:
 
     static NValue castAsBigInt(const NValue& value) {
         if (value.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BIGINT);
+            return NValue::getNullValue(ValueType::tBIGINT);
         }
         return value.castAsBigInt();
     }
 
     static NValue castAsInteger(const NValue& value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_INTEGER);
+            NValue retval(ValueType::tINTEGER);
             retval.setNull();
             return retval;
         }
@@ -170,7 +169,7 @@ public:
 
     static NValue castAsSmallInt(const NValue& value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_SMALLINT);
+            NValue retval(ValueType::tSMALLINT);
             retval.setNull();
             return retval;
         }
@@ -180,7 +179,7 @@ public:
 
     static NValue castAsTinyInt(const NValue& value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_TINYINT);
+            NValue retval(ValueType::tTINYINT);
             retval.setNull();
             return retval;
         }
@@ -190,7 +189,7 @@ public:
 
     static NValue castAsDouble(const NValue& value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_DOUBLE);
+            NValue retval(ValueType::tDOUBLE);
             retval.setNull();
             return retval;
         }
@@ -200,7 +199,7 @@ public:
 
     static NValue castAsDecimal(const NValue& value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_DECIMAL);
+            NValue retval(ValueType::tDECIMAL);
             retval.setNull();
             return retval;
         }
@@ -219,42 +218,31 @@ public:
 
     static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, Pool* pool) {
         switch (type) {
-            case VALUE_TYPE_NULL:
-            {
+            case ValueType::tNULL:
                 return getNullValue();
-            }
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
-            case VALUE_TYPE_TIMESTAMP:
+            case ValueType::tTINYINT:
+            case ValueType::tSMALLINT:
+            case ValueType::tINTEGER:
+            case ValueType::tBIGINT:
+            case ValueType::tTIMESTAMP:
             {
-                NValue retval(VALUE_TYPE_BIGINT);
+                NValue retval(ValueType::tBIGINT);
                 int64_t ival = atol(value.c_str());
                 retval = getBigIntValue(ival);
                 return retval.castAs(type);
             }
-            case VALUE_TYPE_DECIMAL:
-            {
+            case ValueType::tDECIMAL:
                 return getDecimalValueFromString(value);
-            }
-            case VALUE_TYPE_DOUBLE:
+            case ValueType::tDOUBLE:
             {
                 double dval = atof(value.c_str());
                 return getDoubleValue(dval);
             }
-            case VALUE_TYPE_VARCHAR:
-            {
+            case ValueType::tVARCHAR:
                 return getStringValue(value.c_str(), pool);
-            }
-            case VALUE_TYPE_VARBINARY:
-            {
+            case ValueType::tVARBINARY:
                 return getBinaryValue(value, pool);
-            }
-            default:
-            {
-                // skip to throw
-            }
+            default:; // skip to throw
         }
         throwDynamicSQLException("Default value parsing error.");
     }
@@ -262,4 +250,3 @@ public:
     static NValue getRandomValue(ValueType type, uint32_t maxLength, Pool* pool = NULL);
 };
 }
-#endif /* VALUEFACTORY_HPP_ */

@@ -62,7 +62,7 @@ protected:
     UniqueTable<LargeTempTable> createAndFillLargeTempTable(int32_t varcharLengthBytes,
                                                             int32_t inlinePadding,
                                                             int32_t numBlocks) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         TupleSchema *schema = getSchemaOfLength(varcharLengthBytes, inlinePadding);
         std::vector<std::string> names;
         names.push_back("strfld");
@@ -74,7 +74,7 @@ protected:
 
         int expectedTuples = 0;
         for (int i = 0; i < numBlocks; ++i) {
-            LargeTempTableBlock* block = lttBlockCache->getEmptyBlock(schema);
+            LargeTempTableBlock* block = lttBlockCache.getEmptyBlock(schema);
             fillBlock(block);
             expectedTuples += block->activeTupleCount();
             block->unpin();
@@ -189,9 +189,9 @@ protected:
 private:
     TupleSchema* getSchemaOfLength(int32_t varcharLengthBytes, int32_t inlinePadding) {
         TupleSchemaBuilder builder(inlinePadding + 1);
-        builder.setColumnAtIndex(0, VALUE_TYPE_VARCHAR, varcharLengthBytes, true, true);
+        builder.setColumnAtIndex(0, ValueType::tVARCHAR, varcharLengthBytes, true, true);
         for (int i = 0; i < inlinePadding; ++i) {
-            builder.setColumnAtIndex(i + 1, VALUE_TYPE_TINYINT);
+            builder.setColumnAtIndex(i + 1, ValueType::tTINYINT);
         }
         return builder.build();
     }
@@ -207,7 +207,7 @@ private:
 
         uint32_t varcharLength = block->schema()->getColumnInfo(0)->length;
         do {
-            tupleToInsert.setNValue(0, ValueFactory::getRandomValue(VALUE_TYPE_VARCHAR, varcharLength, tempPool));
+            tupleToInsert.setNValue(0, ValueFactory::getRandomValue(ValueType::tVARCHAR, varcharLength, tempPool));
         }
         while (block->insertTuple(tupleToInsert));
     }
@@ -360,7 +360,7 @@ typedef std::tuple<int, int> SortConfig;
 
 #ifndef MEMCHECK
 std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     std::vector<SortConfig> configs;
 
@@ -376,7 +376,7 @@ std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
     // Add some interesting numbers:
     int totalTuples = static_cast<int>(ltt->activeTupleCount());
     if (totalTuples > 0) {
-        LargeTempTableBlock *block = lttBlockCache->getBlockForDebug(ltt->getBlockIds()[0]);
+        LargeTempTableBlock *block = lttBlockCache.getBlockForDebug(ltt->getBlockIds()[0]);
         int tuplesPerBlock = static_cast<int>(block->activeTupleCount());
 
         std::vector<int> interestingValues {

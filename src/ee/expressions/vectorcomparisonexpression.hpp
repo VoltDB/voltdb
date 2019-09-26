@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREVECTORCOMPARISONEXPRESSION_H
-#define HSTOREVECTORCOMPARISONEXPRESSION_H
+#pragma once
 
 #include "common/common.h"
 #include "common/executorcontext.hpp"
@@ -64,15 +63,14 @@ namespace voltdb {
 
 // Compares two tuples column by column using lexicographical compare.
 template<typename OP>
-NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
-{
+NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2) {
     vassert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
     NValue fallback_result = OP::includes_equality() ? NValue::getTrue() : NValue::getFalse();
     int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
         NValue value1 = tuple1.getNValue(columnIdx);
         if (value1.isNull() && OP::isNullRejecting()) {
-            fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            fallback_result = NValue::getNullValue(ValueType::tBOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
             }
@@ -80,7 +78,7 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
         }
         NValue value2 = tuple2.getNValue(columnIdx);
         if (value2.isNull() && OP::isNullRejecting()) {
-            fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            fallback_result = NValue::getNullValue(ValueType::tBOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
             }
@@ -91,12 +89,9 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
                 // allow early return on strict inequality
                 return NValue::getTrue();
             }
-        }
-        else {
-            if (OP::implies_false_for_row(value1, value2)) {
+        } else if (OP::implies_false_for_row(value1, value2)) {
                 // allow early return on strict inequality
                 return NValue::getFalse();
-            }
         }
     }
     // The only cases that have not already short-circuited involve all equal columns.
@@ -107,14 +102,14 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
 //Assumption - quantifier is on the right
 template <typename OP, typename ValueExtractorLeft, typename ValueExtractorRight>
 class VectorComparisonExpression : public AbstractExpression {
+    QuantifierType m_quantifier;
 public:
     VectorComparisonExpression(ExpressionType et,
                            AbstractExpression *left,
                            AbstractExpression *right,
                            QuantifierType quantifier)
         : AbstractExpression(et, left, right),
-          m_quantifier(quantifier)
-    {
+          m_quantifier(quantifier) {
         vassert(left != NULL);
         vassert(right != NULL);
     };
@@ -124,104 +119,92 @@ public:
     std::string debugInfo(const std::string &spacer) const {
         return (spacer + "VectorComparisonExpression\n");
     }
-
-private:
-    QuantifierType m_quantifier;
 };
 
-struct NValueExtractor
-{
-    typedef NValue ValueType;
+class NValueExtractor {
+    NValue m_value;
+    const NValue m_nullValue;
+    bool m_hasNext = true;
+public:
+    using value_type = NValue;
 
-    NValueExtractor(NValue value) :
-        m_value(value), m_nullValue(value), m_hasNext(true)
-    { }
-
-    int64_t resultSize() const
-    {
+    NValueExtractor(NValue value) : m_value(value), m_nullValue(value) {}
+    int64_t resultSize() const {
         return hasNullValue() ? 0 : 1;
     }
 
-    bool hasNullValue() const
-    {
+    bool hasNullValue() const {
         return m_value.isNull();
     }
 
-    bool hasNext()
-    {
+    bool hasNext() const {
         return m_hasNext;
     }
 
-    ValueType next()
-    {
+    NValue next() {
         m_hasNext = false;
         return m_value;
     }
 
     template<typename OP>
-    NValue compare(const TableTuple& tuple) const
-    {
+    NValue compare(const TableTuple& tuple) const {
         vassert(tuple.getSchema()->columnCount() == 1);
         return compare<OP>(tuple.getNValue(0));
     }
 
     template<typename OP>
-    NValue compare(const NValue& nvalue) const
-    {
+    NValue compare(const NValue& nvalue) const {
         if (m_value.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
+        } else if (nvalue.isNull() && OP::isNullRejecting()) {
+            return NValue::getNullValue(ValueType::tBOOLEAN);
+        } else {
+            return OP::compare(m_value, nvalue);
         }
-        if (nvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-        return OP::compare(m_value, nvalue);
     }
 
-    std::string debug() const
-    {
+    std::string debug() const {
         return m_value.isNull() ? "NULL" : m_value.debug();
     }
 
-    const ValueType& getNullValue()
-    {
+    const NValue& getNullValue() const {
         return m_nullValue;
     }
-
-private:
-    ValueType m_value;
-    const ValueType m_nullValue;
-    bool m_hasNext;
 };
 
-struct TupleExtractor
-{
-    typedef TableTuple ValueType;
+class TupleExtractor {
+    Table* m_table;
+    TableIterator m_iterator;
+    TableTuple m_tuple;
+    StandAloneTupleStorage m_null_tuple;
+    int64_t m_size;
 
-    TupleExtractor(NValue value) :
-        m_table(getOutputTable(value)),
-        m_iterator(m_table->iterator()),
-        m_tuple(m_table->schema()),
-        m_null_tuple(m_table->schema()),
-        m_size(m_table->activeTupleCount())
-    {}
+    static Table* getOutputTable(const NValue& value) {
+        int subqueryId = ValuePeeker::peekInteger(value);
+        ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
+        Table* table = exeContext->getSubqueryOutputTable(subqueryId);
+        vassert(table != NULL);
+        return table;
+    }
+public:
+    using value_type = TableTuple;
+    TupleExtractor(NValue value) : m_table(getOutputTable(value)),
+        m_iterator(m_table->iterator()), m_tuple(m_table->schema()),
+        m_null_tuple(m_table->schema()), m_size(m_table->activeTupleCount()) {}
 
-    int64_t resultSize() const
-    {
+    int64_t resultSize() const {
         return m_size;
     }
 
-    bool hasNext()
-    {
+    bool hasNext() {
         return m_iterator.next(m_tuple);
     }
 
-    ValueType next()
-    {
+    TableTuple next() {
         return m_tuple;
     }
 
-    bool hasNullValue() const
-    {
+    bool hasNullValue() const {
         if (m_tuple.isNullTuple()) {
             return true;
         }
@@ -235,54 +218,35 @@ struct TupleExtractor
     }
 
     template<typename OP>
-    NValue compare(const TableTuple& tuple) const
-    {
+    NValue compare(const TableTuple& tuple) const {
         return compare_tuple<OP>(m_tuple, tuple);
     }
 
     template<typename OP>
-    NValue compare(const NValue& nvalue) const
-    {
+    NValue compare(const NValue& nvalue) const {
         vassert(m_tuple.getSchema()->columnCount() == 1);
         NValue lvalue = m_tuple.getNValue(0);
         if (lvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
         if (nvalue.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
         return OP::compare(lvalue, nvalue);
     }
 
-    std::string debug() const
-    {
+    std::string debug() const {
         return m_tuple.isNullTuple() ? "NULL" : m_tuple.debug("TEMP");
     }
 
-    ValueType getNullValue()
-    {
+    TableTuple getNullValue() {
         return m_null_tuple.tuple();
     }
-private:
-    static Table* getOutputTable(const NValue& value)
-    {
-        int subqueryId = ValuePeeker::peekInteger(value);
-        ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
-        Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-        vassert(table != NULL);
-        return table;
-    }
-
-    Table* m_table;
-    TableIterator m_iterator;
-    ValueType m_tuple;
-    StandAloneTupleStorage m_null_tuple;
-    int64_t m_size;
 };
 
 template <typename OP, typename ValueExtractorOuter, typename ValueExtractorInner>
-NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
-{
+NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>::eval(
+        const TableTuple *tuple1, const TableTuple *tuple2) const {
     // Outer and inner expressions can be either a row (expr1, expr2, expr3...) or a single expr
     // The quantifier is expected on the right side of the expression "outer_expr OP ANY/ALL(inner_expr )"
 
@@ -329,12 +293,12 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             // Check if the comparison operator is Null rejecting. If it is, return
             // NULL for boolean.
             if (OP::isNullRejecting() || !outerExtractor.hasNext()) {
-                return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+                return NValue::getNullValue(ValueType::tBOOLEAN);
             }
 
             // If for the operator, NULL is a valid value in result, construct RHS value
             // with NULL and use that to compare against outer-extractor value.
-            const typename ValueExtractorInner::ValueType& innerNullValue = innerExtractor.getNullValue();
+            const typename ValueExtractorInner::value_type& innerNullValue = innerExtractor.getNullValue();
             vassert(innerExtractor.hasNullValue());
             return outerExtractor.template compare<OP>(innerNullValue);
         }
@@ -349,7 +313,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
 
     vassert (innerExtractor.resultSize() > 0);
     if (!outerExtractor.hasNext() || (outerExtractor.hasNullValue() && OP::isNullRejecting()) ) {
-        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
 
     //  Iterate over the inner results until
@@ -359,7 +323,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     bool hasInnerNull = false;
     NValue result;
     while (innerExtractor.hasNext()) {
-        typename ValueExtractorInner::ValueType innerValue = innerExtractor.next();
+        typename ValueExtractorInner::value_type innerValue = innerExtractor.next();
         result = outerExtractor.template compare<OP>(innerValue);
         if (result.isTrue()) {
             if (m_quantifier != QUANTIFIER_TYPE_ALL) {
@@ -379,11 +343,10 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // A NULL match along the way determines the result
     // for cases that never found a definitive result.
     if (hasInnerNull) {
-        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        return NValue::getNullValue(ValueType::tBOOLEAN);
     }
     // Otherwise, return the unanimous result. false for ANY, true for ALL.
     return result;
 }
-
 }
-#endif
+

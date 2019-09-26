@@ -90,6 +90,19 @@ public class CatchAllVoltDBStatement extends StatementProcessor {
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 
+        if (TASK.equals(m_firstProcessor.getCommandPrefix())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE TASK statement: \"%s\", expected syntax: \n\""
+                            + "CREATE TASK <name> "
+                            + "ON SCHEDULE (CRON <exp> | DELAY <interval> <unit> | EVERY <interval> <unit>) "
+                            + "PROCEDURE <procedure> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]"
+                            + "\"\nor\n\""
+                            + "CREATE TASK <name> FROM CLASS <class> [ WITH (arg1, ...)] "
+                            + "[ON ERROR (STOP | LOG | IGNORE)] [RUN ON (DATABASE | HOSTS | PARTITIONS)] [AS USER <user>] [ENABLE | DISABLE]\"",
+                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
+        }
+
         if (AGGREGATE.equals(m_firstProcessor.getCommandPrefix())) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE AGGREGATE FUNCTION statement: \"%s\", " +

@@ -504,7 +504,8 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint)
+            suspect instanceof Constraint ||
+            suspect instanceof Task)
         {
             return null;
         }
@@ -570,6 +571,11 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Connector) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
+
+        else if (suspect instanceof ThreadPool) {
             m_requiresNewExportGeneration = true;
             return null;
         }
@@ -963,11 +969,11 @@ public class CatalogDiffEngine {
         if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
         }
-        if (suspect instanceof Connector && "enabled".equals(field)) {
+        if (suspect instanceof Connector && ("enabled".equals(field) || "loaderclass".equals(field) || "threadpoolname".equals(field))) {
             m_requiresNewExportGeneration = true;
             return null;
         }
-        if (suspect instanceof Connector && "loaderclass".equals(field)) {
+        if (suspect instanceof ThreadPool) {
             m_requiresNewExportGeneration = true;
             return null;
         }
@@ -1040,6 +1046,10 @@ public class CatalogDiffEngine {
                 assert isDRed != null;
                 if (!isDRed) return null;
             }
+        }
+
+        if (suspect instanceof Task && (field.equals("enabled") || field.equals("onError"))) {
+            return null;
         }
 
         // whitelist certain column changes

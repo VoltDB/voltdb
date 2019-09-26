@@ -78,10 +78,12 @@
 // This is useful because it will allow us to check different types and other
 // configurations without having to dig down into the code
 //
-voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { voltdb::VALUE_TYPE_INTEGER,
-                                                    voltdb::VALUE_TYPE_VARCHAR,
-                                                    voltdb::VALUE_TYPE_VARCHAR,
-                                                    voltdb::VALUE_TYPE_INTEGER };
+voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = {
+    voltdb::ValueType::tINTEGER,
+    voltdb::ValueType::tVARCHAR,
+    voltdb::ValueType::tVARCHAR,
+    voltdb::ValueType::tINTEGER
+};
 int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };
 
@@ -113,7 +115,8 @@ const char *catalog_string =
             "set $PREV drClusterId 0\n"
             "set $PREV drProducerPort 0\n"
             "set $PREV drMasterHost \"\"\n"
-            "set $PREV drFlushInterval 0\n"
+            "set $PREV drFlushInterval 1\n"
+            "set $PREV exportFlushInterval 1\n"
             "add /clusters#cluster databases database\n"
             "set /clusters#cluster/databases#database schema \"eJylU1tuwzAM+99pbIn043N1nPsfabJRtGtXdYmLIFFgWSJFgVAKiEiAEuwbIWjj3w52KEm10x0bSJEgxd75vMqjAhJSTT0jMeXEbDXo2IkRSevdpD30SKiU2aUb+jawc0oxS9JURpSiokGhRepTbTPmS5X8NtQANeZz8ifOt7sMc6rNcITVai82Zx06uPOPbNXLFx6ktVQfUCxXAjep7xmNltvRffF90D+ApnW3GaPFo/CyDN/cXTZnU4sK6SGKn9D47QFr8tYDr/JnPTB7LHpg1i55YFR+7gF3/v89MAm89YAnvg96wgMuvCzDN3eXzdnUokJ6iOI5Gj8YBELa\"\n"
             "set $PREV isActiveActiveDRed false\n"

@@ -163,8 +163,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId,
-            final int exportFlushTimeout)
+            final boolean isLowestSiteId)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -194,8 +193,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
                     isLowestSiteId,
-                    EE_COMPACTION_THRESHOLD,
-                    exportFlushTimeout);
+                    EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);
@@ -943,6 +941,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
+            // For vectorization, pass an array of arguments of same type, stored in m_udfBuffer
             udafRunner.assemble(m_udfBuffer, udafIndex);
             m_udfBuffer.clear();
             return 0;
@@ -974,8 +973,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             } finally {
                 try {
                     in.close();
-                } catch (IOException ex) {
-                }
+                } catch (IOException exIgnored) {}
             }
             // call the combine method with the deserialized worker object
             udafRunner.combine(workerObject, udafIndex);

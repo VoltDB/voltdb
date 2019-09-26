@@ -93,223 +93,264 @@ class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest()
             : drStream(44, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
-              drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION) {
-            mockEngine = new MockVoltDBEngine();
-            eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
-            mem = 0;
-            *reinterpret_cast<int64_t*>(signature) = 42;
+            drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION) {
+                mockEngine = new MockVoltDBEngine();
+                eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
+                mem = 0;
+                *reinterpret_cast<int64_t*>(signature) = 42;
 
-            eContext->setupForPlanFragments(NULL, 44, 44, 44, 44, false);
+                eContext->setupForPlanFragments(NULL, 44, 44, 44, 44, false);
 
-            vector<voltdb::ValueType> districtColumnTypes;
-            vector<int32_t> districtColumnLengths;
-            vector<bool> districtColumnAllowNull(11, true);
-            districtColumnAllowNull[0] = false;
+                vector<voltdb::ValueType> districtColumnTypes;
+                vector<int32_t> districtColumnLengths;
+                vector<bool> districtColumnAllowNull(11, true);
+                districtColumnAllowNull[0] = false;
 
-            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(2);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(9);
-            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+                districtColumnTypes.push_back(ValueType::tTINYINT);
+                districtColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+                districtColumnTypes.push_back(ValueType::tTINYINT);
+                districtColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(15);
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(15);
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(15);
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(15);
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(2);
+                districtColumnTypes.push_back(ValueType::tVARCHAR);
+                districtColumnLengths.push_back(9);
+                districtColumnTypes.push_back(ValueType::tDOUBLE);
+                districtColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                districtColumnTypes.push_back(ValueType::tDOUBLE);
+                districtColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                districtColumnTypes.push_back(ValueType::tINTEGER);
+                districtColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
 
-            districtTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
-            districtReplicaTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
+                districtTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
+                districtReplicaTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
 
-            districtIndex1ColumnIndices.push_back(1);
-            districtIndex1ColumnIndices.push_back(0);
+                districtIndex1ColumnIndices.push_back(1);
+                districtIndex1ColumnIndices.push_back(0);
 
-            districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
-                                                    districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, false, false, districtTupleSchema);
-            districtReplicaIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
-                                                           districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, false, false, districtReplicaTupleSchema);
+                districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
+                        districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, false, false, districtTupleSchema);
+                districtReplicaIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
+                        districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, false, false, districtReplicaTupleSchema);
 
 
-            vector<voltdb::ValueType> warehouseColumnTypes;
-            vector<int32_t> warehouseColumnLengths;
-            vector<bool> warehouseColumnAllowNull(9, true);
-            warehouseColumnAllowNull[0] = false;
+                vector<voltdb::ValueType> warehouseColumnTypes;
+                vector<int32_t> warehouseColumnLengths;
+                vector<bool> warehouseColumnAllowNull(9, true);
+                warehouseColumnAllowNull[0] = false;
 
-            warehouseColumnTypes.push_back(VALUE_TYPE_TINYINT); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(2);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(9);
-            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+                warehouseColumnTypes.push_back(ValueType::tTINYINT);
+                warehouseColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(15);
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(15);
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(15);
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(15);
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(2);
+                warehouseColumnTypes.push_back(ValueType::tVARCHAR);
+                warehouseColumnLengths.push_back(9);
+                warehouseColumnTypes.push_back(ValueType::tDOUBLE);
+                warehouseColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                warehouseColumnTypes.push_back(ValueType::tDOUBLE);
+                warehouseColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
 
-            warehouseTupleSchema = TupleSchema::createTupleSchemaForTest(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
+                warehouseTupleSchema = TupleSchema::createTupleSchemaForTest(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
 
-            warehouseIndex1ColumnIndices.push_back(0);
+                warehouseIndex1ColumnIndices.push_back(0);
 
-            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
-                                                     warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                     true, true, false, warehouseTupleSchema);
+                warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
+                        warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, true, false, warehouseTupleSchema);
 
-            vector<voltdb::ValueType> customerColumnTypes;
-            vector<int32_t> customerColumnLengths;
-            vector<bool> customerColumnAllowNull(21, true);
-            customerColumnAllowNull[0] = false;
-            customerColumnAllowNull[1] = false;
-            customerColumnAllowNull[2] = false;
+                vector<voltdb::ValueType> customerColumnTypes;
+                vector<int32_t> customerColumnLengths;
+                vector<bool> customerColumnAllowNull(21, true);
+                customerColumnAllowNull[0] = false;
+                customerColumnAllowNull[1] = false;
+                customerColumnAllowNull[2] = false;
 
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(9);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
-            customerColumnTypes.push_back(VALUE_TYPE_TIMESTAMP); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(500);
+                customerColumnTypes.push_back(ValueType::tINTEGER);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+                customerColumnTypes.push_back(ValueType::tTINYINT);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+                customerColumnTypes.push_back(ValueType::tTINYINT);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(2);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(2);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(9);
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(15);
+                customerColumnTypes.push_back(ValueType::tTIMESTAMP);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTIMESTAMP));
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(2);
+                customerColumnTypes.push_back(ValueType::tDOUBLE);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                customerColumnTypes.push_back(ValueType::tDOUBLE);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                customerColumnTypes.push_back(ValueType::tDOUBLE);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                customerColumnTypes.push_back(ValueType::tDOUBLE);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tDOUBLE));
+                customerColumnTypes.push_back(ValueType::tINTEGER);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+                customerColumnTypes.push_back(ValueType::tINTEGER);
+                customerColumnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+                customerColumnTypes.push_back(ValueType::tVARCHAR);
+                customerColumnLengths.push_back(500);
 
-            customerTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
-            customerReplicaTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
+                customerTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
+                customerReplicaTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
 
-            customerIndex1ColumnIndices.push_back(2);
-            customerIndex1ColumnIndices.push_back(1);
-            customerIndex1ColumnIndices.push_back(0);
+                customerIndex1ColumnIndices.push_back(2);
+                customerIndex1ColumnIndices.push_back(1);
+                customerIndex1ColumnIndices.push_back(0);
 
-            customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
-                                                    customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, false, customerTupleSchema);
-            customerReplicaIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
-                                                           customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, true, false, customerReplicaTupleSchema);
+                customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
+                        customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, true, false, customerTupleSchema);
+                customerReplicaIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
+                        customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, true, false, customerReplicaTupleSchema);
 
-            customerIndex2ColumnIndices.push_back(2);
-            customerIndex2ColumnIndices.push_back(1);
-            customerIndex2ColumnIndices.push_back(5);
-            customerIndex2ColumnIndices.push_back(3);
+                customerIndex2ColumnIndices.push_back(2);
+                customerIndex2ColumnIndices.push_back(1);
+                customerIndex2ColumnIndices.push_back(5);
+                customerIndex2ColumnIndices.push_back(3);
 
-            customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
-                                                    customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, false, customerTupleSchema);
-            customerReplicaIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
-                                                           customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, true, false, customerReplicaTupleSchema);
-            customerIndexes.push_back(customerIndex2Scheme);
-            customerReplicaIndexes.push_back(customerReplicaIndex2Scheme);
+                customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
+                        customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, true, false, customerTupleSchema);
+                customerReplicaIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
+                        customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
+                        true, true, false, customerReplicaTupleSchema);
+                customerIndexes.push_back(customerIndex2Scheme);
+                customerReplicaIndexes.push_back(customerReplicaIndex2Scheme);
 
-            customerIndex3ColumnIndices.push_back(2);
-            customerIndex3ColumnIndices.push_back(1);
-            customerIndex3ColumnIndices.push_back(5);
+                customerIndex3ColumnIndices.push_back(2);
+                customerIndex3ColumnIndices.push_back(1);
+                customerIndex3ColumnIndices.push_back(5);
 
-            customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
-                                                    customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    false, false, false, customerTupleSchema);
-            customerReplicaIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
-                                                           customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           false, false, false, customerReplicaTupleSchema);
-            customerIndexes.push_back(customerIndex3Scheme);
-            customerReplicaIndexes.push_back(customerReplicaIndex3Scheme);
+                customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
+                        customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
+                        false, false, false, customerTupleSchema);
+                customerReplicaIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
+                        customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
+                        false, false, false, customerReplicaTupleSchema);
+                customerIndexes.push_back(customerIndex3Scheme);
+                customerReplicaIndexes.push_back(customerReplicaIndex3Scheme);
 
-            string districtColumnNamesArray[11] = {
-                "D_ID", "D_W_ID", "D_NAME", "D_STREET_1", "D_STREET_2", "D_CITY",
-                "D_STATE", "D_ZIP", "D_TAX", "D_YTD", "D_NEXT_O_ID" };
-            const vector<string> districtColumnNames(districtColumnNamesArray, districtColumnNamesArray + 11 );
+                string districtColumnNamesArray[11] = {
+                    "D_ID", "D_W_ID", "D_NAME", "D_STREET_1", "D_STREET_2", "D_CITY",
+                    "D_STATE", "D_ZIP", "D_TAX", "D_YTD", "D_NEXT_O_ID" };
+                const vector<string> districtColumnNames(districtColumnNamesArray, districtColumnNamesArray + 11 );
 
-            string warehouseColumnNamesArray[9] = {
+                string warehouseColumnNamesArray[9] = {
                     "W_ID", "W_NAME", "W_STREET_1", "W_STREET_2", "W_CITY", "W_STATE",
                     "W_ZIP", "W_TAX", "W_YTD" };
-            const vector<string> warehouseColumnNames(warehouseColumnNamesArray, warehouseColumnNamesArray + 9 );
+                const vector<string> warehouseColumnNames(warehouseColumnNamesArray, warehouseColumnNamesArray + 9 );
 
-            string customerColumnNamesArray[21] = {
+                string customerColumnNamesArray[21] = {
                     "C_ID", "C_D_ID", "C_W_ID", "C_FIRST", "C_MIDDLE", "C_LAST",
                     "C_STREET_1", "C_STREET_2", "C_CITY", "C_STATE", "C_ZIP", "C_PHONE",
                     "C_SINCE_TIMESTAMP", "C_CREDIT", "C_CREDIT_LIM", "C_DISCOUNT",
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
-            const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
+                const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
-                                                                                                        "DISTRICT",
-                                                                                                        districtTupleSchema,
-                                                                                                        districtColumnNames,
-                                                                                                        signature,
-                                                                                                        false, 0));
-            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
-                                                                                                               "DISTRICT",
-                                                                                                               districtReplicaTupleSchema,
-                                                                                                               districtColumnNames,
-                                                                                                               signature,
-                                                                                                               false, 0));
+                districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                            "DISTRICT",
+                            districtTupleSchema,
+                            districtColumnNames,
+                            signature,
+                            false, 0));
+                districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                            "DISTRICT",
+                            districtReplicaTupleSchema,
+                            districtColumnNames,
+                            signature,
+                            false, 0));
 
-            // add other indexes
-            BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
-                TableIndex *index = TableIndexFactory::getInstance(scheme);
-                assert(index);
-                districtTable->addIndex(index);
+                // add other indexes
+                BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
+                    TableIndex *index = TableIndexFactory::getInstance(scheme);
+                    assert(index);
+                    districtTable->addIndex(index);
+                }
+                BOOST_FOREACH(TableIndexScheme &scheme, districtReplicaIndexes) {
+                    TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
+                    assert(replicaIndex);
+                    districtTableReplica->addIndex(replicaIndex);
+                }
+
+                districtTempTable = TableFactory::buildCopiedTempTable("DISTRICT TEMP",
+                        districtTable);
+
+                warehouseTable = static_cast<PersistentTable*>(TableFactory::getPersistentTable(0, "WAREHOUSE",
+                            warehouseTupleSchema,
+                            warehouseColumnNames,
+                            signature, false,
+                            0, PERSISTENT));
+
+                // add other indexes
+                BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
+                    TableIndex *index = TableIndexFactory::getInstance(scheme);
+                    assert(index);
+                    warehouseTable->addIndex(index);
+                }
+
+                warehouseTempTable = TableFactory::buildCopiedTempTable("WAREHOUSE TEMP",
+                        warehouseTable);
+
+                customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
+                            customerTupleSchema, customerColumnNames,
+                            signature, false,
+                            0, PERSISTENT));
+                customerTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
+                            customerReplicaTupleSchema, customerColumnNames,
+                            signature, false,
+                            0, PERSISTENT));
+
+                // add other indexes
+                BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
+                    TableIndex *index = TableIndexFactory::getInstance(scheme);
+                    assert(index);
+                    customerTable->addIndex(index);
+                }
+                BOOST_FOREACH(TableIndexScheme &scheme, customerReplicaIndexes) {
+                    TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
+                    assert(replicaIndex);
+                    customerTableReplica->addIndex(replicaIndex);
+                }
+
+                customerTempTable = TableFactory::buildCopiedTempTable("CUSTOMER TEMP",
+                        customerTable);
             }
-            BOOST_FOREACH(TableIndexScheme &scheme, districtReplicaIndexes) {
-                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
-                assert(replicaIndex);
-                districtTableReplica->addIndex(replicaIndex);
-            }
-
-            districtTempTable = TableFactory::buildCopiedTempTable("DISTRICT TEMP",
-                                                                   districtTable);
-
-            warehouseTable = static_cast<PersistentTable*>(TableFactory::getPersistentTable(0, "WAREHOUSE",
-                                                                                            warehouseTupleSchema,
-                                                                                            warehouseColumnNames,
-                                                                                            signature, false,
-                                                                                            0, PERSISTENT));
-
-            // add other indexes
-            BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
-                TableIndex *index = TableIndexFactory::getInstance(scheme);
-                assert(index);
-                warehouseTable->addIndex(index);
-            }
-
-            warehouseTempTable = TableFactory::buildCopiedTempTable("WAREHOUSE TEMP",
-                                                                    warehouseTable);
-
-            customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
-                                                               customerTupleSchema, customerColumnNames,
-                                                               signature, false,
-                                                               0, PERSISTENT));
-            customerTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
-                                                                      customerReplicaTupleSchema, customerColumnNames,
-                                                                      signature, false,
-                                                                      0, PERSISTENT));
-
-            // add other indexes
-            BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
-                TableIndex *index = TableIndexFactory::getInstance(scheme);
-                assert(index);
-                customerTable->addIndex(index);
-            }
-            BOOST_FOREACH(TableIndexScheme &scheme, customerReplicaIndexes) {
-                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
-                assert(replicaIndex);
-                customerTableReplica->addIndex(replicaIndex);
-            }
-
-            customerTempTable = TableFactory::buildCopiedTempTable("CUSTOMER TEMP",
-                                                                   customerTable);
-        }
 
         size_t drStartPosition(boost::shared_ptr<StreamBlock> sb) {
             return sb->headerSize() - 8;
@@ -446,7 +487,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
@@ -590,7 +631,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
@@ -708,7 +749,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
-    boost::unordered_map<int64_t, PersistentTable*> tables;
+    std::unordered_map<int64_t, PersistentTable*> tables;
     tables[42] = customerTableReplica;
 
     //Fetch the generated block of log data

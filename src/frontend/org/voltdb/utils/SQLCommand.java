@@ -210,7 +210,7 @@ public class SQLCommand {
         }
     }
 
-    public static void getInteractiveQueries(SQLConsoleReader interactiveReader) throws Exception {
+    private static void getInteractiveQueries(SQLConsoleReader interactiveReader) throws Exception {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
@@ -218,8 +218,8 @@ public class SQLCommand {
         boolean isRecall = false;
 
         while (true) {
-            String stmtContinuationStr = (statement.length() > 0 ? "  " : "");
-            String prompt = isRecall ? "" : ( stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
+            String stmtContinuationStr = statement.length() > 0 ? "  " : "";
+            String prompt = isRecall ? "" : (stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
             if (line == null) {
@@ -377,12 +377,15 @@ public class SQLCommand {
                 case "configuration":
                     execListConfigurations();
                     break;
+            case "tasks":
+                    executeListTasks();
+                    break;
                 default:
                     String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + subcommand + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are proc, procedures, tables, or classes.");
+                            "The valid SHOW command completions are proc, procedures, tables, classes or schedules.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
@@ -545,6 +548,14 @@ public class SQLCommand {
             return true;
         }
 
+        // QUERYSTATS
+        String queryStatsArgs = SQLParser.parseQueryStatsStatement(line);
+        if (queryStatsArgs != null) {
+            m_startTime = System.nanoTime();    // needs to reset timer here
+            printResponse(m_client.callProcedure("@QueryStats", queryStatsArgs), false);
+            return true;
+        }
+
         // It wasn't a locally-interpreted directive.
         return false;
     }
@@ -553,6 +564,14 @@ public class SQLCommand {
         VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
         if (configData.getRowCount() != 0) {
             printConfig(configData);
+        }
+    }
+
+    private static void executeListTasks() throws Exception {
+        VoltTable schedules = m_client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
+        System.out.println("--- Tasks ----------------------------------------------------");
+        while (schedules.advanceRow()) {
+            System.out.println(schedules.getString(0));
         }
     }
 
@@ -710,7 +729,7 @@ public class SQLCommand {
      * i.e., a "here document" that is coming from the same input stream
      * as the "file" directive.
      *
-     * @param fileInfo    Info on the file directive being processed
+     * @param filesInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
      * @throws IOException
      */
@@ -740,7 +759,6 @@ public class SQLCommand {
 
             FileInfo fileInfo = filesInfo.get(ii);
             adapter = null;
-            reader = null;
 
             if (fileInfo.getOption() == FileOption.INLINEBATCH) {
                 // File command is a "here document" so pass in the current
@@ -801,8 +819,9 @@ public class SQLCommand {
             throws Exception {
 
         // return back in case of multiple batch files
-        if (reader == null)
+        if (reader == null) {
             return;
+        }
 
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
@@ -1100,7 +1119,7 @@ public class SQLCommand {
         // and multiple valid statements.
         m_exitCode = -1;
         if (m_stopOnError) {
-            if ( ! m_interactive ) {
+            if (! m_interactive ) {
                 throw new SQLCmdEarlyExitException();
             }
             // Setting this member to drive a fast stack unwind from
@@ -1182,8 +1201,7 @@ public class SQLCommand {
                         .put( 1, Arrays.asList("varchar"))
                         .put( 3, Arrays.asList("varchar", "varchar", "bit")).build());
         Procedures.put("@SnapshotScan",
-                ImmutableMap.<Integer, List<String>>builder().put( 1,
-                Arrays.asList("varchar")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Statistics",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("statisticscomponent", "bit")).build());
         Procedures.put("@SystemCatalog",
@@ -1220,10 +1238,12 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("tinyint", "tinyint", "tinyint")).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@QueryStats",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Trace",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>())
-                        .put( 1, Arrays.asList("varchar"))
-                        .put( 2, Arrays.asList("varchar", "varchar")).build());
+                        .put(1, Arrays.asList("varchar"))
+                        .put(2, Arrays.asList("varchar", "varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
@@ -1231,16 +1251,21 @@ public class SQLCommand {
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
-        String connectionErrorMessages = "";
+        StringBuilder connectionErrorMessages = new StringBuilder();
 
         for (String server : servers) {
             try {
                 client.createConnection(server.trim(), port);
                 connectedAnyServer = true;
             } catch (UnknownHostException e) {
-                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
+                connectionErrorMessages.append("\n    ")
+                        .append(server.trim())
+                        .append(":").append(port)
+                        .append(" - UnknownHostException");
             } catch (IOException e) {
-                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
+                connectionErrorMessages.append("\n    ")
+                        .append(server.trim()).append(":")
+                        .append(port).append(" - ").append(e.getMessage());
             }
         }
 
@@ -1502,23 +1527,35 @@ public class SQLCommand {
         for (String arg : args) {
             if (arg.startsWith("--servers=")) {
                 serverList = extractArgInput(arg);
-                if (serverList == null) return -1;
+                if (serverList == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--port=")) {
                 String portStr = extractArgInput(arg);
-                if (portStr == null) return -1;
+                if (portStr == null) {
+                    return -1;
+                }
                 port = Integer.parseInt(portStr);
             } else if (arg.startsWith("--user=")) {
                 user = extractArgInput(arg);
-                if (user == null) return -1;
+                if (user == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
-                if (password == null) return -1;
+                if (password == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--credentials")) {
                 credentials = extractArgInput(arg);
-                if (credentials == null) return -1;
+                if (credentials == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
-                if (kerberos == null) return -1;
+                if (kerberos == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
@@ -1532,7 +1569,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--output-format=")) {
                 String formatName = extractArgInput(arg);
-                if (formatName == null) return -1;
+                if (formatName == null) {
+                    return -1;
+                }
                 formatName = formatName.toLowerCase();
                 switch (formatName) {
                     case "fixed":
@@ -1550,7 +1589,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--stop-on-error=")) {
                 String optionName = extractArgInput(arg);
-                if (optionName == null) return -1;
+                if (optionName == null) {
+                    return -1;
+                }
                 optionName = optionName.toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
@@ -1562,7 +1603,9 @@ public class SQLCommand {
                 }
             } else if (arg.startsWith("--ddl-file=")) {
                 String ddlFilePath = extractArgInput(arg);
-                if (ddlFilePath == null) return -1;
+                if (ddlFilePath == null) {
+                    return -1;
+                }
                 try {
                     File ddlJavaFile = new File(ddlFilePath);
                     Scanner scanner = new Scanner(ddlJavaFile);
@@ -1575,14 +1618,18 @@ public class SQLCommand {
             } else if (arg.startsWith("--query-timeout=")) {
                 m_hasBatchTimeout = true;
                 String batchTimeoutStr = extractArgInput(arg);
-                if (batchTimeoutStr == null) return -1;
+                if (batchTimeoutStr == null) {
+                    return -1;
+                }
                 m_batchTimeout = Integer.parseInt(batchTimeoutStr);
             } else if (arg.equals("--output-skip-metadata")) { // equals check starting here
                 m_outputShowMetadata = false;
             } else if (arg.startsWith("--ssl=")) {
                 enableSSL = true;
                 sslConfigFile = extractArgInput(arg);
-                if (sslConfigFile == null) return -1;
+                if (sslConfigFile == null) {
+                    return -1;
+                }
             } else if (arg.startsWith("--ssl")) {
                 enableSSL = true;
                 sslConfigFile = null;
@@ -1694,7 +1741,7 @@ public class SQLCommand {
             }
             if (m_interactive) {
                 // Print out welcome message
-                System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
+                System.out.printf("SQL Command :: %s%s:%d\n", (user.isEmpty() ? "" : user + "@"), serverList, port);
                 interactWithTheUser();
             }
         } catch (SQLCmdEarlyExitException e) {

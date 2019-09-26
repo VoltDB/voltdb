@@ -146,9 +146,9 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
         return;
 
     char err_msg[128];
-    snprintf(err_msg, 128, "SIGSEGV caught: signal number %d, error value %d,"
-             " signal code %d\n\n", info->si_signo, info->si_errno,
-             info->si_code);
+    snprintf(err_msg, sizeof err_msg, "SIGSEGV caught: signal number %d, error value %d,"
+            " signal code %d\n\n", info->si_signo, info->si_errno, info->si_code);
+    err_msg[sizeof err_msg - 1] = '\0';
     std::string message = err_msg;
     message.append(currentEngine->debug());
 
@@ -280,8 +280,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jint compactionThreshold,
-    jint exportFlushTimeout)
+    jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -309,8 +308,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold),
-                           exportFlushTimeout);
+                           static_cast<int32_t>(compactionThreshold));
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }

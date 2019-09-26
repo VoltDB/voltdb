@@ -27,17 +27,16 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.annotate.JsonPropertyOrder;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig;
-import org.codehaus.jackson.schema.JsonSchema;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsonschema.JsonSchema;
 import org.eclipse.jetty.server.Request;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -78,23 +77,22 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
         static {
             ObjectMapper configurable = new ObjectMapper();
             // configurable.setSerializationInclusion(Inclusion.NON_NULL);
-            configurable.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            configurable.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
-            SerializationConfig serializationConfig = configurable.getSerializationConfig();
-            serializationConfig.addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            serializationConfig.addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+            configurable.addMixIn(UsersType.User.class, IgnorePasswordMixIn.class);
+            configurable.addMixIn(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
             //These mixins are to ignore the "key" and redirect "path" to getNodePath()
-            serializationConfig.addMixInAnnotations(PathsType.Commandlog.class,
+            configurable.addMixIn(PathsType.Commandlog.class,
                     IgnoreNodePathKeyMixIn.class);
-            serializationConfig.addMixInAnnotations(PathsType.Commandlogsnapshot.class,
+            configurable.addMixIn(PathsType.Commandlogsnapshot.class,
                     IgnoreNodePathKeyMixIn.class);
-            serializationConfig.addMixInAnnotations(PathsType.Droverflow.class,
+            configurable.addMixIn(PathsType.Droverflow.class,
                     IgnoreNodePathKeyMixIn.class);
-            serializationConfig.addMixInAnnotations(PathsType.Exportoverflow.class,
+            configurable.addMixIn(PathsType.Exportoverflow.class,
                     IgnoreNodePathKeyMixIn.class);
-            serializationConfig.addMixInAnnotations(PathsType.Snapshots.class,
+            configurable.addMixIn(PathsType.Snapshots.class,
                     IgnoreNodePathKeyMixIn.class);
-            serializationConfig.addMixInAnnotations(PathsType.Voltdbroot.class, IgnoreNodePathKeyMixIn.class);
+            configurable.addMixIn(PathsType.Voltdbroot.class, IgnoreNodePathKeyMixIn.class);
 
             mapper = configurable;
         }

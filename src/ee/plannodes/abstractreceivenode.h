@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREABSTRACTRECEIVENODE_H
-#define HSTOREABSTRACTRECEIVENODE_H
+#pragma once
 
 #include "abstractplannode.h"
 #include "SchemaColumn.h"
@@ -54,18 +53,15 @@
 
 namespace voltdb {
 
-class AbstractReceivePlanNode : public AbstractPlanNode
-{
-
+class AbstractReceivePlanNode : public AbstractPlanNode {
 protected:
     AbstractReceivePlanNode();
     ~AbstractReceivePlanNode();
     static void schemaDebugInfo(std::ostringstream& buffer,
-                                const std::vector<SchemaColumn*>& schema,
-                                const std::string& schema_name,
-                                const std::string& spacer);
+            const std::vector<SchemaColumn*>& schema,
+            const std::string& schema_name,
+            const std::string& spacer);
 };
 
 } // namespace voltdb
 
-#endif

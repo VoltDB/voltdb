@@ -132,7 +132,13 @@ public class TTLLoader extends BenchmarkThread {
                     long ttl = new Double(Math.ceil(TTL*1.5)).longValue();
                     ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select count(*) from "+tableName+" where "+tsColumnName+" < DATEADD(SECOND,-"+ttl+",NOW) ");
                     long remainingRows = TxnId2Utils.doProcCall(client, "@AdHoc", "select count(*) from "+tableName).getResults()[0].asScalarLong();
-                    Map<String,Object> stats = getStats(tableName, type);
+                    Map<String,Object> stats;
+                    try {
+                        stats = getStats(tableName, type);
+                    } catch ( ProcCallException e ) {
+                        // retry
+                        continue;
+                    }
                     if (response.getStatus() == ClientResponse.SUCCESS ) {
                         long unDeletedRows  = response.getResults()[0].asScalarLong();
                         Object rows_left = (type == "TTL") ? stats.get("ROWS_LEFT") : stats.get("TUPLE_PENDING");
@@ -163,7 +169,7 @@ public class TTLLoader extends BenchmarkThread {
             }
         }
 
-        public Map<String,Object> getStats(String tableName, String type ) {
+        public Map<String,Object> getStats(String tableName, String type ) throws ProcCallException {
             Map<String,Object> stats = new HashMap<String,Object>();
             ClientResponse cr = null;
             log.info("stats request, type: " + type);
@@ -173,7 +179,8 @@ public class TTLLoader extends BenchmarkThread {
                 log.error(e.getMessage());
                 return stats;
             } catch(ProcCallException pe) {
-                log.error(pe.getMessage());
+                    log.warn(pe.getMessage());
+                    throw pe;
             }
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Statistics " + type + " proc.");
@@ -220,7 +227,12 @@ public class TTLLoader extends BenchmarkThread {
         }
 
         public long getRemainingRowCount(String tableName, String type) {
-            Map<String,Object> stats = getStats(tableName, "TTL");
+            Map<String,Object> stats;
+            try {
+                stats = getStats(tableName, "TTL");
+            } catch ( ProcCallException e) {
+                return -1;
+            }
             if (stats.isEmpty()) {
                 return -1;
             }

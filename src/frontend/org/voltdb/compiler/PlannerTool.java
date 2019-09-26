@@ -17,6 +17,9 @@
 
 package org.voltdb.compiler;
 
+import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
+
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
@@ -26,6 +29,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.tools.RelConversionException;
@@ -54,12 +59,9 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-
-
-import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
-import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
@@ -86,7 +88,7 @@ public class PlannerTool {
     // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
     // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
     // we should ignore.
-    private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
+    private final double m_largeModeRatio = Double.parseDouble((System.getenv("LARGE_MODE_RATIO") == null ||
             System.getenv("LARGE_MODE_RATIO").equals("-1")) ?
             System.getProperty("LARGE_MODE_RATIO", "0") :
             System.getenv("LARGE_MODE_RATIO"));
@@ -142,8 +144,11 @@ public class PlannerTool {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
-        m_schemaPlus = VoltSchemaPlus.from(m_database);
-
+        if (AdHocNTBase.USING_CALCITE) {
+            // Do not use Calcite to process DDLs, until we have full support of all DDLs, as well as
+            // catalog commands such as "DR TABLE foo".
+            m_schemaPlus = VoltSchemaPlus.from(m_database);
+        }
         return this;
     }
 
@@ -222,6 +227,10 @@ public class PlannerTool {
         RelNode rel = planner.convert(validatedNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
 
+        JoinCounter scanCounter = new JoinCounter();
+        rel.accept(scanCounter);
+        boolean canCommuteJoins = scanCounter.canCommuteJoins();
+
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
 
@@ -257,6 +266,9 @@ public class PlannerTool {
             throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
+        // Transform RIGHT Outer joins to LEFT ones
+        transformed = VoltPlanner.transformHep(Phase.OUTER_JOIN, transformed);
+
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
         // See RelDistributions.RelDistributionImpl.satisfies()
@@ -265,7 +277,9 @@ public class PlannerTool {
                 .replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
-        transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(), requiredPhysicalOutputTraits, transformed);
+        Phase physicalPhase = (canCommuteJoins) ?
+                Phase.PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE : Phase.PHYSICAL_CONVERSION;
+        transformed = planner.transform(physicalPhase.ordinal(), requiredPhysicalOutputTraits, transformed);
 
         // apply inlining rules.
         transformed = VoltPlanner.transformHep(Phase.INLINE, HepMatchOrder.ARBITRARY, transformed, true);
@@ -294,7 +308,12 @@ public class PlannerTool {
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException, PlannerFallbackException {
-        CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
+        CompiledPlan plan = getCompiledPlanCalcite(
+                // TODO: we need a reliable way to sync Calcite's SchemaPlus from VoltDB's Catalog,
+                // esp. since we start relying on Calcite to operate on 'CREATE TABLE' statements.
+                // See VoltCompiler#compileDatabase().
+                VoltSchemaPlus.from(m_database)/*m_schemaPlus*/,
+                task.getParsedQuery());
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO Calcite ready: enable when we are ready
@@ -388,4 +407,24 @@ public class PlannerTool {
             }
         }
     }
+
+    // RelShuttle to count number of joins in the RelNode to decide
+    // whether to apply join commute rules or not
+    public static class JoinCounter extends RelShuttleImpl {
+        private final static int DEFAULT_MAX_JOIN_TABLES = 6;
+
+        private int joinCount = 0;
+
+        public boolean canCommuteJoins() {
+            return joinCount < DEFAULT_MAX_JOIN_TABLES;
+        }
+
+         @Override
+        public RelNode visit(LogicalJoin join) {
+            ++joinCount;
+            return super.visit(join);
+        }
+
+    }
+
 }

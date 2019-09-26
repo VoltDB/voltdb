@@ -41,6 +41,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -55,6 +57,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class KafkaExportClient extends ExportClientBase {
 
+    private final static String DEFAULT_CLIENT_ID = "voltdb";
     private final static String TIMEZONE_PN = "timezone";
     private final static String SKIP_INTERNALS_PN = "skipinternals";
     private final static String BINARY_ENCODING_PN = "binaryencoding";
@@ -72,11 +75,12 @@ public class KafkaExportClient extends ExportClientBase {
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
 
     private final static int SHUTDOWN_TIMEOUT_MS = 10_000;
+    public final static String DEFAULT_EXPORT_PREFIX = "voltdbexport";
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
 
     Properties m_producerConfig;
-    String m_topicPrefix = "voltdbexport";
+    String m_topicPrefix = DEFAULT_EXPORT_PREFIX;
     Map<String, String> m_tableTopics;
 
     //Keep this default to false as people out there might depend on index in csv
@@ -168,7 +172,9 @@ public class KafkaExportClient extends ExportClientBase {
 
         String idVal = config.getProperty(ProducerConfig.CLIENT_ID_CONFIG, "").trim();
         if (idVal.isEmpty()) {
-            m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "voltdb");
+            // If no client id was provided, set it to a default which will be
+            // replaced by a unique value in the decoder
+            m_producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, DEFAULT_CLIENT_ID);
         }
 
         String acksVal = config.getProperty(ProducerConfig.ACKS_CONFIG, "").trim();
@@ -288,6 +294,7 @@ public class KafkaExportClient extends ExportClientBase {
 
         String m_topic = null;
         boolean m_primed = false;
+        Properties m_decoderProducerConfig;
         KafkaProducer<String, String> m_producer;
         final CSVStringDecoder m_decoder;
         final List<Future<RecordMetadata>> m_futures = new ArrayList<>();
@@ -304,16 +311,24 @@ public class KafkaExportClient extends ExportClientBase {
                 .binaryEncoding(m_binaryEncoding)
                 .skipInternalFields(m_skipInternals)
             ;
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " +
-                            source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "Kafka Export decoder for partition " +
+                                source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
 
             m_decoder = builder.build();
+            // Ensure each decoder uses its own properties (ENG-17657)
+            m_decoderProducerConfig = new Properties();
+            m_decoderProducerConfig.putAll(m_producerConfig);
         }
 
         final void checkOnFirstRow() throws RestartBlockException {
             if (!m_primed) try {
-                m_producer = new KafkaProducer<>(m_producerConfig);
+                setClientId();
+                m_producer = new KafkaProducer<>(m_decoderProducerConfig);
             }
             catch (ConfigException e) {
                 LOG.error("Unable to instantiate a Kafka producer", e);
@@ -325,6 +340,15 @@ public class KafkaExportClient extends ExportClientBase {
             m_primed = true;
         }
 
+        private void setClientId() {
+            String clientId = m_decoderProducerConfig.getProperty(ProducerConfig.CLIENT_ID_CONFIG);
+            if (DEFAULT_CLIENT_ID.equals(clientId)) {
+                // Generate a unique kafka client id
+                clientId = "producer-" + m_source.tableName + "-" + m_source.partitionId;
+                m_decoderProducerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, clientId);
+            }
+        }
+
         private void populateTopic(String tableName) {
             if (m_tableTopics != null && m_tableTopics.containsKey(tableName.toLowerCase())) {
                 m_topic = m_tableTopics.get(tableName.toLowerCase()).intern();
@@ -333,6 +357,7 @@ public class KafkaExportClient extends ExportClientBase {
                 m_topic = new StringBuilder(m_topicPrefix).append(tableName).toString().intern();
             }
         }
+
         @Override
         public ListeningExecutorService getExecutor() {
             return m_es;
@@ -382,7 +407,7 @@ public class KafkaExportClient extends ExportClientBase {
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         if (e != null){
                             LOG.warn("Failed to send data. Verify if the kafka server matches bootstrap.servers %s", e,
-                                    m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
+                                    m_decoderProducerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
                             m_failure.compareAndSet(false, true);
                         }
                     }
@@ -402,23 +427,29 @@ public class KafkaExportClient extends ExportClientBase {
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
-            m_es.shutdown();
-            try {
-                if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                    // In case we were misconfigured to a non-existent Kafka broker,
-                    // a decoder thread may be stuck on 'send' and we need to force it out.
-                    // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                        // In case we were misconfigured to a non-existent Kafka broker,
+                        // a decoder thread may be stuck on 'send' and we need to force it out.
+                        // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+                        forceExecutorShutdown();
+                    }
+                } catch (InterruptedException e) {
+                    // We are in the UAC path and don't want to throw exception for this condition;
+                    // just force the shutdown.
+                    LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
                     forceExecutorShutdown();
                 }
-            } catch (InterruptedException e) {
-                // We are in the UAC path and don't want to throw exception for this condition;
-                // just force the shutdown.
-                LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
-                forceExecutorShutdown();
             }
         }
 
         private void forceExecutorShutdown() {
+            if (m_es == null) {
+                return;
+            }
+
             LOG.warn("Forcing executor shutdown on source: " + m_source);
             try {
                 m_es.shutdownNow();

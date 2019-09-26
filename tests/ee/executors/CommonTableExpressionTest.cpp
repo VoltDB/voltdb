@@ -76,6 +76,7 @@ const std::string catalogPayload =
     "set $PREV drProducerPort 5555\n"
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 1000\n"
+    "set $PREV exportFlushInterval 4000\n"
     "set $PREV preferredSource 0\n"
     "add /clusters#cluster databases database\n"
     "set /clusters#cluster/databases#database schema \"qgRUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMWDQ1NEQ1MDRDNEY1OTQ1NDU1MzIwMjgyARIwMTUzNTQ1RjRFNDE0RAEsJDU2NDE1MjQzNDgBCDwyODMyMzAyOTIwNEU0RjU0AQgkNTU0QzRDMkMyMAlYEDVGNDk0ARoIOTRFAXwUNDc0NTUyASpKMgAIRDQxBWwFJF46ABAyOTNCCmrPAAA0AWEQNDk1NjQBcABGEYcENTAF/QA4/t0A/t0Adt0AUkkBCEM0NQXOIVWKRwEZ6kKvAQgxMzAJAlK1ARQwMjkzQgo=\"\n"

@@ -16,15 +16,18 @@
  */
 package org.voltdb;
 
+/**
+ * Defines which stats should be collected when this enum is passed as an argument to the procedure {@code @Statistics}
+ */
 public enum StatsSelector {
-    TABLE,            // invoked as @stat table
-    INDEX,            // invoked as @stat index
-    PROCEDURE,        // invoked as @stat procedure
+    TABLE,
+    INDEX,
+    PROCEDURE,
     STARVATION,
     QUEUE,
-    IDLETIME,         // synonym for STARVATION
-    INITIATOR,        // invoked as @stat initiator
-    LATENCY,          // invoked as @stat latency
+    IDLETIME(STARVATION),
+    INITIATOR,
+    LATENCY(false),
     LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY
     LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
@@ -32,37 +35,74 @@ public enum StatsSelector {
     MEMORY,           // info about node's memory usage
     LIVECLIENTS,      // info about the currently connected clients
     PLANNER,          // info about planner and EE performance and cache usage
-    MANAGEMENT,       // Returns pretty much everything
-    PROCEDUREPROFILE, // performs an aggregation of the procedure statistics
-    SNAPSHOTSTATUS,
-    PROCEDUREINPUT,
-    PROCEDUREOUTPUT,
-    PROCEDUREDETAIL,  // provides more granular statistics for procedure calls at a per-statement level.
+    CPU,            // return CPU Stats
+    MANAGEMENT(MEMORY, INITIATOR, PROCEDURE, IOSTATS, TABLE, INDEX, STARVATION, QUEUE, CPU), // Returns pretty much everything
+    SNAPSHOTSTATUS(false),
+    PROCEDUREPROFILE(PROCEDURE), // performs an aggregation of the procedure statistics
+    PROCEDUREINPUT(PROCEDURE),
+    PROCEDUREOUTPUT(PROCEDURE),
+    PROCEDUREDETAIL(PROCEDURE),  // provides more granular statistics for procedure calls at a per-statement level.
 
     /*
      * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
      * Externally the selector is "DRPRODUCER", or just "DR"
      */
-    DR,
-    DRPRODUCER,
-    DRPRODUCERPARTITION,
-    DRPRODUCERNODE,
+    DRPRODUCERPARTITION(false),
+    DRPRODUCERNODE(false),
+    DR(DRPRODUCERPARTITION, DRPRODUCERNODE),
+    DRPRODUCER(DR.subSelectors()),
 
-    DRCONSUMER,
-    DRCONSUMERNODE,
-    DRCONSUMERPARTITION,
+    DRCONSUMERNODE(false),
+    DRCONSUMERPARTITION(false),
+    DRCONSUMER(DRCONSUMERNODE, DRCONSUMERPARTITION),
 
-    DRROLE,
+    DRROLE(false),
 
     TOPO,           // return leader and site info for iv2
     TTL,            // return time to live info
     REBALANCE,      // return elastic rebalance progress
     KSAFETY,        // return ksafety coverage information
-    CPU,            // return CPU Stats
     GC,             // return GC Stats
 
-    COMMANDLOG,     // return number of outstanding bytes and txns on this node
+    COMMANDLOG(false),     // return number of outstanding bytes and txns on this node
     IMPORTER,       // synonym as IMPORT for backward compatibility
-    IMPORT,
-    EXPORT
+    IMPORT(IMPORTER),
+    EXPORT,
+    TASK(false),
+    TASK_SCHEDULER(TASK),
+    TASK_PROCEDURE(TASK);
+
+    /** Whether or not this stat supports interval collection */
+    private final boolean m_supportsInterval;
+    /** Mapping to actual stat(s) to collect which are registered in the system */
+    private final StatsSelector[] m_subSelctors;
+
+    private StatsSelector(boolean supportsInterval, StatsSelector... subSelectors) {
+        m_supportsInterval = supportsInterval;
+        m_subSelctors = subSelectors == null ? new StatsSelector[] { this } : subSelectors;
+    }
+
+    private StatsSelector(boolean supportsInterval) {
+        this(supportsInterval, (StatsSelector[]) null);
+    }
+
+    private StatsSelector(StatsSelector... subSelectors) {
+        this(true, subSelectors);
+    }
+
+    private StatsSelector() {
+        this(true);
+    }
+
+    public boolean interval(boolean interval) {
+        return m_supportsInterval && interval;
+    }
+
+    StatsSelector[] subSelectors() {
+        return m_subSelctors;
+    }
+
+    public static StatsSelector[] getAllStatsCollector() {
+        return StatsSelector.class.getEnumConstants();
+    }
 }

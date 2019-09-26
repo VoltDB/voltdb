@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -621,9 +623,12 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
-        source.setupMigrateRowsDeleter(
-                CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
 
+        // Setup delete for migrate table
+        if (CatalogUtil.isPersistentMigrate(source.getTableName())) {
+            source.setupMigrateRowsDeleter(
+                    CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
+        }
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -688,7 +693,11 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
-                        exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+
+                        // Setup delete for migrate table
+                        if (TableType.isPersistentMigrate(table.getTabletype())) {
+                            exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+                        }
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
@@ -1030,6 +1039,8 @@ public class ExportGeneration implements Generation {
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
+        TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        targets.addAll(exportTargets);
         synchronized (m_dataSourcesByPartition) {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
                 Integer partition = partitionDataSourceMap.getKey();
@@ -1038,8 +1049,8 @@ public class ExportGeneration implements Generation {
                         continue;
                     }
 
-                    // no target match
-                    if (!exportTargets.contains(source.getTarget())) {
+                    // no target match (case insensitive)
+                    if (!targets.contains(source.getTarget())) {
                         continue;
                     }
 

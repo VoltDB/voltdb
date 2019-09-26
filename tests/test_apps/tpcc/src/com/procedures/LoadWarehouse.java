@@ -65,14 +65,14 @@ public class LoadWarehouse extends VoltProcedure {
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "WAREHOUSE", warehouses, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "DISTRICT", districts, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER", customers, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "STOCK", stocks, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ORDERS", orders, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "NEW_ORDER", neworders, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ORDER_LINE", orderLines, false, false);
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "HISTORY", histories, false, false);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "WAREHOUSE", warehouses);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "DISTRICT", districts);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "CUSTOMER", customers);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "STOCK", stocks);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "ORDERS", orders);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "NEW_ORDER", neworders);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "ORDER_LINE", orderLines);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "HISTORY", histories);
         return null;
     }
 }

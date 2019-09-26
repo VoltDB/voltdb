@@ -22,16 +22,17 @@
 
 namespace voltdb {
 
-PlanNodeType IndexCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXCOUNT; }
+PlanNodeType IndexCountPlanNode::getPlanNodeType() const {
+    return PLAN_NODE_TYPE_INDEXCOUNT;
+}
 
 IndexCountPlanNode::~IndexCountPlanNode() { }
 
-std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
-    buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
+    buffer << spacer << "IndexLookupType[" << indexLookupToString(m_lookup_type) << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
     for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
@@ -57,8 +58,7 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const
     return buffer.str();
 }
 
-void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string endTypeString = obj.valueForKey("END_TYPE").asStr();

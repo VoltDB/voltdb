@@ -21,6 +21,7 @@ Administration:
  * [Run VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
  * [Run VoltDB Examples on a Cluster](RunAnExampleInACluster.md)
  * [Run VoltDB Virtualized, Containerized or in the Cloud](VirtualizeOrContainerize.md)
+ * [Run VoltDB Cluster on a single host](single-host/running-clusters-on-one-host.md)
  * [Command Logging](CommandLogging.md)
  * [Backups](Backups.md)
  * [Enable Authentication](EnableAuthentication.md)

@@ -609,14 +609,16 @@ static bool hasNameIntegrity(std::string const& tableName, std::vector<std::stri
         snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
                  "catalog name %s resolved to table named %s.",
                  tableName.c_str(), table->name().c_str());
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
         return false;
     }
     BOOST_FOREACH (std::string const& iName, indexNames) {
-        if ( ! table->index(iName)) {
+        if (! table->index(iName)) {
             snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
                      "table named %s failed to resolve index name %s.",
                      tableName.c_str(), iName.c_str());
+            errMsg[sizeof errMsg - 1] = '\0';
             LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
             return false;
         }
@@ -1029,7 +1031,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
                sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
            }
        } else {
-           sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
+           sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(ValueType::tBIGINT));
            migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
        }
     }
@@ -1039,7 +1041,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
         size_t drMark = drStream->appendUpdateRecord(m_signature, m_partitionColumn, currentSpHandle,
-                                                     currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
+                currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
@@ -1060,16 +1062,18 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     if (someIndexGotUpdated) {
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex* index = indexesToUpdate[i];
-            if (!index->keyUsesNonInlinedMemory() || index->isPartialIndex()) {
-                if (!index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
-                    indexRequiresUpdate[i] = false;
-                    continue;
+            if (!index->keyUsesNonInlinedMemory() &&
+                    !index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
+                indexRequiresUpdate[i] = false;
+                continue;
+            } else {
+                indexRequiresUpdate[i] = true;
+                if (!index->deleteEntry(&targetTupleToUpdate)) {
+                    throwFatalException(
+                            "Failed to remove tuple (%s) from index (during update) in Table: %s Index %s:\n%s",
+                            targetTupleToUpdate.debug().c_str(), m_name.c_str(), index->getName().c_str(),
+                            index->debug().c_str());
                 }
-            }
-            indexRequiresUpdate[i] = true;
-            if (!index->deleteEntry(&targetTupleToUpdate)) {
-                throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
             }
         }
     }
@@ -1083,11 +1087,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        for (auto viewHandler: m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
         // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
+        for (auto view: m_views) {
             view->processTupleDelete(targetTupleToUpdate, fallible);
         }
     }
@@ -1136,7 +1140,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
          * Create and register an undo action with copies of the "before" and "after" tuple storage
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
-       char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
+        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
@@ -1170,12 +1174,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // Note that inserting into the delta table is guaranteed to
     // succeed, since we checked constraints above.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+    for (auto viewHandler: m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
 
     // handle any materialized views
-    BOOST_FOREACH (auto view, m_views) {
+    for (auto view: m_views) {
         view->processTupleInsert(targetTupleToUpdate, fallible);
     }
 }
@@ -1734,10 +1738,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
             uniqueViolationOutput->writeIntAt(lengthPosition, 0);
         } else {
             uniqueViolationOutput->writeIntAt(lengthPosition,
-                                              static_cast<int32_t>(uniqueViolationOutput->position() -
-                                                                   lengthPosition - sizeof(int32_t)));
-            uniqueViolationOutput->writeIntAt(tupleCountPosition,
-                                              serializedTupleCount);
+                    uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition, serializedTupleCount);
         }
     }
 }
@@ -1824,11 +1826,8 @@ bool PersistentTable::activateStream(
  * Return true on success or false if it was already active.
  */
 bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
-        HiddenColumnFilter::Type hiddenColumnFilterType,
-        boost::shared_ptr<TableStreamerInterface> tableStreamer,
-        CatalogId tableId,
-        std::vector<std::string>& predicateStrings,
-        bool skipInternalActivation) {
+        HiddenColumnFilter::Type hiddenColumnFilterType, boost::shared_ptr<TableStreamerInterface> tableStreamer,
+        CatalogId tableId, std::vector<std::string>& predicateStrings, bool skipInternalActivation) {
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
     vassert(m_tableStreamer == NULL);
     m_tableStreamer = tableStreamer;
@@ -1845,12 +1844,12 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor& outputStreams,
-                                    TableStreamType streamType,
-                                    std::vector<int>& retPositions) {
+        TableStreamType streamType, std::vector<int>& retPositions) {
     if (m_tableStreamer.get() == NULL) {
         char errMsg[1024];
-        snprintf(errMsg, 1024, "No table streamer of Type %s for table %s.",
+        snprintf(errMsg, sizeof errMsg, "No table streamer of Type %s for table %s.",
                 tableStreamTypeToString(streamType).c_str(), name().c_str());
+        errMsg[sizeof errMsg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
 
         return TABLE_STREAM_SERIALIZATION_ERROR;
@@ -1933,16 +1932,23 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
+
     if (isTableWithMigrate(m_tableType)) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
-            vassert(it != m_migratingRows.end());
-            MigratingBatch& batch = it->second;
-            void* addr = originalTuple.address();
-            size_t found = batch.erase(addr);
-            vassert(found == 1);
-            batch.emplace(destinationTuple.address());
+
+            // The delete-pending tuple should have been removed from migrating index
+            if (originalTuple.isPendingDelete()) {
+                vassert(it == m_migratingRows.end());
+            } else {
+                 vassert(it != m_migratingRows.end());
+                 MigratingBatch& batch = it->second;
+                 void* addr = originalTuple.address();
+                 size_t found = batch.erase(addr);
+                 vassert(found == 1);
+                 batch.emplace(destinationTuple.address());
+            }
         }
     }
 }
@@ -2068,6 +2074,7 @@ bool PersistentTable::doForcedCompaction() {
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
                          "occurred %d times.", m_failedCompactionCount);
+                msg[sizeof msg - 1] = '\0';
                 LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
             }
             if (m_failedCompactionCount == 0) {
@@ -2093,6 +2100,7 @@ bool PersistentTable::doForcedCompaction() {
         snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
                 "and compacted to the point that the compaction predicate was "
                 "satisfied after %d failed attempts", failedCompactionCountBefore);
+        msg[sizeof msg - 1] = '\0';
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
         m_failedCompactionCount = 0;
     }
@@ -2101,7 +2109,9 @@ bool PersistentTable::doForcedCompaction() {
     boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
     boost::posix_time::time_duration duration = endTime - startTime;
     snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms on table %s",
-            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()), m_name.c_str());
+            (intmax_t)notPendingCompactions, (intmax_t)pendingCompactions, (intmax_t)allocatedTupleCount(),
+            (intmax_t)duration.total_milliseconds(), m_name.c_str());
+    msg[sizeof msg - 1] = '\0';
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     return (notPendingCompactions + pendingCompactions) > 0;
 }
@@ -2121,7 +2131,7 @@ void PersistentTable::printBucketInfo() {
     boost::unordered_set<TBPtr>::iterator blocksNotPendingSnapshot = m_blocksNotPendingSnapshot.begin();
     std::cout << "Blocks not pending snapshot: ";
     while (blocksNotPendingSnapshot != m_blocksNotPendingSnapshot.end()) {
-        std::cout << static_cast<void*>((*blocksNotPendingSnapshot)->address()) << ",";
+        std::cout << static_cast<void*>(TBPtr(*blocksNotPendingSnapshot)->address()) << ",";
         blocksNotPendingSnapshot++;
     }
     std::cout << std::endl;
@@ -2132,7 +2142,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksNotPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksNotPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksNotPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksNotPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(TBPtr(*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }
@@ -2140,7 +2150,7 @@ void PersistentTable::printBucketInfo() {
     boost::unordered_set<TBPtr>::iterator blocksPendingSnapshot = m_blocksPendingSnapshot.begin();
     std::cout << "Blocks pending snapshot: ";
     while (blocksPendingSnapshot != m_blocksPendingSnapshot.end()) {
-        std::cout << static_cast<void*>((*blocksPendingSnapshot)->address()) << ",";
+        std::cout << static_cast<void*>(TBPtr(*blocksPendingSnapshot)->address()) << ",";
         blocksPendingSnapshot++;
     }
     std::cout << std::endl;
@@ -2151,7 +2161,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(TBPtr(*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }

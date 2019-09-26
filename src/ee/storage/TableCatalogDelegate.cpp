@@ -231,6 +231,7 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
     for (size_t i = 0; i < columnIndexes.size(); i++) {
         char buf[128];
         snprintf(buf, 128, "-%d", columnIndexes[i]);
+        buf[sizeof buf - 1] = '\0';
         retval += buf;
     }
 
@@ -524,7 +525,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
 
         // assign a default value, if one exists
         ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
-        if (defaultColType == VALUE_TYPE_INVALID) {
+        if (defaultColType == ValueType::tINVALID) {
             defaults[newIndex] = ValueFactory::getNullValue();
         }
         else {
@@ -806,25 +807,25 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
         switch (defaultColType) {
-        case VALUE_TYPE_INVALID:
-            tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
-            break;
-
-        case VALUE_TYPE_TIMESTAMP:
-            if (isDefaultNow(col->defaultvalue())) {
-                // Caller will need to set this to the current
-                // timestamp at the appropriate time
-                nowFields.push_back(col->index());
+            case ValueType::tINVALID:
+                tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
                 break;
-            }
-            /* fall through */ // gcc-7 needs this comment.
-            // else, fall through to default case
-        default:
-            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
-                                                                         col->defaultvalue(),
-                                                                         pool);
-            tbTuple.setNValue(col->index(), defaultValue);
-            break;
+
+            case ValueType::tTIMESTAMP:
+                if (isDefaultNow(col->defaultvalue())) {
+                    // Caller will need to set this to the current
+                    // timestamp at the appropriate time
+                    nowFields.push_back(col->index());
+                    break;
+                }
+                /* fall through */ // gcc-7 needs this comment.
+                // else, fall through to default case
+            default:
+                NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
+                        col->defaultvalue(),
+                        pool);
+                tbTuple.setNValue(col->index(), defaultValue);
+                break;
         }
     }
 }

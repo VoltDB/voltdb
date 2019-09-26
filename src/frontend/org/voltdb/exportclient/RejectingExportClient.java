@@ -21,6 +21,8 @@ import java.util.Properties;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -40,8 +42,12 @@ public class RejectingExportClient extends ExportClientBase {
         final ListeningExecutorService m_es;
         public DiscardDecoder(AdvertisedDataSource source) {
             super(source);
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "Kafka Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
         }
 
         @Override

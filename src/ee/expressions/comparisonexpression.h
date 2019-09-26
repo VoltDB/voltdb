@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORECOMPARISONEXPRESSION_H
-#define HSTORECOMPARISONEXPRESSION_H
+#pragma once
 
 #include "common/common.h"
 #include "common/serializeio.h"
@@ -55,7 +54,6 @@
 #include "expressions/constantvalueexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
-#include <string>
 #include <common/debuglog.h>
 
 namespace voltdb {
@@ -78,110 +76,175 @@ namespace voltdb {
 
 class CmpEq {
 public:
-    inline static const char* op_name() { return "CmpEq"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpEq";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_equals_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return false; }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_null_for_row() { return false; }
-    inline static bool includes_equality() { return true; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return false;
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_null_for_row() {
+        return false;
+    }
+    static bool includes_equality() {
+        return true;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpNotDistinct : public CmpEq {
 public:
-    inline static const char* op_name() { return "CmpNotDistinct"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_equals(r);}
-    inline static bool isNullRejecting() { return false; }
+    static const char* op_name() {
+        return "CmpNotDistinct";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
+        return l.op_equals(r);
+    }
+    static bool isNullRejecting() {
+        return false;
+    }
 };
 
 class CmpNe {
 public:
-    inline static const char* op_name() { return "CmpNe"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpNe";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_notEquals_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return false; }
-    inline static bool implies_null_for_row() { return false; }
-    inline static bool includes_equality() { return false; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return false;
+    }
+    static bool implies_null_for_row() {
+        return false;
+    }
+    static bool includes_equality() {
+        return false;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpLt {
 public:
-    inline static const char* op_name() { return "CmpLt"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpLt";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_lessThan_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r)
-    { return l.op_notEquals_withoutNull(r).isTrue(); }
-    inline static bool implies_null_for_row() { return true; }
-    inline static bool includes_equality() { return false; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return l.op_notEquals_withoutNull(r).isTrue();
+    }
+    static bool implies_null_for_row() {
+        return true;
+    }
+    static bool includes_equality() {
+        return false;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpGt {
 public:
-    inline static const char* op_name() { return "CmpGt"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpGt";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_greaterThan_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r)
-    { return l.op_notEquals_withoutNull(r).isTrue(); }
-    inline static bool implies_null_for_row() { return true; }
-    inline static bool includes_equality() { return false; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return l.op_notEquals_withoutNull(r).isTrue();
+    }
+    static bool implies_null_for_row() {
+        return true;
+    }
+    static bool includes_equality() {
+        return false;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpLte {
 public:
-    inline static const char* op_name() { return "CmpLte"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() { return "CmpLte"; }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_lessThanOrEqual_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r)
-    { return l.op_notEquals_withoutNull(r).isTrue(); }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_null_for_row() { return true; }
-    inline static bool includes_equality() { return true; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return l.op_notEquals_withoutNull(r).isTrue();
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_null_for_row() {
+        return true;
+    }
+    static bool includes_equality() {
+        return true;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpGte {
 public:
-    inline static const char* op_name() { return "CmpGte"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpGte";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.op_greaterThanOrEqual_withoutNull(r);
     }
-    inline static bool implies_true_for_row(const NValue& l, const NValue& r)
-    { return l.op_notEquals_withoutNull(r).isTrue(); }
-    inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
-    inline static bool implies_null_for_row() { return true; }
-    inline static bool includes_equality() { return true; }
-    inline static bool isNullRejecting() { return true; }
+    static bool implies_true_for_row(const NValue& l, const NValue& r) {
+        return l.op_notEquals_withoutNull(r).isTrue();
+    }
+    static bool implies_false_for_row(const NValue& l, const NValue& r) {
+        return true;
+    }
+    static bool implies_null_for_row() {
+        return true;
+    }
+    static bool includes_equality() {
+        return true;
+    }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 // CmpLike and CmpIn are slightly special in that they can never be
@@ -189,26 +252,32 @@ public:
 // decomposed into column-wise equality comparisons "(a, b) = ANY (subquery)".
 class CmpLike {
 public:
-    inline static const char* op_name() { return "CmpLike"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpLike";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.like(r);
     }
-    inline static bool isNullRejecting() { return true; }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 class CmpIn {
 public:
-    inline static const char* op_name() { return "CmpIn"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpIn";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.inList(r) ? NValue::getTrue() : NValue::getFalse();
     }
-    inline static bool isNullRejecting() { return true; }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 /*
@@ -216,30 +285,29 @@ public:
  */
 class CmpStartsWith {
 public:
-    inline static const char* op_name() { return "CmpStartsWith"; }
-    inline static NValue compare(const NValue& l, const NValue& r)
-    {
+    static const char* op_name() {
+        return "CmpStartsWith";
+    }
+    static NValue compare(const NValue& l, const NValue& r) {
         vassert(!l.isNull());
         vassert(!r.isNull());
         return l.startsWith(r);
     }
-    inline static bool isNullRejecting() { return true; }
+    static bool isNullRejecting() {
+        return true;
+    }
 };
 
 template <typename OP>
 class ComparisonExpression : public AbstractExpression {
 public:
-    ComparisonExpression(ExpressionType type,
-                                  AbstractExpression *left,
-                                  AbstractExpression *right)
-        : AbstractExpression(type, left, right)
-    {
+    ComparisonExpression(ExpressionType type, AbstractExpression *left, AbstractExpression *right) :
+        AbstractExpression(type, left, right) {
         m_left = left;
         m_right = right;
     };
 
-    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const
-    {
+    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
                    OP::op_name(),
                    typeid(m_left).name(),
@@ -251,12 +319,12 @@ public:
 
         NValue lnv = m_left->eval(tuple1, tuple2);
         if (lnv.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
 
         NValue rnv = m_right->eval(tuple1, tuple2);
         if (rnv.isNull() && OP::isNullRejecting()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            return NValue::getNullValue(ValueType::tBOOLEAN);
         }
 
         // comparisons with null or NaN are always false
@@ -270,16 +338,12 @@ public:
         return OP::compare(lnv, rnv);
     }
 
-    inline const char* traceEval(const TableTuple *tuple1, const TableTuple *tuple2) const
-    {
+    inline const char* traceEval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         NValue lnv;
         NValue rnv;
-        return  (((lnv = m_left->eval(tuple1, tuple2)).isNull() ||
-                  (rnv = m_right->eval(tuple1, tuple2)).isNull()) ?
-                 "NULL" :
-                 (OP::compare(lnv, rnv).isTrue() ?
-                  "TRUE" :
-                  "FALSE"));
+        return  (lnv = m_left->eval(tuple1, tuple2)).isNull() || (rnv = m_right->eval(tuple1, tuple2)).isNull() ?
+            "NULL" :
+            (OP::compare(lnv, rnv).isTrue() ? "TRUE" : "FALSE");
     }
 
     std::string debugInfo(const std::string &spacer) const {
@@ -295,11 +359,7 @@ template <typename C, typename L, typename R>
 class InlinedComparisonExpression : public ComparisonExpression<C> {
 public:
     InlinedComparisonExpression(ExpressionType type,
-                                         AbstractExpression *left,
-                                         AbstractExpression *right)
-        : ComparisonExpression<C>(type, left, right)
-    {}
+            AbstractExpression *left, AbstractExpression *right) : ComparisonExpression<C>(type, left, right) {}
 };
 
 }
-#endif

@@ -26,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -52,12 +51,15 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Stopwatch;
 
 /**
@@ -89,7 +91,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     public static CatalogChangeResult prepareApplicationCatalogDiff(
             String invocationName, final byte[] operationBytes, final String operationString,
             final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
-            final boolean isPromotion, final boolean useAdhocDDL, String hostname, String user) {
+            final boolean isPromotion, String user) {
         final DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
         // create the change result and set up all the boiler plate
@@ -154,8 +156,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 case "@AdHoc":
                     // work.adhocDDLStmts should be applied to the current catalog
                     try {
-                        newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes, drRole == DrRoleType.XDCR);
-                    } catch (IOException | VoltCompilerException e) {
+                        newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes,
+                            drRole == DrRoleType.XDCR, user);
+                    } catch (IOException | VoltCompilerException | PlanningErrorException e) {
                         retval.errorMsg = e.getMessage();
                         return retval;
                     } catch (Exception ex) {
@@ -237,6 +240,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return retval;
             }
 
+            if (!validateNewCatalog(newCatalog, newCatalogJar, retval)) {
+                return retval;
+            }
+
             //In non legacy mode discard the path element.
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
@@ -277,11 +284,27 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
             retval.hasSecurityUserChange = diff.hasSecurityUserChanges();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             retval.errorMsg = "Unexpected error in catalog update from " + invocationName + ": " + e.getClass() + ", " +
                     e.getMessage();
         }
         return retval;
+    }
+
+    /**
+     * Validate that the catalog in its entirety is valid. If it is not valid an appropriate error message will be set
+     * on {@code result}
+     *
+     * @return {@code true} if the catalog is valid
+     */
+    private static boolean validateNewCatalog(Catalog catalog, InMemoryJarfile catalogJar, CatalogChangeResult result) {
+        String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
+        if (taskErrors != null) {
+            result.errorMsg = taskErrors;
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -290,7 +313,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * @throws VoltCompilerException
      */
     private static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile,
-            String[] adhocDDLStmts, List<SqlNode> sqlNodes, boolean isXDCR) throws IOException, VoltCompilerException {
+            String[] adhocDDLStmts, List<SqlNode> sqlNodes, boolean isXDCR, String user)
+            throws IOException, VoltCompilerException {
         StringBuilder sb = new StringBuilder();
         compilerLog.info("Applying the following DDL to cluster:");
         for (String stmt : adhocDDLStmts) {
@@ -301,7 +325,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         String newDDL = sb.toString();
         compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
-        VoltCompiler compiler = new VoltCompiler(isXDCR);
+        VoltCompiler compiler = new VoltCompiler(isXDCR, user);
         compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, sqlNodes, oldCatalog);
         return jarfile;
     }
@@ -343,7 +367,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             for (Entry<String, byte[]> e : newJarfile.entrySet()) {
                 final String filename = e.getKey();
                 // Ignore root level, non-class file names
-                if (Paths.get(filename).getNameCount() == 1 || filename.endsWith(".class")) {
+                if (Paths.get(filename).getNameCount() != 1 || filename.endsWith(".class")) {
                     foundClasses = true;
                     jarfile.put(e.getKey(), e.getValue());
                 }
@@ -452,7 +476,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     CompletableFuture<ClientResponse> updateApplication(
             String invocationName, final byte[] operationBytes, final String operationString,
             final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
-            final boolean isPromotion, final boolean useAdhocDDL) {
+            final boolean isPromotion) {
         final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         final CatalogChangeResult ccr;
 
@@ -466,7 +490,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         try {
             ccr = prepareApplicationCatalogDiff(
                     invocationName, operationBytes, operationString, adhocDDLStmts, sqlNodes,
-                    replayHashOverride, isPromotion, useAdhocDDL, getHostname(), getUsername());
+                    replayHashOverride, isPromotion, getUsername());
         } catch (Exception e) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();

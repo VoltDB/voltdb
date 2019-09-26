@@ -29,73 +29,73 @@ Pool* NValue::getTempStringPool() {
 // For x<op>y where x is an integer,
 // promote x and y to s_intPromotionTable[y]
 ValueType NValue::s_intPromotionTable[] = {
-    VALUE_TYPE_INVALID,   // 0 invalid
-    VALUE_TYPE_NULL,      // 1 null
-    VALUE_TYPE_INVALID,   // 2 <unused>
-    VALUE_TYPE_BIGINT,    // 3 tinyint
-    VALUE_TYPE_BIGINT,    // 4 smallint
-    VALUE_TYPE_BIGINT,    // 5 integer
-    VALUE_TYPE_BIGINT,    // 6 bigint
-    VALUE_TYPE_INVALID,   // 7 <unused>
-    VALUE_TYPE_DOUBLE,    // 8 double
-    VALUE_TYPE_INVALID,   // 9 varchar
-    VALUE_TYPE_INVALID,   // 10 <unused>
-    VALUE_TYPE_BIGINT,    // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tBIGINT,    // 3 tinyint
+    ValueType::tBIGINT,    // 4 smallint
+    ValueType::tBIGINT,    // 5 integer
+    ValueType::tBIGINT,    // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tBIGINT,    // 11 timestamp
     // 12 - 21 unused
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_DECIMAL,   // 22 decimal
-    VALUE_TYPE_INVALID,   // 23 boolean
-    VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDECIMAL,   // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 // for x<op>y where x is a double
 // promote x and y to s_doublePromotionTable[y]
 ValueType NValue::s_doublePromotionTable[] = {
-    VALUE_TYPE_INVALID,   // 0 invalid
-    VALUE_TYPE_NULL,      // 1 null
-    VALUE_TYPE_INVALID,   // 2 <unused>
-    VALUE_TYPE_DOUBLE,    // 3 tinyint
-    VALUE_TYPE_DOUBLE,    // 4 smallint
-    VALUE_TYPE_DOUBLE,    // 5 integer
-    VALUE_TYPE_DOUBLE,    // 6 bigint
-    VALUE_TYPE_INVALID,   // 7 <unused>
-    VALUE_TYPE_DOUBLE,    // 8 double
-    VALUE_TYPE_INVALID,   // 9 varchar
-    VALUE_TYPE_INVALID,   // 10 <unused>
-    VALUE_TYPE_DOUBLE,    // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tDOUBLE,    // 3 tinyint
+    ValueType::tDOUBLE,    // 4 smallint
+    ValueType::tDOUBLE,    // 5 integer
+    ValueType::tDOUBLE,    // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tDOUBLE,    // 11 timestamp
     // 12 - 21 unused.
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_DOUBLE,    // 22 decimal
-    VALUE_TYPE_INVALID,   // 23 boolean
-    VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDOUBLE,    // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 // for x<op>y where x is a decimal
 // promote x and y to s_decimalPromotionTable[y]
 ValueType NValue::s_decimalPromotionTable[] = {
-    VALUE_TYPE_INVALID,   // 0 invalid
-    VALUE_TYPE_NULL,      // 1 null
-    VALUE_TYPE_INVALID,   // 2 <unused>
-    VALUE_TYPE_DECIMAL,   // 3 tinyint
-    VALUE_TYPE_DECIMAL,   // 4 smallint
-    VALUE_TYPE_DECIMAL,   // 5 integer
-    VALUE_TYPE_DECIMAL,   // 6 bigint
-    VALUE_TYPE_INVALID,   // 7 <unused>
-    VALUE_TYPE_DOUBLE,    // 8 double
-    VALUE_TYPE_INVALID,   // 9 varchar
-    VALUE_TYPE_INVALID,   // 10 <unused>
-    VALUE_TYPE_DECIMAL,   // 11 timestamp
+    ValueType::tINVALID,   // 0 invalid
+    ValueType::tNULL,      // 1 null
+    ValueType::tINVALID,   // 2 <unused>
+    ValueType::tDECIMAL,   // 3 tinyint
+    ValueType::tDECIMAL,   // 4 smallint
+    ValueType::tDECIMAL,   // 5 integer
+    ValueType::tDECIMAL,   // 6 bigint
+    ValueType::tINVALID,   // 7 <unused>
+    ValueType::tDOUBLE,    // 8 double
+    ValueType::tINVALID,   // 9 varchar
+    ValueType::tINVALID,   // 10 <unused>
+    ValueType::tDECIMAL,   // 11 timestamp
     // 12 - 21 unused. ick.
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_DECIMAL,   // 22 decimal
-    VALUE_TYPE_INVALID,   // 23 boolean
-    VALUE_TYPE_INVALID,   // 24 address
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tINVALID, ValueType::tINVALID,
+    ValueType::tDECIMAL,   // 22 decimal
+    ValueType::tINVALID,   // 23 boolean
+    ValueType::tINVALID,   // 24 address
 };
 
 TTInt NValue::s_maxDecimalValue("9999999999"   //10 digits
@@ -130,40 +130,40 @@ std::string NValue::debug() const {
     }
 
     switch (type) {
-       case VALUE_TYPE_BOOLEAN:
+        case ValueType::tBOOLEAN:
           buffer << (getBoolean() ? "true" : "false");
           break;
-       case VALUE_TYPE_TINYINT:
+        case ValueType::tTINYINT:
           buffer << static_cast<int32_t>(getTinyInt());
           break;
-       case VALUE_TYPE_SMALLINT:
+        case ValueType::tSMALLINT:
           buffer << getSmallInt();
           break;
-       case VALUE_TYPE_INTEGER:
+        case ValueType::tINTEGER:
           buffer << getInteger();
           break;
-       case VALUE_TYPE_BIGINT:
+        case ValueType::tBIGINT:
           buffer << getBigInt();
           break;
-       case VALUE_TYPE_DOUBLE:
+        case ValueType::tDOUBLE:
           buffer << getDouble();
           break;
-       case VALUE_TYPE_VARCHAR:
+        case ValueType::tVARCHAR:
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]";
           buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
           break;
-       case VALUE_TYPE_VARBINARY:
+        case ValueType::tVARBINARY:
           ptr = getObject_withoutNull(length);
           out_val = std::string(ptr, length);
           buffer << "[" << length << "]";
           buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
           break;
-       case VALUE_TYPE_DECIMAL:
+        case ValueType::tDECIMAL:
           buffer << createStringFromDecimal();
           break;
-       case VALUE_TYPE_TIMESTAMP:
+        case ValueType::tTIMESTAMP:
           try {
              std::stringstream ss;
              streamTimestamp(ss);
@@ -174,10 +174,10 @@ std::string NValue::debug() const {
              buffer << "<exception when converting timestamp:" << getBigInt() << ">";
           }
           break;
-       case VALUE_TYPE_POINT:
+        case ValueType::tPOINT:
           buffer << getGeographyPointValue().toString();
           break;
-       case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tGEOGRAPHY:
           buffer << getGeographyValue().toString();
           break;
        default:
@@ -189,9 +189,9 @@ std::string NValue::debug() const {
 
 int32_t NValue::serializedSize() const {
     switch (m_valueType) {
-       case VALUE_TYPE_VARCHAR:
-       case VALUE_TYPE_VARBINARY:
-       case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tGEOGRAPHY:
           if (! isNull()) {
              int32_t valueLength;
              getObject_withoutNull(valueLength);
@@ -253,11 +253,8 @@ void NValue::createDecimalFromString(const std::string &txt) {
      */
     for (int ii = (setSign ? 1 : 0); ii < static_cast<int>(txt.size()); ii++) {
         if ((txt[ii] < '0' || txt[ii] > '9') && txt[ii] != '.') {
-            char message[4096];
-            snprintf(message, 4096, "Invalid characters in decimal string: %s",
-                     txt.c_str());
-            throw SQLException(SQLException::volt_decimal_serialization_error,
-                               message);
+            throwSQLException(SQLException::volt_decimal_serialization_error,
+                    "Invalid characters in decimal string: %s", txt.c_str());
         }
     }
 
@@ -267,7 +264,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
         const std::size_t wholeStringSize = wholeString.size();
         if (wholeStringSize > 26) {
             throw SQLException(SQLException::volt_decimal_serialization_error,
-                               "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+                    "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
         }
         TTInt whole(wholeString);
         if (setSign) {
@@ -280,7 +277,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
 
     if (txt.find( '.', separatorPos + 1) != std::string::npos) {
         throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Too many decimal points");
+                "Too many decimal points");
     }
 
     // This is set to 1 if we carry in the scale.
@@ -353,16 +350,14 @@ void NValue::createDecimalFromString(const std::string &txt) {
 }
 
 struct NValueList {
-    static int allocationSizeForLength(size_t length)
-    {
+    static int allocationSizeForLength(size_t length) {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
         // This allocation has the advantage of getting freed via NValue::free.
         return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
     }
 
-    void* operator new(size_t size, char* placement)
-    {
+    void* operator new(size_t size, char* placement) {
         return placement;
     }
     void operator delete(void*, char*) {}
@@ -371,8 +366,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
-    {
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool) {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
         }
@@ -388,15 +382,14 @@ struct NValueList {
 
 /**
  * This NValue can be of any scalar value type.
- * @param rhs  a VALUE_TYPE_ARRAY NValue whose referent must be an NValueList.
+ * @param rhs  a tARRAY NValue whose referent must be an NValueList.
  *             The NValue elements of the NValueList should be comparable to and ideally
  *             of exactly the same VALUE_TYPE as "this".
  * The planner and/or deserializer should have taken care of this with checks and
  * explicit cast operators and and/or constant promotions as needed.
- * @return a VALUE_TYPE_BOOLEAN NValue.
+ * @return a tBOOLEAN NValue.
  */
-bool NValue::inList(const NValue& rhs) const
-{
+bool NValue::inList(const NValue& rhs) const {
     //TODO: research: does the SQL standard allow a null to match a null list element
     // vs. returning FALSE or NULL?
     const bool lhsIsNull = isNull();
@@ -405,7 +398,7 @@ bool NValue::inList(const NValue& rhs) const
     }
 
     const ValueType rhsType = rhs.getValueType();
-    if (rhsType != VALUE_TYPE_ARRAY) {
+    if (rhsType != ValueType::tARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(rhs.getObjectValue_withoutNull());
@@ -417,8 +410,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
-{
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool) {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
     int trueSize = NValueList::allocationSizeForLength(length);
@@ -430,17 +422,15 @@ void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPo
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-void NValue::allocateANewNValueList(size_t length, ValueType elementType)
-{
+void NValue::allocateANewNValueList(size_t length, ValueType elementType) {
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, NULL);
     ::memset(storage, 0, trueSize);
     new (storage) NValueList(length, elementType);
 }
 
-void NValue::setArrayElements(std::vector<NValue> &args) const
-{
-    vassert(m_valueType == VALUE_TYPE_ARRAY);
+void NValue::setArrayElements(std::vector<NValue> &args) const {
+    vassert(m_valueType == ValueType::tARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
     // Assign each of the elements.
@@ -453,24 +443,22 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
-int NValue::arrayLength() const
-{
-    vassert(m_valueType == VALUE_TYPE_ARRAY);
+int NValue::arrayLength() const {
+    vassert(m_valueType == ValueType::tARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
-const NValue& NValue::itemAtIndex(int index) const
-{
-    vassert(m_valueType == VALUE_TYPE_ARRAY);
+const NValue& NValue::itemAtIndex(int index) const {
+    vassert(m_valueType == ValueType::tARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     vassert(index >= 0);
     vassert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];
 }
 
-void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const
-{
+void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
+        std::vector<NValue> &outList) const {
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
@@ -500,8 +488,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     }
 }
 
-void NValue::streamTimestamp(std::stringstream& value) const
-{
+void NValue::streamTimestamp(std::stringstream& value) const {
     int64_t epoch_micros = getTimestamp();
     if (epochMicrosOutOfRange(epoch_micros)) {
         throwOutOfRangeTimestampInput("CAST");
@@ -527,25 +514,22 @@ void NValue::streamTimestamp(std::stringstream& value) const
     value << mbstr;
 }
 
-inline static void throwTimestampFormatError(const std::string &str)
-{
-    char message[4096];
+inline static void throwTimestampFormatError(const std::string &str) {
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
-             "or \'YYYY-MM-DD\'",
-             str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
-    throw SQLException(SQLException::dynamic_sql_error, message);
+    throwSQLException(SQLException::dynamic_sql_error,
+            "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'or \'YYYY-MM-DD\'",
+            str.c_str(), valueToString(ValueType::tTIMESTAMP).c_str());
 }
 
-int64_t NValue::parseTimestampString(const std::string &str)
-{
+int64_t NValue::parseTimestampString(const std::string &str) {
     // date_str
     std::string date_str(str);
     // This is the std:string API for "ltrim" and "rtrim".
-    date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
+    date_str.erase(date_str.begin(),
+            std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(),
+            date_str.end());
     std::size_t sep_pos;
-
 
     int year = 0;
     int month = 0;
@@ -710,8 +694,7 @@ int64_t NValue::parseTimestampString(const std::string &str)
 }
 
 
-int warn_if(int condition, const char* message)
-{
+int warn_if(int condition, const char* message) {
     if (condition) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, message);
     }
