@@ -111,14 +111,14 @@ def buildEnterprise(version):
 def packagePro(version):
     print "Making license"
     licensee="VoltDB Pro Trial User " + version
-    makeTrialLicense(licensee=licensee, days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
+    license = makeTrialLicense(licensee=licensee, days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
     print "Repacking pro kit"
     with cd(builddir + "/pro/obj/pro"):
         run("mkdir pro_kit_staging")
     with cd(builddir + "/pro/obj/pro/pro_kit_staging"):
         run("tar xf ../voltdb-ent-%s.tar.gz" % version)
         run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
-        run("cp %s/pro/trial_*.xml voltdb-pro-%s/voltdb/license.xml" % (builddir, version))
+        run("cp %s/pro/%s voltdb-pro-%s/voltdb/license.xml" % (builddir, license, version))
         run("tar cvfz ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
 
 ################################################
@@ -159,10 +159,14 @@ def buildRabbitMQExport(version, dist_type):
 
 # Must be called after buildEnterprise has been done
 def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
+    timestring = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    filename = 'trial_' + timestring + '.xml'
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
+        -Dfilename=%s \
         -Dallowreplication=true -DallowDrActiveActive=true\
-                     -Dlicensedays=%d -Dlicensee='%s'" % (days, licensee))
+                     -Dlicensedays=%d -Dlicensee='%s'" % (filename, days, licensee))
+        return filename
 
 ################################################
 # MAKE A SHA256 checksum
@@ -207,8 +211,8 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         get("%s/voltdb/obj/release/voltdb-%s.sym" % (builddir, version),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
 
-def copyTrialLicenseToReleaseDir(releaseDir):
-    get("%s/pro/trial_*.xml" % (builddir),
+def copyTrialLicenseToReleaseDir(licensefile, releaseDir):
+    get(licensefile,
         "%s/license.xml" % (releaseDir))
 
 def copyMavenJarsToReleaseDir(releaseDir, version):
@@ -357,8 +361,8 @@ if __name__ == "__main__":
             packagePro(versionCentos)
             makeSHA256SUM(versionCentos,"pro")
             copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
-            makeTrialLicense(licensee="VoltDB Internal Use Only V" + centosVersion)
-            copyTrialLicenseToReleaseDir(releaseDir)
+            licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only V" + versionCentos)
+            copyTrialLicenseToReleaseDir(builddir + "/pro/" + licensefile, releaseDir)
             makeMavenJars()
             copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
