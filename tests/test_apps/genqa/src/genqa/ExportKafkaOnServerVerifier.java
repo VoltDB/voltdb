@@ -23,8 +23,6 @@
 
 package genqa;
 
-import genqa.ExportOnServerVerifier.ValidationErr;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -202,7 +200,7 @@ public class ExportKafkaOnServerVerifier {
                 while (it.hasNext()) {
                     byte msg[] = it.next().message();
                     String smsg = new String(msg);
-                    String row[] = ExportOnServerVerifier.RoughCSVTokenizer.tokenize(smsg);
+                    String row[] = RoughCSVTokenizer.tokenize(smsg);
                     try {
                         if (m_doneStream) {
                             System.out.println("EOS Consumed: " + smsg + " Expected Rows: " + row[6]);
@@ -215,7 +213,7 @@ public class ExportKafkaOnServerVerifier {
                                 break;
                             }
                         }
-                        ExportOnServerVerifier.ValidationErr err = ExportOnServerVerifier.verifyRow(row);
+                        ValidationErr err = ExportOnServerVerifier.verifyRow(row);
                         if (err != null) {
                             System.out.println("ERROR in validation: " + err.toString());
                         }
@@ -237,7 +235,7 @@ public class ExportKafkaOnServerVerifier {
                         //if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
                         //    break;
                         //}
-                    } catch (ExportOnServerVerifier.ValidationErr ex) {
+                    } catch (ValidationErr ex) {
                         System.out.println("Validation ERROR " + ex);
                     }
                 }

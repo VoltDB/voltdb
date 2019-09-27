@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -66,7 +66,7 @@ public class SampleRecord
         this.type_null_bigint           = nextBigint(rand, true);
         this.type_not_null_bigint       = nextBigint(rand);
         this.type_null_timestamp        = nextTimestamp(rand, true);
-        this.type_not_null_timestamp    = nextTimestamp(rand);
+        this.type_not_null_timestamp    = nextTimestamp(rand); // typically set to NOW at INSERT, but left as random here in case other Sample class users still depend on it
         this.type_null_float            = nextFloat(rand, true);
         this.type_not_null_float        = nextFloat(rand);
         this.type_null_decimal          = nextDecimal(rand, true);
@@ -77,6 +77,32 @@ public class SampleRecord
         this.type_not_null_varchar128   = nextVarchar(rand, 25, 128);
         this.type_null_varchar1024      = nextVarchar(rand, true, 128, 1024);
         this.type_not_null_varchar1024  = nextVarchar(rand, 128, 1024);
+    }
+
+    public String toString() {
+        return
+            rowid                      + ", " +
+            rowid_group                + ", " +
+            type_null_tinyint          + ", " +
+            type_not_null_tinyint      + ", " +
+            type_null_smallint         + ", " +
+            type_not_null_smallint     + ", " +
+            type_null_integer          + ", " +
+            type_not_null_integer      + ", " +
+            type_null_bigint           + ", " +
+            type_not_null_bigint       + ", " +
+            type_null_timestamp        + ", " +
+            type_not_null_timestamp    + ", " +
+            type_null_float            + ", " +
+            type_not_null_float        + ", " +
+            type_null_decimal          + ", " +
+            type_not_null_decimal      + ", " +
+            type_null_varchar25        + ", " +
+            type_not_null_varchar25    + ", " +
+            type_null_varchar128       + ", " +
+            type_not_null_varchar128   + ", " +
+            type_null_varchar1024      + ", " +
+            type_not_null_varchar1024;
     }
 
     private static Object nextTinyint(Random rand)

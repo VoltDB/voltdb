@@ -20,24 +20,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package genqa2.procedures;
 
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
+package genqa;
 
-public class JiggleExportGroupDoneTable extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
-    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
+import java.lang.Exception;
+public class ValidationErr extends Exception {
+        private static final long serialVersionUID = 1L;
+        final String msg;
+        final Object value;
+        final Object expected;
 
-    public long run(long txid)
-    {
-        voltQueueSQL(export, txid);
-        voltQueueSQL(exportFoo, txid);
+        ValidationErr(String msg, Object value, Object expected) {
+            this.msg = msg;
+            this.value = value;
+            this.expected = expected;
+        }
 
-        // Execute last statement batch
-        voltExecuteSQL(true);
-
-        // Retun to caller
-        return txid;
-    }
+        public ValidationErr(String string) {
+            this.msg = string;
+            this.value = "[not provided]";
+            this.expected = "[not provided]";
+        }
+        @Override
+        public String toString() {
+            return msg + " Value: " + value + " Expected: " + expected;
+        }
 }
