@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <tuple>
 #include "limitexecutor.h"
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
@@ -52,8 +53,7 @@ using namespace voltdb;
 
 bool
 LimitExecutor::p_init(AbstractPlanNode* abstract_node,
-                      const ExecutorVector& executorVector)
-{
+                      const ExecutorVector& executorVector) {
     VOLT_TRACE("init limit Executor");
 
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
@@ -62,8 +62,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     // Skip if we are inline
     //
-    if (!node->isInline())
-    {
+    if (!node->isInline()) {
         //
         // Just copy the table schema of our input table
         //
@@ -95,7 +94,7 @@ bool LimitExecutor::p_execute(const NValueArray &params) {
     int tuple_ctr = 0;
     int limit = -1;
     int offset = -1;
-    node->getLimitAndOffsetByReference(params, limit, offset);
+    std::tie(limit, offset) = node->getLimitAndOffset(params);
 
     if (iterator.advance(tuple, offset) < offset) {
         return true;     // offset beyond table count: empty table
