@@ -25,8 +25,6 @@ package org.voltdb.export;
 
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -42,6 +40,7 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Lists;
 
 /**
@@ -137,8 +136,7 @@ public class TestExportDanglingSources extends ExportLocalClusterBase {
         m_client = getClient(m_cluster);
 
         //add data to all stream tables
-        Object[] data = new Object[3];
-        Arrays.fill(data, 1);
+        Object[] data = new Object[] {1, 1, 1};
 
         for (int i = 0; i < LOOP_COUNT; i++) {
             insertToStream(STREAM_NAME, rowCount, ROW_BATCH, m_client, data);
@@ -185,17 +183,12 @@ public class TestExportDanglingSources extends ExportLocalClusterBase {
         m_cluster.updateCatalog(m_builder);
 
         // Wait for export to drain
-        List<String> list = new ArrayList<>(1);
-        list.add(STREAM_NAME);
+        List<String> list = ImmutableList.of(STREAM_NAME);
         TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
         m_verifier.verifyRows();
 
         // Verify at least one host had to drain a data source
-        assertTrue(m_cluster.verifyLogMessage(0, m_logPattern)
-                || m_cluster.verifyLogMessage(1, m_logPattern)
-                || m_cluster.verifyLogMessage(2, m_logPattern)
-                || m_cluster.verifyLogMessage(3, m_logPattern)
-                || m_cluster.verifyLogMessage(4, m_logPattern));
+        assertTrue(m_cluster.anyHostHasLogMessage(m_logPattern));
     }
 
 }
