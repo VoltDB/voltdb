@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
+import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.jcraft.jsch.ChannelSftp;
@@ -76,6 +77,7 @@ import com.jcraft.jsch.SftpException;
 
 public class ExportOnServerVerifier {
 
+    static VoltLogger log = new VoltLogger("ExportOnServerVerifier");
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 50000;
@@ -94,29 +96,6 @@ public class ExportOnServerVerifier {
         String path;
         boolean activeSeen = false;
         boolean fileSeen = false;
-    }
-
-    public static class ValidationErr extends Exception {
-        private static final long serialVersionUID = 1L;
-        final String msg;
-        final Object value;
-        final Object expected;
-
-        ValidationErr(String msg, Object value, Object expected) {
-            this.msg = msg;
-            this.value = value;
-            this.expected = expected;
-        }
-
-        public ValidationErr(String string) {
-            this.msg = string;
-            this.value = "[not provided]";
-            this.expected = "[not provided]";
-        }
-        @Override
-        public String toString() {
-            return msg + " Value: " + value + " Expected: " + expected;
-        }
     }
 
     ExportOnServerVerifier()
@@ -348,7 +327,7 @@ public class ExportOnServerVerifier {
                         csvPair = openNextExportFile();
                         if (csvPair == null)
                         {
-                            System.out.println("No more export rows");
+                            log.info("No more export rows");
                             more_rows = false;
                             break;
                         }
@@ -376,7 +355,7 @@ public class ExportOnServerVerifier {
                      * rows' own tx id for verification
                      */
                     if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
-                        System.out.println("Verified " + ttlVerified + " rows.");
+                        log.info("Verified " + ttlVerified + " rows.");
                     }
 
                     Integer partition = Integer.parseInt(row[3].trim());
@@ -384,7 +363,7 @@ public class ExportOnServerVerifier {
                     Long rowId = Long.parseLong(row[7].trim());
 
                     if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                        System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
+                        log.error("ERROR: mismatched exported partition for txid " + rowTxnId +
                                 ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                 ", while export record says " + partition);
                         partition = TxnEgo.getPartitionId(rowTxnId);
@@ -395,22 +374,22 @@ public class ExportOnServerVerifier {
                     Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
                     if (previous != null)
                     {
-                        System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
+                        log.info("WARN Duplicate TXN ID in export stream: " + rowTxnId);
                     }
                 }
 
-                System.out.println("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
+                log.info("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
 
                 determineReadUpToCounters();
                 dcount = m_clientOverFlow.size();
                 processClientIdOverFlow();
 
-                System.out.println("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
-                System.out.println("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
+                log.info("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
+                log.info("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
 
                 more_txnids = readEnoughClientRecords();
                 if (!more_txnids) {
-                    System.out.println("No more client txn IDs");
+                    log.info("No more client txn IDs");
                 }
 
                 if (matchClientTxnIds(vfout))
@@ -419,7 +398,7 @@ public class ExportOnServerVerifier {
                 }
                 else if (++emptyRemovalCycles >= 20)
                 {
-                    System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    log.error("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
                     dumpUnmatchedSituation();
                     System.exit(1);
                 }
@@ -441,18 +420,18 @@ public class ExportOnServerVerifier {
         }
         if (more_rows || more_txnids)
         {
-            System.out.println("Something wasn't drained");
-            System.out.println("client txns remaining: " + m_clientTxnIds.size());
-            System.out.println("Export rows remaining: ");
+            log.info("Something wasn't drained");
+            log.info("client txns remaining: " + m_clientTxnIds.size());
+            log.info("Export rows remaining: ");
             int total = 0;
             for (int i = 0; i < m_partitions; i++)
             {
                 total += m_rowTxnIds.get(i).size();
-                System.out.println("\tpartition: " + i + ", size: " + m_rowTxnIds.get(i).size());
+                log.info("\tpartition: " + i + ", size: " + m_rowTxnIds.get(i).size());
             }
             if (total != 0 && m_clientTxnIds.size() != 0)
             {
-                System.out.println("THIS IS A REAL ERROR?!");
+                log.info("THIS IS A REAL ERROR?!");
             }
         }
     }
@@ -490,7 +469,7 @@ public class ExportOnServerVerifier {
 
                 if ( trace == null) {
                     m_readUpTo.get(partId).set(0);
-                    System.out.println("No more client txn IDs for partition id " + partId);
+                    log.info("No more client txn IDs for partition id " + partId);
                     break INNER;
                 }
 
@@ -509,11 +488,11 @@ public class ExportOnServerVerifier {
                     }
                     dcount++;
                 } else if (trace != null) {
-                    System.out.println("WARN read malformed trace " + trace);
+                    log.info("WARN read malformed trace " + trace);
                 }
             }
         }
-        System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
+        log.info("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
 
         // read the client records that do not have associated tx (invocations with failed status codes)
         readOrphanedClientRecords();
@@ -566,7 +545,7 @@ public class ExportOnServerVerifier {
                             m_clientTxnIdOrphans.add(rowid);
                         }
                     } else if (line != null) {
-                        System.out.println("WARN read malformed trace " + line + " in " + f);
+                        log.info("WARN read malformed trace " + line + " in " + f);
                     }
                     line = in.readLine();
                 }
@@ -647,7 +626,7 @@ public class ExportOnServerVerifier {
                         csvPair = openNextExportFile();
                         if (csvPair == null)
                         {
-                            System.out.println("No more export rows");
+                            log.info("No more export rows");
                             more_rows = false;
                             break;
                         }
@@ -667,7 +646,7 @@ public class ExportOnServerVerifier {
                     dcount++;
 
                     if (expect_export_eof) {
-                        System.err.println(
+                        log.error(
                                 "ERROR: Unexpected number of columns for the following row:\n\t" +
                                  row
                                  );
@@ -679,7 +658,7 @@ public class ExportOnServerVerifier {
                      * rows' own tx id for verification
                      */
                     if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
-                        System.out.println("Verified " + ttlVerified + " rows.");
+                        log.info("Verified " + ttlVerified + " rows.");
                     }
 
                     int partition =  Integer.MAX_VALUE;
@@ -691,7 +670,7 @@ public class ExportOnServerVerifier {
                     long rowId = rowValues[7];
 
                     if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                        System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
+                        log.info("ERROR: mismatched exported partition for txid " + rowTxnId +
                                 ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                 ", while export record says " + partition);
                         partition = TxnEgo.getPartitionId(rowTxnId);
@@ -700,14 +679,14 @@ public class ExportOnServerVerifier {
                     txout.printf("%d:%d\n", rowTxnId, rowId);
 
                     if (! m_rowTxnIds.containsKey(partition)) {
-                        System.err.println("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
+                        log.error("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
                         continue;
                     }
 
                     Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
                     if (previous != null)
                     {
-                        System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
+                        log.info("WARN Duplicate TXN ID in export stream: " + rowTxnId);
                     }
                     else
                     {
@@ -715,18 +694,18 @@ public class ExportOnServerVerifier {
                     }
                 }
 
-                System.out.println("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
+                log.info("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
 
                 determineReadUpToCounters();
                 dcount = m_clientOverFlow.size();
                 processClientIdOverFlow();
 
-                System.out.println("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
-                System.out.println("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
+                log.info("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
+                log.info("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
 
                 more_txnids = readEnoughClientRecords();
                 if (!more_txnids) {
-                    System.out.println("No more client txn IDs");
+                    log.info("No more client txn IDs");
                 }
 
                 if (matchClientTxnIds(vfout))
@@ -735,7 +714,7 @@ public class ExportOnServerVerifier {
                 }
                 else if (++emptyRemovalCycles >= 20)
                 {
-                    System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    log.info("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
                     dumpUnmatchedSituation();
                     System.exit(1);
                 }
@@ -765,9 +744,9 @@ public class ExportOnServerVerifier {
             if( cnt++ > 0) sb.append(", ");
             sb.append(part.size());
         }
-        System.out.println("\n==================================================================");
-        System.out.println(sb.toString());
-        System.out.println("client tx id list size is " + m_clientTxnIds.size());
+        log.info("\n==================================================================");
+        log.info(sb.toString());
+        log.info("client tx id list size is " + m_clientTxnIds.size());
         int [] txByPart    = new int [m_partitions]; Arrays.fill(txByPart, 0);
         int [] staleByPart = new int [m_partitions]; Arrays.fill(staleByPart, 0);
         for( Long tx: m_clientTxnIds.keySet())
@@ -782,8 +761,8 @@ public class ExportOnServerVerifier {
             if (i>0) sb.append(", ");
             sb.append(txByPart[i]).append("[").append(staleByPart[i]).append("]");
         }
-        System.out.println(sb.toString());
-        System.out.println("overflow txid id list size is " + m_clientOverFlow.size());
+        log.info(sb.toString());
+        log.info("overflow txid id list size is " + m_clientOverFlow.size());
         Arrays.fill(txByPart, 0);
         Arrays.fill(staleByPart, 0);
         for( Long tx: m_clientOverFlow)
@@ -798,10 +777,10 @@ public class ExportOnServerVerifier {
             if (i>0) sb.append(", ");
             sb.append(txByPart[i]).append("[").append(staleByPart[i]).append("]");
         }
-        System.out.println(sb.toString());
-        System.out.println("orphaned client row id list size is " + m_clientTxnIdOrphans.size());
-        System.out.println("stale client txid id list size is " + m_staleTxnIds.size());
-        System.out.println("==================================================================\n");
+        log.info(sb.toString());
+        log.info("orphaned client row id list size is " + m_clientTxnIdOrphans.size());
+        log.info("stale client txid id list size is " + m_staleTxnIds.size());
+        log.info("==================================================================\n");
     }
 
     void printClientTxIds() {
@@ -815,15 +794,15 @@ public class ExportOnServerVerifier {
             itr.remove();
         }
 
-        System.out.println("\n==================================================================");
-        System.out.println("List of remaining committed but unmatched client transactions:");
+        log.info("\n==================================================================");
+        log.info("List of remaining committed but unmatched client transactions:");
         for (Map.Entry<Long,Long> entry: sortedByDate.entrySet()) {
             String ts = dfmt.format(new Date(entry.getKey()));
             long txid = entry.getValue();
             int partid = TxnEgo.getPartitionId(txid);
-            System.out.println(ts+ ", partition: " + partid + ", txid: " + txid);
+            log.info(ts+ ", partition: " + partid + ", txid: " + txid);
         }
-        System.out.println("==================================================================\n");
+        log.info("==================================================================\n");
     }
 
     /**
@@ -897,7 +876,7 @@ public class ExportOnServerVerifier {
                                 activeInRemote = activeInRemote || entryModifyTime > trackerModifyTime;
                                 filesInRemote = true;
                             } else {
-                                System.err.println(
+                                log.error(
                                         "ERROR: " + entryFileName +
                                         " does not match expected export file name pattern");
                             }
@@ -987,7 +966,7 @@ public class ExportOnServerVerifier {
             || !unmatchedDH.canRead()
             || !unmatchedDH.canExecute()
             || !unmatchedDH.canWrite()) {
-            System.err.println("cannot access/create the unmatched directory");
+            log.error("cannot access/create the unmatched directory");
             return;
         }
 
@@ -1051,10 +1030,10 @@ public class ExportOnServerVerifier {
      * @param activeFound how many active export files where found id the probe
      */
     private void printExportFileSituation(List<Pair<ChannelSftp, List<String>>> pathsFromAllNodes, int activeFound) {
-        System.out.println("\n================= E X P O R T  F I L E S  S I T U A T I O N ======================");
-        System.out.println("On                      " + new Date());
-        System.out.println("Active Found Count is   " + activeFound);
-        System.out.println("All active seen flag is " + allActiveSeen());
+        log.info("\n================= E X P O R T  F I L E S  S I T U A T I O N ======================");
+        log.info("On                      " + new Date());
+        log.info("Active Found Count is   " + activeFound);
+        log.info("All active seen flag is " + allActiveSeen());
         if (!allActiveSeen()) {
             for (RemoteHost host: m_hosts) {
                 String hn = "(unknown)";
@@ -1062,7 +1041,7 @@ public class ExportOnServerVerifier {
                     hn = host.channel.getSession().getHost();
                 } catch (JSchException ignoreIt) {}
                 if (!host.activeSeen && host.fileSeen) {
-                    System.out.println("\tno activity was detected on " + hn);
+                    log.info("\tno activity was detected on " + hn);
                 }
             }
         }
@@ -1071,12 +1050,12 @@ public class ExportOnServerVerifier {
             try {
                 hn = p.getFirst().getSession().getHost();
             } catch (JSchException ignoreIt) {}
-            System.out.println("On "+hn+" I found the following files");
+            log.info("On "+hn+" I found the following files");
             for (String f: p.getSecond()) {
-                System.out.println("\t" + f);
+                log.info("\t" + f);
             }
         }
-        System.out.println("==================================================================================\n");
+        log.info("==================================================================================\n");
     }
 
 
@@ -1107,9 +1086,9 @@ public class ExportOnServerVerifier {
             if ((now - start_time) > FILE_TIMEOUT_MS)
             {
                 Arrays.sort(files, comparator);
-                System.err.println("ERROR Polling for client files timed out, the current list of files is:");
+                log.error("ERROR Polling for client files timed out, the current list of files is:");
                 for (File f: files) {
-                    System.err.println("\t"+ f);
+                    log.error("\t"+ f);
                 }
 
                 throw new ValidationErr("Timed out waiting on new files in " + path.getName()+ ".\n" +
@@ -1173,7 +1152,7 @@ public class ExportOnServerVerifier {
         checkForMoreFilesRemote(comparator);
         for (Pair<ChannelSftp, String> p : m_exportFiles)
         {
-            System.out.println("" + p.getFirst().getSession().getHost() + " : " + p.getSecond());
+            log.info("" + p.getFirst().getSession().getHost() + " : " + p.getSecond());
         }
     }
 
@@ -1237,7 +1216,7 @@ public class ExportOnServerVerifier {
         if (remotePair == null) return null;
         final ChannelSftp channel = remotePair.getFirst();
         final String path = remotePair.getSecond();
-        System.out.println(
+        log.info(
                 "INFO export: Opening export file: " + channel.getSession().getHost() + "@" + path);
         final BufferedReader reader = new BufferedReader(
                 new InputStreamReader(channel.get(path)), 4096 * 32
@@ -1289,7 +1268,7 @@ public class ExportOnServerVerifier {
         }
 
         File clientFile = clientFiles[clientIndex];
-        System.out.println(
+        log.info(
                 "INFO clientlog: Opening client file: " + clientFile.getName()
               + " for partition id " + partId
               );
@@ -1372,7 +1351,7 @@ public class ExportOnServerVerifier {
         int partid = TxnEgo.getPartitionId(txid);
         if (m_readUpTo.get(partid) == null)
         {
-            System.out.println("WARN: could find countdown for partition " + partid);
+            log.info("WARN: could find countdown for partition " + partid);
             return;
         }
         if (m_readUpTo.get(partid).decrementAndGet() <= 0)
@@ -1400,7 +1379,7 @@ public class ExportOnServerVerifier {
 
                 if (writer != null) writer.println(staletx);
 
-                System.out.println(" *** Resurfaced stale tx " + staletx + " found in the client tx list");
+                log.info(" *** Resurfaced stale tx " + staletx + " found in the client tx list");
             }
         }
         for (int i = 0; i < m_partitions; ++i)
@@ -1424,7 +1403,7 @@ public class ExportOnServerVerifier {
                     }
                     if (m_staleTxnIds.remove(e.getKey()))
                     {
-                        System.out.println(" *** Matched stale tx " + e.getKey() + " found in the client tx list");
+                        log.info(" *** Matched stale tx " + e.getKey() + " found in the client tx list");
                     }
                 }
                 else if (e.getKey() <= m_maxPartTxId.get(i))
@@ -1441,7 +1420,7 @@ public class ExportOnServerVerifier {
                     long bsidx = Collections.binarySearch(m_clientTxnIdOrphans, e.getValue());
                     if( bsidx >= 0)
                     {
-                        System.out.println(" *** Found unrecorded txid " + e.getKey() + " for rowId " + e.getValue());
+                        log.info(" *** Found unrecorded txid " + e.getKey() + " for rowId " + e.getValue());
 
                         if (writer != null) writer.println(e.getKey());
 
@@ -1453,7 +1432,7 @@ public class ExportOnServerVerifier {
             }
         }
 
-        System.out.println("!_!_! DEBUG !_!_! *MATCHED* " + matchCount
+        log.info("!_!_! DEBUG !_!_! *MATCHED* " + matchCount
                 + " exported records, with *STALE* " + staleCount + " of which  "
                 + dupStaleCount + " are duplicate"
                 );
@@ -1480,7 +1459,7 @@ public class ExportOnServerVerifier {
     {
         if (row.length < 29)
         {
-            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t Expected 29, Found: "
+            log.info("ERROR: Unexpected number of columns for the following row:\n\t Expected 29, Found: "
                     + row.length + "Row:" + Arrays.toString(row));
             return new ValidationErr("number of columns", row.length, 29);
         }
@@ -1491,6 +1470,12 @@ public class ExportOnServerVerifier {
         // matches VoltProcedure.getSeededRandomNumberGenerator()
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
+
+        //
+        //  Uncomment these lines to dump the column data if needed for debugging.
+        //
+        // System.out.println("RabbitMQ row:\n\t " + Arrays.toString(row));
+        // System.out.println("Generated row:\n\t " + valid.toString());
 
         // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
@@ -1554,16 +1539,18 @@ public class ExportOnServerVerifier {
         if ( (!(type_null_timestamp == null && valid.type_null_timestamp == null)) &&
              (!type_null_timestamp.equals(valid.type_null_timestamp)) )
         {
-            System.out.println("CSV value: " + row[col]);
-            System.out.println("EXP value: " + valid.type_null_timestamp.toString());
-            System.out.println("ACT value: " + type_null_timestamp.toString());
+            log.info("CSV value: " + row[col]);
+            log.info("EXP value: " + valid.type_null_timestamp.toString());
+            log.info("ACT value: " + type_null_timestamp.toString());
             return error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
         }
 
         // col 18
-        TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
-        if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
-            return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+        // skip, should be current time, not random so don't count on a match
+        // TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
+        // if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
+        //     return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+        col++; // make sure to move onto the next column...
 
         // col 19
         BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
@@ -1581,11 +1568,10 @@ public class ExportOnServerVerifier {
         if ( (!(type_null_float == null && valid.type_null_float == null)) &&
              (!type_null_float.equals(valid.type_null_float)) )
         {
-            System.out.println("CSV value: " + row[col]);
-            System.out.println("EXP value: " + valid.type_null_float);
-            System.out.println("ACT value: " + type_null_float);
-            System.out.println("valueOf():" + Double.valueOf("-2155882919525625344.000000000000"));
-            System.out.flush();
+            log.info("CSV value: " + row[col]);
+            log.info("EXP value: " + valid.type_null_float);
+            log.info("ACT value: " + type_null_float);
+            log.info("valueOf():" + Double.valueOf("-2155882919525625344.000000000000"));
             return error("type_null_float", type_null_float, valid.type_null_float);
         }
 
@@ -1631,7 +1617,7 @@ public class ExportOnServerVerifier {
     }
 
     public static ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
-        System.err.println("ERROR: " + msg + "Value:" + val + "\nExpected:" + exp);
+        log.error("ERROR: " + msg + "Value:" + val + "\nExpected:" + exp);
         return new ValidationErr(msg, val, exp);
     }
 
@@ -1664,6 +1650,8 @@ public class ExportOnServerVerifier {
     }
 
     public static void main(String[] args) throws Exception {
+        VoltLogger log = new VoltLogger("ExportOnServerVerifier.main");
+
         ExportOnServerVerifier verifier = new ExportOnServerVerifier();
         try
         {
@@ -1674,7 +1662,7 @@ public class ExportOnServerVerifier {
 
             if (verifier.m_clientTxnIds.size() > 0)
             {
-                System.err.println("ERROR: not all client txids were matched against exported txids");
+                log.info("ERROR: not all client txids were matched against exported txids");
                 verifier.printClientTxIds();
                 System.exit(1);
             }
@@ -1684,77 +1672,10 @@ public class ExportOnServerVerifier {
             System.exit(-1);
         }
         catch (ValidationErr e ) {
-            System.err.println("Validation error: " + e.toString());
+            log.info("Validation error: " + e.toString());
             System.exit(-1);
         }
         System.exit(0);
     }
 
-    public static class RoughCSVTokenizer {
-
-        private RoughCSVTokenizer() {
-        }
-
-        private static void moveToBuffer(List<String> resultBuffer, StringBuilder buf) {
-            resultBuffer.add(buf.toString());
-            buf.delete(0, buf.length());
-        }
-
-        public static String[] tokenize(String csv) {
-            List<String> resultBuffer = new java.util.ArrayList<String>();
-
-            if (csv != null) {
-                int z = csv.length();
-                Character openingQuote = null;
-                boolean trimSpace = false;
-                StringBuilder buf = new StringBuilder();
-
-                for (int i = 0; i < z; ++i) {
-                    char c = csv.charAt(i);
-                    trimSpace = trimSpace && Character.isWhitespace(c);
-                    if (c == '"' || c == '\'') {
-                        if (openingQuote == null) {
-                            openingQuote = c;
-                            int bi = 0;
-                            while (bi < buf.length()) {
-                                if (Character.isWhitespace(buf.charAt(bi))) {
-                                    buf.deleteCharAt(bi);
-                                } else {
-                                    bi++;
-                                }
-                            }
-                        }
-                        else if (openingQuote == c ) {
-                            openingQuote = null;
-                            trimSpace = true;
-                        }
-                    }
-                    else if (c == '\\') {
-                        if ((z > i + 1)
-                            && ((csv.charAt(i + 1) == '"')
-                                || (csv.charAt(i + 1) == '\\'))) {
-                            buf.append(csv.charAt(i + 1));
-                            ++i;
-                        } else {
-                            buf.append("\\");
-                        }
-                    } else {
-                        if (openingQuote != null) {
-                            buf.append(c);
-                        } else {
-                            if (c == ',') {
-                                moveToBuffer(resultBuffer, buf);
-                            } else {
-                                if (!trimSpace) buf.append(c);
-                            }
-                        }
-                    }
-                }
-                moveToBuffer(resultBuffer, buf);
-            }
-
-            String[] result = new String[resultBuffer.size()];
-            return resultBuffer.toArray(result);
-        }
-    }
 }
