@@ -42,6 +42,8 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 
+import com.google_voltpatches.common.collect.Lists;
+
 /**
  * Test handling of dangling data sources
  */
@@ -86,6 +88,11 @@ public class TestExportDanglingSources extends ExportLocalClusterBase {
         m_cluster.overrideAnyRequestForValgrind();
         assertTrue(m_cluster.compile(m_builder));
 
+        // Set up log message pattern
+        List<String> patterns = Lists.newArrayList();
+        patterns.add(m_logPattern);
+        m_cluster.setLogSearchPatterns(patterns);
+
         // Start cluster and socket listener
         m_cluster.startUp(true);
         startListener();
@@ -120,7 +127,7 @@ public class TestExportDanglingSources extends ExportLocalClusterBase {
         }
     }
 
-    @Test(timeout = 600_000)
+    @Test(timeout = 60_000)
     public void testExportDanglingSources() throws Exception {
 
         int rowCount = 0;
