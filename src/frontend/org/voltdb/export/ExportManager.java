@@ -286,8 +286,8 @@ public class ExportManager
                 + (compress ? "enabled" : "disabled") + " in " + VoltDB.instance().getExportOverflowPath());
 
         CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
-        if (!CatalogUtil.hasEnabledConnectors(connectors)) {
-            exportLog.info("System is not using any export functionality or connectors configured are disabled.");
+        if (!CatalogUtil.hasConnectors(connectors)) {
+            exportLog.info("System is not using any export functionality.");
             return;
         }
 
@@ -295,10 +295,6 @@ public class ExportManager
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
-
-//    public HostMessenger getHostMessenger() {
-//        return m_messenger;
-//    }
 
     private void clearOverflowData() throws ExportManager.SetupException {
         String overflowDir = VoltDB.instance().getExportOverflowPath();
@@ -321,7 +317,7 @@ public class ExportManager
 
         CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
         if(!CatalogUtil.hasEnabledConnectors(connectors)) {
-            exportLog.info("System is not using any export functionality or connectors configured are disabled.");
+            exportLog.info("System is not using any export functionality or connector is disabled.");
             return;
         }
 
@@ -396,7 +392,10 @@ public class ExportManager
                 exportLog.debug("initialize for " + connectors.size() + " connectors.");
                 CatalogUtil.dumpConnectors(exportLog, connectors);
             }
-            if (!CatalogUtil.hasEnabledConnectors(connectors)) {
+            if (!CatalogUtil.hasConnectors(connectors)) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("No table has connected to connector, skip initializing export manager.");
+                }
                 return;
             }
 
