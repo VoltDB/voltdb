@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,15 +27,19 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 
 public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt(
-            "INSERT INTO export_skinny_partitioned_table (rowid, txnid) VALUES (?,?)"
-            );
+    public final SQLStmt export_kafka = new SQLStmt( "INSERT INTO export_skinny_partitioned_table_kafka (rowid, txnid) VALUES (?,?)");
+    public final SQLStmt export_rabbit = new SQLStmt( "INSERT INTO export_skinny_partitioned_table_rabbit (rowid, txnid) VALUES (?,?)");
+    public final SQLStmt export_jdbc = new SQLStmt( "INSERT INTO export_skinny_partitioned_table_jdbc (rowid, txnid) VALUES (?,?)");
+    public final SQLStmt export_file = new SQLStmt( "INSERT INTO export_skinny_partitioned_table_file (rowid, txnid) VALUES (?,?)");
 
     public long run(long rowid, int reversed) {
         @SuppressWarnings("deprecation")
         long txnid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
-        voltQueueSQL(export, rowid, txnid);
+        voltQueueSQL(export_kafka, rowid, txnid);
+        voltQueueSQL(export_rabbit, rowid, txnid);
+        voltQueueSQL(export_file, rowid, txnid);
+        voltQueueSQL(export_jdbc, rowid, txnid);
 
         // Execute last statement batch
         voltExecuteSQL(true);

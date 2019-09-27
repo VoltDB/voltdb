@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,18 +33,23 @@ import org.voltdb.VoltType;
 
 public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM partitioned_table WHERE rowid = ?");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     public final SQLStmt update = new SQLStmt("UPDATE partitioned_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM partitioned_table WHERE rowid = ?");
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
+    String template = "INSERT INTO export_partitioned_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
+    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
+    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
+    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
+    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
 
     public VoltTable[] run(long rowid, long ignore)
     {
         @SuppressWarnings("deprecation")
-        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+        long txnid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = new Random(txid);
+        Random rand = new Random(txnid);
 
         // Check if the record exists first
         voltQueueSQL(check, rowid);
@@ -61,9 +66,12 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
                 voltQueueSQL(delete, rowid);
                 // Export deletion
                 VoltTableRow row = item.fetchRow(0);
-                voltQueueSQL(
-                              export
-                            , txid
+
+                SQLStmt [] statements = {export_kafka, export_rabbit, export_file, export_jdbc};
+                for (SQLStmt stmt: statements) {
+                    voltQueueSQL(
+                              stmt
+                            , txnid
                             , rowid
                             , row.get( 1, VoltType.TINYINT)
                             , row.get( 2, VoltType.TINYINT)
@@ -87,6 +95,8 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
                             , row.get(20, VoltType.STRING)
                             , row.get(21, VoltType.STRING)
                             );
+                }
+
             }
             else
             {
@@ -134,7 +144,7 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
                             , record.type_null_bigint
                             , record.type_not_null_bigint
                             , record.type_null_timestamp
-                            , record.type_not_null_timestamp
+                            // , record.type_not_null_timestamp
                             , record.type_null_float
                             , record.type_not_null_float
                             , record.type_null_decimal
@@ -151,7 +161,7 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
         // Execute last statement batch
         voltExecuteSQL(true);
 
-        // Retun to caller
+        // Return to caller
         return null;
     }
 }
