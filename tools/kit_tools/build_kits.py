@@ -163,7 +163,7 @@ def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
     filename = 'trial_' + timestring + '.xml'
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
-        -Dfilename=%s \
+        -Dfilename=%s -Dlicensetype=t -Dhardexpire=true \
         -Dallowreplication=true -DallowDrActiveActive=true\
                      -Dlicensedays=%d -Dlicensee='%s'" % (filename, days, licensee))
         return filename
