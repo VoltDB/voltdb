@@ -3184,6 +3184,15 @@ public abstract class CatalogUtil {
         return db.getConnectors();
     }
 
+    public static boolean hasConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
         for (Connector conn : connectors) {
             if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
