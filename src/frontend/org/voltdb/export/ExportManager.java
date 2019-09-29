@@ -646,14 +646,14 @@ public class ExportManager
         }
     }
 
-    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+    public void updateInitialExportStateToSeqNo(int partitionId, String tableName,
                                                 StreamStartAction action,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
-            generation.updateInitialExportStateToSeqNo(partitionId, signature,
+            generation.updateInitialExportStateToSeqNo(partitionId, tableName,
                                                        action,
                                                        sequenceNumberPerPartition);
         }
