@@ -816,6 +816,19 @@ def formatted_time(seconds_since_epoch):
     return strftime('%Y-%m-%d %H:%M:%S', localtime(seconds_since_epoch)) + ' (' + str(seconds_since_epoch) + ')'
 
 
+def odd_num_quote_characters(sql, chars="'"):
+    """Check whether the specified string contains an odd number of any of the
+    specified characters; by default, only the single-quote character (') is
+    checked; returns True or False.
+    """
+    for ch in chars:
+        if sql.count(ch) % 2:
+            if debug > 2:
+                print "\nDEBUG: in odd_num_quote_characters, found odd number "+str(sql.count(ch))+" for char '"+str(ch)+"'."
+            return True
+    return False
+
+
 def print_sql_statement(sql, num_chars_in_sql_type=6):
     """Print the specified SQL statement (sql), to the SQL output file (which may
     be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
@@ -833,6 +846,11 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     # separately
     sql_statement_count = sql.count(';')
     if sql_statement_count > 1:
+        if debug > 2:
+            print "\nDEBUG: sql_statement_count:", sql_statement_count
+            if debug > 3:
+                print 'DEBUG: for sql:\n    "'+sql+'"'
+        completed_via_recursive_calls = False
         start_index = 0
         for i in range(sql_statement_count):
             end_index = sql.find(';', start_index)
@@ -846,9 +864,19 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 print '         sql[start_index:]  :\n', str(sql[start_index:])
                 break
             sql_substring = sql[start_index:end_index].strip() + ';'
+            if odd_num_quote_characters(sql_substring):
+                sql = sql[start_index:]
+                if debug > 2:
+                    print '\nDEBUG: proceeding with sql substring:\n    "'+sql+'"'
+                completed_via_recursive_calls = False
+                break
+            if debug > 2:
+                print '\nDEBUG: calling print_sql_statement with sql_substring:\n    "'+sql_substring+'"'
             print_sql_statement(sql_substring, num_chars_in_sql_type)
+            completed_via_recursive_calls = True
             start_index = end_index + 1
-        return
+        if completed_via_recursive_calls:
+            return
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
@@ -893,7 +921,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         signal(SIGALRM, timeout_handler)
         max_seconds_to_wait_for_sqlcmd = 60  # must be larger than query timeout of 10
         if debug > 4:
-            print 'DEBUG: max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
+            print 'DEBUG: max_seconds_to_wait_for_sqlcmd:', str(max_seconds_to_wait_for_sqlcmd)
 
         output = None
         while True:
@@ -906,9 +934,11 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             except TimeoutException:
                 hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements, include_current_time=True))
                 if debug > 1:
-                        print "\nERROR: timeout waiting for (hanging?) sqlcmd, after", \
-                              str(max_seconds_to_wait_for_sqlcmd), "seconds, with:\n" + \
-                              get_last_n_sql_statements(last_n_sql_statements, include_current_time=True)
+                    print "\nERROR: timeout waiting for ('hanging') sqlcmd, after", \
+                          str(max_seconds_to_wait_for_sqlcmd), "seconds,\n" + \
+                          "(sql was partially/fully echoed: "+str(sql_partially_echoed_as_output) + \
+                          ", "+str(sql_was_echoed_as_output)+"), with:\n" + \
+                          get_last_n_sql_statements(last_n_sql_statements, include_current_time=True)
                 break
             else:
                 alarm(0)  # turns off the alarm
@@ -962,16 +992,6 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print "\nDEBUG: Found 'ERROR' before SQL echoed (rare condition), with:\n" + \
                               get_last_n_sql_statements(last_n_sql_statements)
 
-                # Special case, for the first line of multi-statement SQL
-                elif ';' in sql and sql.startswith(output.rstrip(';')):
-                    sql_partially_echoed_as_output = True
-
-                # Special case, for a line (not the first) of multi-statement SQL
-                elif sql_partially_echoed_as_output and output.rstrip(';') in sql:
-                    # For the last line of multi-statement SQL
-                    if sql.rstrip(';').endswith(output.rstrip(';')):
-                        sql_was_echoed_as_output = True
-
                 # Invalid 'exec', 'explainproc' & 'explainview' commands (etc.) sometimes
                 # respond with various messages that do not include 'ERROR'
                 elif any( all(err_msg in output for err_msg in kem) for kem in known_error_messages):
@@ -987,6 +1007,24 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print "\nDEBUG: Found invalid 'exec', 'explainproc', or 'explainview'", \
                               "error message before SQL echoed (rare condition), with:\n" + \
                               get_last_n_sql_statements(last_n_sql_statements)
+
+                # Special case, for the first line of multi-statement SQL
+                elif ';' in sql and sql.startswith(output.rstrip(';')):
+                    sql_partially_echoed_as_output = True
+                    if debug > 2:
+                        print '\nDEBUG: found (first) sql_partially_echoed_as_output, with output:\n    "' \
+                                +output+'"\nand sql:\n    "'+sql+'"\n'
+
+                # Special case, for a line (not the first) of multi-statement SQL
+                elif sql_partially_echoed_as_output and output.rstrip(';') in sql:
+                    if debug > 2:
+                        print '\nDEBUG: found (more) sql_partially_echoed_as_output, with sql:\n    "' \
+                                +sql+'"\nand output:\n    "'+output+'"\n'
+                    # For the last line of multi-statement SQL
+                    if sql.rstrip(';').endswith(output.rstrip(';')):
+                        sql_was_echoed_as_output = True
+                        if debug > 2:
+                            print "\nDEBUG: this was the last piece, so now sql_was_echoed_as_output is True"
 
                 # CREATE VIEW statements will occasionally simply return 'null' in sqlcmd;
                 # see ENG-15587: this is a known bug, so we don't want to exit or fail
@@ -1429,7 +1467,6 @@ if __name__ == "__main__":
                             ['Object not found'],
                             ['View does not support COUNT(DISTINCT) expression'],
                             ['Table', 'cannot be swapped since it is used for exporting'],
-                            ['DDL Error'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
