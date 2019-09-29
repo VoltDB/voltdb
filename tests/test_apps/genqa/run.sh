@@ -27,17 +27,21 @@ fi
 CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-    \ls -1 /home/opt/kafka/libs/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar;
 } 2> /dev/null | paste -sd ':' - )
 
+CLASSPATH=/home/opt/rabbitmq/rabbitmq.jar:/home/test/jdbc/vertica-jdbc.jar:/home/test/jdbc/postgresql-9.4.1207.jar:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.4.6.jar:$CLASSPATH
+echo CLASSPATH $CLASSPATH
+echo VOLTDB_BASE $VOLTDB_BASE
+echo VOLTDB_LIB "$VOLTDB_BASE/lib"
+echo VOLTDB_VOLTDB $VOLTDB_VOLTDB
+
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
-ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
 VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
 POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
+CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB:"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -48,7 +52,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar exportdata clientlog log build
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
