@@ -78,7 +78,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static boolean m_verbose = false;
 
     // Default wait is 10 mins
-    private static final long DEFAULT_DELAY_MS = (10 * 60 * 1000);
+    protected static final long DEFAULT_DELAY_MS = (10 * 60 * 1000);
 
     public static class ServerListener extends Thread {
 
@@ -337,10 +337,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @throws Exception
      */
     public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
-        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS);
+        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS, false);
     }
 
-    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames, long delayMs) throws Exception {
+    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames, long delayMs, boolean waitForTuples) throws Exception {
         boolean passed = false;
         assertFalse(streamNames.isEmpty());
         Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
@@ -370,6 +370,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             long ts = 0;
             stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (stats.advanceRow()) {
+                if (waitForTuples) {
+                    long t = stats.getLong("TUPLE_COUNT");
+                    if (t == 0) {
+                        continue;
+                    }
+                }
                 Long tts = stats.getLong("TIMESTAMP");
                 // Get highest timestamp and watch is change
                 if (tts > ts) {
@@ -475,10 +481,16 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             ExportTestExpectedData tester) throws Exception {
         quiesceAndVerifyTarget(client, streamNames, tester, DEFAULT_DELAY_MS);
     }
+
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester, long delayMs) throws Exception {
+        quiesceAndVerifyTarget(client, streamNames, tester, delayMs, false);
+    }
+
+    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
+            ExportTestExpectedData tester, long delayMs, boolean waitForTuples) throws Exception {
         client.drain();
-        waitForExportAllRowsDelivered(client, streamNames, delayMs);
+        waitForExportAllRowsDelivered(client, streamNames, delayMs, waitForTuples);
         tester.verifyRows();
         System.out.println("Passed!");
     }
