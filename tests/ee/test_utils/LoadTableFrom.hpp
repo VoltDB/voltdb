@@ -67,8 +67,7 @@ namespace voltdb {
  * The caller owns the table object, and is responsible for
  * deleting it.
  */
-TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader = false)
-{
+TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader = false) {
     // These variables are only used if
     // VOLT_TRACE is defined.  But their
     // values need to be calculated, because the
@@ -118,7 +117,7 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
             builder.setColumnAtIndex(idx, colType);
         }
     }
-    TupleSchema *schema = builder.build();
+    TupleSchema *schema = builder.build().release();
     for (int idx = 0; idx < column_count; idx += 1) {
         columnNames.push_back(result.readTextString());
         VOLT_TRACE("  column %02d name:         %s\n",
@@ -134,8 +133,7 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
     return table;
 }
 
-TempTable *loadTableFrom(const char *buffer, size_t size)
-{
+TempTable *loadTableFrom(const char *buffer, size_t size) {
     ReferenceSerializeInputBE result(buffer, size);
     return loadTableFrom(result);
 }

@@ -63,7 +63,7 @@ protected:
                                                             int32_t inlinePadding,
                                                             int32_t numBlocks) {
         LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        TupleSchema *schema = getSchemaOfLength(varcharLengthBytes, inlinePadding);
+        auto* schema = getSchemaOfLength(varcharLengthBytes, inlinePadding).release();
         std::vector<std::string> names;
         names.push_back("strfld");
         for (int i = 1; i < schema->columnCount(); ++i) {
@@ -85,7 +85,6 @@ protected:
             FAIL("Expected tuples does not match tuple count of table");
             return NULL;
         }
-
         return ltt;
     }
 
@@ -187,7 +186,7 @@ protected:
     }
 
 private:
-    TupleSchema* getSchemaOfLength(int32_t varcharLengthBytes, int32_t inlinePadding) {
+    ScopedTupleSchema getSchemaOfLength(int32_t varcharLengthBytes, int32_t inlinePadding) {
         TupleSchemaBuilder builder(inlinePadding + 1);
         builder.setColumnAtIndex(0, ValueType::tVARCHAR, varcharLengthBytes, true, true);
         for (int i = 0; i < inlinePadding; ++i) {

@@ -25,40 +25,13 @@
 
 // A class to automatically free TupleSchema instances, which cannot
 // be allocated on the stack due to variable-length data that follows
-// each instance.  Modeled after boost::scoped_ptr.
-//
-// This is not typdef'd to boost::scoped_ptr<TupleSchema> because we
-// need to call freeTupleSchema to free memory for TupleSchema
-// objects.
-//
-// In the future we should:
-//   - Replace code that calls freeTupleSchema with smart pointers
-//     where possible (this seems to be most uses, with a few
-//     exceptions)
-//   - Overload the delete operator for TupleSchema, so we can use
-//     smart pointers out of the box.  I.e., the code below could be
-//     replaced with
-//         typedef boost::scoped_ptr<TupleSchema> ScopedTupleSchema;
-class ScopedTupleSchema {
-    voltdb::TupleSchema* m_schema;
+// each instance.
+/*
+using ScopedTupleSchema_t =
+std::unique_ptr<voltdb::TupleSchema, std::function<void(voltdb::TupleSchema*)>>;
+class ScopedTupleSchema : public ScopedTupleSchema_t {
 public:
     ScopedTupleSchema(voltdb::TupleSchema* schema)
-        : m_schema(schema) { }
-
-    voltdb::TupleSchema* get() {
-        return m_schema;
-    }
-
-    voltdb::TupleSchema& operator*() {
-        return *m_schema;
-    }
-
-    voltdb::TupleSchema* operator->() {
-        return m_schema;
-    }
-
-    ~ScopedTupleSchema() {
-        voltdb::TupleSchema::freeTupleSchema(m_schema);
-    }
-};
+        : ScopedTupleSchema_t(schema, voltdb::TupleSchema::freeTupleSchema) {}
+};*/
 

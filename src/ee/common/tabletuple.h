@@ -56,8 +56,6 @@
 #include "common/ExportSerializeIo.h"
 
 #include <common/debuglog.h>
-#include <ostream>
-#include <iostream>
 #include <vector>
 #include <json/json.h>
 
@@ -834,7 +832,7 @@ class StandAloneTupleStorage {
             // note: apparently array new of the form
             //   new char[N]()
             // will zero-initialize the allocated memory.
-            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
+            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]);
             m_tuple.m_schema = m_tupleSchema;
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();

@@ -74,8 +74,8 @@ Table* TableCatalogDelegate::getTable() const {
     return m_table;
 }
 
-TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catalogTable,
-                                                     bool isXDCR) {
+TupleSchema* TableCatalogDelegate::createTupleSchema(
+        catalog::Table const& catalogTable, bool isXDCR) {
     // Columns:
     // Column is stored as map<std::string, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
@@ -114,10 +114,10 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
 
         auto catalogColumn = colIterator->second;
         schemaBuilder.setColumnAtIndex(catalogColumn->index(),
-                                       static_cast<ValueType>(catalogColumn->type()),
-                                       static_cast<int32_t>(catalogColumn->size()),
-                                       catalogColumn->nullable(),
-                                       catalogColumn->inbytes());
+                static_cast<ValueType>(catalogColumn->type()),
+                static_cast<int32_t>(catalogColumn->size()),
+                catalogColumn->nullable(),
+                catalogColumn->inbytes());
     }
     int hiddenIndex = 0;
     if (needsDRTimestamp) {
@@ -143,7 +143,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::Type::MIGRATE_TXN);
     }
     vassert(numHiddenColumns == hiddenIndex);
-    return schemaBuilder.build();
+    return schemaBuilder.build().release();
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,

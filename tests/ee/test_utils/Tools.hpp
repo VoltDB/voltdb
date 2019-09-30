@@ -75,15 +75,13 @@ public:
             std::make_pair(tVARCHAR, 15));
     */
     template<typename... Args>
-    static voltdb::TupleSchema* buildSchema(Args... args);
+    static voltdb::ScopedTupleSchema buildSchema(Args... args);
 
     /** Produce an instance of TupleSchema using the element
-        types of a std::tuple type, e.g.,
-
-        TupleSchema* schema = Tools::buildSchema<std::tuple<int64_t, std::string>>();
+        types of a std::tuple type.
     */
     template<typename Tuple>
-    static voltdb::TupleSchema* buildSchema();
+    static voltdb::ScopedTupleSchema buildSchema();
 
     /** Given a tuple, populate its fields with the given native
         values, e.g.,
@@ -394,7 +392,7 @@ void buildSchemaHelper(std::vector<voltdb::ValueType>* columnTypes,
 } // end unnamed namespace
 
 template<typename... Args>
-voltdb::TupleSchema* Tools::buildSchema(Args... args) {
+voltdb::ScopedTupleSchema Tools::buildSchema(Args... args) {
     std::vector<voltdb::ValueType> columnTypes;
     std::vector<int32_t> columnSizes;
     std::vector<bool> inBytes;
@@ -403,7 +401,8 @@ voltdb::TupleSchema* Tools::buildSchema(Args... args) {
 
     std::vector<bool> allowNull(columnTypes.size(), true);
 
-    return voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, inBytes);
+    return {voltdb::TupleSchema::createTupleSchema(
+            columnTypes, columnSizes, allowNull, inBytes)};
 }
 
 namespace {
@@ -435,7 +434,7 @@ struct BuildSchemaTupleHelper<Tuple, 0> {
 } // end unnamed namespace
 
 template<typename Tuple>
-voltdb::TupleSchema* Tools::buildSchema() {
+voltdb::ScopedTupleSchema Tools::buildSchema() {
     const size_t NUMVALUES = std::tuple_size<Tuple>::value;
     std::vector<voltdb::ValueType> columnTypes;
     std::vector<bool> allowNulls;
@@ -450,14 +449,14 @@ voltdb::TupleSchema* Tools::buildSchema() {
         voltdb::ValueType vt = columnTypes[i];
         if (isVariableLengthType(columnTypes[i])) {
             columnSizes.push_back(4096); // good enough for testing
-        }
-        else {
+        } else {
             columnSizes.push_back(voltdb::NValue::getTupleStorageSize(vt));
         }
     }
 
     std::vector<bool> inBytes(columnSizes.size(), false);
-    return voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNulls, inBytes);
+    return {voltdb::TupleSchema::createTupleSchema(
+            columnTypes, columnSizes, allowNulls, inBytes)};
 }
 
 inline Tools::Tools() {

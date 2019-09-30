@@ -173,20 +173,15 @@ public:
      * This value is guaranteed to be greater than all valid hidden column indexes
      */
     static constexpr uint8_t UNSET_HIDDEN_COLUMN = 0xFF;
-
-    /** Static factory method to create a TupleSchema a fixed number
-     *  of all visible columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
-                                          const std::vector<int32_t>&   columnSizes,
-                                          const std::vector<bool>&      allowNull,
-                                          const std::vector<bool>&      columnInBytes);
+    using ScopedTupleSchema = std::unique_ptr<TupleSchema, void(TupleSchema*)>;
 
     /** Static factory method to create a TupleSchema that contains hidden columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
-                                          const std::vector<int32_t>&   columnSizes,
-                                          const std::vector<bool>&      allowNull,
-                                          const std::vector<bool>&      columnInBytes,
-                                          const std::vector<HiddenColumn::Type>& hiddenColumnTypes);
+    static TupleSchema* createTupleSchema(
+            const std::vector<ValueType>& columnTypes,
+            const std::vector<int32_t>&   columnSizes,
+            const std::vector<bool>&      allowNull,
+            const std::vector<bool>&      columnInBytes,
+            const std::vector<HiddenColumn::Type>& hiddenColumnTypes = std::vector<HiddenColumn::Type>(0));
 
     /** Static factory method to create a TupleSchema for index keys */
     static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
@@ -247,7 +242,7 @@ public:
     inline uint16_t hiddenColumnCount() const;
 
     /** Return true if tuples with this schema do not have an accessible header byte. */
-    inline bool isHeaderless() const {
+    bool isHeaderless() const {
         return m_isHeaderless;
     }
 
@@ -329,6 +324,16 @@ public:
         return getHiddenColumnIndex(columnType) != UNSET_HIDDEN_COLUMN;
     }
 
+};
+
+/**
+ * Intermediate step to remove m_data structure and need for
+ * freeTupleSchema method. Frees burden off TupleSchemaBuilder.
+ */
+struct ScopedTupleSchema : public std::unique_ptr<TupleSchema, std::function<void(TupleSchema*)>> {
+    ScopedTupleSchema(TupleSchema* schema) :
+        std::unique_ptr<TupleSchema, std::function<void(TupleSchema*)>>(
+                schema, TupleSchema::freeTupleSchema) {}
 };
 
 ///////////////////////////////////

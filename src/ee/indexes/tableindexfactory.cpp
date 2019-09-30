@@ -212,9 +212,9 @@ private:
 };
 
 static CoveringCellIndex* getCoveringCellIndexInstance(const TableIndexScheme &scheme) {
-    TupleSchemaBuilder builder(1);
-    builder.setColumnAtIndex(0, ValueType::tPOINT);
-    return new CoveringCellIndex(builder.buildKeySchema(), scheme);
+    return new CoveringCellIndex(
+            TupleSchemaBuilder(1).setColumnAtIndex(0, ValueType::tPOINT).buildKeySchema().release(),
+            scheme);
 }
 
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {

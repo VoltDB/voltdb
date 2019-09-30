@@ -47,7 +47,7 @@ TEST_F(LargeTempTableBlockTest, iterator) {
     UniqueEngine engine = UniqueEngineBuilder().build();
 
     typedef std::tuple<int64_t, std::string, boost::optional<int32_t>> Tuple;
-    ScopedTupleSchema schema{Tools::buildSchema<Tuple>()};
+    auto schema = Tools::buildSchema<Tuple>();
 
     LargeTempTableBlock block{LargeTempTableBlockId{0,0}, schema.get()};
     LargeTempTableBlock::iterator it = block.begin();

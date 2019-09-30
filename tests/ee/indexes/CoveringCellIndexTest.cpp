@@ -91,7 +91,7 @@ protected:
     // caller may have specified a number of extra columns.  Also add
     // two indexes: one integer primary key and one geospatial.
     static unique_ptr<PersistentTable> createTable(int numExtraCols = 0) {
-        TupleSchema* schema = createTupleSchemaWithExtraCols(numExtraCols);
+        auto* schema = createTupleSchemaWithExtraCols(numExtraCols).release();
         char signature[20];
         CatalogId databaseId = 1000;
         std::vector<std::string> columnNames;
@@ -101,11 +101,11 @@ protected:
             columnNames.push_back(oss.str());
         }
         auto table = unique_ptr<PersistentTable>(
-                         static_cast<PersistentTable*>(TableFactory::getPersistentTable(databaseId,
-                                                                                        "test_table",
-                                                                                        schema,
-                                                                                        columnNames,
-                                                                                        signature)));
+                static_cast<PersistentTable*>(TableFactory::getPersistentTable(databaseId,
+                        "test_table",
+                        schema,
+                        columnNames,
+                        signature)));
         table->addIndex(createGeospatialIndex(table->schema()));
 
         TableIndex* pkIndex = createPrimaryKeyIndex(table->schema());
@@ -406,7 +406,7 @@ private:
     //   INTEGER
     //   GEOGRAPHY(32767)
     // And the rest are VARBINARY(63)
-    static TupleSchema* createTupleSchemaWithExtraCols(int numExtraCols) {
+    static ScopedTupleSchema createTupleSchemaWithExtraCols(int numExtraCols) {
         TupleSchemaBuilder builder(2 + numExtraCols);
         builder.setColumnAtIndex(PK_COL_INDEX, ValueType::tINTEGER);
         builder.setColumnAtIndex(GEOG_COL_INDEX, ValueType::tGEOGRAPHY, 32767);
