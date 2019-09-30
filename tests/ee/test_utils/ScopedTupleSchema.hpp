@@ -40,11 +40,10 @@
 //     replaced with
 //         typedef boost::scoped_ptr<TupleSchema> ScopedTupleSchema;
 class ScopedTupleSchema {
+    voltdb::TupleSchema* m_schema;
 public:
     ScopedTupleSchema(voltdb::TupleSchema* schema)
-        : m_schema(schema)
-    {
-    }
+        : m_schema(schema) { }
 
     voltdb::TupleSchema* get() {
         return m_schema;
@@ -61,7 +60,5 @@ public:
     ~ScopedTupleSchema() {
         voltdb::TupleSchema::freeTupleSchema(m_schema);
     }
-
-private:
-    voltdb::TupleSchema* m_schema;
 };
+

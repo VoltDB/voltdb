@@ -92,7 +92,7 @@ public:
                 break;
             case DR:
             case BALANCE_PARTITIONS:
-                if (schema->hasHiddenColumn(HiddenColumn::MIGRATE_TXN)) {
+                if (schema->hasHiddenColumn(HiddenColumn::Type::MIGRATE_TXN)) {
                     --hiddenColumnCount;
                 }
                 break;
@@ -110,11 +110,11 @@ public:
     inline bool useDefaultValue(HiddenColumn::Type columnType) const {
         switch (m_id) {
         case CLIENT:
-            if (columnType == HiddenColumn::XDCR_TIMESTAMP) return true;
+            if (columnType == HiddenColumn::Type::XDCR_TIMESTAMP) return true;
             /* fallthrough */
         case DR:
         case BALANCE_PARTITIONS:
-            return columnType == HiddenColumn::MIGRATE_TXN;
+            return columnType == HiddenColumn::Type::MIGRATE_TXN;
         default:
             return false;
         }

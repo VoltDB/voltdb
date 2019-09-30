@@ -461,12 +461,12 @@ public:
 
     /** Returns true if there is a hidden column in this table for the
         DR timestamp (used to resolve active/active conflicts) */
-    bool hasDRTimestampColumn() const { return m_schema->hasHiddenColumn(HiddenColumn::XDCR_TIMESTAMP); }
+    bool hasDRTimestampColumn() const { return m_schema->hasHiddenColumn(HiddenColumn::Type::XDCR_TIMESTAMP); }
 
     /** Returns the index of the DR timestamp column (relative to the
         hidden columns for the table).  If there's no DR timestamp
         column, returns -1. */
-    int getDRTimestampColumnIndex() const { return m_schema->getHiddenColumnIndex(HiddenColumn::XDCR_TIMESTAMP); }
+    int getDRTimestampColumnIndex() const { return m_schema->getHiddenColumnIndex(HiddenColumn::Type::XDCR_TIMESTAMP); }
 
     // for test purpose
     void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }

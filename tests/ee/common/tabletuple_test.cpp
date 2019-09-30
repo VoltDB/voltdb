@@ -47,8 +47,7 @@ public:
     }
 };
 
-TEST_F(TableTupleTest, ComputeNonInlinedMemory)
-{
+TEST_F(TableTupleTest, ComputeNonInlinedMemory) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     Pool *pool = ExecutorContext::getTempStringPool();
 
@@ -78,15 +77,14 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
               nonInlinedTuple.getNonInlinedMemorySizeForPersistentTable());
 }
 
-TEST_F(TableTupleTest, HiddenColumns)
-{
+TEST_F(TableTupleTest, HiddenColumns) {
     UniqueEngine engine = UniqueEngineBuilder().build();
 
     TupleSchemaBuilder builder(2, 2);
     builder.setColumnAtIndex(0, ValueType::tBIGINT);
     builder.setColumnAtIndex(1, ValueType::tVARCHAR, 256);
-    builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
-    builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
+    builder.setHiddenColumnAtIndex(0, HiddenColumn::Type::XDCR_TIMESTAMP);
+    builder.setHiddenColumnAtIndex(1, HiddenColumn::Type::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
@@ -116,16 +114,15 @@ TEST_F(TableTupleTest, HiddenColumns)
     nvalVisibleString.free();
 }
 
-TEST_F(TableTupleTest, ToJsonArray)
-{
+TEST_F(TableTupleTest, ToJsonArray) {
     UniqueEngine engine = UniqueEngineBuilder().build();
 
     TupleSchemaBuilder builder(3, 2);
     builder.setColumnAtIndex(0, ValueType::tBIGINT);
     builder.setColumnAtIndex(1, ValueType::tVARCHAR, 256);
     builder.setColumnAtIndex(2, ValueType::tVARCHAR, 256);
-    builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
-    builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
+    builder.setHiddenColumnAtIndex(0, HiddenColumn::Type::XDCR_TIMESTAMP);
+    builder.setHiddenColumnAtIndex(1, HiddenColumn::Type::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
@@ -354,8 +351,8 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
     schemaBuilder.setColumnAtIndex(0, ValueType::tBIGINT);
     schemaBuilder.setColumnAtIndex(1, ValueType::tVARCHAR, 60);
     schemaBuilder.setColumnAtIndex(2, ValueType::tINTEGER);
-    schemaBuilder.setHiddenColumnAtIndex(0, HiddenColumn::MIGRATE_TXN);
-    schemaBuilder.setHiddenColumnAtIndex(1, HiddenColumn::XDCR_TIMESTAMP);
+    schemaBuilder.setHiddenColumnAtIndex(0, HiddenColumn::Type::MIGRATE_TXN);
+    schemaBuilder.setHiddenColumnAtIndex(1, HiddenColumn::Type::XDCR_TIMESTAMP);
 
     ScopedTupleSchema schema(schemaBuilder.build());
     char *storage = static_cast<char*>(pool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));

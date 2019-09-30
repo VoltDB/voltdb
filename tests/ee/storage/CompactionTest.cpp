@@ -134,7 +134,7 @@ public:
     }
 
     void initTable() {
-        std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT, HiddenColumn::MIGRATE_TXN);
+        std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT, HiddenColumn::Type::MIGRATE_TXN);
         const std::vector<bool> columnInBytes (m_tableSchemaAllowNull.size(), false);
 
         m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes, m_tableSchemaColumnSizes, m_tableSchemaAllowNull, columnInBytes,

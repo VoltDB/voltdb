@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VOLTDB_EE_COMMON_HIDDENCOLUMN_H_
-#define VOLTDB_EE_COMMON_HIDDENCOLUMN_H_
+#pragma once
 
 #include "stdint.h"
 #include "common/NValue.hpp"
@@ -28,7 +27,7 @@ namespace voltdb {
  */
 class HiddenColumn {
 public:
-    enum Type : uint8_t {
+    enum class Type : uint8_t {
         XDCR_TIMESTAMP = 0,
         MIGRATE_TXN,
         VIEW_COUNT,
@@ -43,4 +42,3 @@ public:
 
 }
 
-#endif /* VOLTDB_EE_COMMON_HIDDENCOLUMN_H_ */

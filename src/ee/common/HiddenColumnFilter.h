@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VOLTDB_EE_COMMON_HIDDENCOLUMNFILTER_H_
-#define VOLTDB_EE_COMMON_HIDDENCOLUMNFILTER_H_
+#pragma once
 
 #include "stdint.h"
 #include "common/HiddenColumn.h"
@@ -39,7 +38,7 @@ public:
         uint8_t skip;
         switch (type) {
         case EXCLUDE_MIGRATE:
-            skip = schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
+            skip = schema->getHiddenColumnIndex(HiddenColumn::Type::MIGRATE_TXN);
             break;
         default:
             vassert(false);
@@ -64,4 +63,3 @@ private:
 
 }
 
-#endif /* VOLTDB_EE_COMMON_HIDDENCOLUMNFILTER_H_ */

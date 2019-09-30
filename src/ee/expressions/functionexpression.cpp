@@ -117,11 +117,11 @@ namespace functionexpression {
    template<> NValue ConstantFunctionExpression<FUNC_VOLT_MIGRATING>::eval(
          const TableTuple* tuple1, const TableTuple*) const {
       // For MIGRATING(), check if we are evaluating on a migrating table (the table with a migrate target).
-      if (tuple1 != NULL && tuple1->getSchema()->hasHiddenColumn(HiddenColumn::MIGRATE_TXN)) {
+      if (tuple1 != NULL && tuple1->getSchema()->hasHiddenColumn(HiddenColumn::Type::MIGRATE_TXN)) {
          // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
          // and transaction id for migrating is always the last one.
          return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
-               tuple1->getSchema()->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN)).callUnary<FUNC_VOLT_MIGRATING>();
+               tuple1->getSchema()->getHiddenColumnIndex(HiddenColumn::Type::MIGRATE_TXN)).callUnary<FUNC_VOLT_MIGRATING>();
       } else {
          throw SQLException(SQLException::dynamic_sql_error,
                "Can not apply MIGRATING function on non-migrating tables.");

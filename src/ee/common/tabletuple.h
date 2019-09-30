@@ -636,7 +636,7 @@ private:
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
         // Exclude the hidden column for persistent table with stream
         uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
-        uint8_t migrateColumn = m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
+        uint8_t migrateColumn = m_schema->getHiddenColumnIndex(HiddenColumn::Type::MIGRATE_TXN);
         for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
             if (colIdx != migrateColumn) {
                 getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
@@ -1105,7 +1105,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
 
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::HiddenColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        if (hiddenColumnInfo->columnType == HiddenColumn::MIGRATE_TXN) {
+        if (hiddenColumnInfo->columnType == HiddenColumn::Type::MIGRATE_TXN) {
             // Set the hidden column for persistent table to null
             NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
             setHiddenNValue(i, value);

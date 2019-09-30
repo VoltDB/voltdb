@@ -127,12 +127,12 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         // Column will be marked as not nullable in TupleSchema,
         // because we never expect a null value here, but this is not
         // actually enforced at runtime.
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::XDCR_TIMESTAMP);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::Type::XDCR_TIMESTAMP);
         VOLT_DEBUG("Adding hidden column for dr table %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
     if (needsHiddenCountForView) {
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::VIEW_COUNT);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::Type::VIEW_COUNT);
         VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
@@ -140,7 +140,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // for snapshot write plans.
     if (needsHiddenCloumnTableWithMigrate) {
         VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::MIGRATE_TXN);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, HiddenColumn::Type::MIGRATE_TXN);
     }
     vassert(numHiddenColumns == hiddenIndex);
     return schemaBuilder.build();

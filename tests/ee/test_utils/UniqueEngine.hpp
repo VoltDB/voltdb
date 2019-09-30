@@ -21,8 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
-#define TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+#pragma once
 
 #include "execution/VoltDBEngine.h"
 #include "common/SynchronizedThreadLock.h"
@@ -36,9 +35,33 @@
  * Create one of these using UniqueEngineBuilder, defined below.
  */
 class UniqueEngine {
-    friend class UniqueEngineBuilder;
+    std::unique_ptr<voltdb::Topend> m_topend;
+    std::unique_ptr<voltdb::VoltDBEngine> m_engine;
 
+    UniqueEngine() {
+        if (m_engine.get() != nullptr) {
+            m_engine.reset();
+            voltdb::SynchronizedThreadLock::destroy();
+        }
+    }
 public:
+    UniqueEngine(std::unique_ptr<voltdb::Topend> topend,
+                 int64_t tempTableMemoryLimitInBytes) :
+        m_topend(topend.release()),
+        m_engine(new voltdb::VoltDBEngine(m_topend.get())) {
+        m_engine->initialize(1,     // clusterIndex
+                             1,     // siteId
+                             0,     // partitionId
+                             1,     // sitesPerHost
+                             0,     // hostId
+                             "",    // hostname
+                             0,     // drClusterId
+                             1024,  // defaultDrBufferSize
+                             tempTableMemoryLimitInBytes,
+                             true, // this is lowest site/engineId
+                             95);   // compaction threshold
+        m_engine->setUndoToken(0);
+    }
     const voltdb::VoltDBEngine* operator->() const {
         return m_engine.get();
     }
@@ -54,46 +77,7 @@ public:
     const voltdb::VoltDBEngine* get() const {
         return m_engine.get();
     }
-
-    // This move constructor is not necessary on modern compilers
-    // (probably since all members have move constructors defined),
-    // but C6 still requires it.
-    UniqueEngine(UniqueEngine&& that)
-        : m_topend(that.m_topend.release())
-        , m_engine(that.m_engine.release())
-    {
-    }
-
-private:
-
-    UniqueEngine(std::unique_ptr<voltdb::Topend> topend,
-                 int64_t tempTableMemoryLimitInBytes)
-        : m_topend(topend.release())
-        , m_engine(new voltdb::VoltDBEngine(m_topend.get()))
-    {
-        m_engine->initialize(1,     // clusterIndex
-                             1,     // siteId
-                             0,     // partitionId
-                             1,     // sitesPerHost
-                             0,     // hostId
-                             "",    // hostname
-                             0,     // drClusterId
-                             1024,  // defaultDrBufferSize
-                             tempTableMemoryLimitInBytes,
-                             true, // this is lowest site/engineId
-                             95);   // compaction threshold
-        m_engine->setUndoToken(0);
-    }
-    UniqueEngine()
-    {
-        if (m_engine.get() != NULL) {
-            m_engine.reset();
-            voltdb::SynchronizedThreadLock::destroy();
-        }
-    }
-
-    std::unique_ptr<voltdb::Topend> m_topend;
-    std::unique_ptr<voltdb::VoltDBEngine> m_engine;
+    UniqueEngine(UniqueEngine&&) = default;
 };
 
 /**
@@ -104,13 +88,13 @@ private:
  *   setTopend               (DummyTopend is used by default)
  */
 class UniqueEngineBuilder {
+    int64_t m_tempTableMemoryLimit;
+    std::unique_ptr<voltdb::Topend> m_topend;
 public:
     /** Instantiate a builder */
     UniqueEngineBuilder()
         : m_tempTableMemoryLimit(voltdb::DEFAULT_TEMP_TABLE_MEMORY)
-        , m_topend(new voltdb::DummyTopend())
-    {
-    }
+        , m_topend(new voltdb::DummyTopend()) { }
 
     /** Set a non-default limit for temp table memory */
     UniqueEngineBuilder& setTempTableMemoryLimit(int64_t ttMemLimitInBytes) {
@@ -126,13 +110,8 @@ public:
 
     /** Create an engine */
     UniqueEngine build() {
-        assert(m_topend.get() != NULL);
+        assert(m_topend.get() != nullptr);
         return UniqueEngine(std::move(m_topend), m_tempTableMemoryLimit);
     }
-
-private:
-    int64_t m_tempTableMemoryLimit;
-    std::unique_ptr<voltdb::Topend> m_topend;
 };
 
-#endif // EE_TESTS_TEST_UTILS_UNIQUEENGINE_HPP

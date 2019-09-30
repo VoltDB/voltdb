@@ -727,7 +727,7 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
 void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     vassert(hasDRTimestampColumn());
     if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
-        tuple.setHiddenNValue(getDRTimestampColumnIndex(), HiddenColumn::getDefaultValue(HiddenColumn::XDCR_TIMESTAMP));
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), HiddenColumn::getDefaultValue(HiddenColumn::Type::XDCR_TIMESTAMP));
     }
 }
 
@@ -2480,7 +2480,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 }
 
 uint16_t PersistentTable::getMigrateColumnIndex() {
-    return m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
+    return m_schema->getHiddenColumnIndex(HiddenColumn::Type::MIGRATE_TXN);
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {

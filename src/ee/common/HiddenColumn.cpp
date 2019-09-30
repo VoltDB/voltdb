@@ -20,17 +20,17 @@
 #include "common/ValueFactory.hpp"
 
 namespace voltdb {
-NValue HiddenColumn::getDefaultValue(HiddenColumn::Type columnType) {
-    switch (columnType) {
-    case HiddenColumn::MIGRATE_TXN:
-        return NValue::getNullValue(ValueType::tBIGINT);
-    case HiddenColumn::XDCR_TIMESTAMP:
-        return ValueFactory::getBigIntValue(ExecutorContext::getExecutorContext()->currentDRTimestamp());
-    default:
-        // Unsupported hidden column type passed in
-        vassert(false);
-        return NValue::getNullValue(ValueType::tBIGINT);
+    NValue HiddenColumn::getDefaultValue(HiddenColumn::Type columnType) {
+        switch (columnType) {
+            case Type::MIGRATE_TXN:
+                return NValue::getNullValue(ValueType::tBIGINT);
+            case Type::XDCR_TIMESTAMP:
+                return ValueFactory::getBigIntValue(ExecutorContext::getExecutorContext()->currentDRTimestamp());
+            default:
+                // Unsupported hidden column type passed in
+                vassert(false);
+                return NValue::getNullValue(ValueType::tBIGINT);
+        }
     }
-}
 
 }

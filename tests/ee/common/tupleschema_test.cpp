@@ -86,8 +86,8 @@ TEST_F(TupleSchemaTest, HiddenColumn)
                              false, // do not allow nulls
                              true); // size is in bytes
 
-    builder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::MIGRATE_TXN);
-    builder.setHiddenColumnAtIndex(1, voltdb::HiddenColumn::XDCR_TIMESTAMP);
+    builder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::Type::MIGRATE_TXN);
+    builder.setHiddenColumnAtIndex(1, voltdb::HiddenColumn::Type::XDCR_TIMESTAMP);
     ScopedTupleSchema schema(builder.build());
 
     ASSERT_NE(NULL, schema.get());
@@ -159,7 +159,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
                              false); // length not in bytes
     hiddenBuilder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
 
-    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::XDCR_TIMESTAMP);
+    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::Type::XDCR_TIMESTAMP);
 
     ScopedTupleSchema schema2(hiddenBuilder.build());
 
@@ -187,7 +187,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     EXPECT_FALSE(schema3->equals(schema1.get()));
 
     // Now do a similar test comparing two schemas with hidden columns.
-    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::MIGRATE_TXN); // nulls not allowed
+    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::Type::MIGRATE_TXN); // nulls not allowed
     ScopedTupleSchema schema4(hiddenBuilder.build());
 
     // Structural layout is the same
@@ -221,8 +221,8 @@ TEST_F(TupleSchemaTest, MaxSerializedTupleSize) {
                              true,   // allow nulls
                              false); // length not in bytes
     hiddenBuilder.setColumnAtIndex(2, ValueType::tTIMESTAMP);
-    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::MIGRATE_TXN);
-    hiddenBuilder.setHiddenColumnAtIndex(1, voltdb::HiddenColumn::XDCR_TIMESTAMP);
+    hiddenBuilder.setHiddenColumnAtIndex(0, voltdb::HiddenColumn::Type::MIGRATE_TXN);
+    hiddenBuilder.setHiddenColumnAtIndex(1, voltdb::HiddenColumn::Type::XDCR_TIMESTAMP);
     ScopedTupleSchema schemaWithHidden(hiddenBuilder.build());
 
     EXPECT_EQ((4 + 16 + (4 + 64 * 4) + 8 + 8 + 8),

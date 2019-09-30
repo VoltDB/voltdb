@@ -15,14 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #include <vector>
 
 #include "common/NValue.hpp"
 #include "common/types.h"
 #include "common/TupleSchema.h"
-
-#ifndef TUPLESCHEMABUILDER_H_
-#define TUPLESCHEMABUILDER_H_
 
 namespace voltdb {
 
@@ -155,4 +153,3 @@ private:
 
 } // end namespace voltdb
 
-#endif // TUPLESCHEMABUILDER_H_
