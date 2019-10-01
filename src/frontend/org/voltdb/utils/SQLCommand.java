@@ -1244,6 +1244,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>())
                         .put(1, Arrays.asList("varchar"))
                         .put(2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@PollTopic",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {

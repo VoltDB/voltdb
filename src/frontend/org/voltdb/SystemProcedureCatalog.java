@@ -653,6 +653,11 @@ public class SystemProcedureCatalog {
                         true, false, false, 0, VoltType.INVALID,
                         false, false, false, true,
                         true, false, false));
+        builder.put("@PollTopic",
+                new Config(null,
+                        false, true, true, 0, VoltType.INVALID,
+                        false, false, true, false,
+                        false, true, false));
         builder.put("@ElasticRemoveNT",
                 Builder.createNp("org.voltdb.sysprocs.ElasticRemoveNT").commercial().allowedInReplica().build());
         builder.put("@ElasticRemove", Builder.createMp("org.voltdb.sysprocs.ElasticRemove").commercial().build());

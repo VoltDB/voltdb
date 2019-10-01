@@ -514,6 +514,9 @@ public final class InvocationDispatcher {
                 // Log the invocation with user name and ip information
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
             }
+            else if ("@PollTopic".equals(procName)) {
+                return dispatchPollTopic(handler, task);
+            }
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
@@ -748,6 +751,34 @@ public final class InvocationDispatcher {
             } else {
                 err = "Parameter \"" + param + "\" is not recognized/supported"; break;
             }
+        }
+        return new ClientResponseImpl(
+                       err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                       new VoltTable[] { },
+                       err,
+                       task.clientHandle);
+    }
+
+    private final ClientResponseImpl dispatchPollTopic(InvocationClientHandler handler, StoredProcedureInvocation task) {
+        final ParameterSet ps = task.getParams();
+        final Object params[] = ps.toArray();
+        String err = null;
+        Object param = null;
+
+        if (params.length == 0 || params.length > 1) {
+            err = "Invalid parameter count: " + params.length + ", 1 parameters expected";
+        }
+        else {
+            param = params[0];
+            if (param == null) {
+                err = "Parameter index 0 was null";
+            }
+            else if (!(param instanceof String)) {
+                err = "Parameter index 0 was not a String";
+            }
+        }
+        if (err == null) {
+            err = "Polling topic: " + param;
         }
         return new ClientResponseImpl(
                        err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
