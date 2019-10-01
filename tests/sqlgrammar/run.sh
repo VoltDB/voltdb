@@ -209,22 +209,31 @@ function ddl() {
     jars-if-needed
     server-if-needed
 
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql &> ddl.out
+    echo -e "\n$0 performing: ddl; running (in sqlcmd):\n$SQLGRAMMAR_DIR/DDL.sql"
+    echo -e   "$0 performing: ddl; running (in sqlcmd):\n$SQLGRAMMAR_DIR/DDL.sql" &> ddl.out
+    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql >> ddl.out 2>&1
     code4a=$?
     if [[ "${code4a}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql"
+
+    echo "================================================================================" >> ddl.out
+    echo -e "\n$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql"
+    echo -e   "$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql" >> ddl.out
     $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql >> ddl.out 2>&1
     code4b=$?
     if [[ "${code4b}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
+
+    echo "================================================================================" >> ddl.out
+    echo -e "\n$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
+    echo -e   "$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-load.sql" >> ddl.out
     $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql >> ddl.out 2>&1
     code4c=$?
     if [[ "${code4c}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
 
     PREVIOUS_DIR=$(pwd)
     cd $UDF_TEST_DDL
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql"
+    echo "================================================================================" >> ${PREVIOUS_DIR}/ddl.out
+    echo -e "\n$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql"
+    echo -e   "$0 performing: ddl; running (in sqlcmd):\n$UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql" >> ${PREVIOUS_DIR}/ddl.out
     $VOLTDB_BIN_DIR/sqlcmd < UserDefinedTestFunctions-batch.sql >> ${PREVIOUS_DIR}/ddl.out 2>&1
     code4d=$?
     if [[ "${code4d}" -eq "0" ]]; then echo -e "... succeeded.\n"; else echo -e "... error!\n"; fi
@@ -246,9 +255,12 @@ function ddl-if-needed() {
 function ddl-pro() {
     ddl-if-needed
 
-    echo -e "\n$0 performing: ddl-pro; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL-pro.sql
+    echo "================================================================================" >> ddl.out
+    echo -e "\n$0 performing: ddl-pro; running (in sqlcmd):\n$SQLGRAMMAR_DIR/DDL-pro.sql"
+    echo -e   "$0 performing: ddl-pro; running (in sqlcmd):\n$SQLGRAMMAR_DIR/DDL-pro.sql" >> ddl.out
+    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL-pro.sql >> ddl.out 2>&1
     code4e=$?
+    if [[ "${code4e}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
 
     # Reset the default value of the args to pass to SQL-grammar-gen, to include
     # the values in sql-grammar-pro.txt, which are intended to be used only with
