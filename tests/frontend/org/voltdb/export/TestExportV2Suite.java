@@ -94,7 +94,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             params = convertValsToParams("S_NO_NULLS", i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
     }
 
     @Test
