@@ -32,12 +32,12 @@ DRY_RUN = False
 JENKINSBOT = None
 
 # All possible failure "types", as detailed below
-ALL_FAILURE_TYPES = ['NEW', 'INTERMITTENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']
+ALL_FAILURE_TYPES = ['NEW', 'INTERMITTENT', 'FREQUENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']
 
 # Constants used to determine which test failures are considered Consistent,
 # Intermittent or New failures
-NEW_FAILURE_WINDOW_SIZE             = 5
-NEW_NUM_FAILURES_THRESHOLD          = 1  # 1 out of 5 failures is 'New' - if not seen recently
+NEW_FAILURE_WINDOW_SIZE             = 10
+NEW_NUM_FAILURES_THRESHOLD          = 2  # 2 out of 10 failures is 'New' - if not seen recently
 INTERMITTENT_FAILURE_WINDOW_SIZE    = 25
 INTERMITTENT_NUM_FAILURES_THRESHOLD = 3  # 3 out of 25 failures is 'Intermittent'
 CONSISTENT_FAILURE_WINDOW_SIZE      = 3
@@ -53,6 +53,12 @@ CHANGE_INTERMITTENT_TO_OLD_WINDOW_SIZE            = 10
 CHANGE_INTERMITTENT_TO_OLD_NUM_FAILURES_THRESHOLD = 1  # if less than 1 in 10 failed, downgrade to 'Old'
 CHANGE_INTERMITTENT_TO_CONSISTENT_WINDOW_SIZE            = 5
 CHANGE_INTERMITTENT_TO_CONSISTENT_NUM_FAILURES_THRESHOLD = 5  # if 5 out of 5 failed, upgrade to 'Consistent'
+CHANGE_INTERMITTENT_TO_FREQUENT_WINDOW_SIZE              = 10
+CHANGE_INTERMITTENT_TO_FREQUENT_NUM_FAILURES_THRESHOLD   = 8  # if 8 out of 10 failed, upgrade to 'Frequent'
+CHANGE_FREQUENT_TO_CONSISTENT_WINDOW_SIZE                = 10
+CHANGE_FREQUENT_TO_CONSISTENT_NUM_FAILURES_THRESHOLD     = 10 # if 10 out of 10 failed, change to 'Consistent'
+CHANGE_FREQUENT_TO_INTERMITTENT_WINDOW_SIZE              = 10
+CHANGE_FREQUENT_TO_INTERMITTENT_NUM_FAILURES_THRESHOLD   = 7  # if less than 7 in 10 failed, downgrade to 'Intermittent'
 CHANGE_CONSISTENT_TO_INCONSISTENT_WINDOW_SIZE            = 1
 CHANGE_CONSISTENT_TO_INCONSISTENT_NUM_FAILURES_THRESHOLD = 1  # if less than 1 in 1 failed, downgrade to 'Inconsistent'
 CHANGE_INCONSISTENT_TO_INTERMITTENT_WINDOW_SIZE            = 1
@@ -66,12 +72,14 @@ CLOSE_OLD_NUM_FAILURES_THRESHOLD = 1  # if less than 1 in 10 failed, close the t
 
 # Constants used in filing (or modifying) Jira tickets
 JIRA_PRIORITY_FOR_CONSISTENT_FAILURES   = 'Critical'
+JIRA_PRIORITY_FOR_FREQUENT_FAILURES     = 'Critical'
 JIRA_PRIORITY_FOR_INCONSISTENT_FAILURES = 'Major'
 JIRA_PRIORITY_FOR_INTERMITTENT_FAILURES = 'Major'
 JIRA_PRIORITY_FOR_NEW_FAILURES = 'Minor'
 JIRA_PRIORITY_FOR_OLD_FAILURES = 'Trivial'
 JIRA_LABEL_FOR_AUTO_FILING     = 'auto-filed'
 JIRA_LABEL_FOR_CONSISTENT_FAILURES   = 'junit-consistent-failure'
+JIRA_LABEL_FOR_FREQUENT_FAILURES     = 'junit-intermittent-failure'
 JIRA_LABEL_FOR_INCONSISTENT_FAILURES = 'junit-intermittent-failure'
 JIRA_LABEL_FOR_INTERMITTENT_FAILURES = 'junit-intermittent-failure'
 JIRA_LABEL_FOR_NEW_FAILURES          = 'junit-intermittent-failure'
@@ -83,21 +91,13 @@ MAX_NUM_ATTACHMENTS_PER_JIRA_TICKET  = 8
 MAX_NUM_CHARS_PER_JIRA_DESCRIPTION  = 32767
 MAX_NUM_CHARS_PER_DESCRIPTION_PIECE = 2000
 
+# Characters that don't work well in Jira seqrches
+JIRA_SEARCH_PROBLEMATIC_CHARACTERS = '._'
+
 # Used in Jira ticket descriptions:
 DASHES = '-------------------------'
 STACK_TRACE_LINE = '\n'+DASHES+'\-Stack Trace\-'+DASHES+'\n\n'
 SEPARATOR_LINE   = '\n'+DASHES+'--------------' +DASHES+'\n\n'
-JENKINS_JOB_NICKNAMES = {
-    'branch-2-community-junit-master'         : 'community-junit',
-    'branch-2-pro-junit-master'               : 'pro-junit',
-    'test-nextrelease-debug-pro'              : 'debug-pro',
-    'test-nextrelease-memcheck-pro'           : 'memcheck-pro',
-    'test-nextrelease-memcheck-nodebug-pro'   : 'memcheck-nodebug',
-    'test-nextrelease-fulljmemcheck-pro-junit': 'fulljmemcheck',
-    'test-nextrelease-nonflaky-pro-junit'     : 'nonflaky-pro',
-    'test-nextrelease-pool-community-junit'   : 'pool-community',
-    'test-nextrelease-pool-pro-junit'         : 'pool-pro',
-    }
 JENKINS_JOBS = {
     'branch-2-community-junit-master'         : {'nickname' : 'community-junit',  'label' : 'junit-community-failure'},
     'branch-2-pro-junit-master'               : {'nickname' : 'pro-junit',        'label' : 'junit-pro-failure'},
@@ -207,7 +207,7 @@ QUERY4 = """
 class Stats(object):
     def __init__(self):
         self.jhost = 'http://ci.voltdb.lan'
-        self.dbhost = 'junitstatsdb.voltdb.lan'
+        self.dbhost = os.environ.get('dbhost', 'junitstatsdb.voltdb.lan')
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', 'qa')
@@ -405,6 +405,23 @@ class Stats(object):
             return 0  # does not qualify
 
 
+    def change_intermittent_failure_to_frequent(self, cursor, testName,
+                                                jenkins_job, last_build):
+        """TODO
+        """
+        logging.debug('In change_intermittent_failure_to_frequent...')
+
+        num_failures = self.get_number_of_jenkins_failures(cursor, testName,
+                        jenkins_job, last_build, CHANGE_INTERMITTENT_TO_FREQUENT_WINDOW_SIZE)
+
+        if num_failures >= CHANGE_INTERMITTENT_TO_FREQUENT_NUM_FAILURES_THRESHOLD:
+            failurePercent = (100.0 * num_failures
+                              / CHANGE_INTERMITTENT_TO_FREQUENT_WINDOW_SIZE)
+            return failurePercent
+        else:
+            return 0  # do not change
+
+
     def change_intermittent_failure_to_consistent(self, cursor, testName,
                                                   jenkins_job, last_build):
         """TODO
@@ -503,6 +520,60 @@ class Stats(object):
                         jenkins_job, last_build, CHANGE_INCONSISTENT_TO_INTERMITTENT_WINDOW_SIZE)
 
         if num_failures >= CHANGE_INCONSISTENT_TO_INTERMITTENT_NUM_FAILURES_THRESHOLD:
+            # recompute failure percent, as an intermittent failure
+            return self.get_intermittent_failure_percent(cursor, testName,
+                                                         jenkins_job, last_build)
+        else:
+            return 0  # do not change
+
+
+    def change_frequent_failure_to_consistent(self, cursor, testName,
+                                              jenkins_job, last_build, status):
+        """TODO
+        """
+        logging.debug('In change_frequent_failure_to_consistent...')
+
+        # Possible shortcut to skip querying the 'qa' database,
+        # if we're just checking the most recent build
+        if (status is 'REGRESSION' and
+                CHANGE_FREQUENT_TO_CONSISTENT_WINDOW_SIZE is 1 and
+                CHANGE_FREQUENT_TO_CONSISTENT_NUM_FAILURES_THRESHOLD is 1):
+            logging.debug('...do change to consistent, via shortcut (recompute failure percent)')
+            # recompute failure percent, as an intermittent failure
+            return self.get_intermittent_failure_percent(cursor, testName,
+                                                         jenkins_job, last_build)
+
+        num_failures = self.get_number_of_jenkins_failures(cursor, testName,
+                        jenkins_job, last_build, CHANGE_FREQUENT_TO_CONSISTENT_WINDOW_SIZE)
+
+        if num_failures >= CHANGE_FREQUENT_TO_CONSISTENT_NUM_FAILURES_THRESHOLD:
+            # recompute failure percent, as an intermittent failure
+            return self.get_intermittent_failure_percent(cursor, testName,
+                                                         jenkins_job, last_build)
+        else:
+            return 0  # do not change
+
+
+    def change_frequent_failure_to_intermittent(self, cursor, testName,
+                                                jenkins_job, last_build, status):
+        """TODO
+        """
+        logging.debug('In change_frequent_failure_to_intermittent...')
+
+        # Possible shortcut to skip querying the 'qa' database,
+        # if we're just checking the most recent build
+        if (status is 'REGRESSION' and
+                CHANGE_FREQUENT_TO_INTERMITTENT_WINDOW_SIZE is 1 and
+                CHANGE_FREQUENT_TO_INTERMITTENT_NUM_FAILURES_THRESHOLD is 1):
+            logging.debug('...do change to intermittent, via shortcut (recompute failure percent)')
+            # recompute failure percent, as an intermittent failure
+            return self.get_intermittent_failure_percent(cursor, testName,
+                                                         jenkins_job, last_build)
+
+        num_failures = self.get_number_of_jenkins_failures(cursor, testName,
+                        jenkins_job, last_build, CHANGE_FREQUENT_TO_INTERMITTENT_WINDOW_SIZE)
+
+        if num_failures < CHANGE_FREQUENT_TO_INTERMITTENT_NUM_FAILURES_THRESHOLD:
             # recompute failure percent, as an intermittent failure
             return self.get_intermittent_failure_percent(cursor, testName,
                                                          jenkins_job, last_build)
@@ -890,6 +961,61 @@ class Stats(object):
         return modified_labels
 
 
+    def get_short_test_name(self, testName):
+        """Given a testName, returns a (possibly) shorter test name, that omits
+           any suffix starting with '_localCluster'. For example, the following
+           test names:
+               TestSqlUpdateSuite.testUpdate_localCluster_1_1_JNI
+               TestSqlUpdateSuite.testUpdate_localCluster_2_3_JNI
+               TestSqlUpdateSuite.testUpdate_localCluster_1_1_VALGRIND_IPC
+           are actually failures of the same test, so just one Jira ticket should
+           be filed, not three.
+        """
+        result = testName.translate(TT)
+        localCluster_index = result.find('_localCluster')
+        if localCluster_index > 0:
+            result = result[:localCluster_index]
+        return result
+
+
+    def get_summary_keys(self, className, testName):
+        """Given a className and a testName, returns a list containing the
+           'keys' to be searched for in a Jira summary.  Normally, these keys
+           consist simply of two items, the className and the (possibly
+           shortened) testName; however, if either one contains certain
+           characters that cause problems for Jira searches (e.g. '.' or '_'),
+           then the keys will be split up to include certain substrings on
+           either side of those characters.
+        """
+        summary_keys = []
+
+        # Shorten the testName to omit any suffix beginning with '_localCluster'
+        for name in [className, self.get_short_test_name(testName)]:
+            if all(char not in name for char in JIRA_SEARCH_PROBLEMATIC_CHARACTERS):
+                summary_keys.append(name)
+                continue
+
+            # Handle any underscore ('_') characters: use only the substrings
+            # before the first and after the last underscore
+            first_underscore_index = name.find('_')
+            last_underscore_index  = name.rfind('_')
+            if first_underscore_index < 0 or last_underscore_index < 0:
+                pieces = [name]
+            else:
+                pieces = [name[:first_underscore_index], name[last_underscore_index+1:]]
+
+            # Handle any dot ('.') characters: use each substring before and
+            # after any dots
+            for piece in pieces:
+                indexes = [i for i, char in enumerate(piece) if char == '.']
+                indexes.append(len(piece))
+                previous_index = -1
+                for index in indexes:
+                    summary_keys.append(piece[previous_index+1:index])
+
+        return summary_keys
+
+
     def file_jira_issue(self, issue, DRY_RUN=False, failing_consistently=False):
         global JENKINSBOT
         if not JENKINSBOT:
@@ -901,12 +1027,13 @@ class Stats(object):
 
         fullTestName = issue['packageName']+'.'+issue['className']+'.'+issue['testName']
         summary_keys = [issue['className'], issue['testName']]
+#         summary_keys = self.get_summary_keys(issue['className'], issue['testName'])
         channel      = issue['channel']
         labels       = issue['labels']
         priority     = issue['priority']
         build_number = issue['build']
         jenkins_job  = issue['job']
-        jenkins_job_nickname = JENKINS_JOB_NICKNAMES.get(jenkins_job, jenkins_job)
+        jenkins_job_nickname = JENKINS_JOBS.get(jenkins_job, {}).get('nickname', jenkins_job)
         existing_ticket = issue['existing_ticket']
 
         logging.debug('In file_jira_issue:')
@@ -1030,6 +1157,15 @@ class Stats(object):
         return self.file_jira_issue(issue, DRY_RUN)
 
 
+    def file_jira_frequent_issue(self, issue, failure_percent, DRY_RUN=False):
+        logging.debug('In file_jira_frequent_issue...')
+        issue['type'] = 'FREQUENT'
+        issue['labels'] = [JIRA_LABEL_FOR_AUTO_FILING, JIRA_LABEL_FOR_FREQUENT_FAILURES]
+        issue['priority'] = JIRA_PRIORITY_FOR_FREQUENT_FAILURES
+        issue['failurePercent'] = "%.0f" % failure_percent
+        return self.file_jira_issue(issue, DRY_RUN)
+
+
     def file_jira_consistent_issue(self, issue, failure_percent, DRY_RUN=False):
         logging.debug('In file_jira_consistent_issue...')
         issue['type'] = 'CONSISTENT'
@@ -1063,6 +1199,7 @@ class Stats(object):
             JENKINSBOT = JenkinsBot()
 
         summary_keys = [issue['className'], issue['testName']]
+#         summary_keys = self.get_summary_keys(issue['className'], issue['testName'])
         channel      = issue.get('channel')
         jenkins_job  = issue.get('job', 'Unknown job')
         build_number = issue.get('build', 'Unknown build')
@@ -1166,6 +1303,9 @@ class Stats(object):
             return
 
         logging.info("Effective builds for job %s: %s-%s" % (job, build_low, build_high))
+
+        if (build_high - build_low) > 25:
+            raise Exception('Build range too large (> 25), for job %s: %s-%s' % (job, build_low, build_high))
 
         for build in range(build_low, build_high + 1):
             build_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
@@ -1362,6 +1502,7 @@ class Stats(object):
                             status        = case['status']
                             fullClassName = case['className'].translate(TT)
                             testName      = case['name'].translate(TT)
+#                             testName      = get_short_test_name(case['name'])
                             lastDot       = fullClassName.rfind('.')
                             packageName   = fullClassName[:lastDot]
                             className     = fullClassName[lastDot+1:]
@@ -1476,6 +1617,7 @@ class Stats(object):
                                 JENKINSBOT = JenkinsBot()
 
                             summary_keys = [className, testName]
+#                             summary_keys = self.get_summary_keys(className, testName)
                             labels = [JIRA_LABEL_FOR_AUTO_FILING]
 
                             previous_ticket_summary = None
@@ -1551,11 +1693,16 @@ class Stats(object):
                                     if failure_percent:
                                         self.file_jira_consistent_issue(test_data, failure_percent, DRY_RUN)
                                     else:
-                                        # Update the 'INTERMITTENT' ticket's failure percent
-                                        failure_percent = self.qualifies_as_intermittent_failure(
+                                        failure_percent = self.change_intermittent_failure_to_frequent(
                                                             cursor, fullTestName, job, build)
                                         if failure_percent:
-                                            self.file_jira_intermittent_issue(test_data, failure_percent, DRY_RUN)
+                                            self.file_jira_frequent_issue(test_data, failure_percent, DRY_RUN)
+                                        else:
+                                            # Update the 'INTERMITTENT' ticket's failure percent
+                                            failure_percent = self.qualifies_as_intermittent_failure(
+                                                                cursor, fullTestName, job, build)
+                                            if failure_percent:
+                                                self.file_jira_intermittent_issue(test_data, failure_percent, DRY_RUN)
                                 elif (status in ['FIXED', 'PASSED']):
                                     failure_percent = self.change_intermittent_failure_to_old(
                                                             cursor, fullTestName, job, build)
@@ -1601,15 +1748,32 @@ class Stats(object):
                                                             previous_ticket_description):
                                         self.close_jira_issue(test_data, DRY_RUN)
 
+                            # When a current, open Jira bug ticket exists, of type 'FREQUENT',
+                            # consider upgrading it to 'CONSISTENT', or downgrading it to 'INTERMITTENT'
+                            elif previous_ticket_failure_type == 'FREQUENT':
+                                if (status in ['REGRESSION', 'FAILED']):
+                                    failure_percent = self.change_frequent_failure_to_consistent(
+                                                            cursor, fullTestName, job, build, status)
+                                    if failure_percent:
+                                        self.file_jira_consistent_issue(test_data, failure_percent, DRY_RUN)
+                                elif (status in ['FIXED', 'PASSED']):
+                                    failure_percent = self.change_frequent_failure_to_intermittent(
+                                                            cursor, fullTestName, job, build, status)
+                                    if failure_percent:
+                                        self.file_jira_intermittent_issue(test_data, failure_percent, DRY_RUN)
+
                             # It should be impossible to get here; but just in case we
                             # miss a type of ticket failure, and somehow slip through to
                             # here, as used to happen with older Jira tickets, auto-filed
                             # before recent changes, whose type could not be identified
                             # in the same way: then issue a warning
                             else:
+                                previous_ticket_key = None
+                                if previous_ticket:
+                                    previous_ticket_key = previous_ticket.get(key)
                                 self.warn("Unrecognized failure type '%s' ignored, for ticket: %s"
                                              + (str(previous_ticket_failure_type),
-                                                str(previous_ticket.get(key)) ))
+                                                str(previous_ticket_key) ))
 
                             count_test_cases = count_test_cases + 1
                             if not (count_test_cases % LOG_MESSAGE_EVERY_NUM_TEST_CASES):
@@ -1664,7 +1828,7 @@ class Tests(unittest.TestCase):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', "junitstatstests")
-        self.dbhost = 'junitstatsdb.voltdb.lan'
+        self.dbhost = os.environ.get('dbhost', 'junitstatsdb.voltdb.lan')
 
     def open_db(self):
         self.set_env()
