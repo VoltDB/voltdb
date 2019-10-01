@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.Connection;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -190,5 +191,9 @@ public interface ExportManagerInterface {
 
     default public void onDrainedSource(String tableName, int partition) {
         // No-op
+    }
+
+    default public void pollTopic(String topic, long clientHandle, Connection ccxn) {
+        throw new UnsupportedOperationException("pollTopic");
     }
 }

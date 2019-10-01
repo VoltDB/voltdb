@@ -56,7 +56,6 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
@@ -64,6 +63,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -779,8 +779,23 @@ public final class InvocationDispatcher {
                 err = "Parameter index 0 was not a String";
             }
         }
+        if (err != null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[] { },
+                    err,
+                    task.clientHandle);
+        }
         final String topic = (String) param;
-
+        try {
+            ExportManagerInterface.instance().pollTopic(topic, task.clientHandle, ccxn);
+        } catch (Exception ex) {
+            return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    Throwables.getStackTraceAsString(ex),
+                    task.clientHandle);
+        }
+        /*
         Thread thr = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -818,6 +833,7 @@ public final class InvocationDispatcher {
                 }
             }});
         thr.start();
+        */
         return null;
     }
 
