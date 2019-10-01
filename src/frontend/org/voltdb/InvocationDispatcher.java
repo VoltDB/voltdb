@@ -56,6 +56,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
@@ -515,7 +516,7 @@ public final class InvocationDispatcher {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
             }
             else if ("@PollTopic".equals(procName)) {
-                return dispatchPollTopic(handler, task);
+                return dispatchPollTopic(handler, task, ccxn);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
@@ -759,7 +760,8 @@ public final class InvocationDispatcher {
                        task.clientHandle);
     }
 
-    private final ClientResponseImpl dispatchPollTopic(InvocationClientHandler handler, StoredProcedureInvocation task) {
+    private final ClientResponseImpl dispatchPollTopic(InvocationClientHandler handler, StoredProcedureInvocation task,
+            Connection ccxn) {
         final ParameterSet ps = task.getParams();
         final Object params[] = ps.toArray();
         String err = null;
@@ -777,14 +779,46 @@ public final class InvocationDispatcher {
                 err = "Parameter index 0 was not a String";
             }
         }
-        if (err == null) {
-            err = "Polling topic: " + param;
-        }
-        return new ClientResponseImpl(
-                       err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
-                       new VoltTable[] { },
-                       err,
-                       task.clientHandle);
+        final String topic = (String) param;
+
+        Thread thr = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                    ColumnInfo[] rescols = new ColumnInfo[] {
+                            new ColumnInfo("CLIENT", VoltType.STRING),
+                            new ColumnInfo("TOPIC", VoltType.STRING),
+                            new ColumnInfo("RESULT", VoltType.STRING),
+                    };
+                    VoltTable result = new VoltTable(rescols);
+                    result.addRow(ccxn.getHostnameAndIPAndPort(), topic,
+                            "User-requested polling of topic " + topic + " successfully executed.");
+                    ClientResponseImpl resp =
+                            new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                                    new VoltTable[] {result},
+                                    "FOOBAR",
+                                    task.clientHandle);
+                        ByteBuffer buf = ByteBuffer.allocate(resp.getSerializedSize() + 4);
+                        buf.putInt(buf.capacity() - 4);
+                        resp.flattenToBuffer(buf).flip();
+                        ccxn.writeStream().enqueue(buf);
+                } catch (Exception e) {
+                    VoltTable tables[] = new VoltTable[0];
+                    byte status = ClientResponseImpl.GRACEFUL_FAILURE;
+                    final ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(status,
+                                                   tables,
+                                                   Throwables.getStackTraceAsString(e),
+                                                   task.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    errorResponse.flattenToBuffer(buf).flip();
+                    ccxn.writeStream().enqueue(buf);
+                }
+            }});
+        thr.start();
+        return null;
     }
 
     final static ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn) {
