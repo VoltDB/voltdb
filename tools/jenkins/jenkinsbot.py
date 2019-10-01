@@ -886,7 +886,7 @@ tr:hover{
         return [jira_component]
 
 
-    def get_jira_version_list(self, jira, version='Backlog',
+    def get_jira_version_list(self, jira, version='Autofiled',
                               project=JIRA_PROJECT):
         jira_version = version
 
@@ -965,7 +965,7 @@ tr:hover{
         issue_dict['components'] = self.get_jira_component_list(jira, component, project)
         issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
 
-        issue_dict['fixVersions'] = [{'name':'Backlog'}]
+        issue_dict['fixVersions'] = [{'name':'Autofiled'}]
         issue_dict['priority']    = {'name': priority}
 
         logging.debug("Filing ticket with summary:\n%s" % summary)
@@ -973,6 +973,11 @@ tr:hover{
 
         if DRY_RUN:
             new_issue = None
+        # Kludge to prevent too many of these tickets:
+        elif 'TestFixedSQLSuite' in summary:
+            logging.warn("NOT creating the following ticket, with summary:"
+                         +"\n    '%s'\nbecause it is for 'TestFixedSQLSuite':\n%s    "
+                         % (summary, str(issue_dict)))
         else:
             try:
                 new_issue = jira.create_issue(fields=issue_dict)
@@ -1451,7 +1456,7 @@ tr:hover{
             # Versions is still a required field
             issue_dict['versions'] = ['DEPLOY-Integration']
 
-        issue_dict['fixVersions'] = [{'name':'Backlog'}]
+        issue_dict['fixVersions'] = [{'name':'Autofiled'}]
         issue_dict['priority'] = {'name': 'Critical'}
 
         self.logger.info("Filing ticket: %s" % summary)
