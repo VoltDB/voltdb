@@ -629,11 +629,15 @@ def print_summary(error_message=''):
     global start_time, sql_output_file, sqlcmd_output_file, sqlcmd_summary_file, \
         options, echo_substrings, count_sql_statements, last_n_sql_statements, \
         hanging_sql_commands, find_in_log_output_files
+    # Used to test whether the new sql_partially_echoed_as_output code is useful
+    global count_sql_partially_echoed
 
     # Generate the summary message (to be printed below)
     summary_message = ''
+    # Used to test whether the new sql_partially_echoed_as_output code is useful
+    last_sql_message = '\ncount_sql_partially_echoed: '+str(count_sql_partially_echoed)+'\n'
     try:
-        last_sql_message = '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
+        last_sql_message += '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
                          + get_last_n_sql_statements(last_n_sql_statements, False, False)
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
@@ -839,6 +843,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, \
         known_error_messages, known_valid_show_responses, hanging_sql_commands, \
         find_in_log_output_files, debug
+    # Used to test whether the new sql_partially_echoed_as_output code is useful
+    global count_sql_partially_echoed
 
     # Count the number of semicolons, which determines the number of
     # distinct SQL statements within 'sql'; in the (somewhat unusual)
@@ -1000,6 +1006,9 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                                                       sql_contains_echo_substring)
                         if sql_was_echoed_as_output:
                             break
+                        elif debug > 1:
+                            print '\nDEBUG: found known_error_messages, with sql_partially_echoed_as_output, sql:\n    "' \
+                                    +sql+'"\nand output:\n    "'+output+'"\n'
                     elif debug > 1:
                         # this can happen, though it's uncommon, when there is a multi-line
                         # error message, which uses the word 'ERROR' on one line and one of
@@ -1011,19 +1020,21 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # Special case, for the first line of multi-statement SQL
                 elif ';' in sql and sql.startswith(output.rstrip(';')):
                     sql_partially_echoed_as_output = True
-                    if debug > 2:
+                    # Used to test whether this new sql_partially_echoed_as_output code is useful
+                    count_sql_partially_echoed += 1
+                    if debug > 1:
                         print '\nDEBUG: found (first) sql_partially_echoed_as_output, with output:\n    "' \
                                 +output+'"\nand sql:\n    "'+sql+'"\n'
 
                 # Special case, for a line (not the first) of multi-statement SQL
                 elif sql_partially_echoed_as_output and output.rstrip(';') in sql:
-                    if debug > 2:
+                    if debug > 1:
                         print '\nDEBUG: found (more) sql_partially_echoed_as_output, with sql:\n    "' \
                                 +sql+'"\nand output:\n    "'+output+'"\n'
                     # For the last line of multi-statement SQL
                     if sql.rstrip(';').endswith(output.rstrip(';')):
                         sql_was_echoed_as_output = True
-                        if debug > 2:
+                        if debug > 1:
                             print "\nDEBUG: this was the last piece, so now sql_was_echoed_as_output is True"
 
                 # CREATE VIEW statements will occasionally simply return 'null' in sqlcmd;
@@ -1479,6 +1490,9 @@ if __name__ == "__main__":
 
     # Initialize a list of any SQL (or other) commands that may hang sqlcmd
     hanging_sql_commands = []
+
+    # Used to test whether the new sql_partially_echoed_as_output code is useful
+    count_sql_partially_echoed = 0
 
     # Generate the specified number of each type of SQL statement;
     # and run each in sqlcmd, if the sqlcmd option was specified

@@ -210,19 +210,24 @@ function ddl() {
     server-if-needed
 
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql
+    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql &> ddl.out
     code4a=$?
+    if [[ "${code4a}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql
+    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql >> ddl.out 2>&1
     code4b=$?
+    if [[ "${code4b}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
+    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql >> ddl.out 2>&1
     code4c=$?
+    if [[ "${code4c}" -eq "0" ]]; then echo "... succeeded."; else echo "... error!"; fi
 
+    PREVIOUS_DIR=$(pwd)
     cd $UDF_TEST_DDL
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < UserDefinedTestFunctions-batch.sql
+    $VOLTDB_BIN_DIR/sqlcmd < UserDefinedTestFunctions-batch.sql >> ${PREVIOUS_DIR}/ddl.out 2>&1
     code4d=$?
+    if [[ "${code4d}" -eq "0" ]]; then echo -e "... succeeded.\n"; else echo -e "... error!\n"; fi
     cd -
 
     code[4]=$(($code4a|$code4b|$code4c|$code4d))
@@ -320,6 +325,11 @@ function shutdown() {
     find-directories-if-needed
     SUFFIX_INFO=
     if [[ -n "$SUFFIX" ]]; then
+        # If a suffix was specified, rename the DDL output and VoltDB server
+        # console output & log files accordingly
+        mv ddl.out ddl$SUFFIX.out
+        mv volt_console.out volt_console$SUFFIX.out
+        mv voltdbroot/log/volt.log voltdbroot/log/volt$SUFFIX.log
         SUFFIX_INFO=" --suffix=$SUFFIX"
     fi
     echo -e "\n$0 performing: shutdown$SUFFIX_INFO"
@@ -330,8 +340,6 @@ function shutdown() {
 
     # Compress the VoltDB server console output & log files; and the files
     # containing their (Java) Exceptions, and other ERROR messages
-    mv volt_console.out volt_console$SUFFIX.out
-    mv voltdbroot/log/volt.log voltdbroot/log/volt$SUFFIX.log
     gzip -f volt_console$SUFFIX.out
     gzip -f voltdbroot/log/volt$SUFFIX.log
     gzip -f exceptions_in_volt$SUFFIX.log
