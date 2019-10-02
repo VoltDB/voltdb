@@ -40,6 +40,7 @@ public class InProcessVoltDBServer {
     String pathToLicense = null;
     Client loaderClient = null;
     int sitesPerHost = 8; // default
+    int httpdPort = 8080;
 
     List<Client> trackedClients = new ArrayList<>();
 
@@ -57,6 +58,16 @@ public class InProcessVoltDBServer {
      */
     public InProcessVoltDBServer configPartitionCount(int partitionCount) {
         sitesPerHost = partitionCount;
+        return this;
+    }
+
+    /**
+     * Override default HTTP port.
+     * @param port http port to use.
+     * @return InProcessVoltDBServer instance for chaining.
+     */
+    public InProcessVoltDBServer configureHttpPort(int port) {
+        httpdPort = port;
         return this;
     }
 
@@ -79,7 +90,7 @@ public class InProcessVoltDBServer {
         DeploymentBuilder depBuilder = new DeploymentBuilder(sitesPerHost, 1, 0);
         depBuilder.setEnableCommandLogging(false);
         depBuilder.setUseDDLSchema(true);
-        depBuilder.setHTTPDPort(8080);
+        depBuilder.setHTTPDPort(httpdPort);
         depBuilder.setJSONAPIEnabled(true);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
