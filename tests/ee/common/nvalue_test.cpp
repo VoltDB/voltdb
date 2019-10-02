@@ -2722,7 +2722,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
         coinFlip = (rand() % 2) == 0;
         // 50% are cast down... 50% are not
         ValueType type = coinFlip ? ValueType::tBIGINT : ValueType::tSMALLINT;
-        arrayValue.castAndSortAndDedupArrayForInList(type, vectorValues);
+        vectorValues = arrayValue.castAndSortAndDedupArrayForInList(type);
 
         // verify
         EXPECT_TRUE(checkValueVector(vectorValues));
@@ -2754,8 +2754,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
-    vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARCHAR, vectorValues);
+    vectorValues = arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARCHAR);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2791,8 +2790,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
-    vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDOUBLE, vectorValues);
+    vectorValues = arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDOUBLE);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2823,8 +2821,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
-    vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDECIMAL, vectorValues);
+    vectorValues = arrayValue.castAndSortAndDedupArrayForInList(ValueType::tDECIMAL);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
@@ -2855,8 +2852,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     arrayValue.setArrayElements(vectorValues);
 
     // dedup, cast and sort
-    vectorValues.clear();
-    arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARBINARY, vectorValues);
+    vectorValues = arrayValue.castAndSortAndDedupArrayForInList(ValueType::tVARBINARY);
     EXPECT_TRUE(vectorValues.size() == 5);
 
     // verify
