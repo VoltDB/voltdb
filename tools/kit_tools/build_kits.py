@@ -97,7 +97,7 @@ def buildEnterprise(version):
         run("git describe --dirty")
         run("VOLTCORE=../voltdb ant -f mmt.xml \
         -Djmemcheck=NO_MEMCHECK \
-        -DallowDrReplication=true -DallowDrActiveActive \
+        -DallowDrReplication=true -DallowDrActiveActive=true \
         -Dlicensedays=%d -Dlicensee='%s' \
         -Dkitbuild=%s %s \
         clean dist.pro" \
