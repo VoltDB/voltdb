@@ -23,6 +23,7 @@
 #include <climits>
 #include <numeric>
 #include <cstring>
+#include <logging/LogManager.h>
 #include "common/FatalException.hpp"
 
 using namespace voltdb;
@@ -75,11 +76,12 @@ void* Pool::allocate(std::size_t size) {
             return currentChunk.data();
          } else {                                       // Need to allocate a new chunk
             if (m_currentChunkIndex > m_maxChunkCount) {
-               VOLT_WARN("%s\n",
-                     "Pool had to allocate a new chunk. Not a good thing "
-                     "from a performance perspective. If you see this we need to look "
-                     "into structuring our pool sizes and allocations so the this doesn't "
-                     "happen frequently");
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Pool had to allocate a new chunk. Not a good thing "
+                                           "from a performance perspective. If you see this we need to look "
+                                           "into structuring our pool sizes and allocations so the this doesn't "
+                                           "happen frequently.");
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, msg);
             }
             m_chunks.emplace_back(m_chunkSize, size);    // and adjust chunk's offset
             return m_chunks.back().data();
