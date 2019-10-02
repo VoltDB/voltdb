@@ -164,8 +164,8 @@ def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
         -Dfilename=%s -Dlicensetype=t -Dhardexpire=true \
-        -DallowDrReplication=true -DallowDrActiveActive=true\
-        -Dlicensedays=%d -Dlicensee='%s'" % (filename, days, licensee))
+        -DallowDrReplication=%s -DallowDrActiveActive=%s\
+        -Dlicensedays=%d -Dlicensee='%s'" % (filename, dr_and_xdcr, dr_and_xdcr, days, licensee))
         return filename
 
 ################################################
@@ -361,7 +361,7 @@ if __name__ == "__main__":
             packagePro(versionCentos)
             makeSHA256SUM(versionCentos,"pro")
             copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
-            licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only V" + versionCentos)
+            licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)
             copyTrialLicenseToReleaseDir(builddir + "/pro/" + licensefile, releaseDir)
             makeMavenJars()
             copyMavenJarsToReleaseDir(releaseDir, versionCentos)
