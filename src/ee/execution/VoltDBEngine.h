@@ -467,7 +467,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
             if (m_undoLog.getSize() > 50*1024*1024) {
-                VOLT_WARN("%s\n", "Undo log has used 100 much memory. Not a good thing "
+                VOLT_WARN("%s\n", "Undo log has used too much memory. Not a good thing "
                           "from a performance perspective.");
             }
         }
