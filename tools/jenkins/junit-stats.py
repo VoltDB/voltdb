@@ -207,7 +207,7 @@ QUERY4 = """
 class Stats(object):
     def __init__(self):
         self.jhost = 'http://ci.voltdb.lan'
-        self.dbhost = os.environ.get('dbhost', 'junitstatsdb.voltdb.lan')
+        self.dbhost = 'junitstatsdb.voltdb.lan'
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', 'qa')
@@ -1272,7 +1272,8 @@ class Stats(object):
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
         except MySQLError as e:
-            self.error('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass), e)
+            self.error('Could not connect to qa database:\n    dbhost: %s; user: %s; password: %s'
+                       % (self.dbhost, self.dbuser, self.dbpass), e)
             return
 
         query_last_build = ("select max(build) FROM `junit-builds` where name='%s'" % job)
@@ -1305,7 +1306,9 @@ class Stats(object):
         logging.info("Effective builds for job %s: %s-%s" % (job, build_low, build_high))
 
         if (build_high - build_low) > 25:
-            raise Exception('Build range too large (> 25), for job %s: %s-%s' % (job, build_low, build_high))
+            logging.error('Build range too large (> 25), for job %s: %s-%s' % (job, build_low, build_high))
+            build_low = build_high - 10
+            logging.info("Modified effective builds for job %s: %s-%s" % (job, build_low, build_high))
 
         for build in range(build_low, build_high + 1):
             build_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
@@ -1828,7 +1831,7 @@ class Tests(unittest.TestCase):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', "junitstatstests")
-        self.dbhost = os.environ.get('dbhost', 'junitstatsdb.voltdb.lan')
+        self.dbhost = 'junitstatsdb.voltdb.lan'
 
     def open_db(self):
         self.set_env()
