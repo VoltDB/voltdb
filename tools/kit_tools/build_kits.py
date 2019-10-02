@@ -97,7 +97,7 @@ def buildEnterprise(version):
         run("git describe --dirty")
         run("VOLTCORE=../voltdb ant -f mmt.xml \
         -Djmemcheck=NO_MEMCHECK \
-        -Dallowreplication=true -DallowDrActiveActive=true \
+        -DallowDrReplication=true -DallowDrActiveActive \
         -Dlicensedays=%d -Dlicensee='%s' \
         -Dkitbuild=%s %s \
         clean dist.pro" \
@@ -164,8 +164,8 @@ def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
         -Dfilename=%s -Dlicensetype=t -Dhardexpire=true \
-        -Dallowreplication=true -DallowDrActiveActive=true\
-                     -Dlicensedays=%d -Dlicensee='%s'" % (filename, days, licensee))
+        -DallowDrReplication=true -DallowDrActiveActive=true\
+        -Dlicensedays=%d -Dlicensee='%s'" % (filename, days, licensee))
         return filename
 
 ################################################
