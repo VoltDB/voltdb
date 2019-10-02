@@ -457,8 +457,7 @@ const NValue& NValue::itemAtIndex(int index) const {
     return listOfNValues->m_values[index];
 }
 
-void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
-        std::vector<NValue> &outList) const {
+std::vector<NValue> NValue::castAndSortAndDedupArrayForInList(const ValueType outputType) const {
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
@@ -480,12 +479,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
         // TODO: make this less hacky
         catch (SQLException &sqlException) {}
     }
-
-    // insert all items in the set in order
-    std::set<StlFriendlyNValue>::const_iterator iter;
-    for (iter = uniques.begin(); iter != uniques.end(); iter++) {
-        outList.push_back(*iter);
-    }
+    return std::vector<NValue>(uniques.cbegin(), uniques.cend());
 }
 
 void NValue::streamTimestamp(std::stringstream& value) const {
@@ -693,6 +687,306 @@ int64_t NValue::parseTimestampString(const std::string &str) {
     return result;
 }
 
+/*
+ * The LHS (this) should always be the string being compared
+ * and the RHS should always be the LIKE expression.
+ * The planner or EE needs to enforce this.
+ *
+ * Null check should have been handled already.
+ */
+NValue NValue::like(const NValue& rhs) const {
+    /*
+     * Validate that all params are VARCHAR
+     */
+    const ValueType mType = getValueType();
+    if (mType != ValueType::tVARCHAR) {
+        throwDynamicSQLException(
+                "The left operand of the LIKE expression is %s not %s",
+                getValueTypeString().c_str(),
+                getTypeName(ValueType::tVARCHAR).c_str());
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != ValueType::tVARCHAR) {
+        throwDynamicSQLException(
+                "The right operand of the LIKE expression is %s not %s",
+                rhs.getValueTypeString().c_str(),
+                getTypeName(ValueType::tVARCHAR).c_str());
+    }
+
+    int32_t valueUTF8Length;
+    const char* valueChars = getObject_withoutNull(valueUTF8Length);
+    int32_t patternUTF8Length;
+    const char* patternChars = rhs.getObject_withoutNull(patternUTF8Length);
+
+    if (0 == patternUTF8Length) {
+        if (0 == valueUTF8Length) {
+            return getTrue();
+        } else {
+            return getFalse();
+        }
+    }
+
+    vassert(valueChars);
+    vassert(patternChars);
+
+    /*
+     * Because lambdas are for poseurs.
+     */
+    class Liker {
+
+    private:
+        // Constructor used internally for temporary recursion contexts.
+        Liker( const Liker& original, const char* valueChars, const char* patternChars) :
+            m_value(original.m_value, valueChars),
+            m_pattern(original.m_pattern, patternChars)
+             {}
+
+    public:
+        Liker(const char *valueChars, const char* patternChars,
+              int32_t valueUTF8Length, int32_t patternUTF8Length)
+            : m_value(valueChars, valueChars + valueUTF8Length)
+            , m_pattern(patternChars, patternChars + patternUTF8Length)
+        { }
+
+        bool like() {
+            while ( ! m_pattern.atEnd()) {
+                const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
+                switch (nextPatternCodePoint) {
+                case '%': {
+                    if (m_pattern.atEnd()) {
+                        return true;
+                    }
+
+                    const char *postPercentPatternIterator = m_pattern.getCursor();
+                    uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+
+                    // ENG-14485 handle two or more consecutive '%' characters at the end of the pattern
+                    if (m_value.atEnd()) {
+                        while (nextPatternCodePointAfterPercent == '%') {
+                            if (m_pattern.atEnd()) {
+                                return true;
+                            }
+                            nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+                        }
+                        return false;
+                    }
+
+                    const bool nextPatternCodePointAfterPercentIsSpecial =
+                            (nextPatternCodePointAfterPercent == '_') ||
+                            (nextPatternCodePointAfterPercent == '%');
+
+                    /*
+                     * This loop tries to skip as many characters as possible with the % by checking
+                     * if the next value character matches the pattern character after the %.
+                     *
+                     * If the next pattern character is special then we always have to recurse to
+                     * match that character. For stacked %s this just skips to the last one.
+                     * For stacked _ it will recurse and demand the correct number of characters.
+                     *
+                     * For a regular character it will recurse if the value character matches the pattern character.
+                     * This saves doing a function call per character and allows us to skip if there is no match.
+                     */
+                    while (! m_value.atEnd()) {
+
+                        const char *preExtractionValueIterator = m_value.getCursor();
+                        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
+
+                        const bool nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint =
+                                (nextPatternCodePointAfterPercentIsSpecial ||
+                                        (nextPatternCodePointAfterPercent == nextValueCodePoint));
+
+                        if (nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint) {
+                            Liker recursionContext(*this, preExtractionValueIterator, postPercentPatternIterator);
+                            if (recursionContext.like()) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+                case '_': {
+                    if (m_value.atEnd()) {
+                        return false;
+                    }
+                    //Extract a code point to consume a character
+                    m_value.extractCodePoint();
+                    break;
+                }
+                default: {
+                    if (m_value.atEnd()) {
+                        return false;
+                    }
+                    const int nextValueCodePoint = m_value.extractCodePoint();
+                    if (nextPatternCodePoint != nextValueCodePoint) {
+                        return false;
+                    }
+                    break;
+                }
+                }
+            }
+            //A matching value ends exactly where the pattern ends (having already accounted for '%')
+            return m_value.atEnd();
+        }
+
+        UTF8Iterator m_value;
+        UTF8Iterator m_pattern;
+    };
+
+    Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
+
+    return liker.like() ? getTrue() : getFalse();
+}
+
+/*
+ * This function checks to see if a VARCHAR string starts with the given prefix pattern.
+ *
+ * The LHS (this) should always be the string being checked
+ * and the RHS should always be a plain string used as the pattern.
+ * The funtion returns NValue: true if rhs is a prefix of lhs, o/w NValue: false.
+ *
+ * Null check should have been handled in comparisonexpression.h already.
+ */
+NValue NValue::startsWith(const NValue& rhs) const {
+    /*
+     * Validate that all params are VARCHAR
+     */
+    const ValueType mType = getValueType();
+    if (mType != ValueType::tVARCHAR) {
+        throwDynamicSQLException(
+                "The left operand of the STARTS WITH expression is %s not %s",
+                getValueTypeString().c_str(),
+                getTypeName(ValueType::tVARCHAR).c_str());
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != ValueType::tVARCHAR) {
+        throwDynamicSQLException(
+                "The right operand of the STARTS WITH expression is %s not %s",
+                rhs.getValueTypeString().c_str(),
+                getTypeName(ValueType::tVARCHAR).c_str());
+    }
+
+    int32_t valueUTF8Length;
+    const char* valueChars = getObject_withoutNull(valueUTF8Length);
+    int32_t patternUTF8Length;
+    const char* patternChars = rhs.getObject_withoutNull(patternUTF8Length);
+
+    /*
+     * The case if pattern is an empty string.
+     * Return true only if the left string is also an empty string.
+     */
+    if (0 == patternUTF8Length) {
+        if (0 == valueUTF8Length) {
+            return getTrue();
+        } else {
+            return getFalse();
+        }
+    }
+
+    UTF8Iterator m_value(valueChars, valueChars + valueUTF8Length);
+    UTF8Iterator m_pattern(patternChars, patternChars + patternUTF8Length);
+
+    /*
+     * Go through the pattern per single code point to see if pattern is the prefix
+     */
+    while (! m_pattern.atEnd()) {
+        const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
+        if (m_value.atEnd()) { // if the pattern is longer than the value being checked
+            return getFalse();
+        }
+        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
+        if (nextPatternCodePoint != nextValueCodePoint) { // if the current char is not the same
+            return getFalse();
+        }
+    }
+    // Have checked the pattern is the prefix of left string, return true
+    return getTrue();
+}
+
+
+/*
+ * With a persistent update the copy should only do an allocation for
+ * a string if the source and destination pointers are different.
+ */
+void TableTuple::copyForPersistentUpdate(const TableTuple &source,
+        std::vector<char*> &oldObjects, std::vector<char*> &newObjects) {
+    vassert(m_schema);
+    vassert(m_schema->equals(source.m_schema));
+    const int columnCount = m_schema->columnCount();
+    const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
+    /*
+     * The source and target tuple have the same policy WRT to
+     * inlining strings because a TableTuple used for updating a
+     * persistent table uses the same schema as the persistent table.
+     */
+    if (uninlineableObjectColumnCount > 0) {
+        uint16_t uninlineableObjectColumnIndex = 0;
+        uint16_t nextUninlineableObjectColumnInfoIndex = m_schema->getUninlinedObjectColumnInfoIndex(0);
+        /*
+         * Copy each column doing an allocation for string
+         * copies. Compare the source and target pointer to see if it
+         * is changed in this update. If it is changed then free the
+         * old string and copy/allocate the new one from the source.
+         */
+        for (uint16_t ii = 0; ii < columnCount; ii++) {
+            if (ii == nextUninlineableObjectColumnInfoIndex) {
+                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
+                char *       *mPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
+                const TupleSchema::ColumnInfo *sourceColumnInfo = source.getSchema()->getColumnInfo(ii);
+                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(sourceColumnInfo));
+                if (*mPtr != *oPtr) {
+                    // Make a copy of the input string. Don't want to delete the old string
+                    // because it's either from the temp pool or persistently referenced elsewhere.
+                    oldObjects.push_back(*mPtr);
+                    // TODO: Here, it's known that the column is an object type, and yet
+                    // setNValueAllocateForObjectCopies is called to figure this all out again.
+                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
+                    // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
+                    newObjects.push_back(*mPtr);
+                }
+                uninlineableObjectColumnIndex++;
+                if (uninlineableObjectColumnIndex < uninlineableObjectColumnCount) {
+                    nextUninlineableObjectColumnInfoIndex =
+                      m_schema->getUninlinedObjectColumnInfoIndex(uninlineableObjectColumnIndex);
+                } else {
+                    // This is completely optional -- the value from here on has to be one that can't
+                    // be reached by incrementing from the current value.
+                    // Zero works, but then again so does the current value.
+                    nextUninlineableObjectColumnInfoIndex = 0;
+                }
+            } else {
+                // TODO: Here, it's known that the column value is some kind of scalar or inline, yet
+                // setNValueAllocateForObjectCopies is called to figure this all out again.
+                // This seriously complicated function is going to boil down to an incremental
+                // memcpy of a few more bytes of the tuple.
+                // Solution? It would likely be faster even for object-heavy tuples to work in three passes:
+                // 1) collect up all the "changed object pointer" offsets.
+                // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
+                // 3) replace the object pointer at each "changed object pointer offset"
+                //    with a pointer to an object copy of its new referent.
+                setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
+            }
+        }
+
+        // Copy any hidden columns that follow normal visible ones.
+        if (m_schema->hiddenColumnCount() > 0) {
+            // If we ever add support for uninlined hidden columns,
+            // we'll need to do update this code.
+            vassert(m_schema->getUninlinedObjectHiddenColumnCount() == 0);
+            ::memcpy(m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
+                     source.m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
+                     m_schema->lengthOfAllHiddenColumns());
+        }
+
+        // This obscure assignment is propagating the tuple flags rather than leaving it to the caller.
+        // TODO: It would be easier for the caller to simply set the values it wants upon return.
+        m_data[0] = source.m_data[0];
+    } else {
+        // copy the tuple flags and the data (all inline/scalars)
+        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+    }
+}
 
 int warn_if(int condition, const char* message) {
     if (condition) {

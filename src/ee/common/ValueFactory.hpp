@@ -22,7 +22,6 @@
 namespace voltdb {
 class ValueFactory {
 public:
-
     static NValue getTinyIntValue(int8_t value) {
         return NValue::getTinyIntValue(value);
     }
@@ -48,8 +47,7 @@ public:
     }
 
     static NValue getDecimalValue(double value) {
-        NValue doubleNVal = ValueFactory::getDoubleValue(value);
-        return doubleNVal.castAsDecimal();
+        return getDoubleValue(value).castAsDecimal();
     }
 
     static NValue getBooleanValue(bool value) {
@@ -58,13 +56,15 @@ public:
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static NValue getStringValue(const char *value, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(ValueType::tVARCHAR, value, (size_t)(value ? strlen(value) : 0), pool);
+    static NValue getStringValue(const char *value, Pool* pool = nullptr) {
+        return NValue::getAllocatedValue(ValueType::tVARCHAR, value,
+                value != nullptr ? strlen(value) : 0,
+                pool);
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static NValue getStringValue(const std::string& value, Pool* pool = NULL) {
+    static NValue getStringValue(const std::string& value, Pool* pool = nullptr) {
         return NValue::getAllocatedValue(ValueType::tVARCHAR, value.c_str(), value.length(), pool);
     }
 
@@ -85,38 +85,37 @@ public:
     /// that will require an explicit NValue::free.
     /// Assumes hex-encoded input
     static NValue getBinaryValue(const std::string& value, Pool* pool = NULL) {
-        size_t rawLength = value.length() / 2;
+        size_t const rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
-        return getBinaryValue(rawBuf, (int32_t)rawLength, pool);
+        return getBinaryValue(rawBuf, rawLength, pool);
     }
 
     /// Constructs a value copied into temporary string pool
     /// Assumes hex-encoded input
     static NValue getTempBinaryValue(const std::string& value) {
-        size_t rawLength = value.length() / 2;
+        size_t const rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
-        return getBinaryValue(rawBuf, static_cast<int32_t>(rawLength),
-                              NValue::getTempStringPool());
+        return getBinaryValue(rawBuf, rawLength, NValue::getTempStringPool());
     }
 
     /// Constructs a varbinary value copied into temporary string
     /// pool.  Arguments provide a pointer to the raw bytes and the
     /// size of the value.
     static NValue getTempBinaryValue(const char* rawBuf, int32_t rawLength) {
-        return NValue::getAllocatedValue(ValueType::tVARBINARY, rawBuf, rawLength,
-                                         NValue::getTempStringPool());
+        return NValue::getAllocatedValue(
+                ValueType::tVARBINARY, rawBuf, rawLength, NValue::getTempStringPool());
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     /// Assumes raw byte input
-    static NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(ValueType::tVARBINARY,
-                                         reinterpret_cast<const char*>(rawBuf),
-                                         (size_t)rawLength,
-                                         pool);
+    static NValue getBinaryValue(const unsigned char* rawBuf,
+            int32_t rawLength, Pool* pool = nullptr) {
+        return NValue::getAllocatedValue(
+                ValueType::tVARBINARY, reinterpret_cast<const char*>(rawBuf),
+                rawLength, pool);
     }
 
     static NValue getNullBinaryValue() {
@@ -139,8 +138,8 @@ public:
         return NValue::getDecimalValueFromString(txt);
     }
 
-    static NValue getArrayValueFromSizeAndType(size_t elementCount,
-                                               ValueType elementType) {
+    static NValue getArrayValueFromSizeAndType(
+            size_t elementCount, ValueType elementType) {
         return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
     }
 
@@ -151,59 +150,39 @@ public:
     // What follows exists for test only!
 
     static NValue castAsBigInt(const NValue& value) {
-        if (value.isNull()) {
-            return NValue::getNullValue(ValueType::tBIGINT);
-        }
-        return value.castAsBigInt();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tBIGINT) :
+            value.castAsBigInt();
     }
 
     static NValue castAsInteger(const NValue& value) {
-        if (value.isNull()) {
-            NValue retval(ValueType::tINTEGER);
-            retval.setNull();
-            return retval;
-        }
-
-        return value.castAsInteger();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tINTEGER) :
+            value.castAsInteger();
     }
 
     static NValue castAsSmallInt(const NValue& value) {
-        if (value.isNull()) {
-            NValue retval(ValueType::tSMALLINT);
-            retval.setNull();
-            return retval;
-        }
-
-        return value.castAsSmallInt();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tSMALLINT) :
+            value.castAsSmallInt();
     }
 
     static NValue castAsTinyInt(const NValue& value) {
-        if (value.isNull()) {
-            NValue retval(ValueType::tTINYINT);
-            retval.setNull();
-            return retval;
-        }
-
-        return value.castAsTinyInt();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tTINYINT) :
+            value.castAsTinyInt();
     }
 
     static NValue castAsDouble(const NValue& value) {
-        if (value.isNull()) {
-            NValue retval(ValueType::tDOUBLE);
-            retval.setNull();
-            return retval;
-        }
-
-        return value.castAsDouble();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tDOUBLE) :
+            value.castAsDouble();
     }
 
     static NValue castAsDecimal(const NValue& value) {
-        if (value.isNull()) {
-            NValue retval(ValueType::tDECIMAL);
-            retval.setNull();
-            return retval;
-        }
-        return value.castAsDecimal();
+        return value.isNull() ?
+            NValue::getNullValue(ValueType::tDECIMAL) :
+            value.castAsDecimal();
     }
 
     static NValue castAsString(const NValue& value) {
@@ -212,11 +191,11 @@ public:
 
     // Get an empty NValue with specified data type.
     static NValue getNValueOfType(const ValueType type) {
-        NValue retval(type);
-        return retval;
+        return NValue(type);
     }
 
-    static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, Pool* pool) {
+    static NValue nvalueFromSQLDefaultType(
+            const ValueType type, const std::string &value, Pool* pool) {
         switch (type) {
             case ValueType::tNULL:
                 return getNullValue();
@@ -225,28 +204,20 @@ public:
             case ValueType::tINTEGER:
             case ValueType::tBIGINT:
             case ValueType::tTIMESTAMP:
-            {
-                NValue retval(ValueType::tBIGINT);
-                int64_t ival = atol(value.c_str());
-                retval = getBigIntValue(ival);
-                return retval.castAs(type);
-            }
+                return getBigIntValue(atol(value.c_str())).castAs(type);
             case ValueType::tDECIMAL:
                 return getDecimalValueFromString(value);
             case ValueType::tDOUBLE:
-            {
-                double dval = atof(value.c_str());
-                return getDoubleValue(dval);
-            }
+                return getDoubleValue(atof(value.c_str()));
             case ValueType::tVARCHAR:
                 return getStringValue(value.c_str(), pool);
             case ValueType::tVARBINARY:
                 return getBinaryValue(value, pool);
-            default:; // skip to throw
+            default: // skip to throw
+                throwDynamicSQLException("Default value parsing error.");
         }
-        throwDynamicSQLException("Default value parsing error.");
     }
 
-    static NValue getRandomValue(ValueType type, uint32_t maxLength, Pool* pool = NULL);
+    static NValue getRandomValue(ValueType type, uint32_t maxLength, Pool* pool = nullptr);
 };
 }

@@ -68,7 +68,7 @@ class VoltDBEngine;
  */
 class AbstractExecutor {
   public:
-    virtual ~AbstractExecutor();
+    virtual ~AbstractExecutor() {}
 
     /** Executors are initialized once when the catalog is loaded */
     bool init(VoltDBEngine*, const ExecutorVector& executorVector);
@@ -86,10 +86,14 @@ class AbstractExecutor {
     /**
      * Returns the plannode that generated this executor.
      */
-    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
-    inline const AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
+    AbstractPlanNode* getPlanNode() {
+        return m_abstractNode;
+    }
+    const AbstractPlanNode* getPlanNode() const {
+        return m_abstractNode;
+    }
 
-    inline void cleanupTempOutputTable() {
+    void cleanupTempOutputTable() {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
             m_tmpOutputTable->deleteAllTempTuples();
@@ -100,7 +104,7 @@ class AbstractExecutor {
         // LEAVE as blank on purpose
     }
 
-    inline bool outputTempTableIsEmpty() const {
+    bool outputTempTableIsEmpty() const {
         if (m_tmpOutputTable != NULL) {
             return m_tmpOutputTable->activeTupleCount() == 0;
         } else {
@@ -108,7 +112,7 @@ class AbstractExecutor {
         }
     }
 
-    inline void disableReplicatedFlag() {
+    void disableReplicatedFlag() {
         m_replicatedTableOperation = false;
     }
 

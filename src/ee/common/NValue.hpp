@@ -191,6 +191,81 @@ inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue
               << 'E' << optionalSign << fancyText.substr(startSignifExponent);
 }
 
+// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
+class UTF8Iterator {
+    public:
+        UTF8Iterator(const char *start, const char *end) :
+            m_cursor(start),
+            m_end(end) {
+                // TODO: We could validate up front that the string is well-formed UTF8,
+                // at least to the extent that multi-byte characters have a valid
+                // prefix byte and continuation bytes that will not cause a read
+                // off the end of the buffer.
+                // That done, extractCodePoint could be considerably simpler/faster.
+                vassert(m_cursor <= m_end);
+            }
+
+        //Construct a one-off with an alternative current cursor position
+        UTF8Iterator(const UTF8Iterator& other, const char *start) :
+            m_cursor(start), m_end(other.m_end) {
+                vassert(m_cursor <= m_end);
+            }
+
+        const char * getCursor() { return m_cursor; }
+
+        bool atEnd() { return m_cursor >= m_end; }
+
+        const char * skipCodePoints(int64_t skips) {
+            while (skips-- > 0 && ! atEnd()) {
+                // TODO: since the returned code point is ignored, it might be better
+                // to call a faster, simpler, skipCodePoint method -- maybe once that
+                // becomes trivial due to up-front validation.
+                extractCodePoint();
+            }
+            if (atEnd()) {
+                return m_end;
+            } else {
+                return m_cursor;
+            }
+        }
+
+        /*
+         * Go through a lot of trouble to make sure that corrupt
+         * utf8 data doesn't result in touching uninitialized memory
+         * by copying the character data onto the stack.
+         * That wouldn't be needed if we pre-validated the buffer.
+         */
+        uint32_t extractCodePoint() {
+            vassert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
+            /*
+             * Copy the next 6 bytes to a temp buffer and retrieve.
+             * We should only get 4 byte code points, and the library
+             * should only accept 4 byte code points, but once upon a time there
+             * were 6 byte code points in UTF-8 so be careful here.
+             */
+            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
+            char *nextPotentialCodePointIter = nextPotentialCodePoint;
+            //Copy 6 bytes or until the end
+            ::memcpy( nextPotentialCodePoint, m_cursor, std::min(6L, m_end - m_cursor));
+
+            /*
+             * Extract the code point, find out how many bytes it was
+             */
+            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
+            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
+
+            /*
+             * Increment the iterator that was passed in by ref, by the delta
+             */
+            m_cursor += delta;
+            return codePoint;
+        }
+
+        const char * m_cursor;
+        const char * const m_end;
+};
+
+
 /**
  * A class to wrap all scalar values regardless of type and
  * storage. An NValue is not the representation used in the
@@ -429,7 +504,7 @@ class NValue {
      *
      * Undefined behavior if not an array (cassert fail in debug).
      */
-    void castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const;
+    std::vector<NValue> castAndSortAndDedupArrayForInList(const ValueType outputType) const;
 
     int32_t murmurHash3() const;
 
@@ -459,89 +534,8 @@ class NValue {
     template <int F> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
 
-    /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
-    class UTF8Iterator {
-    public:
-        UTF8Iterator(const char *start, const char *end) :
-            m_cursor(start),
-            m_end(end) {
-            // TODO: We could validate up front that the string is well-formed UTF8,
-            // at least to the extent that multi-byte characters have a valid
-            // prefix byte and continuation bytes that will not cause a read
-            // off the end of the buffer.
-            // That done, extractCodePoint could be considerably simpler/faster.
-            vassert(m_cursor <= m_end);
-            }
-
-        //Construct a one-off with an alternative current cursor position
-        UTF8Iterator(const UTF8Iterator& other, const char *start) :
-            m_cursor(start), m_end(other.m_end) {
-               vassert(m_cursor <= m_end);
-            }
-
-        const char * getCursor() { return m_cursor; }
-
-        bool atEnd() { return m_cursor >= m_end; }
-
-        const char * skipCodePoints(int64_t skips) {
-            while (skips-- > 0 && ! atEnd()) {
-                // TODO: since the returned code point is ignored, it might be better
-                // to call a faster, simpler, skipCodePoint method -- maybe once that
-                // becomes trivial due to up-front validation.
-                extractCodePoint();
-            }
-            if (atEnd()) {
-                return m_end;
-            } else {
-               return m_cursor;
-            }
-        }
-
-        /*
-         * Go through a lot of trouble to make sure that corrupt
-         * utf8 data doesn't result in touching uninitialized memory
-         * by copying the character data onto the stack.
-         * That wouldn't be needed if we pre-validated the buffer.
-         */
-        uint32_t extractCodePoint() {
-            vassert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
-            /*
-             * Copy the next 6 bytes to a temp buffer and retrieve.
-             * We should only get 4 byte code points, and the library
-             * should only accept 4 byte code points, but once upon a time there
-             * were 6 byte code points in UTF-8 so be careful here.
-             */
-            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
-            char *nextPotentialCodePointIter = nextPotentialCodePoint;
-            //Copy 6 bytes or until the end
-            ::memcpy( nextPotentialCodePoint, m_cursor, std::min(6L, m_end - m_cursor));
-
-            /*
-             * Extract the code point, find out how many bytes it was
-             */
-            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
-            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
-
-            /*
-             * Increment the iterator that was passed in by ref, by the delta
-             */
-            m_cursor += delta;
-            return codePoint;
-        }
-
-        const char * m_cursor;
-        const char * const m_end;
-    };
-
 
     size_t hashCombine(std::size_t seed) const noexcept;
-
-    /* Functor comparator for use with std::set */
-    struct ltNValue {
-        bool operator()(const NValue& v1, const NValue& v2) const {
-            return v1.compare(v2) < 0;
-        }
-    };
 
     /* Return a string full of arcana and wonder. */
     std::string debug() const;
@@ -782,7 +776,7 @@ private:
     /**
      * 16 bytes of storage for NValue data.
      */
-    char m_data[16];
+    char m_data[16] = {0};
     ValueType m_valueType;
     uint8_t m_attributes;
 
@@ -791,7 +785,6 @@ private:
      * that will be stored in this instance
      */
     NValue(ValueType type) {
-        ::memset(m_data, 0, 16);
         setValueType(type);
         setDefaultAttributes();
     }
@@ -857,8 +850,12 @@ private:
         m_attributes = 0x0;
     }
 
-    void tagAsNull() { m_data[13] = OBJECT_NULL_BIT; }
-    void tagAsNotNull() { m_data[13] = 0; }
+    void tagAsNull() {
+        m_data[13] = OBJECT_NULL_BIT;
+    }
+    void tagAsNotNull() {
+        m_data[13] = 0;
+    }
 
     /**
      * An Object is something like a String that has a variable length
@@ -2461,7 +2458,6 @@ private:
  * with other NValues.  Useful for declaring storage for an NValue.
  */
 inline NValue::NValue() {
-    ::memset(m_data, 0, 16);
     setValueType(ValueType::tINVALID);
     setDefaultAttributes();
 }
@@ -2676,9 +2672,9 @@ inline int NValue::compareNullAsMax(const NValue& rhs) const {
         // VALUE_COMPARE_LESSTHAN indicates lhs == null && rhs != null, do nothing.
         // VALUE_COMPARE_GREATERTHAN indicates lhs != null && rhs == null, flip the result.
         return hasNullCompare == VALUE_COMPARE_GREATERTHAN ? VALUE_COMPARE_LESSTHAN : hasNullCompare;
+    } else {
+        return compare_withoutNull(rhs);
     }
-
-    return compare_withoutNull(rhs);
 }
 
 /**
@@ -2920,8 +2916,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 const int32_t length = input.readInt();
                 if (length < -1) {
                     throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
-                }
-                if (isInlined) {
+                } else if (isInlined) {
                     vassert(type != ValueType::tGEOGRAPHY);
                     vassert(length <= OBJECT_MAX_LENGTH_SHORT_LENGTH);
                     // Always reset the bits regardless of how long the actual value is.
@@ -2935,12 +2930,10 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                     checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
                     ::memcpy(storage + SHORT_OBJECT_LENGTHLENGTH, data, length);
                     return;
-                }
-                if (length == OBJECTLENGTH_NULL) {
+                } else if (length == OBJECTLENGTH_NULL) {
                     *reinterpret_cast<void**>(storage) = NULL;
                     return;
                 }
-
                 StringRef* sref = NULL;
                 if (type != ValueType::tGEOGRAPHY) {
                     // This advances input past the end of the string
@@ -3053,16 +3046,13 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
                if (length == OBJECTLENGTH_NULL) {
                    setNull();
                    return;
-               }
-
-               if (type != ValueType::tGEOGRAPHY) {
+               } else if (type != ValueType::tGEOGRAPHY) {
                    const char *str = (const char*) input.getRawPointer(length);
                    createObjectPointer(length, str, tempPool);
                } else {
                    StringRef* sref = createObjectPointer(length, NULL, tempPool);
                    GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
                }
-
                return;
            }
        case ValueType::tDECIMAL:
@@ -3444,13 +3434,12 @@ inline NValue NValue::castAs(ValueType type) const {
         case ValueType::tGEOGRAPHY:
             return castAsGeography();
         default:
-            break;
+            DEBUG_IGNORE_OR_THROW_OR_CRASH(
+                    "Fallout from planner error. The invalid target value type for a cast is " <<
+                    getTypeName(type));
+            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                    "Type %d not a recognized type for casting", static_cast<int>(type));
     }
-    DEBUG_IGNORE_OR_THROW_OR_CRASH(
-            "Fallout from planner error. The invalid target value type for a cast is " <<
-            getTypeName(type));
-    throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-            "Type %d not a recognized type for casting", (int) type);
 }
 
 inline void* NValue::castAsAddress() const {
@@ -3460,9 +3449,9 @@ inline void* NValue::castAsAddress() const {
         case ValueType::tADDRESS:
             return *reinterpret_cast<void* const*>(m_data);
         default:
-            break;
+            throwDynamicSQLException("Type %s not a recognized type for casting as an address",
+                    getValueTypeString().c_str());
     }
-    throwDynamicSQLException("Type %s not a recognized type for casting as an address", getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_unary_minus() const {
@@ -3489,8 +3478,8 @@ inline NValue NValue::op_unary_minus() const {
             retval.getDouble() = -getDouble();
             break;
         default:
-            throwDynamicSQLException( "unary minus cannot be applied to type %s", getValueTypeString().c_str());
-            break;
+            throwDynamicSQLException("unary minus cannot be applied to type %s",
+                    getValueTypeString().c_str());
     }
     return retval;
 }
@@ -3750,223 +3739,6 @@ inline int32_t NValue::murmurHash3() const {
             break;
     }
     throwFatalException("Unknown type for murmur hashing %s", getTypeName(type).c_str());
-}
-
-/*
- * The LHS (this) should always be the string being compared
- * and the RHS should always be the LIKE expression.
- * The planner or EE needs to enforce this.
- *
- * Null check should have been handled already.
- */
-inline NValue NValue::like(const NValue& rhs) const {
-    /*
-     * Validate that all params are VARCHAR
-     */
-    const ValueType mType = getValueType();
-    if (mType != ValueType::tVARCHAR) {
-        throwDynamicSQLException(
-                "The left operand of the LIKE expression is %s not %s",
-                getValueTypeString().c_str(),
-                getTypeName(ValueType::tVARCHAR).c_str());
-    }
-
-    const ValueType rhsType = rhs.getValueType();
-    if (rhsType != ValueType::tVARCHAR) {
-        throwDynamicSQLException(
-                "The right operand of the LIKE expression is %s not %s",
-                rhs.getValueTypeString().c_str(),
-                getTypeName(ValueType::tVARCHAR).c_str());
-    }
-
-    int32_t valueUTF8Length;
-    const char* valueChars = getObject_withoutNull(valueUTF8Length);
-    int32_t patternUTF8Length;
-    const char* patternChars = rhs.getObject_withoutNull(patternUTF8Length);
-
-    if (0 == patternUTF8Length) {
-        if (0 == valueUTF8Length) {
-            return getTrue();
-        } else {
-            return getFalse();
-        }
-    }
-
-    vassert(valueChars);
-    vassert(patternChars);
-
-    /*
-     * Because lambdas are for poseurs.
-     */
-    class Liker {
-
-    private:
-        // Constructor used internally for temporary recursion contexts.
-        Liker( const Liker& original, const char* valueChars, const char* patternChars) :
-            m_value(original.m_value, valueChars),
-            m_pattern(original.m_pattern, patternChars)
-             {}
-
-    public:
-        Liker(const char *valueChars, const char* patternChars,
-              int32_t valueUTF8Length, int32_t patternUTF8Length)
-            : m_value(valueChars, valueChars + valueUTF8Length)
-            , m_pattern(patternChars, patternChars + patternUTF8Length)
-        { }
-
-        bool like() {
-            while ( ! m_pattern.atEnd()) {
-                const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
-                switch (nextPatternCodePoint) {
-                case '%': {
-                    if (m_pattern.atEnd()) {
-                        return true;
-                    }
-
-                    const char *postPercentPatternIterator = m_pattern.getCursor();
-                    uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
-
-                    // ENG-14485 handle two or more consecutive '%' characters at the end of the pattern
-                    if (m_value.atEnd()) {
-                        while (nextPatternCodePointAfterPercent == '%') {
-                            if (m_pattern.atEnd()) {
-                                return true;
-                            }
-                            nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
-                        }
-                        return false;
-                    }
-
-                    const bool nextPatternCodePointAfterPercentIsSpecial =
-                            (nextPatternCodePointAfterPercent == '_') ||
-                            (nextPatternCodePointAfterPercent == '%');
-
-                    /*
-                     * This loop tries to skip as many characters as possible with the % by checking
-                     * if the next value character matches the pattern character after the %.
-                     *
-                     * If the next pattern character is special then we always have to recurse to
-                     * match that character. For stacked %s this just skips to the last one.
-                     * For stacked _ it will recurse and demand the correct number of characters.
-                     *
-                     * For a regular character it will recurse if the value character matches the pattern character.
-                     * This saves doing a function call per character and allows us to skip if there is no match.
-                     */
-                    while (! m_value.atEnd()) {
-
-                        const char *preExtractionValueIterator = m_value.getCursor();
-                        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
-
-                        const bool nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint =
-                                (nextPatternCodePointAfterPercentIsSpecial ||
-                                        (nextPatternCodePointAfterPercent == nextValueCodePoint));
-
-                        if (nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint) {
-                            Liker recursionContext(*this, preExtractionValueIterator, postPercentPatternIterator);
-                            if (recursionContext.like()) {
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                }
-                case '_': {
-                    if (m_value.atEnd()) {
-                        return false;
-                    }
-                    //Extract a code point to consume a character
-                    m_value.extractCodePoint();
-                    break;
-                }
-                default: {
-                    if (m_value.atEnd()) {
-                        return false;
-                    }
-                    const int nextValueCodePoint = m_value.extractCodePoint();
-                    if (nextPatternCodePoint != nextValueCodePoint) {
-                        return false;
-                    }
-                    break;
-                }
-                }
-            }
-            //A matching value ends exactly where the pattern ends (having already accounted for '%')
-            return m_value.atEnd();
-        }
-
-        UTF8Iterator m_value;
-        UTF8Iterator m_pattern;
-    };
-
-    Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
-
-    return liker.like() ? getTrue() : getFalse();
-}
-
-/*
- * This function checks to see if a VARCHAR string starts with the given prefix pattern.
- *
- * The LHS (this) should always be the string being checked
- * and the RHS should always be a plain string used as the pattern.
- * The funtion returns NValue: true if rhs is a prefix of lhs, o/w NValue: false.
- *
- * Null check should have been handled in comparisonexpression.h already.
- */
-inline NValue NValue::startsWith(const NValue& rhs) const {
-    /*
-     * Validate that all params are VARCHAR
-     */
-    const ValueType mType = getValueType();
-    if (mType != ValueType::tVARCHAR) {
-        throwDynamicSQLException(
-                "The left operand of the STARTS WITH expression is %s not %s",
-                getValueTypeString().c_str(),
-                getTypeName(ValueType::tVARCHAR).c_str());
-    }
-
-    const ValueType rhsType = rhs.getValueType();
-    if (rhsType != ValueType::tVARCHAR) {
-        throwDynamicSQLException(
-                "The right operand of the STARTS WITH expression is %s not %s",
-                rhs.getValueTypeString().c_str(),
-                getTypeName(ValueType::tVARCHAR).c_str());
-    }
-
-    int32_t valueUTF8Length;
-    const char* valueChars = getObject_withoutNull(valueUTF8Length);
-    int32_t patternUTF8Length;
-    const char* patternChars = rhs.getObject_withoutNull(patternUTF8Length);
-
-    /*
-     * The case if pattern is an empty string.
-     * Return true only if the left string is also an empty string.
-     */
-    if (0 == patternUTF8Length) {
-        if (0 == valueUTF8Length) {
-            return getTrue();
-        } else {
-            return getFalse();
-        }
-    }
-
-    UTF8Iterator m_value(valueChars, valueChars + valueUTF8Length);
-    UTF8Iterator m_pattern(patternChars, patternChars + patternUTF8Length);
-
-    /*
-     * Go through the pattern per single code point to see if pattern is the prefix
-     */
-    while (! m_pattern.atEnd()) {
-        const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
-        if (m_value.atEnd()) { // if the pattern is longer than the value being checked
-            return getFalse();
-        }
-        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
-        if (nextPatternCodePoint != nextValueCodePoint) { // if the current char is not the same
-            return getFalse();
-        }
-    }
-    // Have checked the pattern is the prefix of left string, return true
-    return getTrue();
 }
 
 } // namespace voltdb

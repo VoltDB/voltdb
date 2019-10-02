@@ -19,60 +19,60 @@
 
 namespace voltdb {
 
-NValue ValueFactory::getRandomValue(ValueType type,
-                                    uint32_t maxLength,
-                                    Pool* pool) {
+NValue ValueFactory::getRandomValue(ValueType type, uint32_t maxLength, Pool* pool) {
+    auto const r = rand();
     switch (type) {
         case ValueType::tTIMESTAMP:
-            return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
+            return getTimestampValue(time(nullptr));
         case ValueType::tTINYINT:
-            return ValueFactory::getTinyIntValue(static_cast<int8_t>(rand() % 128));
+            return getTinyIntValue(r % 128);
         case ValueType::tSMALLINT:
-            return ValueFactory::getSmallIntValue(static_cast<int16_t>(rand() % 32768));
+            return getSmallIntValue(r % 32768);
         case ValueType::tINTEGER:
-            return ValueFactory::getIntegerValue(rand() % (1 << 31));
+            return getIntegerValue(r % (1 << 31));
         case ValueType::tBIGINT:
-            return ValueFactory::getBigIntValue(rand());
+            return getBigIntValue(r);
         case ValueType::tDECIMAL:
             {
                 char characters[29];
                 int i;
                 for (i = 0; i < 15; ++i) {
-                    characters[i] = (char)(48 + (rand() % 10));
+                    characters[i] = static_cast<char>(48 + rand() % 10);
                 }
                 characters[i] = '.';
                 for (i = 16; i < 28; ++i) {
-                    characters[i] = (char)(48 + (rand() % 10));
+                    characters[i] = static_cast<char>(48 + rand() % 10);
                 }
                 characters[i] = '\0';
-                return ValueFactory::getDecimalValueFromString(std::string(characters));
+                return getDecimalValueFromString(characters);
             }
         case ValueType::tDOUBLE:
-            return ValueFactory::getDoubleValue((rand() % 10000) / double((rand() % 10000) + 1));
+            return getDoubleValue((r % 10000) / (rand() % 10000 + 1.));
         case ValueType::tVARCHAR:
             {
-                int length = (rand() % maxLength);
+                int const length = r % maxLength;
                 char characters[maxLength];
                 for (int ii = 0; ii < length; ii++) {
-                    characters[ii] = char(32 + (rand() % 94)); //printable characters
+                    characters[ii] = static_cast<char>(32 + rand() % 94); //printable characters
                 }
                 characters[length] = '\0';
-                return ValueFactory::getStringValue(string(characters), pool);
+                return getStringValue(characters, pool);
             }
         case ValueType::tVARBINARY:
             {
-                int length = (rand() % maxLength);
+                int const length = r % maxLength;
                 unsigned char bytes[maxLength];
                 for (int ii = 0; ii < length; ii++) {
                     bytes[ii] = static_cast<unsigned char>(rand() % 256);
                 }
                 bytes[length] = '\0';
-                return ValueFactory::getBinaryValue(bytes, length, pool);
+                return getBinaryValue(bytes, length, pool);
             }
             break;
         case ValueType::tARRAY:
         default:
-            throwSerializableEEException("Attempted to get a random value of unsupported value type %s",
+            throwSerializableEEException(
+                    "Attempted to get a random value of unsupported value type %s",
                     getTypeName(type).c_str());
     }
 }

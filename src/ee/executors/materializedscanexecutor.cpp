@@ -18,17 +18,13 @@
 #include <iostream>
 #include <set>
 #include "materializedscanexecutor.h"
-#include "plannodes/materializedscanplannode.h"
 #include "storage/tablefactory.h"
 
 using namespace voltdb;
 
-bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                                      const ExecutorVector& executorVector)
-{
+bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Materialized Scan Executor");
 
-    vassert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
     vassert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
@@ -44,12 +40,12 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
     vassert(output_table);
-    vassert((int)output_table->columnCount() == 1);
+    vassert(output_table->columnCount() == 1);
 
     // get the output type
     const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);
     ValueType outputType = columnInfo->getVoltType();
-    bool outputCantBeNull = !columnInfo->allowNull;
+    bool const outputCantBeNull = !columnInfo->allowNull;
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     vassert(rowsExpression);
@@ -60,30 +56,28 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     SortDirectionType sort_direction = node->getSortDirection();
 
     // make a set to eliminate unique values in O(nlogn) time
-    std::vector<NValue> sortedUniques;
+    std::vector<NValue> const sortedUniques =
+        arrayNValue.castAndSortAndDedupArrayForInList(outputType);
 
     // iterate over the array of values and build a sorted/deduped set of
     // values that don't overflow or violate unique constaints
-    arrayNValue.castAndSortAndDedupArrayForInList(outputType, sortedUniques);
 
     // insert all items in the set in order
     if (sort_direction != SORT_DIRECTION_TYPE_DESC) {
-        std::vector<NValue>::const_iterator iter;
-        for (iter = sortedUniques.begin(); iter != sortedUniques.end(); iter++) {
-            if ((*iter).isNull() && outputCantBeNull) {
-                continue;
+        for (auto const iter : sortedUniques) {
+            if (! iter.isNull() || ! outputCantBeNull) {
+                tmptup.setNValue(0, iter);
+                output_table->insertTuple(tmptup);
             }
-            tmptup.setNValue(0, *iter);
-            output_table->insertTuple(tmptup);
         }
     } else {
-        std::vector<NValue>::reverse_iterator reverse_iter;
-        for (reverse_iter = sortedUniques.rbegin(); reverse_iter != sortedUniques.rend(); reverse_iter++) {
-            if ((*reverse_iter).isNull() && outputCantBeNull) {
-                continue;
+        for (auto reverse_iter = sortedUniques.rbegin();
+                reverse_iter != sortedUniques.rend();
+                reverse_iter++) {
+            if (! reverse_iter->isNull() || !outputCantBeNull) {
+                tmptup.setNValue(0, *reverse_iter);
+                output_table->insertTuple(tmptup);
             }
-            tmptup.setNValue(0, *reverse_iter);
-            output_table->insertTuple(tmptup);
         }
     }
 
@@ -93,5 +87,3 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-MaterializedScanExecutor::~MaterializedScanExecutor() {
-}

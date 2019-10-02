@@ -168,8 +168,6 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits const* limits) {
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
-AbstractExecutor::~AbstractExecutor() {}
-
 AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
     const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size()) {
     vassert(keys.size() == dirs.size());

@@ -88,16 +88,16 @@ TEST_F(TableTupleTest, HiddenColumns) {
         .build();
 
     StandAloneTupleStorage autoStorage(schema.get());
-    TableTuple& tuple = autoStorage.tuple();
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
 
-    tuple.setNValue(0, nvalVisibleBigint);
-    tuple.setNValue(1, nvalVisibleString);
-    tuple.setHiddenNValue(0, nvalHiddenBigint);
-    tuple.setHiddenNValue(1, NValue::getNullValue(ValueType::tBIGINT));
+    TableTuple tuple = autoStorage.tuple()
+        .setNValue(0, nvalVisibleBigint)
+        .setNValue(1, nvalVisibleString)
+        .setHiddenNValue(0, nvalHiddenBigint)
+        .setHiddenNValue(1, NValue::getNullValue(ValueType::tBIGINT));
 
     EXPECT_EQ(0, tuple.getNValue(0).compare(nvalVisibleBigint));
     EXPECT_EQ(0, tuple.getNValue(1).compare(nvalVisibleString));
@@ -126,17 +126,17 @@ TEST_F(TableTupleTest, ToJsonArray) {
         .build();
 
     StandAloneTupleStorage autoStorage(schema.get());
-    TableTuple& tuple = autoStorage.tuple();
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("数据库");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
 
-    tuple.setNValue(0, nvalVisibleBigint);
-    tuple.setNValue(1, nvalVisibleString);
-    tuple.setNValue(2, ValueFactory::getNullValue());
-    tuple.setHiddenNValue(0, nvalHiddenBigint);
-    tuple.setHiddenNValue(1, nvalHiddenBigint);
+    TableTuple& tuple = autoStorage.tuple()
+        .setNValue(0, nvalVisibleBigint)
+        .setNValue(1, nvalVisibleString)
+        .setNValue(2, ValueFactory::getNullValue())
+        .setHiddenNValue(0, nvalHiddenBigint)
+        .setHiddenNValue(1, nvalHiddenBigint);
 
     EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"\\u6570\\u636e\\u5e93\",\"null\"]"));
 
@@ -341,6 +341,30 @@ TEST_F(TableTupleTest, HeaderDefaults) {
     ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
 }
 
+TEST_F(TableTupleTest, VarcharColumnReferences) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    Pool pool;
+    auto schema = Tools::buildSchema(
+            std::make_pair(ValueType::tVARCHAR, 12),
+            std::make_pair(ValueType::tVARCHAR, 12));
+    NValue const emptyString1 = ValueFactory::getStringValue(""),
+           //emptyString2 = emptyString1,
+           //nullString = NValue::getNullValue(ValueType::tVARCHAR),
+           someString = ValueFactory::getStringValue("foobar");
+    TableTuple tuple(static_cast<char*>(pool.allocateZeroes(
+                    schema->tupleLength() + TUPLE_HEADER_SIZE)),
+            schema.get());
+    tuple.setNValue(0, someString)
+        .setNValue(1, emptyString1);
+    // Emulate what an UPDATE statement does:
+
+    // Update to itself
+    tuple.setNValue(0, tuple.getNValue(0))
+        .setNValue(1, tuple.getNValue(1));
+    ASSERT_TRUE(someString == tuple.getNValue(0));
+    ASSERT_TRUE(emptyString1 == tuple.getNValue(1));
+}
+
 TEST_F(TableTupleTest, HiddenColumnSerialization) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     Pool pool;
@@ -354,8 +378,9 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
             .setHiddenColumnAtIndex(1, HiddenColumn::Type::XDCR_TIMESTAMP)
             .build());
 
-    char *storage = static_cast<char*>(pool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
-    TableTuple tuple(storage, schema.get());
+    TableTuple tuple(static_cast<char*>(pool.allocateZeroes(
+                    schema->tupleLength() + TUPLE_HEADER_SIZE)),
+            schema.get());
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
@@ -363,11 +388,11 @@ TEST_F(TableTupleTest, HiddenColumnSerialization) {
     NValue nvalHiddenMigrate = ValueFactory::getBigIntValue(1066);
     NValue nvalHiddenXdcr = ValueFactory::getBigIntValue(1067);
 
-    tuple.setNValue(0, nvalVisibleBigint);
-    tuple.setNValue(1, nvalVisibleString);
-    tuple.setNValue(2, nvalVisibleInt);
-    tuple.setHiddenNValue(0, nvalHiddenMigrate);
-    tuple.setHiddenNValue(1, nvalHiddenXdcr);
+    tuple.setNValue(0, nvalVisibleBigint)
+        .setNValue(1, nvalVisibleString)
+        .setNValue(2, nvalVisibleInt)
+        .setHiddenNValue(0, nvalHiddenMigrate)
+        .setHiddenNValue(1, nvalHiddenXdcr);
 
     char serialized[128];
     ReferenceSerializeOutput unfilteredOutput(serialized, sizeof(serialized));
