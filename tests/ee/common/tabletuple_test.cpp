@@ -382,11 +382,9 @@ TEST_F(TableTupleTest, VarcharColumnReferences) {
     ASSERT_EQ(emptyString1, tuple.getNValue(1));
     ASSERT_EQ(nullString, tuple.getNValue(2));
     // inlined VARCHARs
-    // TODO: these gives us trouble. Something wrong with inlined
-    // VARCHAR self assignment?
-    // ASSERT_EQ(someString, tuple.getNValue(3));
-    // ASSERT_EQ(emptyString2, tuple.getNValue(4));
-    // ASSERT_EQ(nullString, tuple.getNValue(5));
+    ASSERT_EQ(someString, tuple.getNValue(3));
+    ASSERT_EQ(emptyString2, tuple.getNValue(4));
+    ASSERT_EQ(nullString, tuple.getNValue(5));
 
     reset(tuple);
     // LShift-all
@@ -399,6 +397,18 @@ TEST_F(TableTupleTest, VarcharColumnReferences) {
     ASSERT_EQ(emptyString2, tuple.getNValue(3));
     ASSERT_EQ(nullString, tuple.getNValue(4));
     ASSERT_EQ(nullString, tuple.getNValue(5));             // unchanged
+
+    reset(tuple);
+    // RShift-all
+    for (int col = 4; col >= 0; --col) {
+        tuple.setNValue(col + 1, tuple.getNValue(col));
+    }
+    ASSERT_EQ(someString, tuple.getNValue(0));             // unchanged
+    ASSERT_EQ(someString, tuple.getNValue(1));
+    ASSERT_EQ(emptyString1, tuple.getNValue(2));
+    ASSERT_EQ(nullString, tuple.getNValue(3));
+    ASSERT_EQ(someString, tuple.getNValue(4));
+    ASSERT_EQ(emptyString1, tuple.getNValue(5));
 
     reset(tuple);
     // UPDATEs with copy followed by deleting original NValue (by

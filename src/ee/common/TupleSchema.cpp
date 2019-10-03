@@ -200,7 +200,7 @@ void TupleSchema::setColumnMetaData(
                 MAX_BYTES_PER_UTF8_CHARACTER : 1;
 
             // inlined variable length columns have a size prefix (1 byte)
-            offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTHLENGTH + length * factor);
+            offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTH + length * factor);
         } else {
             columnInfo->inlined = false;
 

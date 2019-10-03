@@ -55,7 +55,7 @@ namespace voltdb {
  * depending on how many bytes are needed to represent the length. These
  * define how many bytes are used for the short value vs. the long value.
  */
-constexpr int SHORT_OBJECT_LENGTHLENGTH = 1;
+constexpr int SHORT_OBJECT_LENGTH = 1;
 constexpr char OBJECT_NULL_BIT = 1 << 6;
 constexpr char OBJECT_CONTINUATION_BIT = static_cast<char>(1 << 7);
 constexpr auto OBJECT_MAX_LENGTH_SHORT_LENGTH = 63;
@@ -896,7 +896,7 @@ private:
 
     const char* getObjectValue_withoutNull() const {
         if (getSourceInlined()) {
-            return *reinterpret_cast<const char* const*>(m_data) + SHORT_OBJECT_LENGTHLENGTH;
+            return *reinterpret_cast<const char* const*>(m_data) + SHORT_OBJECT_LENGTH;
         } else {
            return getObjectPointer()->getObjectValue();
         }
@@ -906,7 +906,7 @@ private:
         if (getSourceInlined()) {
             const char* storage = *reinterpret_cast<const char* const*>(m_data);
             lengthOut = storage[0]; // one-byte length prefix for inline
-            return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
+            return storage + SHORT_OBJECT_LENGTH; // skip prefix.
         } else {
            char const* retVal = getObjectPointer()->getObject(lengthOut);
            vassert(lengthOut >= 0);
@@ -1691,13 +1691,19 @@ private:
         }
         int32_t length;
         const char* buf = getObject_withoutNull(length);
+        char* storageContent = storage + SHORT_OBJECT_LENGTH;
         checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
 
+        *storage = static_cast<char>(length);
         // Always reset all the bits regardless of the actual length of the value.
         // Offset 1 byte for the length prefix
-        ::memset(storage + SHORT_OBJECT_LENGTHLENGTH, 0, maxLength);
-        storage[0] = static_cast<char>(length);
-        ::memcpy(storage + SHORT_OBJECT_LENGTHLENGTH, buf, length);
+        if (storageContent != buf) {
+            ::memset(storageContent, 0, maxLength);
+            ::memcpy(storageContent, buf, length);
+        } else {       // unlikely: ptr aliasing
+            ::memset(storageContent + length, 0,
+                    maxLength - SHORT_OBJECT_LENGTH - length);
+        }
     }
 
     static inline bool validVarcharSize(const char *valueChars, size_t length, int32_t maxLength) {
@@ -2928,7 +2934,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                     }
                     const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
                     checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
-                    ::memcpy(storage + SHORT_OBJECT_LENGTHLENGTH, data, length);
+                    ::memcpy(storage + SHORT_OBJECT_LENGTH, data, length);
                     return;
                 } else if (length == OBJECTLENGTH_NULL) {
                     *reinterpret_cast<void**>(storage) = NULL;
