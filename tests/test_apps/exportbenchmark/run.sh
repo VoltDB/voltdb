@@ -130,15 +130,17 @@ function client() {
     run_benchmark
 }
 
-# run a 'long' (5 mins) benchmark for poll demo
-function poll_benchmark() { 
-	run_benchmark_100x_long
-}
-
 function poll_client() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.PollClient
+}
+
+function poll_client_tables() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.PollClient \
+        --printTables=true
 }
 
 function run_benchmark_help() {

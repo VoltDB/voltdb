@@ -60,6 +60,9 @@ public class PollClient {
         @Option(desc = "Name of stream or table to poll from")
         String topic = "ALL_VALUES";
 
+        @Option(desc = "Print tables if true")
+        boolean printTables = false;
+
         @Override
         public void validate() {
         }
@@ -144,7 +147,7 @@ public class PollClient {
         catch (InterruptedException e) {
             exitWithException("ERROR: Error connecting to VoltDB", e);
         }
-
+        long tupleCount = 0;
         // Poll continuously until CTRL-C
         try {
             while(true) {
@@ -164,9 +167,14 @@ public class PollClient {
 
                 for (int i =0; i < res.length; i++) {
                     VoltTable vt = res[i];
-                    System.out.println(vt);
-                    System.out.println();
+                    tupleCount += vt.getRowCount();
+                    if (config.printTables) {
+                        System.out.println(vt);
+                        System.out.println();
+                    }
                 }
+                System.out.println("Rows: " + tupleCount);
+                System.out.println();
             }
         }
         catch (Exception e) {
