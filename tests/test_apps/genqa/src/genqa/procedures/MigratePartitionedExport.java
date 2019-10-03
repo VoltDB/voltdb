@@ -31,7 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 
-public class MigrateExport extends VoltProcedure {
+public class MigratePartitionedExport extends VoltProcedure {
     public final SQLStmt migrate_kafka = new SQLStmt("MIGRATE FROM export_partitioned_table_kafka WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
     public final SQLStmt migrate_rabbit = new SQLStmt("MIGRATE FROM export_partitioned_table_rabbit WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
     public final SQLStmt migrate_file = new SQLStmt("MIGRATE FROM export_partitioned_table_file WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
@@ -42,17 +42,17 @@ public class MigrateExport extends VoltProcedure {
     public long run(int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
-        voltQueueSQL(migrate_kafka, -seconds);
         voltQueueSQL(migrate_rabbit, -seconds);
         voltQueueSQL(migrate_file, -seconds);
         voltQueueSQL(migrate_jdbc, -seconds);
-
-        // Execute last statement batch
-         VoltTable[] v = voltExecuteSQL(true);
-        // voltExecuteSQL(true);
+        voltExecuteSQL();
+        
+        // grab the count from the last "migrate". they should all be the same
+        // TODO prune to Kafka only; this really only runs in that context
+        voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
+        long migratedCount = voltExecuteSQL()[0].asScalarLong();
 
         // Return to caller
-        // return v;
-        return seconds;
+        return migratedCount;
     }
 }

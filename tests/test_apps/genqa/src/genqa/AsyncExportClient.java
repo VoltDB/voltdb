@@ -336,7 +336,7 @@ public class AsyncExportClient
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
-                .add("exportgroups", "export_groups", "Multiple export connections", "false")
+                .add("exportgroups", "export_groups", "Multiple export connections", "true") // TODO: remove obsolescent exportgroups remnants
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport","usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
@@ -417,7 +417,7 @@ public class AsyncExportClient
                         }
                     }
                 }
-                else {
+               else {
                 // Post the request, asynchronously
                     try {
                         clientRef.get().callProcedure(
@@ -435,18 +435,29 @@ public class AsyncExportClient
 
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
                 if (config.usemigrateonly && r.nextBoolean()) {
+                    trigger_migrate(r.nextInt(10)); // vary the migrate/delete interval a little
+                /************
                     try {
                         int i = r.nextInt(10);
-                        log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
-                        clientRef.get().callProcedure(
-                                new NullCallback(),
-                                "MigrateExport", i);
+                        // if (i == 1) // to reduce output clutter log about 1 in 10 cycles, 1 in 20 actually, considering the rand bool above
+                        //     log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
+                        long result = 0;
+                        if (config.procedure.equals("JiggleExportSinglePartition"))
+                            result = clientRef.get().callProcedure("MigratePartitionedExport", i).getResults()[0].asScalarLong();
+                        else
+                            result = clientRef.get().callProcedure("MigrateReplicatedExport", i).getResults()[0].asScalarLong();
+                        log.info("Migrate Result: " + result);
+
+                        // clientRef.get().callProcedure(
+                        //         new NullCallback(),
+                        //         "MigrateExport", -i);
                     }
                     catch (Exception e) {
                         log.fatal("Exception: " + e);
                         e.printStackTrace();
                         System.exit(-1);
                     }
+                ************/
                 }
 
                 swap_count++;
@@ -457,6 +468,14 @@ public class AsyncExportClient
                     first_cat = !first_cat;
                 }
             }
+
+            if (config.usemigrateonly) {
+                // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
+                // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
+                trigger_migrate(0);
+                Thread.sleep(5000);
+            }
+
             shutdown.compareAndSet(false, true);
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -567,6 +586,30 @@ public class AsyncExportClient
             System.exit(-1);
         }
     }
+
+    private static void trigger_migrate(int time_window) {
+        try {
+            // int i = r.nextInt(10);
+            // if (i == 1) // to reduce output clutter log about 1 in 10 cycles, 1 in 20 actually, considering the rand bool above
+            //     log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
+            long result = 0;
+            if (config.procedure.equals("JiggleExportGroupSinglePartition"))
+                result = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults()[0].asScalarLong();
+            else
+                result = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults()[0].asScalarLong();
+            log.info("Migrate Result: " + result);
+
+            // clientRef.get().callProcedure(
+            //         new NullCallback(),
+            //         "MigrateExport", -i);
+        }
+        catch (Exception e) {
+            log.fatal("Exception: " + e);
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
+
 
     private static long get_table_count(String sqlTable) {
         long count = 0;
