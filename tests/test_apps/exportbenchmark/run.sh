@@ -65,6 +65,7 @@ function parse_command_line() {
 function srccompile() {
     javac -classpath $APPCLASSPATH procedures/exportbenchmark/*.java
     javac -classpath $CLIENTCLASSPATH client/exportbenchmark/ExportBenchmark.java
+    javac -classpath $CLIENTCLASSPATH client/exportbenchmark/PollClient.java
     javac -classpath $APPCLASSPATH server/exportbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
@@ -129,6 +130,17 @@ function client() {
     run_benchmark
 }
 
+# run a 'long' (5 mins) benchmark for poll demo
+function poll_benchmark() { 
+	run_benchmark_100x_long
+}
+
+function poll_client() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.PollClient
+}
+
 function run_benchmark_help() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH exportbenchmark.ExportBenchmark --help
@@ -148,7 +160,7 @@ function run_benchmark_10x() {
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
-	--multiply=10 \
+        --multiply=10 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }
@@ -158,7 +170,17 @@ function run_benchmark_100x() {
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=60 \
-	--multiply=100 \
+        --multiply=100 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function run_benchmark_100x_long() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=300 \
+        --multiply=100 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }

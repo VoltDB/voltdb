@@ -795,45 +795,6 @@ public final class InvocationDispatcher {
                     Throwables.getStackTraceAsString(ex),
                     task.clientHandle);
         }
-        /*
-        Thread thr = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Thread.sleep(1000);
-                    ColumnInfo[] rescols = new ColumnInfo[] {
-                            new ColumnInfo("CLIENT", VoltType.STRING),
-                            new ColumnInfo("TOPIC", VoltType.STRING),
-                            new ColumnInfo("RESULT", VoltType.STRING),
-                    };
-                    VoltTable result = new VoltTable(rescols);
-                    result.addRow(ccxn.getHostnameAndIPAndPort(), topic,
-                            "User-requested polling of topic " + topic + " successfully executed.");
-                    ClientResponseImpl resp =
-                            new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                    new VoltTable[] {result},
-                                    "FOOBAR",
-                                    task.clientHandle);
-                        ByteBuffer buf = ByteBuffer.allocate(resp.getSerializedSize() + 4);
-                        buf.putInt(buf.capacity() - 4);
-                        resp.flattenToBuffer(buf).flip();
-                        ccxn.writeStream().enqueue(buf);
-                } catch (Exception e) {
-                    VoltTable tables[] = new VoltTable[0];
-                    byte status = ClientResponseImpl.GRACEFUL_FAILURE;
-                    final ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(status,
-                                                   tables,
-                                                   Throwables.getStackTraceAsString(e),
-                                                   task.clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    errorResponse.flattenToBuffer(buf).flip();
-                    ccxn.writeStream().enqueue(buf);
-                }
-            }});
-        thr.start();
-        */
         return null;
     }
 
