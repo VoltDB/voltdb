@@ -903,7 +903,6 @@ public class VoltDB {
          * Checks for the initialization marker on initialized voltdbroot directory
          */
         private void checkInitializationMarker() {
-
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
             File configCFH = null;

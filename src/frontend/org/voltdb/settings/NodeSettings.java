@@ -47,6 +47,7 @@ public interface NodeSettings extends Settings {
     public final static String CL_PATH_KEY = "org.voltdb.path.command_log";
     public final static String SNAPTHOT_PATH_KEY = "org.voltdb.path.snapshots";
     public final static String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
+    public final static String EXPORT_CURSOR_PATH_KEY = "org.voltdb.path.export_cursor";
     public final static String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
     public final static String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
     public final static String LARGE_QUERY_SWAP_PATH_KEY = "org.voltdb.path.large_query_swap";
@@ -66,6 +67,9 @@ public interface NodeSettings extends Settings {
 
     @Key(EXPORT_OVERFLOW_PATH_KEY)
     public File getExportOverflow();
+
+    @Key(EXPORT_CURSOR_PATH_KEY)
+    public File getExportCursor();
 
     @Key(DR_OVERFLOW_PATH_KEY)
     public File getDROverflow();
@@ -106,6 +110,7 @@ public interface NodeSettings extends Settings {
                 .put(EXPORT_OVERFLOW_PATH_KEY, resolve(getExportOverflow()))
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
                 .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))
+                .put(EXPORT_CURSOR_PATH_KEY, resolve(getExportCursor()))
                 .build();
     }
 

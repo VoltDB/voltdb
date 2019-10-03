@@ -569,6 +569,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
     }
 
+    public String getExportCursorPath(PathsType.Exportcursor path) {
+        if (isRunningWithOldVerbs()) {
+            return path.getPath();
+        }
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportCursor()).getPath();
+    }
+
     @Override
     public String getVoltDBRootPath() {
         try {
@@ -611,6 +618,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public String getLargeQuerySwapPath() {
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
+    }
+
+    @Override
+    public String getExportCursorPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportCursor()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
