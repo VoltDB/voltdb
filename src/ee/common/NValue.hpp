@@ -1691,18 +1691,16 @@ private:
         }
         int32_t length;
         const char* buf = getObject_withoutNull(length);
-        char* storageContent = storage + SHORT_OBJECT_LENGTH;
         checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
 
-        *storage = static_cast<char>(length);
-        // Always reset all the bits regardless of the actual length of the value.
         // Offset 1 byte for the length prefix
+        char* storageContent = storage + SHORT_OBJECT_LENGTH;
+        // Always reset all the bits regardless of the actual length of the value.
+        ::memset(storageContent + length, 0, maxLength - length);
         if (storageContent != buf) {
-            ::memset(storageContent, 0, maxLength);
+            vassert(maxLength >= length);
+            *storage = static_cast<char>(length);
             ::memcpy(storageContent, buf, length);
-        } else {       // unlikely: ptr aliasing
-            ::memset(storageContent + length, 0,
-                    maxLength - SHORT_OBJECT_LENGTH - length);
         }
     }
 
