@@ -157,6 +157,17 @@ function run_benchmark() {
         --statsfile=exportbench.csv
 }
 
+# Use this for tests
+function run_benchmark_small() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --warmup=1 \
+        --duration=1 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
 function run_benchmark_10x() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
