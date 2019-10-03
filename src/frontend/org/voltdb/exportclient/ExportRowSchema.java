@@ -25,6 +25,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
@@ -278,5 +280,18 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
               .append((itNames.hasNext()) ? ", " : "]");
         }
         return sb.toString();
+    }
+
+    public VoltTable toVoltTable() {
+        assert names.size() != 0 : "creating VoltTable from empty schema";
+        ArrayList<ColumnInfo> cols = new ArrayList<>(names.size());
+
+        Iterator<String> itNames = this.names.iterator();
+        Iterator<VoltType> itTypes = this.types.iterator();
+
+        while(itNames.hasNext()) {
+            cols.add(new ColumnInfo(itNames.next(), itTypes.next()));
+        }
+        return new VoltTable(cols.toArray(new ColumnInfo[0]));
     }
 }
