@@ -196,4 +196,8 @@ public interface ExportManagerInterface {
     default public void pollTopic(String topic, long clientHandle, Connection ccxn) {
         throw new UnsupportedOperationException("pollTopic");
     }
+
+    default public void onDisconnect(long connectionId) {
+        // No-op
+    }
 }

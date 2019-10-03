@@ -90,6 +90,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
@@ -861,6 +862,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             m_notifier.removeConnection(c);
+            // FIXME: is there a better way to handle this
+            ExportManagerInterface.instance().onDisconnect(connectionId());
         }
 
         /*
