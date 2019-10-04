@@ -446,6 +446,32 @@ CREATE STREAM export_replicated_table_jdbc EXPORT TO TARGET jdbc_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
+CREATE TABLE export_replicated_table_loopback EXPORT TO TARGET loopback_target ON insert, update, delete
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+, rowid_group               TINYINT       NOT NULL
+, type_null_tinyint         TINYINT
+, type_not_null_tinyint     TINYINT       NOT NULL
+, type_null_smallint        SMALLINT
+, type_not_null_smallint    SMALLINT      NOT NULL
+, type_null_integer         INTEGER
+, type_not_null_integer     INTEGER       NOT NULL
+, type_null_bigint          BIGINT
+, type_not_null_bigint      BIGINT        NOT NULL
+, type_null_timestamp       TIMESTAMP
+, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
+, type_null_float           FLOAT
+, type_not_null_float       FLOAT         NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
+, type_null_varchar128      VARCHAR(128)
+, type_not_null_varchar128  VARCHAR(128)  NOT NULL
+, type_null_varchar1024     VARCHAR(1024)
+, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
+);
 
 CREATE STREAM export_skinny_partitioned_table_kafka  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
 (
@@ -490,8 +516,8 @@ CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_loopback COLUMN row
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
-CREATE PROCEDURE insert_with_metadata PARTITION ON TABLE partitioned_table_with_metadata COLUMN rowid parameter 7 AS insert into partitioned_table_with_metadata
-      values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+-- CREATE PROCEDURE insert_with_metadata PARTITION ON TABLE partitioned_table_with_metadata COLUMN rowid parameter 7 AS insert into partitioned_table_with_metadata
+--     values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Export Stream with extra Geo columns
 CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target
