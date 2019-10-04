@@ -272,7 +272,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
                 + "VALUES (-127, -127, -127, -127);");
         verifyStmtFails(client, "UPDATE ENG_13926 SET C = C - 1;",
                 "Type BIGINT with value -128 can't be cast as TINYINT "
-                + "because the value is out of range for the destination type \'C\'");
+                + "because the value is out of range for the destination type");
     }
 
     private void subtestENG14478() throws Exception {

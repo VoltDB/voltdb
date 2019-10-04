@@ -607,8 +607,8 @@ class NValue {
     // m/kMaxWholeDivisor < kMaxWholeFactor
     static const uint64_t kMaxWholeDivisor = 100000000;             // == 10**8
     static const uint64_t kMaxWholeFactor = 1000000000000000000;    // == 10**18
-    static bool inline oversizeWholeDecimal(TTInt ii) {
-        return (TTInt(kMaxWholeFactor) <= ii / kMaxWholeDivisor);
+    static bool oversizeWholeDecimal(TTInt ii) {
+        return TTInt(kMaxWholeFactor) <= ii / kMaxWholeDivisor;
     }
   public:
     // setArrayElements is a const method since it doesn't actually mutate any NValue state, just
@@ -658,7 +658,7 @@ class NValue {
     // Declared public for cppunit test purposes .
     static int64_t parseTimestampString(const std::string &txt);
 
-    static inline int32_t getCharLength(const char *valueChars, const size_t length) {
+    static int32_t getCharLength(const char *valueChars, const size_t length) {
         // very efficient code to count characters in UTF string and ASCII string
         int32_t j = 0;
         size_t i = length;
@@ -668,7 +668,7 @@ class NValue {
         return j;
     }
 
-    static inline int32_t getIthCharIndex(const char *valueChars,
+    static int32_t getIthCharIndex(const char *valueChars,
             const int64_t length, const int64_t ith) {
         if (ith <= 0) {
             return -1;
@@ -686,7 +686,7 @@ class NValue {
 
     // Return the beginning char * place of the ith char.
     // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
-    static inline const char* getIthCharPosition(const char *valueChars,
+    static const char* getIthCharPosition(const char *valueChars,
             const size_t length, const int32_t ith) {
         // very efficient code to count characters in UTF string and ASCII string
         int32_t i = getIthCharIndex(valueChars,length, ith);
@@ -1035,7 +1035,7 @@ private:
     }
 
     /** return the whole part of a TTInt*/
-    static inline int64_t narrowDecimalToBigInt(TTInt &scaledValue) {
+    static int64_t narrowDecimalToBigInt(TTInt &scaledValue) {
         if (scaledValue > NValue::s_maxInt64AsDecimal || scaledValue < NValue::s_minInt64AsDecimal) {
             throwCastSQLValueOutOfRangeException<TTInt>(scaledValue, ValueType::tDECIMAL, ValueType::tBIGINT);
         }
@@ -1045,7 +1045,7 @@ private:
     }
 
     /** return the fractional part of a TTInt*/
-    static inline int64_t getFractionalPart(TTInt& scaledValue) {
+    static int64_t getFractionalPart(TTInt& scaledValue) {
         TTInt fractional(scaledValue);
         fractional %= kMaxScaleFactor;
         return fractional.ToInt();
@@ -1676,37 +1676,12 @@ private:
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided tuple storage area
      */
-    void serializeInlineObjectToTupleStorage(char* storage, int32_t maxLength, bool isInBytes) const {
-        if (isNull()) {
-            // Always reset all the bits regardless of the actual length of the value
-            // 1 additional byte for the length prefix
-            ::memset(storage, 0, maxLength + 1);
+    void serializeInlineObjectToTupleStorage(char* storage, int32_t maxLength, bool isInBytes) const;
 
-            /*
-             * The 7th bit of the length preceding value
-             * is used to indicate that the object is null.
-             */
-            storage[0] = OBJECT_NULL_BIT;
-            return;
-        }
-        int32_t length;
-        const char* buf = getObject_withoutNull(length);
-        checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
-
-        // Offset 1 byte for the length prefix
-        char* storageContent = storage + SHORT_OBJECT_LENGTH;
-        // Reset all the control bits.
-        ::memset(storageContent + length, 0, maxLength - length);
-        if (storageContent != buf) {
-            vassert(maxLength >= length);
-            *storage = static_cast<char>(length);
-            ::memcpy(storageContent, buf, length);
-        }
-    }
-
-    static inline bool validVarcharSize(const char *valueChars, size_t length, int32_t maxLength) {
+    static bool validVarcharSize(const char *valueChars, size_t length, int32_t maxLength) {
         int32_t min_continuation_bytes = static_cast<int32_t>(length - maxLength);
         if (min_continuation_bytes <= 0) {
+            // Note: it's not so obvious outside this function that we permit length > maxLength for VARCHAR in characters.
             return true;
         }
         size_t i = length;
@@ -1723,7 +1698,7 @@ private:
     /**
      * Assuming non-null NValue, validate the size of the variable length data
      */
-    static inline void checkTooWideForVariableLengthType(ValueType type, const char* ptr,
+    static void checkTooWideForVariableLengthType(ValueType type, const char* ptr,
           int32_t objLength, int32_t maxLength, bool isInBytes) {
        if (maxLength == 0) {
           throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(type));

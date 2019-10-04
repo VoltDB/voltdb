@@ -457,6 +457,35 @@ const NValue& NValue::itemAtIndex(int index) const {
     return listOfNValues->m_values[index];
 }
 
+void NValue::serializeInlineObjectToTupleStorage(char* storage, int32_t maxLength, bool isInBytes) const {
+    if (isNull()) {
+        // Always reset all the bits regardless of the actual length of the value
+        // 1 additional byte for the length prefix
+        ::memset(storage, 0, maxLength + 1);
+
+        /*
+         * The 7th bit of the length preceding value
+         * is used to indicate that the object is null.
+         */
+        storage[0] = OBJECT_NULL_BIT;
+        return;
+    }
+    int32_t length;
+    const char* buf = getObject_withoutNull(length);
+    char* storageContent = storage + SHORT_OBJECT_LENGTH;
+    if (storageContent != buf) {
+        // NOTE: we actually permit length > maxLength unless isInBytes.
+        // See validVarcharSize(). Therefore, the memset() *MUST
+        // NOT* clear length..maxLength portion.
+        checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
+        // Always reset all the bits regardless of the actual length of the value.
+        // Offset 1 byte for the length prefix
+        ::memset(storageContent, 0, maxLength);
+        storage[0] = static_cast<char>(length);
+        ::memcpy(storageContent, buf, length);
+    }
+}
+
 std::vector<NValue> NValue::castAndSortAndDedupArrayForInList(const ValueType outputType) const {
     int size = arrayLength();
 
