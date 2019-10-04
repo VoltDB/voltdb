@@ -74,7 +74,7 @@ public class ForeignHost {
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
-    private AtomicLong m_lastMessageMillis = new AtomicLong(Long.MIN_VALUE);
+    private AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
     private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
     private final AtomicInteger m_connectionStoppingCount = new AtomicInteger(0);
@@ -252,39 +252,40 @@ public class ForeignHost {
     }
 
     private void detectDeadHost() {
+
+        // NodeFailureFault no longer immediately trips FHInputHandler to
+        // set m_isUp to false, so use both that and m_closing to
+        // avoid repeat reports of a single node failure
         long current_time = EstTime.currentTimeMillis();
-        long current_delta = current_time - m_lastMessageMillis.get();
-        /*
-         * Try and give some warning when a connection is timing out.
-         * Allows you to observe the liveness of the host receiving the heartbeats
-         */
+        long last_time = m_lastMessageMillis.get();
+        long current_delta = current_time - last_time;
+        if (m_isUp && current_delta > m_deadHostTimeout) {
+            if (m_deadReportsCount.getAndIncrement() == 0) {
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
+                hostLog.info("\tcurrent time: " + current_time);
+                hostLog.info("\tlast message: " + last_time);
+                hostLog.info("\tdelta (millis): " + current_delta);
+                hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+                VoltDB.dropStackTrace("Timed out foreign host " + hostnameAndIPAndPort());
+            }
+            m_hostMessenger.reportForeignHostFailed(m_hostId);
+        }
+
+        //Try and give some warning when a connection is timing out.
+        //Allows you to observe the liveness of the host receiving the heartbeats
         if (current_delta > m_logRate) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
                         + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
                         current_time);
         }
-        // NodeFailureFault no longer immediately trips FHInputHandler to
-        // set m_isUp to false, so use both that and m_closing to
-        // avoid repeat reports of a single node failure
-        if (m_isUp && current_delta > m_deadHostTimeout) {
-            if (m_deadReportsCount.getAndIncrement() == 0) {
-                hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
-                hostLog.info("\tcurrent time: " + current_time);
-                hostLog.info("\tlast message: " + m_lastMessageMillis.get());
-                hostLog.info("\tdelta (millis): " + current_delta);
-                hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-                VoltDB.dropStackTrace("Timed out foreign host " + hostnameAndIPAndPort() + " with delta " + current_delta);
-            }
-            m_hostMessenger.reportForeignHostFailed(m_hostId);
-        }
+
     }
 
     public void updateLastMessageTime(long lastMessageMillis) {
-        if (m_lastMessageMillis.get() > lastMessageMillis) {
-            return;
+        if (lastMessageMillis > m_lastMessageMillis.get() || m_lastMessageMillis.get() == Long.MAX_VALUE) {
+            m_lastMessageMillis.set(lastMessageMillis);
         }
-        m_lastMessageMillis.set(lastMessageMillis);
     }
 
     // First report of connection hangup will kick-off fault resolution
