@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXECUTORUTIL_H
-#define HSTOREEXECUTORUTIL_H
+#pragma once
 
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
@@ -57,13 +56,29 @@ namespace voltdb {
 
 // Helper struct to evaluate a postfilter and count the number of tuples that
 // successfully passed the evaluation
-struct CountingPostfilter {
+class CountingPostfilter {
+    const AbstractTempTable *m_table = nullptr;
+    const AbstractExpression *m_postPredicate = nullptr;
+    CountingPostfilter* m_parentPostfilter = nullptr;
+
+    int m_limit = NO_LIMIT;
+    int m_offset = NO_OFFSET;
+
+    int m_tuple_skipped = 0;
+    bool m_under_limit = false;
+
+    // Indicate that an inline (child) AggCountingPostfilter associated with this postfilter
+    // has reached its limit
+    void setAboveLimit() {
+        m_under_limit = false;
+    }
+public:
     static const int NO_LIMIT = -1;
     static const int NO_OFFSET = -1;
 
     // A CountingPostfilter is not fully initialized by its default constructor.
     // It should be re-initialized before use via assignment from a properly initialized CountingPostfilter.
-    CountingPostfilter();
+    CountingPostfilter() = default;
 
     // Constructor to initialize a CountingPostfilter
     CountingPostfilter(const AbstractTempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
@@ -76,37 +91,16 @@ struct CountingPostfilter {
 
     // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
     bool eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple);
-
-    private:
-
-    // Indicate that an inline (child) AggCountingPostfilter associated with this postfilter
-    // has reached its limit
-    void setAboveLimit() {
-        m_under_limit = false;
-    }
-
-    const AbstractTempTable *m_table;
-    const AbstractExpression *m_postPredicate;
-    CountingPostfilter* m_parentPostfilter;
-
-    int m_limit;
-    int m_offset;
-
-    int m_tuple_skipped;
-    bool m_under_limit;
 };
 
-inline
-bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
-    if (m_postPredicate == NULL || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
+inline bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
+    if (m_postPredicate == nullptr || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
         // Check if we have to skip this tuple because of offset
         if (m_tuple_skipped < m_offset) {
             m_tuple_skipped++;
             return false;
-        }
-        // Evaluate LIMIT now
-        if (m_limit >= 0) {
-            vassert(m_table != NULL);
+        } else if (m_limit >= 0) { // Evaluate LIMIT now
+            vassert(m_table != nullptr);
             if (m_table->activeTupleCount() == m_limit) {
                 m_under_limit = false;
                 // Notify a parent that the limit is reached
@@ -118,11 +112,10 @@ bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* i
         }
         // LIMIT/OFFSET are satisfied
         return true;
+    } else { // Predicate is not NULL and was evaluated to FALSE
+        return false;
     }
-    // Predicate is not NULL and was evaluated to FALSE
-    return false;
 }
 
 }
 
-#endif

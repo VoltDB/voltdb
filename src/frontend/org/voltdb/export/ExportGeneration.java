@@ -802,6 +802,7 @@ public class ExportGeneration implements Generation {
             }
 
             // Remove source and partition entry if empty
+            exportLog.info("Drained source for " + tableName + ", partition " + partitionId);
             sources.remove(tableName);
             if (sources.isEmpty()) {
                 m_dataSourcesByPartition.remove(partitionId);
@@ -811,7 +812,6 @@ public class ExportGeneration implements Generation {
 
         //Do closing outside the synchronized block. Do not wait on future since
         // we're invoked from the source's executor thread.
-        exportLog.info("Drained on unused partition " + partitionId + ": " + source);
         source.closeAndDelete();
     }
 
@@ -952,6 +952,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void sync() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {

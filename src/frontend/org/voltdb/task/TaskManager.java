@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -102,6 +103,8 @@ public final class TaskManager {
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
     // Partition tasks are disabled while a host is performing the initial join work
     private boolean m_enableTasksOnPartitions;
+    // Supplier to indicate if this manager should be in read-only mode
+    private final BooleanSupplier m_readOnlySupplier;
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
             ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
 
@@ -138,16 +141,20 @@ public final class TaskManager {
     }
 
     /**
-     * @param clientInterface {@link ClientInterface} instance to use for starting transactions
-     * @param statsAgent      {@link StatsAgent} instance used to capture statistics about tasks
-     * @param hostId          ID of this host
-     * @param isElasticJoin   If {@code true} this host is in the process of an elastic join
+     * @param clientInterface  {@link ClientInterface} instance to use for starting transactions
+     * @param statsAgent       {@link StatsAgent} instance used to capture statistics about tasks
+     * @param hostId           ID of this host
+     * @param isElasticJoin    If {@code true} this host is in the process of an elastic join
+     * @param readOnlySupplier {@link BooleanSupplier} which returns whether or not this manager should be in read only
+     *                         mode
      */
-    public TaskManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId, boolean isElasticJoin) {
+    public TaskManager(ClientInterface clientInterface, StatsAgent statsAgent, int hostId, boolean isElasticJoin,
+            BooleanSupplier readOnlySupplier) {
         m_clientInterface = clientInterface;
         m_statsAgent = statsAgent;
         m_hostId = hostId;
         m_enableTasksOnPartitions = !isElasticJoin;
+        m_readOnlySupplier = readOnlySupplier;
 
         m_clientInterface.bindAdapter(m_adapter, new ClientInterfaceRepairCallback() {
             Map<Integer, Future<Boolean>> m_migratingPartitions = Collections.synchronizedMap(new HashMap<>());
@@ -224,9 +231,9 @@ public final class TaskManager {
      * @param context {@link CatalogContext} instance
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    public ListenableFuture<?> start(CatalogContext context, boolean paused) {
+    public ListenableFuture<?> start(CatalogContext context) {
         return start(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
-                context.getCatalogJar().getLoader(), paused);
+                context.getCatalogJar().getLoader());
     }
 
     /**
@@ -241,9 +248,15 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
-            ClassLoader classLoader, boolean paused) {
+            ClassLoader classLoader) {
         return execute(() -> {
-            m_managerState = paused ? ManagerState.PAUSED : ManagerState.RUNNING;
+            if (m_managerState != ManagerState.SHUTDOWN) {
+                if (log.isDebugEnabled()) {
+                    log.debug("MANAGER: Ignoring start call since manager is already started");
+                }
+            }
+
+            m_managerState = ManagerState.RUNNING;
 
             // Create a dummy stats source so something is always reported
             TaskStatsSource.createDummy().register(m_statsAgent);
@@ -309,16 +322,18 @@ public final class TaskManager {
                 () -> processCatalogInline(configuration, tasks, authSystem, classLoader, classesUpdated));
     }
 
-    public ListenableFuture<?> setPaused(boolean paused) {
+    public ListenableFuture<?> evaluateReadOnlyMode() {
         return execute(() -> {
-            if (m_managerState == ManagerState.SHUTDOWN || (m_managerState == ManagerState.PAUSED) == paused) {
+            boolean readOnly = m_readOnlySupplier.getAsBoolean();
+            if (m_managerState == ManagerState.SHUTDOWN || (m_managerState == ManagerState.READONLY) == readOnly) {
                 if (log.isDebugEnabled()) {
-                    log.debug("MANAGER: Ignoring setting of paused to " + paused + "because in state " + m_managerState);
+                    log.debug("MANAGER: Ignoring setting of read only to " + readOnly + " because in state "
+                            + m_managerState);
                 }
                 return;
             }
 
-            m_managerState = paused ? ManagerState.PAUSED : ManagerState.RUNNING;
+            m_managerState = readOnly ? ManagerState.READONLY : ManagerState.RUNNING;
             log.info("MANAGER: Updated state to " + m_managerState);
             for (TaskHandler handler : m_handlers.values()) {
                 handler.updatePaused();
@@ -681,16 +696,19 @@ public final class TaskManager {
      * Process any potential scheduler changes. Any modified schedules will be stopped and restarted with their new
      * configuration. If a schedule was not modified it will be left running.
      *
-     * @param configuration Global configuration for all tasks
-     * @param tasks         {@link Collection} of configured {@link Task}s
-     * @param authSystem    Current {@link AuthSystem} for the system
-     * @param classLoader   {@link ClassLoader} to use to load classes
+     * @param configuration  Global configuration for all tasks
+     * @param tasks          {@link Collection} of configured {@link Task}s
+     * @param authSystem     Current {@link AuthSystem} for the system
+     * @param classLoader    {@link ClassLoader} to use to load classes
+     * @param classesUpdated Should be {@code true} if any custom classes were modified
      */
     private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
             ClassLoader classLoader, boolean classesUpdated) {
         if (m_managerState == ManagerState.SHUTDOWN) {
             return;
         }
+
+        m_managerState = m_readOnlySupplier.getAsBoolean() ? ManagerState.READONLY : ManagerState.RUNNING;
 
         Map<String, TaskHandler> newHandlers = new HashMap<>();
         m_authSystem = authSystem;
@@ -919,7 +937,7 @@ public final class TaskManager {
     }
 
     private enum ManagerState {
-        SHUTDOWN, RUNNING, PAUSED
+        SHUTDOWN, RUNNING, READONLY
     }
 
     /**
@@ -1202,7 +1220,7 @@ public final class TaskManager {
         CANCELED(true),
         /** Scheduler was disabled by the user */
         DISABLED(false, true),
-        /** System is in paused mode and all tasks are paused */
+        /** TaskManager is in READONLY mode and this task is not read only */
         PAUSED(false, true);
 
         private final boolean m_shutdown;
@@ -1281,11 +1299,10 @@ public final class TaskManager {
             }
 
             SchedulerWrapperState state;
-            if (m_handler.m_definition.getEnabled()) {
-                state = m_managerState == ManagerState.PAUSED ? SchedulerWrapperState.PAUSED
-                        : SchedulerWrapperState.RUNNING;
-            } else {
+            if (!m_handler.m_definition.getEnabled()) {
                 state = SchedulerWrapperState.DISABLED;
+            } else {
+                state = SchedulerWrapperState.RUNNING;
             }
 
             setState(state);
@@ -1300,6 +1317,12 @@ public final class TaskManager {
                 m_scheduler = m_handler.constructScheduler(
                         new TaskHelper(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
                                 getScopeId(), m_clientInterface));
+
+                if (m_managerState == ManagerState.READONLY && !m_scheduler.isReadOnly()) {
+                    shutdown(SchedulerWrapperState.PAUSED);
+                    return;
+                }
+
                 submitHandleNextRun();
             }
         }
@@ -1486,7 +1509,8 @@ public final class TaskManager {
                 if (m_wrapperState != SchedulerWrapperState.DISABLED) {
                     shutdown(SchedulerWrapperState.DISABLED);
                 }
-            } else if (m_managerState == ManagerState.PAUSED) {
+            } else if (m_managerState == ManagerState.READONLY && (m_wrapperState == SchedulerWrapperState.PAUSED
+                    || (m_scheduler != null && !m_scheduler.isReadOnly()))) {
                 if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                     shutdown(SchedulerWrapperState.PAUSED);
                 }
@@ -1637,6 +1661,9 @@ public final class TaskManager {
         abstract int getScopeId();
 
         private void setState(SchedulerWrapperState state) {
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage("Updating wrapper state from " + m_wrapperState + " to " + state));
+            }
             m_wrapperState = state;
             m_stats.setState(m_wrapperState.name());
         }

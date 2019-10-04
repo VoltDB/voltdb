@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREABSTRACTJOINEXECUTOR_H
-#define HSTOREABSTRACTJOINEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/tabletuple.h"
@@ -54,10 +53,9 @@ namespace voltdb {
 
 class AbstractPlanNode;
 class AggregateExecutorBase;
-struct CountingPostfilter;
+class CountingPostfilter;
 class ProgressMonitorProxy;
 class Table;
-class TempTableLimits;
 class VoltDBEngine;
 
 /**
@@ -65,6 +63,10 @@ class VoltDBEngine;
  */
 class AbstractJoinExecutor : public AbstractExecutor {
     protected:
+        JoinType m_joinType;
+        StandAloneTupleStorage m_null_outer_tuple;
+        StandAloneTupleStorage m_null_inner_tuple;
+        AggregateExecutorBase* m_aggExec;
         // Constructor
         AbstractJoinExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
             AbstractExecutor(engine, abstract_node) { }
@@ -75,15 +77,7 @@ class AbstractJoinExecutor : public AbstractExecutor {
 
         // Write tuple to the output table
         void outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp);
-
-        JoinType m_joinType;
-
-        StandAloneTupleStorage m_null_outer_tuple;
-        StandAloneTupleStorage m_null_inner_tuple;
-
-        AggregateExecutorBase* m_aggExec;
 };
 
 }
 
-#endif

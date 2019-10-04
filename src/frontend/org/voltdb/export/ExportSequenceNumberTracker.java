@@ -60,7 +60,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * @param range
      * @return Start of the range
      */
-    protected static long start(Range<Long> range) {
+    public static long start(Range<Long> range) {
         if (range.lowerBoundType() == BoundType.OPEN) {
             return DiscreteDomain.longs().next(range.lowerEndpoint());
         } else {
@@ -74,7 +74,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * @param range
      * @return End of the range
      */
-    protected static long end(Range<Long> range) {
+    public static long end(Range<Long> range) {
         if (range.upperBoundType() == BoundType.OPEN) {
             return DiscreteDomain.longs().previous(range.upperEndpoint());
         } else {

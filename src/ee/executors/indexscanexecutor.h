@@ -63,7 +63,7 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class AggregateExecutorBase;
 class InsertExecutor;
-struct CountingPostfilter;
+class CountingPostfilter;
 
 class IndexScanExecutor : public AbstractExecutor {
     // Data in this class is arranged roughly in the order it is read for

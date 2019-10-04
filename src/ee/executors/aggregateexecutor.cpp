@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <tuple>
 #include "common/SerializableEEException.h"
 #include "executors/aggregateexecutor.h"
 #include "plannodes/aggregatenode.h"
@@ -579,7 +580,7 @@ inline void AggregateExecutorBase::initCountingPredicate(const NValueArray& para
     auto* inlineLimitNode = dynamic_cast<LimitPlanNode*>(
             m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     if (inlineLimitNode) {
-        inlineLimitNode->getLimitAndOffsetByReference(params, limit, offset);
+        std::tie(limit, offset) = inlineLimitNode->getLimitAndOffset(params);
     }
     m_postfilter = CountingPostfilter(m_tmpOutputTable, m_postPredicate, limit, offset, parentPostfilter);
 }

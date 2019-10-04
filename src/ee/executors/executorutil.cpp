@@ -54,19 +54,6 @@ CountingPostfilter::CountingPostfilter(const AbstractTempTable* table, const Abs
     m_parentPostfilter(parentPostfilter),
     m_limit(limit),
     m_offset(offset),
-    m_tuple_skipped(0),
-    m_under_limit(true)
-{}
-
-
-CountingPostfilter::CountingPostfilter() :
-    m_table(NULL),
-    m_postPredicate(NULL),
-    m_parentPostfilter(NULL),
-    m_limit(NO_LIMIT),
-    m_offset(NO_OFFSET),
-    m_tuple_skipped(0),
-    m_under_limit(false)
-{}
+    m_under_limit(true) {}
 
 }

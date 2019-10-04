@@ -205,7 +205,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limit_node) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+        tie(limit, offset) = limit_node->getLimitAndOffset(params);
     }
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, where_expression, limit, offset);

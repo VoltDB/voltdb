@@ -201,6 +201,12 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
                         "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI1_IND1_ASCEQ0_0])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
                         "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI2_IND1_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[full], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI1_IND1_ASCEQ0_0])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
                 .pass();
     }
 

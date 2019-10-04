@@ -592,6 +592,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/task/ActionScheduler.java" />
             <include name="src/frontend/org/voltdb/task/DelayedAction.java" />
             <include name="src/frontend/org/voltdb/task/ActionGenerator.java" />
+            <include name="src/frontend/org/voltdb/task/ActionGeneratorBase.java" />
             <include name="src/frontend/org/voltdb/task/Action.java" />
             <include name="src/frontend/org/voltdb/task/ActionSchedule.java" />
             <include name="src/frontend/org/voltdb/task/ActionDelay.java" />
