@@ -70,7 +70,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Task;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -83,8 +82,6 @@ import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.utils.CreateTableUtils;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.task.TaskManager;
-import org.voltdb.task.TaskManager.TaskValidationResult;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -1955,14 +1952,6 @@ public class VoltCompiler {
                 ancestor = ancestor.getEnclosingClass();
             }
             addClassToJar(jarOutput, ancestor);
-        }
-
-        TaskManager taskManager = VoltDB.instance().getTaskManager();
-        for (Task task : db.getTasks()) {
-            TaskValidationResult result = taskManager.validateTask(task, classLoader);
-            if (!result.isValid()) {
-                throw new VoltCompilerException(result.getErrorMessage());
-            }
         }
 
         ////////////////////////////////////////////

@@ -17,13 +17,17 @@
 
 package org.voltdb.task;
 
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientInterface;
+import org.voltdb.DefaultProcedureManager;
+import org.voltdb.InvocationDispatcher;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 
@@ -34,15 +38,64 @@ import org.voltdb.catalog.Procedure;
 public final class TaskHelper {
     private final VoltLogger m_logger;
     private final UnaryOperator<String> m_generateLogMessage;
-    private final String m_scope;
-    private final ClientInterface m_clientInterface;
+    private final String m_taskName;
+    private final TaskScope m_scope;
+    private final int m_scopeId;
+    private final Function<String, Procedure> m_procedureGetter;
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
-            ClientInterface clientInterface) {
+    private static Function<String, Procedure> createProcedureFunction(Database database) {
+        if (database == null) {
+            return null;
+        }
+        DefaultProcedureManager defaultProcedureManager = new DefaultProcedureManager(database);
+        CatalogMap<Procedure> procedures = database.getProcedures();
+        return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
+    }
+
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            Database database) {
+        this(logger, generateLogMessage, taskName, scope, -1, createProcedureFunction(database));
+    }
+
+    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            int scopeId, ClientInterface clientInterface) {
+        this(logger, generateLogMessage, taskName, scope, scopeId, clientInterface::getProcedureFromName);
+    }
+
+    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
+            int scopeId, Function<String, Procedure> procedureGetter) {
         m_logger = logger;
         m_generateLogMessage = generateLogMessage;
+        m_taskName = taskName;
         m_scope = scope;
-        m_clientInterface = clientInterface;
+        m_scopeId = scopeId;
+        m_procedureGetter = procedureGetter;
+    }
+
+    /**
+     * @return The name of the task
+     */
+    public String getTaaskName() {
+        return m_taskName;
+    }
+
+    /**
+     * @return The scope in which the task will be executing
+     */
+    public TaskScope getTaskScepe() {
+        return m_scope;
+    }
+
+    /**
+     * Returns the ID of the scope when this helper is passed to an {@code instantiate} method otherwise {@code -1}
+     * <p>
+     * If {@code scope} is {@link TaskScope#PARTITIONS} {@code id} will be a partition ID. If {@code scope} is
+     * {@link TaskScope#HOSTS} {@code id} will be a host ID. Otherwise {@code id} will be {@code -1}
+     *
+     * @return The ID of the scope
+     */
+    public int getScopeId() {
+        return m_scopeId;
     }
 
     /**
@@ -141,7 +194,10 @@ public final class TaskHelper {
      */
     public void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope,
             String procedureName, Object[] parameters) {
-        Procedure procedure = m_clientInterface.getProcedureFromName(procedureName);
+        if (m_procedureGetter == null) {
+            return;
+        }
+        Procedure procedure = m_procedureGetter.apply(procedureName);
         if (procedure == null) {
             errors.addErrorMessage("Procedure does not exist: " + procedureName);
             return;
@@ -152,29 +208,13 @@ public final class TaskHelper {
             return;
         }
 
-        if (restrictProcedureByScope) {
-            String error = TaskManager.isProcedureValidForScope(m_scope, procedure);
-            if (error != null) {
-                errors.addErrorMessage(error);
-                return;
-            }
+        String error = TaskManager.isProcedureValidForScope(m_scope, procedure, restrictProcedureByScope);
+        if (error != null) {
+            errors.addErrorMessage(error);
+            return;
         }
 
         CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
-
-        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
-            if (procedure.getPartitionparameter() != 0) {
-                errors.addErrorMessage(String.format(
-                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
-                        procedureName));
-                return;
-            }
-
-            Object[] newParameters = new Object[parameters.length + 1];
-            newParameters[0] = 0;
-            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
-            parameters = newParameters;
-        }
 
         if (parameterTypes.size() != parameters.length) {
             errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,
@@ -192,6 +232,21 @@ public final class TaskHelper {
                                 pp.getIndex(), parameters[pp.getIndex()], parameterClass.getName(), e.getMessage()));
             }
         }
+    }
+
+    /**
+     * Test if a procedure is read only. If a procedure cannot be found with {@code procedureName} then {@code false} is
+     * returned
+     *
+     * @param procedureName Name of procedure.
+     * @return {@code true} if {@code procedureName} is read only
+     */
+    public boolean isProcedureReadOnly(String procedureName) {
+        if (m_procedureGetter == null) {
+            return false;
+        }
+        Procedure procedure = m_procedureGetter.apply(procedureName);
+        return procedure == null ? false : procedure.getReadonly();
     }
 
     private String generateLogMessage(String body) {

@@ -1247,9 +1247,13 @@ public class SQLParser extends SQLPatternFactory
      *
      * Capture groups (when captureTokens is true):
      *  (1) ALLOW clause: entire role list with commas and internal whitespace
-     *  (2) PARTITION clause: procedure name
-     *  (3) PARTITION clause: table name
-     *  (4) PARTITION clause: column name
+     *  (2) PARTITION clause: table name
+     *  (3) PARTITION clause: column name
+     *  (4) PARTITION clause: parameter number
+     *  (5) PARTITION clause: table name 2
+     *  (6) PARTITION clause: column name 2
+     *  (7) PARTITION clause: parameter number 2
+     *  (8) DIRECTED clause for directed procedures
      */
     private static SQLPatternPart makeInnerProcedureModifierClausePattern(boolean captureTokens)
     {
@@ -1285,7 +1289,8 @@ public class SQLParser extends SQLPatternFactory
                             )
                         )
                      )
-                )
+                ),
+                SPF.group(captureTokens, SPF.token("directed"))
             );
     }
 

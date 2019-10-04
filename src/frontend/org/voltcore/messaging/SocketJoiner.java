@@ -55,6 +55,7 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.client.TLSHandshaker;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -408,7 +409,7 @@ public class SocketJoiner {
              */
             if (m_listenerSockets.isEmpty()) {
                 LOG.fatal("Failed to bind to " + inetsockaddr);
-                CoreUtils.printPortsInUse(hostLog);
+                MiscUtils.printPortsInUse(hostLog);
                 throw e;
             }
         }

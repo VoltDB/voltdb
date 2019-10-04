@@ -16,8 +16,7 @@
  */
 
 
-#ifndef HSTOREINDEXCOUNTNODE_H
-#define HSTOREINDEXCOUNTNODE_H
+#pragma once
 
 #include "abstractscannode.h"
 
@@ -28,38 +27,39 @@ namespace voltdb {
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
 public:
-    IndexCountPlanNode()
-        : m_target_index_name()
-        , m_searchkey_expressions()
-        , m_compare_not_distinct()
-        , m_endkey_expressions()
-        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_skip_null_predicate()
-    {
-    }
+    IndexCountPlanNode() = default;
 
     ~IndexCountPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 
-    IndexLookupType getLookupType() const { return m_lookup_type; }
+    IndexLookupType getLookupType() const {
+        return m_lookup_type;
+    }
 
-    IndexLookupType getEndType() const { return m_end_type; }
+    IndexLookupType getEndType() const {
+        return m_end_type;
+    }
 
-    const std::string& getTargetIndexName() const { return m_target_index_name; }
+    const std::string& getTargetIndexName() const {
+        return m_target_index_name;
+    }
 
-    const std::vector<AbstractExpression*>& getEndKeyExpressions() const
-    { return m_endkey_expressions; }
+    const std::vector<AbstractExpression*>& getEndKeyExpressions() const {
+        return m_endkey_expressions;
+    }
 
-    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-    { return m_searchkey_expressions; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const {
+        return m_searchkey_expressions;
+    }
 
-    const std::vector<bool>& getCompareNotDistinctFlags() const
-    { return m_compare_not_distinct; }
+    const std::vector<bool>& getCompareNotDistinctFlags() const {
+        return m_compare_not_distinct;
+    }
 
-    AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate.get(); }
-
+    AbstractExpression* getSkipNullPredicate() const {
+        return m_skip_null_predicate.get();
+    }
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
@@ -67,26 +67,25 @@ protected:
     std::string m_target_index_name;
 
     // TODO: Document
-    OwningExpressionVector m_searchkey_expressions;
+    OwningExpressionVector m_searchkey_expressions{};
 
     // If the search key expression is actually a "not distinct" expression,
     //   we do not want the executor to skip null candidates.
     // This flag vector will instruct the executor the correct behavior for null skipping. (ENG-11096)
-    std::vector<bool> m_compare_not_distinct;
+    std::vector<bool> m_compare_not_distinct{};
 
     // TODO: Document
-    OwningExpressionVector m_endkey_expressions;
+    OwningExpressionVector m_endkey_expressions{};
 
     // Index Lookup Type
-    IndexLookupType m_lookup_type;
+    IndexLookupType m_lookup_type = IndexLookupType::Equal;
 
     // Index Lookup End Type
-    IndexLookupType m_end_type;
+    IndexLookupType m_end_type = IndexLookupType::Equal;
 
     // count null row predicate for edge cases: reverse scan or underflow case
-    boost::scoped_ptr<AbstractExpression> m_skip_null_predicate;
+    boost::scoped_ptr<AbstractExpression> m_skip_null_predicate{};
 };
 
 } // namespace voltdb
 
-#endif

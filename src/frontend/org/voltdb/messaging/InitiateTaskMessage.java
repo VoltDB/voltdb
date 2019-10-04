@@ -72,8 +72,9 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public int getParameterCount() {
         assert(m_invocation != null);
-        if (m_invocation.getParams() == null)
+        if (m_invocation.getParams() == null) {
             return 0;
+        }
         return m_invocation.getParams().toArray().length;
     }
 

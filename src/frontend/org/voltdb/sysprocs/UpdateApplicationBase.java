@@ -54,6 +54,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
@@ -239,6 +240,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return retval;
             }
 
+            if (!validateNewCatalog(newCatalog, newCatalogJar, retval)) {
+                return retval;
+            }
+
             //In non legacy mode discard the path element.
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
@@ -284,6 +289,22 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     e.getMessage();
         }
         return retval;
+    }
+
+    /**
+     * Validate that the catalog in its entirety is valid. If it is not valid an appropriate error message will be set
+     * on {@code result}
+     *
+     * @return {@code true} if the catalog is valid
+     */
+    private static boolean validateNewCatalog(Catalog catalog, InMemoryJarfile catalogJar, CatalogChangeResult result) {
+        String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
+        if (taskErrors != null) {
+            result.errorMsg = taskErrors;
+            return false;
+        }
+
+        return true;
     }
 
     /**

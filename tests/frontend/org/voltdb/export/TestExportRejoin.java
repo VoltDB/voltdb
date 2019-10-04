@@ -110,8 +110,8 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         Thread.sleep(500);
         client = getClientToSubsetHosts(new int[] {0, 1, 2});
 
-        // must still be able to verify the export data.
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        // must still be able to verify the export data. (wait for 2 minutes max
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, (2 * 60 * 1000));
     }
 
     public TestExportRejoin(final String name) {

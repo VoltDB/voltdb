@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.Scanner;
 import org.hsqldb_voltpatches.Tokens;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Task;
@@ -36,7 +35,7 @@ import org.voltdb.task.CronSchedule;
 import org.voltdb.task.DelaySchedule;
 import org.voltdb.task.IntervalSchedule;
 import org.voltdb.task.SingleProcGenerator;
-import org.voltdb.task.TaskManager;
+import org.voltdb.task.TaskScope;
 
 import com.google_voltpatches.common.base.MoreObjects;
 
@@ -64,21 +63,14 @@ public class CreateTask extends StatementProcessor {
 
         Task task = tasks.add(name);
         configureTask(task, matcher, ddlStatement.newDdl);
-
-        TaskManager.TaskValidationResult result = VoltDB.instance().getTaskManager()
-                .validateTask(task, m_classLoader);
-        if (!result.isValid()) {
-            tasks.delete(name);
-            throw m_compiler.new VoltCompilerException(result.getErrorMessage());
-        }
         return true;
     }
 
     private Task configureTask(Task task, Matcher matcher, boolean newDdl)
             throws VoltCompilerException {
         task.setName(matcher.group("name"));
-        task.setScope(
-                MoreObjects.firstNonNull(matcher.group("scope"), TaskManager.SCOPE_DEFAULT).toUpperCase());
+        String scopeString = matcher.group("scope");
+        task.setScope(TaskScope.fromName(scopeString).getId());
         if (matcher.group("class") != null) {
             task.setSchedulerclass(matcher.group("class"));
             fillOutParams(task.getSchedulerparameters(), matcher.group("parameters"), 0);

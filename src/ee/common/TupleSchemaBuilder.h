@@ -30,9 +30,9 @@ namespace voltdb {
  * Example:
  *
  *   TupleSchemaBuilder builder(3); // 3 columns
- *   builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
- *   builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 32);
- *   builder.setColumnAtIndex(2, VALUE_TYPE_INTEGER);
+ *   builder.setColumnAtIndex(0, tBIGINT);
+ *   builder.setColumnAtIndex(1, tVARCHAR, 32);
+ *   builder.setColumnAtIndex(2, tINTEGER);
  *   TupleSchema *schema = builder.build();
  */
 class TupleSchemaBuilder {

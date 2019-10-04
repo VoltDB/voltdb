@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENESTLOOPEXECUTOR_H
-#define HSTORENESTLOOPEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -56,16 +55,12 @@ namespace voltdb {
  *
  */
 class NestLoopExecutor : public AbstractJoinExecutor {
-    public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractJoinExecutor(engine, abstract_node) { }
-    private:
-
-        bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
-        bool p_execute(const NValueArray &params);
-
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
+    bool p_execute(const NValueArray &params);
+public:
+    NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+        AbstractJoinExecutor(engine, abstract_node) {}
 };
 
 }
 
-#endif

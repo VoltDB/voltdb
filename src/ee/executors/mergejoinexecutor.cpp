@@ -247,7 +247,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limitNode) {
-        limitNode->getLimitAndOffsetByReference(params, limit, offset);
+        tie(limit, offset) = limitNode->getLimitAndOffset(params);
     }
 
     int const outerCols = outerTable->columnCount();

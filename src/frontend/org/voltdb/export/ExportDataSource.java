@@ -517,8 +517,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Release buffers
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
+            if (!sb.canRelease()) {
+                exportLog.info("Unable to release buffers to seqNo: " + releaseSeqNo
+                        + ", buffer [" + sb.startSequenceNumber() + ", "
+                        + sb.lastSequenceNumber() + "] is still in use");
+                break;
+            }
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
+                    assert sb.canRelease();
                     m_committedBuffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
@@ -1648,10 +1655,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     public void run() {
                         try {
                             if (isMaster() && m_pollTask != null) {
-                                long firstUnpolledSeqNo;
-                                if (m_gapTracker.getFirstGap() != null) {
-                                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                                long firstUnpolledSeqNo = m_firstUnpolledSeqNo;
+                                Pair<Long, Long> gap = m_gapTracker.getFirstGap(m_firstUnpolledSeqNo);
+                                if (gap != null) {
+                                    firstUnpolledSeqNo = gap.getSecond() + 1;
+                                    exportLog.warn("Export data is missing [" + gap.getFirst() + ", " + gap.getSecond() +
                                             "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                                 } else {
                                     firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
@@ -1730,7 +1738,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     // Called from {@code ExportCoordinator}, returns duplicate of tracker
-    ExportSequenceNumberTracker getTracker() {
+    public ExportSequenceNumberTracker getTracker() {
         ExportSequenceNumberTracker tracker = m_gapTracker.duplicate();
         return tracker;
     }

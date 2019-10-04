@@ -21,7 +21,7 @@ package org.voltdb.task;
  * Interface which generates actions to be performed as well as calculating the delay until that should be performed
  * according to a schedule
  */
-public interface ActionScheduler extends Initializable {
+public interface ActionScheduler extends ActionGeneratorBase {
     /**
      * This method is invoked for the first action to be performed. All subsequent invocation will be of
      * {@link DelayedAction#getCallback()}. After the delay has elapsed and the action has been performed.
@@ -32,21 +32,4 @@ public interface ActionScheduler extends Initializable {
      * @return {@link DelayedAction} with the action and delay of that action
      */
     DelayedAction getFirstDelayedAction();
-
-    /**
-     * If this method returns {@code true} that means the type of procedure which this scheduler can run is restricted
-     * based upon the scope type.
-     * <ul>
-     * <li>SYSTEM - No restrictions</li>
-     * <li>HOSTS - Only NT procedures are allowed</li>
-     * <li>PARTITIONS - Only partitioned procedures are allowed</li>
-     * </ul>
-     * <p>
-     * Default return is {@code false}
-     *
-     * @return {@code true} if the type of procedure this scheduler can run should be restricted based upon scope
-     */
-    default boolean restrictProcedureByScope() {
-        return false;
-    }
 }

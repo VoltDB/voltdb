@@ -42,6 +42,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
@@ -49,7 +50,9 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.export.ExportManager;
+import org.voltdb.compiler.deploymentfile.FeaturesType;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -667,7 +670,9 @@ public class Inits {
         public void run() {
             // Let the Export system read its configuration from the catalog.
             try {
-                ExportManager.initialize(
+                FeaturesType features = m_rvdb.m_catalogContext.getDeployment().getFeatures();
+                ExportManagerInterface.initialize(
+                        features,
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,

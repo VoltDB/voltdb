@@ -290,11 +290,13 @@ def print_metrics(data):
     if (invs >= 0):
         print '%19s %3d %10d %10d %10d %7d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
             utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
+        sys.stdout.flush()
 
 def print_header():
     print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed bufferedKB   inMB/s  outMB/s"
     print "------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
     #      2017-03-03 15:54:51
+    sys.stdout.flush()
 
 def print_usage():
     # replaces the standard argparse-generated usage to include definitions of the output columns

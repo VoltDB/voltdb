@@ -59,6 +59,7 @@ import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -482,7 +483,8 @@ public abstract class CatalogSchemaTools {
             sb.append(" FROM CLASS ").append(task.getSchedulerclass());
             appendTaskParameters(sb, task.getSchedulerparameters());
         }
-        sb.append(" ON ERROR ").append(task.getOnerror()).append(" RUN ON ").append(task.getScope());
+        sb.append(" ON ERROR ").append(task.getOnerror()).append(" RUN ON ")
+                .append(TaskScope.translateIdToName(task.getScope()));
         if (task.getUser() != null) {
             sb.append(" AS USER ").append(task.getUser());
         }
@@ -543,14 +545,15 @@ public abstract class CatalogSchemaTools {
                 partitionClause.append("\n");
             }
             partitionClause.append(spacer);
-            partitionClause.append(String.format(
-                    "PARTITION ON TABLE %s COLUMN %s",
-                    proc.getPartitiontable().getTypeName(),
-                    proc.getPartitioncolumn().getTypeName() ));
-            if (proc.getPartitionparameter() != 0) {
-                partitionClause.append(String.format(
-                        " PARAMETER %s",
-                        String.valueOf(proc.getPartitionparameter()) ));
+            if (proc.getPartitiontable() == null) {
+                partitionClause.append("DIRECTED");
+            } else {
+                partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
+                        .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());
+
+                if (proc.getPartitionparameter() != 0) {
+                    partitionClause.append(" PARAMETER ").append(proc.getPartitionparameter());
+                }
             }
 
             // For the second partition clause in 2p txn

@@ -38,6 +38,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
+import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -645,7 +646,11 @@ public class JdbcDatabaseMetaDataGenerator
                 jsObj.put(JSON_SINGLE_PARTITION, proc.getSinglepartition());
                 if (proc.getSinglepartition()) {
                     jsObj.put(JSON_PARTITION_PARAMETER, proc.getPartitionparameter());
-                    jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
+                    if (proc.getPartitionparameter() == -1) {
+                        jsObj.put(JSON_PARTITION_PARAMETER_TYPE, -1);
+                    } else {
+                        jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
+                    }
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {
@@ -847,7 +852,7 @@ public class JdbcDatabaseMetaDataGenerator
             results.addRow(task.getName(), task.getSchedulerclass(), getParamsString(task.getSchedulerparameters()),
                     task.getActiongeneratorclass(), getParamsString(task.getActiongeneratorparameters()),
                     task.getScheduleclass(), getParamsString(task.getScheduleparameters()), task.getOnerror(),
-                    task.getScope(), task.getUser(), Boolean.toString(task.getEnabled()));
+                    TaskScope.translateIdToName(task.getScope()), task.getUser(), Boolean.toString(task.getEnabled()));
 
         }
         return results;

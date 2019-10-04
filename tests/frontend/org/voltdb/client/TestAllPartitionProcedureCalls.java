@@ -35,7 +35,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -184,6 +183,24 @@ public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
                  assertFalse(resp.response.getStatus() == 1);
             }
         }
+    }
+
+    @Test
+    public void testCallAllPartitionProcedureWithNoPartitionKey() throws Exception {
+        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionedTestProc");
+        validateResults(responses, 8);
+
+        responses = clientWithAffinity.callAllPartitionProcedure("PartitionedTestProc");
+        validateResults(responses, 8);
+    }
+
+    @Test
+    public void testCallAllPartitionSQLProcedureWithNoPartitionKey() throws Exception {
+        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionedSQLTestProc");
+        validateResults(responses, 8);
+
+        responses = clientWithAffinity.callAllPartitionProcedure("PartitionedSQLTestProc");
+        validateResults(responses, 8);
     }
 
     private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {

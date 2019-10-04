@@ -461,27 +461,49 @@ public class TestFuzzMeshArbiter
             int attempts = 50;
             int actualFails = 0;
 
-            while (--attempts > 0 && actualFails < expectedFails) {
+            if (expectedFails == 0) {
+                // There were no link failures, only dead hosts so remove
+                // the hosts here because the loop below won't even be entered
                 itr = m_nodes.entrySet().iterator();
                 while (itr.hasNext()) {
                     Map.Entry<Long, MiniNode> e = itr.next();
                     MiniNode node = e.getValue();
-                    int connectedCount =
-                            node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
-                    m_fuzzLog.debug("Connection count for "
-                            + CoreUtils.hsIdToString(e.getKey())
-                            + " is " + connectedCount);
-                    if (connectedCount == 0 || pruneSizes.contains(connectedCount)) {
-                        if (pruneSizes.contains(connectedCount)) {
-                            actualFails += 1;
-                        }
+                    if (node.getNodeState() == NodeState.STOP) {
+                        m_fuzzLog.debug("Connection count for dead host "
+                                + CoreUtils.hsIdToString(e.getKey())
+                                + " is " + 0);
                         removed.put(e.getKey(),e.getValue());
                         itr.remove();
                     }
+                    else {
+                        m_fuzzLog.debug("Connection count for "
+                                + CoreUtils.hsIdToString(e.getKey())
+                                + " is " + node.getConnectedNodes().size());
+                    }
                 }
-                Thread.sleep(100);
             }
-
+            else {
+                while (--attempts > 0 && actualFails < expectedFails) {
+                    itr = m_nodes.entrySet().iterator();
+                    while (itr.hasNext()) {
+                        Map.Entry<Long, MiniNode> e = itr.next();
+                        MiniNode node = e.getValue();
+                        int connectedCount =
+                                node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
+                        m_fuzzLog.debug("Connection count for "
+                                + CoreUtils.hsIdToString(e.getKey())
+                                + " is " + connectedCount);
+                        if (connectedCount == 0 || pruneSizes.contains(connectedCount)) {
+                            if (pruneSizes.contains(connectedCount)) {
+                                actualFails += 1;
+                            }
+                            removed.put(e.getKey(),e.getValue());
+                            itr.remove();
+                        }
+                    }
+                    Thread.sleep(100);
+                }
+            }
             assertEquals("timeout while waiting for mini node to catch up with minisite",expectedFails, actualFails);
 
             itr = m_nodes.entrySet().iterator();
@@ -561,7 +583,6 @@ public class TestFuzzMeshArbiter
     }
 
     @Test
-    @Flaky(isFlaky=true, description="TestFuzzMeshArbiter.testSimpleJoin: slightly flaky, fails rarely")
     public void testSimpleJoin() throws InterruptedException {
         m_rejoinLog.info("testSimpleJoin");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
@@ -600,7 +621,6 @@ public class TestFuzzMeshArbiter
     }
 
     @Test
-    @Flaky(isFlaky=true, description="TestFuzzMeshArbiter.testFuzz: still flaky, fails intermittently")
     public void testFuzz() throws InterruptedException
     {
         m_rejoinLog.info("testFuzz");

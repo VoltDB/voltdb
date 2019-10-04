@@ -317,7 +317,8 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         client.callProcedure("@AdHoc", insertSql.toString());
 
         startListener();
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        // Wait for tuples to be exported before verifying
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
 
         // must still be able to verify the export data.
         client.close();
@@ -497,6 +498,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
+        project.setFlushIntervals(100, 200, 200);
         wireupExportTableToSocketExport("EX");
         int numOfStreams = 2;
         if (MiscUtils.isPro()) {

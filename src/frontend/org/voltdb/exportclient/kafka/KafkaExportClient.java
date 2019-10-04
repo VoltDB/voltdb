@@ -41,6 +41,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -73,11 +75,12 @@ public class KafkaExportClient extends ExportClientBase {
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
 
     private final static int SHUTDOWN_TIMEOUT_MS = 10_000;
+    public final static String DEFAULT_EXPORT_PREFIX = "voltdbexport";
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
 
     Properties m_producerConfig;
-    String m_topicPrefix = "voltdbexport";
+    String m_topicPrefix = DEFAULT_EXPORT_PREFIX;
     Map<String, String> m_tableTopics;
 
     //Keep this default to false as people out there might depend on index in csv
@@ -176,7 +179,7 @@ public class KafkaExportClient extends ExportClientBase {
 
         String acksVal = config.getProperty(ProducerConfig.ACKS_CONFIG, "").trim();
         if (acksVal.isEmpty()) {
-            m_producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "0");
+            m_producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "-1");
         }
         m_pollFutures = !"0".equals(m_producerConfig.get(ProducerConfig.ACKS_CONFIG));
 
@@ -308,9 +311,13 @@ public class KafkaExportClient extends ExportClientBase {
                 .binaryEncoding(m_binaryEncoding)
                 .skipInternalFields(m_skipInternals)
             ;
-            m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " +
-                            source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                m_es = CoreUtils.getListeningSingleThreadExecutor(
+                        "Kafka Export decoder for partition " +
+                                source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+            } else {
+                m_es = null;
+            }
 
             m_decoder = builder.build();
             // Ensure each decoder uses its own properties (ENG-17657)
@@ -420,23 +427,29 @@ public class KafkaExportClient extends ExportClientBase {
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
-            m_es.shutdown();
-            try {
-                if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                    // In case we were misconfigured to a non-existent Kafka broker,
-                    // a decoder thread may be stuck on 'send' and we need to force it out.
-                    // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+            if (m_es != null) {
+                m_es.shutdown();
+                try {
+                    if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                        // In case we were misconfigured to a non-existent Kafka broker,
+                        // a decoder thread may be stuck on 'send' and we need to force it out.
+                        // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+                        forceExecutorShutdown();
+                    }
+                } catch (InterruptedException e) {
+                    // We are in the UAC path and don't want to throw exception for this condition;
+                    // just force the shutdown.
+                    LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
                     forceExecutorShutdown();
                 }
-            } catch (InterruptedException e) {
-                // We are in the UAC path and don't want to throw exception for this condition;
-                // just force the shutdown.
-                LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
-                forceExecutorShutdown();
             }
         }
 
         private void forceExecutorShutdown() {
+            if (m_es == null) {
+                return;
+            }
+
             LOG.warn("Forcing executor shutdown on source: " + m_source);
             try {
                 m_es.shutdownNow();

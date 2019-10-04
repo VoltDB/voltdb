@@ -960,4 +960,8 @@ public class MockVoltDB implements VoltDBInterface
     public TaskManager getTaskManager() {
         return null;
     }
+
+    @Override
+    public void notifyOfShutdown() {
+     }
 }

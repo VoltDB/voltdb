@@ -14,8 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_EXPRESSIONS_DATECONSTANTS_H
-#define SRC_EE_EXPRESSIONS_DATECONSTANTS_H
+#pragma once
 
 #include "boost/date_time/gregorian/greg_date.hpp"
 #include "boost/date_time/posix_time/posix_time_types.hpp"
@@ -32,4 +31,4 @@
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  //  1583-01-01 00:00:00
 static const int64_t NYE9999         = 253402300799999999;  //  9999-12-31 23:59:59.999999
-#endif /* defined(SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_) */
+

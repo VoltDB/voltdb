@@ -163,7 +163,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target partitioned_target
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -201,7 +201,7 @@ CREATE TABLE ex_partview_shadow (
 );
 PARTITION TABLE ex_partview_shadow ON COLUMN cid;
 
-CREATE STREAM replicated_export export to target default
+CREATE STREAM replicated_export export to target replicated_target
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -423,7 +423,7 @@ CREATE TABLE importbr
 );
 
 -- TTL with migrate to stream -- partitioned
-CREATE TABLE ttlmigratep MIGRATE TO TARGET abc1
+CREATE TABLE ttlmigratep MIGRATE TO TARGET ttlmigratep_target
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
@@ -435,7 +435,7 @@ PARTITION TABLE ttlmigratep ON COLUMN p;
 CREATE INDEX ttlmigrateidxp ON ttlmigratep(ts) WHERE NOT MIGRATING;
 
 -- TTL with migrate to stream -- replicated
-CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
+CREATE TABLE ttlmigrater MIGRATE TO TARGET ttlmigrater_target
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
@@ -444,6 +444,28 @@ CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
 , CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
 ) USING TTL 30 SECONDS ON COLUMN ts;
 CREATE INDEX ttlmigrateidxr ON ttlmigrater(ts) WHERE NOT MIGRATING;
+
+-- Table for scheduled task -- partitioned
+CREATE TABLE taskp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_taskp PRIMARY KEY (p,id)
+);
+PARTITION TABLE taskp ON COLUMN p;
+
+-- Table for scheduled task -- replicated
+CREATE TABLE taskr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_taskr PRIMARY KEY (p,id)
+);
+
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -454,71 +476,68 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 
 -- real procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedSP;
-PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE partitioned COLUMN cid FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBothMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMPInProcAdHoc;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSP;
-PARTITION PROCEDURE ReadSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE partitioned COLUMN cid FROM CLASS txnIdSelfCheck.procedures.ReadSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
-PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE partitioned COLUMN cid FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
-PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
+CREATE PROCEDURE PARTITION ON TABLE bigp COLUMN p FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATEPTableInsert;
+
+CREATE PROCEDURE PARTITION ON TABLE ttlmigratep COLUMN p FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATEPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATERTableInsert;
-PARTITION PROCEDURE TTLMIGRATEPTableInsert ON TABLE ttlmigratep COLUMN p;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
-PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
+
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TASKRTableInsert;
+CREATE PROCEDURE PARTITION ON TABLE taskp COLUMN p FROM CLASS txnIdSelfCheck.procedures.TASKPTableInsert;
+
+CREATE PROCEDURE PARTITION ON TABLE partitioned COLUMN cid FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
-PARTITION PROCEDURE CopyLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE cploadp COLUMN cid FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedSP;
-PARTITION PROCEDURE DeleteLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE cploadp COLUMN cid FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
-PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSPW;
-PARTITION PROCEDURE DeleteOnlyLoadTableSPW ON TABLE T_PAYMENT50 COLUMN pid;
+CREATE PROCEDURE PARTITION ON TABLE loadp COLUMN cid FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
+CREATE PROCEDURE PARTITION ON TABLE T_PAYMENT50 COLUMN pid FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSPW;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
-PARTITION PROCEDURE TRUPTableInsert ON TABLE trup COLUMN p;
+CREATE PROCEDURE PARTITION ON TABLE trup COLUMN p FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURSwapTables;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
-PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE PARTITION ON TABLE trup COLUMN p FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPTableInsert;
-PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
+CREATE PROCEDURE PARTITION ON TABLE capp COLUMN p FROM CLASS txnIdSelfCheck.procedures.CAPPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
-PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
-PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
-PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
+CREATE PROCEDURE PARTITION ON TABLE capp COLUMN p FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
+CREATE PROCEDURE PARTITION ON TABLE importp COLUMN cid PARAMETER 3 FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
+-- PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
+-- same table -- how does this work in combined statement? PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
-PARTITION PROCEDURE NIBDPTableInsert ON TABLE nibdp COLUMN p;
+CREATE PROCEDURE PARTITION ON TABLE nibdp COLUMN p FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDRTableInsert;
+
+-- procedures used by the scheduled TASKs defined below
+CREATE PROCEDURE deleteSomeP DIRECTED AS DELETE FROM taskp WHERE ts < DATEADD(SECOND, ?, NOW);
+CREATE PROCEDURE deleteSomeR AS DELETE FROM taskr WHERE ts < DATEADD(SECOND, ?, NOW);
 
 -- functions
 CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
 CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
 CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
 
-
 END_OF_BATCH
+-- tasks
+CREATE TASK taskDeleteP ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeP WITH (-100) ON ERROR LOG RUN ON PARTITIONS;
+CREATE TASK taskDeleteR ON SCHEDULE DELAY 1 MILLISECONDS PROCEDURE deleteSomeR WITH (-100) ON ERROR LOG;
+

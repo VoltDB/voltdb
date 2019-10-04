@@ -24,13 +24,13 @@
 namespace voltdb {
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
-    if (getValueType() != VALUE_TYPE_BIGINT) {
+    if (getValueType() != ValueType::tBIGINT) {
         // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITNOT function");
     }
 
     if (isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t result = ~(getBigInt());
@@ -44,7 +44,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
 }
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
-    if (getValueType() != VALUE_TYPE_BIGINT) {
+    if (getValueType() != ValueType::tBIGINT) {
         // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL HEX function");
     }
@@ -61,7 +61,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
 }
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_BIN>() const {
-    if (getValueType() != VALUE_TYPE_BIGINT) {
+    if (getValueType() != ValueType::tBIGINT) {
         // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIN function");
     }
@@ -93,12 +93,12 @@ template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& ar
     vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
-    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+    if (lval.getValueType() != ValueType::tBIGINT || rval.getValueType() != ValueType::tBIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITAND function");
     }
 
     if (lval.isNull() || rval.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t lv = lval.getBigInt();
@@ -118,12 +118,12 @@ template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arg
     vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
-    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+    if (lval.getValueType() != ValueType::tBIGINT || rval.getValueType() != ValueType::tBIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITOR function");
     }
 
     if (lval.isNull() || rval.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t lv = lval.getBigInt();
@@ -143,12 +143,12 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
     vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
-    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+    if (lval.getValueType() != ValueType::tBIGINT || rval.getValueType() != ValueType::tBIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITXOR function");
     }
 
     if (lval.isNull() || rval.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t lv = lval.getBigInt();
@@ -167,14 +167,14 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vector<NValue>& arguments) {
     vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
-    if (lval.getValueType() != VALUE_TYPE_BIGINT) {
+    if (lval.getValueType() != ValueType::tBIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_LEFT function");
     }
 
     const NValue& rval = arguments[1];
 
     if (lval.isNull() || rval.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t lv = lval.getBigInt();
@@ -201,14 +201,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vecto
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vector<NValue>& arguments) {
     vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
-    if (lval.getValueType() != VALUE_TYPE_BIGINT) {
+    if (lval.getValueType() != ValueType::tBIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_RIGHT function");
     }
 
     const NValue& rval = arguments[1];
 
     if (lval.isNull() || rval.isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     int64_t lv = lval.getBigInt();
@@ -241,7 +241,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
  * function inet_ntop.
  */
 template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
-    if (getValueType() != VALUE_TYPE_BIGINT) {
+    if (getValueType() != ValueType::tBIGINT) {
         // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-BIGINT type for SQL INET_NTOA function");
     }
@@ -281,11 +281,11 @@ template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
  * restrictions on the function.
  */
 template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
-    if (getValueType() != VALUE_TYPE_VARCHAR) {
+    if (getValueType() != ValueType::tVARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET_ATON function");
     }
     if (isNull()) {
-        return getNullValue(VALUE_TYPE_BIGINT);
+        return getNullValue(ValueType::tBIGINT);
     }
 
     in_addr addr;
@@ -319,11 +319,11 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
  * below.
  */
 template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
-    if (getValueType() != VALUE_TYPE_VARBINARY) {
+    if (getValueType() != ValueType::tVARBINARY) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for SQL INET6_NTOA function");
     }
     if (isNull()) {
-        return getNullValue(VALUE_TYPE_VARCHAR);
+        return getNullValue(ValueType::tVARCHAR);
     }
     int32_t addr_len;
     const in6_addr *addr = (const in6_addr *)getObject_withoutNull(addr_len);
@@ -350,10 +350,10 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
  * less significant bits in the output.
  */
 template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
-    if (getValueType() != VALUE_TYPE_VARCHAR) {
+    if (getValueType() != ValueType::tVARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET6_ATON function");
     } else if (isNull()) {
-        return getNullValue(VALUE_TYPE_VARBINARY);
+        return getNullValue(ValueType::tVARBINARY);
     }
 
     int32_t addrlen;
@@ -377,7 +377,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
         sb << "Unrecognized format for IPv6 address string <" << cbuff << ">";
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());
+    return NValue::getAllocatedValue(ValueType::tVARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());
 }
 
 }

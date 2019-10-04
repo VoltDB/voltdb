@@ -23,6 +23,7 @@ package org.voltdb.task;
  */
 public final class SingleProcGenerator implements ActionGenerator {
     private Action m_action;
+    private boolean m_isReadOnly;
 
     public static String validateParameters(TaskHelper helper, String procedure, Object... procedureParameters) {
         TaskValidationErrors errors = new TaskValidationErrors();
@@ -32,6 +33,7 @@ public final class SingleProcGenerator implements ActionGenerator {
 
     public void initialize(TaskHelper helper, String procedure, Object... procedureParameters) {
         m_action = Action.createProcedure(r -> m_action, procedure, procedureParameters);
+        m_isReadOnly = helper.isProcedureReadOnly(procedure);
     }
 
     @Override
@@ -42,5 +44,10 @@ public final class SingleProcGenerator implements ActionGenerator {
     @Override
     public Action getFirstAction() {
         return m_action;
+    }
+
+    @Override
+    public boolean isReadOnly() {
+        return m_isReadOnly;
     }
 }

@@ -47,6 +47,7 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.exportclient.SocketExporter;
+import org.voltdb.exportclient.SocketExporterLegacy;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -1094,13 +1095,22 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test(timeout = 120_000)
     public void testRejoinWithOnlyAStream() throws Exception {
+        testRejoinWithOnlyAStreamCommon(SocketExporter.class.getName());
+    }
+
+    @Test(timeout = 120_000)
+    public void testRejoinWithOnlyAStreamLegacy() throws Exception {
+        testRejoinWithOnlyAStreamCommon(SocketExporterLegacy.class.getName());
+    }
+
+    private void testRejoinWithOnlyAStreamCommon(String exportClassName) throws Exception {
         SocketExportTestServer socketServer = new SocketExportTestServer(5001);
 
         LocalCluster lc = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
         lc.overrideAnyRequestForValgrind();
         VoltProjectBuilder vpb = new VoltProjectBuilder();
         vpb.setUseDDLSchema(true);
-        vpb.addExport(true, ServerExportEnum.CUSTOM, SocketExporter.class.getName(), new Properties(),
+        vpb.addExport(true, ServerExportEnum.CUSTOM, exportClassName, new Properties(),
                 "exporter");
         assertTrue(lc.compile(vpb));
         lc.setHasLocalServer(false);

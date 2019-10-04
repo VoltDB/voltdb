@@ -240,7 +240,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (m_limit_node != NULL) {
-        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
+        std::tie(limit, offset) = m_limit_node->getLimitAndOffset(params);
     }
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
     CountingPostfilter postfilter(m_tmpOutputTable, NULL, limit, offset);
