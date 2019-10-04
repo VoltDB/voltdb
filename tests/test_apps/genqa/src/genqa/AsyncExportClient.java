@@ -436,28 +436,6 @@ public class AsyncExportClient
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
                 if (config.usemigrateonly && r.nextBoolean()) {
                     trigger_migrate(r.nextInt(10)); // vary the migrate/delete interval a little
-                /************
-                    try {
-                        int i = r.nextInt(10);
-                        // if (i == 1) // to reduce output clutter log about 1 in 10 cycles, 1 in 20 actually, considering the rand bool above
-                        //     log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
-                        long result = 0;
-                        if (config.procedure.equals("JiggleExportSinglePartition"))
-                            result = clientRef.get().callProcedure("MigratePartitionedExport", i).getResults()[0].asScalarLong();
-                        else
-                            result = clientRef.get().callProcedure("MigrateReplicatedExport", i).getResults()[0].asScalarLong();
-                        log.info("Migrate Result: " + result);
-
-                        // clientRef.get().callProcedure(
-                        //         new NullCallback(),
-                        //         "MigrateExport", -i);
-                    }
-                    catch (Exception e) {
-                        log.fatal("Exception: " + e);
-                        e.printStackTrace();
-                        System.exit(-1);
-                    }
-                ************/
                 }
 
                 swap_count++;
