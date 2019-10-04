@@ -33,7 +33,6 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 
-#include "test_utils/ScopedTupleSchema.hpp"
 #include "test_utils/Tools.hpp"
 #include "test_utils/UniqueEngine.hpp"
 

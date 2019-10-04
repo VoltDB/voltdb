@@ -1695,7 +1695,7 @@ private:
 
         // Offset 1 byte for the length prefix
         char* storageContent = storage + SHORT_OBJECT_LENGTH;
-        // Always reset all the bits regardless of the actual length of the value.
+        // Reset all the control bits.
         ::memset(storageContent + length, 0, maxLength - length);
         if (storageContent != buf) {
             vassert(maxLength >= length);

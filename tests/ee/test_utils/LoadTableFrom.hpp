@@ -46,7 +46,6 @@
 #include "storage/tablefactory.h"
 #include "common/TupleSchemaBuilder.h"
 
-#include "test_utils/ScopedTupleSchema.hpp"
 #include "common/debuglog.h"
 
 #ifdef VOLT_TRACE_ENABLED

@@ -22,7 +22,6 @@
  */
 
 #include "harness.h"
-#include "test_utils/ScopedTupleSchema.hpp"
 #include "test_utils/Tools.hpp"
 #include "test_utils/TupleComparingTest.hpp"
 
