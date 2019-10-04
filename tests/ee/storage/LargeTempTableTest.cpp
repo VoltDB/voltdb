@@ -80,13 +80,14 @@ TEST_F(LargeTempTableTest, Basic) {
     auto schema = Tools::buildSchema(ValueType::tBIGINT,
             ValueType::tDOUBLE,
             std::make_pair(ValueType::tVARCHAR, 15),
-            std::make_pair(ValueType::tVARCHAR, 128));
+            std::make_pair(ValueType::tVARCHAR, 128))
+        .release();
     std::vector<std::string> columnNames{
         "pk", "val", "inline_text", "noninline_text"
     };
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
-        schema.get(),
+        schema,
         columnNames));
 
     TableTuple tuple = ltt->tempTuple();
@@ -194,12 +195,13 @@ TEST_F(LargeTempTableTest, MultiBlock) {
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),   // 61
-            std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN)); //  8 (pointer to non-inlined)
+            std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN))
+        .release(); //  8 (pointer to non-inlined)
     // --> Tuple length is 272 bytes (not counting non-inlined data)
 
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
-        schema.get(),
+        schema,
         names));
 
     TableTuple tuple = ltt->tempTuple();
@@ -341,14 +343,15 @@ TEST_F(LargeTempTableTest, OverflowCache) {
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
             std::make_pair(ValueType::tVARCHAR, INLINE_LEN),
-            std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN));
+            std::make_pair(ValueType::tVARCHAR, NONINLINE_LEN))
+        .release();
 
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
-        schema.get(),
+        schema,
         names));
 
-    StandAloneTupleStorage tupleWrapper(schema.get());
+    StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
     ASSERT_EQ(0, lttBlockCache.numPinnedEntries());
 
@@ -428,9 +431,9 @@ TEST_F(LargeTempTableTest, basicBlockCache) {
         .setTopend(std::move(topend))
         .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
         .build();
-    auto schema = Tools::buildSchema(ValueType::tBIGINT, ValueType::tDOUBLE);
+    auto schema = Tools::buildSchema(ValueType::tBIGINT, ValueType::tDOUBLE).release();
     LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    LargeTempTableBlock* block = lttBlockCache.getEmptyBlock(schema.get());
+    LargeTempTableBlock* block = lttBlockCache.getEmptyBlock(schema);
     LargeTempTableBlockId blockId = block->id();
 
     ASSERT_NE(NULL, block);
@@ -465,9 +468,9 @@ TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
     LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     typedef std::tuple<int64_t, std::string> StdTuple;
-    auto schema = Tools::buildSchema<StdTuple>();
+    auto schema = Tools::buildSchema<StdTuple>().release();
     std::vector<std::string> names{"id", "str"};
-    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable("ltmp", schema.get(), names));
+    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable("ltmp", schema, names));
 
     ASSERT_EQ(0, ltt->activeTupleCount());
     ASSERT_EQ(0, ltt->allocatedBlockCount());
