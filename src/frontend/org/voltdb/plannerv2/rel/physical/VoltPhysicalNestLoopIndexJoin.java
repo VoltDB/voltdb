@@ -40,14 +40,12 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;

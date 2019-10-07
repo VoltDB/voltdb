@@ -215,6 +215,48 @@ public class TestCalciteJoinsSuite extends RegressionSuite {
             {4,6,5,4},
             {4,7,5,4}
         });
+
+        // Make sure all transient BOOLEAN columns (and expressions based on them) in TEMP tables
+        // are replaced with TINYINT 0 and 1
+        query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R4 INNER JOIN R3 " +
+                "ON R3.A = 3 order by 1, 2, 3, 4;";
+
+        checkQueryPlan(client, query,"NESTLOOP INDEX INNER JOIN");
+        validateTableOfLongs(client, query, new long[][]{
+            {3,4,1,10},
+            {3,4,2,2},
+            {3,4,3,2},
+            {3,4,4,2},
+            {3,4,5,4},
+            {3,4,6,6}
+        });
+
+        query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R4 INNER JOIN R3 " +
+                "ON R3.C = 4 order by 1, 2, 3, 4;";
+
+        checkQueryPlan(client, query,"NEST LOOP INNER JOIN");
+        validateTableOfLongs(client, query, new long[][]{
+            {3,4,1,10},
+            {3,4,2,2},
+            {3,4,3,2},
+            {3,4,4,2},
+            {3,4,5,4},
+            {3,4,6,6}
+        });
+
+        query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R4, R3 " +
+                "WHERE R3.C = 4 order by 1, 2, 3, 4;";
+
+        checkQueryPlan(client, query,"NEST LOOP INNER JOIN");
+        validateTableOfLongs(client, query, new long[][]{
+            {3,4,1,10},
+            {3,4,2,2},
+            {3,4,3,2},
+            {3,4,4,2},
+            {3,4,5,4},
+            {3,4,6,6}
+        });
+
     }
 
     private void subtestUsingFullJoin(Client client) throws Exception {
