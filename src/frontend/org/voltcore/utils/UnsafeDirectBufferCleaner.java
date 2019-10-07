@@ -30,9 +30,16 @@ import java.nio.ByteBuffer;
 public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
     /** Cleaner method. */
     private final Method invokeCleanerMtd;
+    private final Method cleanerMtd;
 
     /** */
     public UnsafeDirectBufferCleaner() {
+        try {
+            cleanerMtd = Class.forName("sun.nio.ch.DirectBuffer").getMethod("cleaner");
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            throw new RuntimeException("No sun.nio.ch.DirectBuffer.cleaner() method found", e);
+        }
+
         try {
             invokeCleanerMtd = Unsafe.class.getMethod("invokeCleaner", ByteBuffer.class);
         } catch (NoSuchMethodException e) {
@@ -42,7 +49,15 @@ public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
 
     @Override
     public boolean clean(ByteBuffer buf) {
-        VoltUnsafe.invoke(invokeCleanerMtd, buf);
-        return true;
+        try {
+            Object cleaner = cleanerMtd.invoke(buf);
+            if (cleaner == null) {
+                return false;
+            }
+            VoltUnsafe.invoke(invokeCleanerMtd, buf);
+            return true;
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException("Failed to invoke direct buffer cleaner", e);
+        }
     }
 }
