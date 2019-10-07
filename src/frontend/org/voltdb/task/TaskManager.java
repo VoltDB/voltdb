@@ -39,6 +39,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -653,9 +654,9 @@ public final class TaskManager {
         return Pair.of(null, new InitializableFactory<>(constructor, initMethod, parameters, takesHelper, hash));
     }
 
-    ListenableFuture<?> execute(Runnable runnable) {
+    private ListenableFuture<?> execute(Runnable runnable) {
         try {
-            return addExceptionListener(m_managerExecutor.submit(runnable));
+            return addExceptionListener(m_managerExecutor.submit(runnable), null);
         } catch (RejectedExecutionException e) {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("NONE", "Could not execute " + runnable), e);
@@ -664,9 +665,9 @@ public final class TaskManager {
         }
     }
 
-    <T> ListenableFuture<T> execute(Callable<T> callable) {
+    private <T> ListenableFuture<T> execute(Callable<T> callable) {
         try {
-            return addExceptionListener(m_managerExecutor.submit(callable));
+            return addExceptionListener(m_managerExecutor.submit(callable), null);
         } catch (RejectedExecutionException e) {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("NONE", "Could not execute " + callable), e);
@@ -679,14 +680,19 @@ public final class TaskManager {
         return m_authSystem.getUser(userName);
     }
 
-    static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future) {
+    static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future,
+            Consumer<Throwable> exceptionHandler) {
         future.addListener(() -> {
             try {
                 if (!future.isCancelled()) {
                     future.get();
                 }
-            } catch (Exception e) {
-                log.error(generateLogMessage("NONE", "Unexpected exception encountered"), e);
+            } catch (Throwable t) {
+                if (exceptionHandler == null) {
+                    log.error(generateLogMessage("NONE", "Unexpected exception encountered"), t);
+                } else {
+                    exceptionHandler.accept(t);
+                }
             }
         }, MoreExecutors.newDirectExecutorService());
         return future;
@@ -1568,6 +1574,19 @@ public final class TaskManager {
             }
 
             return procedure;
+        }
+
+        ListenableFuture<?> addExceptionListener(ListenableFuture<?> future) {
+            return TaskManager.addExceptionListener(future, this::errorOccurred);
+        }
+
+        /**
+         * Log an error message and shutdown the scheduler with the error state
+         *
+         * @param t Throwable to log with the error message
+         */
+        void errorOccurred(Throwable t) {
+            errorOccurred("Task encountered an unexpected error", t);
         }
 
         /**
