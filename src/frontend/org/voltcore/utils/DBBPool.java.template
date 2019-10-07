@@ -21,7 +21,6 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -490,55 +489,6 @@ public final class DBBPool {
                 DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
                 crash("Failed to deallocate direct byte buffer", false, e);
-            }
-        }
-    }
-
-    public static RefCountedDirectBBContainer allocateRefCountedDirect(final int capacity) {
-        ByteBuffer retval = null;
-        try {
-            retval = ByteBuffer.allocateDirect(capacity);
-        } catch (OutOfMemoryError e) {
-            if (e.getMessage().contains("Direct buffer memory")) {
-                clear();
-                retval = ByteBuffer.allocateDirect(capacity);
-            } else {
-                throw e;
-            }
-        }
-        bytesAllocatedGlobally.getAndAdd(capacity);
-        logAllocation(capacity);
-        return new RefCountedDirectBBContainer(retval);
-    }
-    
-    public static class RefCountedDirectBBContainer extends BBContainer {
-        /**
-         * Count of how many threads own a reference to this buffer.
-         */
-        private final AtomicInteger m_refCount = new AtomicInteger(1);
-        private RefCountedDirectBBContainer(ByteBuffer buf) {
-            super(buf);
-        }
-        @Override
-        public void discard() {
-            HOST.fatal("discard may not be called directly for reference counted buffers. Use release.");
-            System.exit(-1);
-        }
-
-        public boolean acquire() {
-            return m_refCount.getAndIncrement() > 0;
-        }
-
-        public void release() {
-            if (m_refCount.decrementAndGet() == 0) {
-                final ByteBuffer buf = checkDoubleFree();
-                try {
-                    bytesAllocatedGlobally.getAndAdd(-buf.capacity());
-                    logDeallocation(buf.capacity());
-                    DBBPool.cleanByteBuffer(buf);
-                } catch (Throwable e) {
-                    crash("Failed to deallocate direct byte buffer", false, e);
-                }
             }
         }
     }
