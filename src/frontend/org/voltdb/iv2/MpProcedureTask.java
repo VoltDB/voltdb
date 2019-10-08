@@ -170,8 +170,6 @@ public class MpProcedureTask extends ProcedureTask
                 hostLog.debug("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
                         " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
-            hostLog.info("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
-                    " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         if (hostLog.isDebugEnabled()) {
@@ -224,13 +222,11 @@ public class MpProcedureTask extends ProcedureTask
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("[MpProcedureTask] COMPLETE: " + this);
                 }
-                hostLog.info("[MpProcedureTask] COMPLETE: " + this);
             } else {
                 restartTransaction();
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("[MpProcedureTask] RESTART: " + this);
                 }
-                hostLog.info("[MpProcedureTask] RESTART: " + this);
             }
         }
 

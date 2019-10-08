@@ -360,4 +360,15 @@ public interface VoltDBInterface
      * notify surviving node upon shutting itself down
      */
     public void notifyOfShutdown();
+
+    /**
+     * Inject a fault (exception or crashLocalDB) in system procedures
+     */
+    public void injectFault(SysprocFaultInjection injection);
+
+    /**
+     * Get the injected fault
+     * @return SysprocFaultInjection
+     */
+    public SysprocFaultInjection getInjectedFault();
 }

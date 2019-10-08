@@ -64,6 +64,7 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.SysprocFaultInjection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
@@ -631,6 +632,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public InitiatorMailbox getInitiatorMailbox() {
             return m_initiatorMailbox;
+        }
+
+        @Override
+        public SysprocFaultInjection getInjectedFault() {
+            return VoltDB.instance().getInjectedFault();
         }
     };
 
