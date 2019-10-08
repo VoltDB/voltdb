@@ -18,7 +18,6 @@
 package org.voltcore.utils;
 import sun.misc.Unsafe;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
@@ -30,16 +29,9 @@ import java.nio.ByteBuffer;
 public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
     /** Cleaner method. */
     private final Method invokeCleanerMtd;
-    private final Method cleanerMtd;
 
     /** */
     public UnsafeDirectBufferCleaner() {
-        try {
-            cleanerMtd = Class.forName("sun.nio.ch.DirectBuffer").getMethod("cleaner");
-        } catch (ClassNotFoundException | NoSuchMethodException e) {
-            throw new RuntimeException("No sun.nio.ch.DirectBuffer.cleaner() method found", e);
-        }
-
         try {
             invokeCleanerMtd = Unsafe.class.getMethod("invokeCleaner", ByteBuffer.class);
         } catch (NoSuchMethodException e) {
@@ -49,15 +41,7 @@ public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
 
     @Override
     public boolean clean(ByteBuffer buf) {
-        try {
-            Object cleaner = cleanerMtd.invoke(buf);
-            if (cleaner == null) {
-                return false;
-            }
-            VoltUnsafe.invoke(invokeCleanerMtd, buf);
-            return true;
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException("Failed to invoke direct buffer cleaner", e);
-        }
+        VoltUnsafe.invoke(invokeCleanerMtd, buf);
+        return true;
     }
 }

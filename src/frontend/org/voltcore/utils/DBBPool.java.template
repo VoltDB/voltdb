@@ -241,7 +241,27 @@ public final class DBBPool {
             DBBPool.cleanByteBuffer(buf);
         }
     }
-    
+
+    /**
+     * Wrapper for native allocated direct memory
+     *
+     */
+    public static final class NDBBWrapperContainer extends BBContainer {
+        private NDBBWrapperContainer(ByteBuffer b) {
+            super( b );
+        }
+
+        @Override
+        public final void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            if (buf == null || !buf.isDirect()) {
+               return;
+            }
+            final DirectBuffer dbuf = (DirectBuffer) buf;
+            deleteCharArrayMemory(dbuf.address());
+        }
+    }
+
     public static class DBBDelegateContainer extends BBContainer {
         protected final BBContainer m_delegate;
         
@@ -563,7 +583,7 @@ public final class DBBPool {
     private static native void nativeDeleteCharArrayMemory(long pointer);
 
     public static BBContainer allocateUnsafeByteBuffer(long size) {
-        final BBContainer retcont = DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
+        final BBContainer retcont = new NDBBWrapperContainer(nativeAllocateUnsafeByteBuffer(size));
 #ifdef MEMCHECK_FULL
         final long pointer = retcont.address();
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
@@ -585,11 +605,10 @@ public final class DBBPool {
      * called deleteCharArrayMemory on the address
      */
     private static void cleanByteBuffer(ByteBuffer buf) {
-        if (buf == null) return;
-        if (!buf.isDirect()) return;
-        final DirectBuffer dbuf = (DirectBuffer) buf;
-        if (!VoltUnsafe.cleanDirectBuffer(buf)) {
-            deleteCharArrayMemory(dbuf.address());
+        if (buf == null || !buf.isDirect()) {
+            return;
         }
+        final DirectBuffer dbuf = (DirectBuffer) buf;
+        VoltUnsafe.cleanDirectBuffer(buf);
     }
 }
