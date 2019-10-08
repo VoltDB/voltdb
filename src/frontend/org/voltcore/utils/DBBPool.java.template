@@ -609,6 +609,8 @@ public final class DBBPool {
             return;
         }
         final DirectBuffer dbuf = (DirectBuffer) buf;
-        VoltUnsafe.cleanDirectBuffer(buf);
+        if (!VoltUnsafe.cleanDirectBuffer(buf)) {
+            deleteCharArrayMemory(dbuf.address());
+        }
     }
 }
