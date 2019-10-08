@@ -15,12 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#ifndef EE_COMMON_GEOGRAPHY_VALUE_HPP
+#define EE_COMMON_GEOGRAPHY_VALUE_HPP
 
 #include <memory>
 #include <sstream>
 #include <vector>
 
+#include "boost/foreach.hpp"
 #include "boost/functional/hash.hpp"
 
 #include "common/serializeio.h"
@@ -40,7 +42,11 @@ class GeographyValue;
 class Loop : public S2Loop {
 public:
 
-    Loop() = default;
+    Loop()
+        : S2Loop()
+    {
+    }
+
     template<class Deserializer>
     void initFromBuffer(Deserializer& input, bool doRepairs = false);
 
@@ -63,7 +69,11 @@ public:
 class Polygon : public S2Polygon {
 public:
 
-    Polygon() = default;
+    Polygon()
+        : S2Polygon()
+    {
+    }
+
     void init(std::vector<std::unique_ptr<S2Loop> > *loops, bool doRepairs);
 
     void initFromGeography(const GeographyValue& geog, bool doRepairs = false);
@@ -98,25 +108,33 @@ public:
  * the data just after the length.
  */
 class GeographyValue {
-    const char* m_data = nullptr;
-    int32_t m_length = 0;
 public:
 
     /** Constructor for a null geography */
-    GeographyValue() = default;
-
-    GeographyValue(const char* data, int32_t length)
-        : m_data(data) , m_length(length) { }
-
-    bool isNull() const {
-        return m_data == nullptr;
+    GeographyValue()
+        : m_data(NULL)
+        , m_length(0)
+    {
     }
 
-    const char* data() const {
+    GeographyValue(const char* data, int32_t length)
+        : m_data(data)
+        , m_length(length)
+    {
+    }
+
+    bool isNull() const
+    {
+        return m_data == NULL;
+    }
+
+    const char* data() const
+    {
         return m_data;
     }
 
-    int32_t length() const {
+    int32_t length() const
+    {
         return m_length;
     }
 
@@ -138,13 +156,15 @@ public:
      * the target storage appropriately.
      */
     template<class Deserializer>
-    static void deserializeFrom(Deserializer& input, char* storage, int32_t length);
+    static void deserializeFrom(Deserializer& input,
+                                char* storage,
+                                int32_t length);
 
     /**
      * Hash this geography value (used for hash aggregation where a
      * geography is group by key).
      */
-    size_t hashCombine(std::size_t seed) const;
+    void hashCombine(std::size_t& seed) const;
 
     /**
      * Produce a human-readable summary of this geography
@@ -153,6 +173,10 @@ public:
     // returns wkt representation for given polygon:
     // "POLYGON ((<Longitude> <Latitude>, <Longitude> <Latitude> .. <Longitude> <Latitude>)[,(..), (..),..(..)])"
     std::string toWKT() const;
+
+private:
+    const char* m_data;
+    int32_t m_length;
 };
 
 /**
@@ -160,22 +184,16 @@ public:
  * do any byte-swapping.
  */
 class SimpleOutputSerializer {
-    template<typename T>
-    void writeNative(T val) {
-        vassert(m_cursor - m_buffer < m_size);
-        reinterpret_cast<T*>(m_cursor)[0] = val;
-        m_cursor += sizeof(T);
-    }
-
-    char* const m_buffer;
-    const std::size_t m_size;
-
-    char* m_cursor;
 public:
     SimpleOutputSerializer(char* const buffer, std::size_t size)
-        : m_buffer(buffer) , m_size(size) , m_cursor(buffer) { }
+        : m_buffer(buffer)
+        , m_size(size)
+        , m_cursor(buffer)
+    {
+    }
 
-    ~SimpleOutputSerializer() {
+    ~SimpleOutputSerializer()
+    {
         // make sure we consumed everything we expected to.
         vassert(m_buffer + m_size == m_cursor);
     }
@@ -207,6 +225,20 @@ public:
             << ", current offset = " << (m_cursor - m_buffer);
         return oss.str();
     }
+
+private:
+
+    template<typename T>
+    void writeNative(T val) {
+        vassert(m_cursor - m_buffer < m_size);
+        reinterpret_cast<T*>(m_cursor)[0] = val;
+        m_cursor += sizeof(T);
+    }
+
+    char* const m_buffer;
+    const std::size_t m_size;
+
+    char* m_cursor;
 };
 
 inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
@@ -231,7 +263,9 @@ inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
 
     if (lhsPoly.num_loops() < rhsPoly.num_loops()) {
         return VALUE_COMPARE_LESSTHAN;
-    } else if (lhsPoly.num_loops() > rhsPoly.num_loops()) {
+    }
+
+    if (lhsPoly.num_loops() > rhsPoly.num_loops()) {
         return VALUE_COMPARE_GREATERTHAN;
     }
 
@@ -243,7 +277,9 @@ inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
 
         if (lhsLoop->num_vertices() < rhsLoop->num_vertices()) {
             return VALUE_COMPARE_LESSTHAN;
-        } else if (lhsLoop->num_vertices() > rhsLoop->num_vertices()) {
+        }
+
+        if (lhsLoop->num_vertices() > rhsLoop->num_vertices()) {
             return VALUE_COMPARE_GREATERTHAN;
         }
     }
@@ -268,12 +304,12 @@ inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
 }
 
 
-inline size_t GeographyValue::hashCombine(std::size_t seed) const {
+inline void GeographyValue::hashCombine(std::size_t& seed) const {
 
     if (isNull()) {
         // Treat a null as a polygon with zero loops
         boost::hash_combine(seed, 0);
-        return seed;
+        return;
     }
 
     Polygon poly;
@@ -290,7 +326,6 @@ inline size_t GeographyValue::hashCombine(std::size_t seed) const {
             boost::hash_combine(seed, v.z());
         }
     }
-    return seed;
 }
 
 inline std::string GeographyValue::toString() const {
@@ -298,7 +333,8 @@ inline std::string GeographyValue::toString() const {
 
     if (isNull()) {
         oss << "null polygon";
-    } else {
+    }
+    else {
         Polygon poly;
         poly.initFromGeography(*this);
         int numLoops = poly.num_loops();
@@ -359,13 +395,17 @@ inline std::string GeographyValue::toWKT() const {
 }
 
 template<class Deserializer>
-inline void GeographyValue::deserializeFrom(Deserializer& input, char* storage, int32_t length) {
+inline void GeographyValue::deserializeFrom(Deserializer& input,
+                                       char* storage,
+                                       int32_t length)
+{
     SimpleOutputSerializer output(storage, length);
     Polygon::copyViaSerializers(output, input);
 }
 
 template<class Serializer>
-inline void GeographyValue::serializeTo(Serializer& output) const {
+inline void GeographyValue::serializeTo(Serializer& output) const
+{
     ReferenceSerializeInputLE input(m_data, m_length);
     Polygon::copyViaSerializers(output, input);
 }
@@ -380,7 +420,8 @@ const std::size_t BOUND_SERIALIZED_SIZE =
 
 
 template<class Deserializer>
-static inline void initBoundFromBuffer(S2LatLngRect *bound, Deserializer& input) {
+static inline void initBoundFromBuffer(S2LatLngRect *bound, Deserializer& input)
+{
     input.readByte(); // encoding version
 
     double latLo = input.readDouble();
@@ -391,7 +432,8 @@ static inline void initBoundFromBuffer(S2LatLngRect *bound, Deserializer& input)
 }
 
 template<class Serializer>
-static inline void saveBoundToBuffer(const S2LatLngRect *bound, Serializer& output) {
+static inline void saveBoundToBuffer(const S2LatLngRect *bound, Serializer& output)
+{
     output.writeByte(COMPLETE_ENCODING);
     output.writeDouble(bound->lat().lo());
     output.writeDouble(bound->lat().hi());
@@ -408,7 +450,8 @@ static inline void copyBoundViaSerializers(Serializer& output, Deserializer& inp
 }
 
 template<class Deserializer>
-static inline void skipBound(Deserializer& input) {
+static inline void skipBound(Deserializer& input)
+{
     input.readByte();
     input.readDouble();
     input.readDouble();
@@ -448,7 +491,8 @@ inline void Loop::copyViaSerializers(Serializer& output, Deserializer& input) {
 }
 
 template<class Deserializer>
-inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>* points) {
+inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>* points)
+{
     input.readByte(); // encoding version
     int numVertices = input.readInt();
     for (int i = 0; i < numVertices; ++i) {
@@ -464,7 +508,8 @@ inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>
 }
 
 template<class Deserializer>
-inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs) {
+inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
+{
     input.readByte();
 
     set_num_vertices(input.readInt());
@@ -550,7 +595,8 @@ inline std::size_t Polygon::serializedLength() {
 }
 
 template<class Serializer, class Deserializer>
-inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input) {
+inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
+{
     int8_t version = input.readByte();
 
     if (version == COMPLETE_ENCODING) {
@@ -565,7 +611,8 @@ inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
         }
 
         copyBoundViaSerializers(output, input);
-    } else {
+    }
+    else {
         vassert(version == INCOMPLETE_ENCODING_FROM_JAVA);
 
         // This is a serialized polygon from Java, which won't have
@@ -602,13 +649,15 @@ static inline void DeleteLoopsInVector(vector<S2Loop*>* loops) {
   loops->clear();
 }
 
-inline void Polygon::initFromGeography(const GeographyValue& geog, bool doRepairs) {
+inline void Polygon::initFromGeography(const GeographyValue& geog, bool doRepairs)
+{
     ReferenceSerializeInputLE input(geog.data(), geog.length());
     initFromBuffer(input, doRepairs);
 }
 
 template<class Deserializer>
-inline void Polygon::initFromBuffer(Deserializer& input, bool doRepairs) {
+inline void Polygon::initFromBuffer(Deserializer& input, bool doRepairs)
+{
     input.readByte(); // encoding version
 
     if (owns_loops()) {
@@ -658,3 +707,4 @@ void Polygon::saveToBuffer(Serializer& output) const {
 
 } // end namespace voltdb
 
+#endif // EE_COMMON_GEOGRAPHY_VALUE_HPP

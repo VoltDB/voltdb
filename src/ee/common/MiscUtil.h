@@ -15,19 +15,22 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#ifndef MISC_UTIL_H_
+#define MISC_UTIL_H_
 
 #include <string>
 #include <vector>
 
 #include "boost/functional/hash.hpp"
 
-namespace voltdb {
+namespace voltdb
+{
 
 /**
  * Miscellaneous static utility methods.
  */
-class MiscUtil {
+class MiscUtil
+{
 
   public:
 
@@ -57,7 +60,7 @@ class MiscUtil {
 #else
         {
             const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(&value);
-            boost::hash_combine(seed, proxyForDouble);
+            boost::hash_combine( seed, proxyForDouble);
         }
 #endif
     }
@@ -65,3 +68,4 @@ class MiscUtil {
 
 } // namespace voltdb
 
+#endif // MISC_UTIL_H_

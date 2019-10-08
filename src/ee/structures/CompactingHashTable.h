@@ -15,7 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#ifndef COMPACTINGHASHTABLE_H_
+#define COMPACTINGHASHTABLE_H_
 
 #include "ContiguousAllocator.h"
 
@@ -46,7 +47,7 @@ namespace voltdb {
      * 4. It allocates over a megabyte when it only contains a single value. It's not as useful for
      *    smaller, more general usage.
      */
-    template<class K, class T, class H = std::hash<K>, class EK = std::equal_to<K>, class ET = std::equal_to<T> >
+    template<class K, class T, class H = boost::hash<K>, class EK = std::equal_to<K>, class ET = std::equal_to<T> >
     class CompactingHashTable {
     public:
         // typefefs just reduce the endless templating boilerplate
@@ -685,3 +686,4 @@ namespace voltdb {
     }
 }
 
+#endif // COMPACTINGHASHTABLE_H_
