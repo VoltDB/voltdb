@@ -272,7 +272,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
                 + "VALUES (-127, -127, -127, -127);");
         verifyStmtFails(client, "UPDATE ENG_13926 SET C = C - 1;",
                 "Type BIGINT with value -128 can't be cast as TINYINT "
-                + "because the value is out of range for the destination type \'C\'");
+                        + "because the value is out of range for the destination type");
     }
 
     private void subtestENG14478() throws Exception {
@@ -299,16 +299,22 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         project.addProcedure(Insert.class);
 
         config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        if (!config.compile(project)) {
+            fail();
+        }
         builder.addServerConfig(config);
 
         config = new LocalCluster("sqlupdate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
+        if (!config.compile(project)) {
+            fail();
+        }
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("sqlupdate-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        if (!config.compile(project)) {
+            fail();
+        }
         builder.addServerConfig(config);
 
         return builder;
