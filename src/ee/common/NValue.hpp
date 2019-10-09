@@ -534,7 +534,7 @@ class NValue {
     };
 
 
-    size_t hashCombine(std::size_t seed) const noexcept;
+    void hashCombine(std::size_t& seed) const noexcept;
 
     /* Functor comparator for use with std::set */
     struct ltNValue {
@@ -3347,21 +3347,21 @@ inline NValue NValue::getNullValue(ValueType type) {
     return retval;
 }
 
-inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
+inline void NValue::hashCombine(std::size_t& seed) const noexcept {
     switch (getValueType()) {
         case ValueType::tTINYINT:
             boost::hash_combine(seed, getTinyInt());
-            return seed;
+            return;
         case ValueType::tSMALLINT:
             boost::hash_combine(seed, getSmallInt());
-            return seed;
+            return;
         case ValueType::tINTEGER:
             boost::hash_combine(seed, getInteger());
-            return seed;
+            return;
         case ValueType::tBIGINT:
         case ValueType::tTIMESTAMP:
             boost::hash_combine(seed, getBigInt());
-            return seed;
+            return;
         case ValueType::tDOUBLE:
             if (isNull()) {
                 // A range of values for FLOAT are considered to be
@@ -3374,41 +3374,38 @@ inline size_t NValue::hashCombine(std::size_t seed) const noexcept {
             } else {
                 MiscUtil::hashCombineFloatingPoint(seed, getDouble());
             }
-            return seed;
+            return;
         case ValueType::tVARCHAR:
-            {
-                if (isNull()) {
-                    boost::hash_combine(seed, std::string(""));
-                    return seed;
-                }
+            if (isNull()) {
+                boost::hash_combine(seed, std::string(""));
+            } else {
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
                 boost::hash_combine(seed, std::string(buf, length));
-                return seed;
             }
+            return;
         case ValueType::tVARBINARY:
-            {
-                if (isNull()) {
-                    boost::hash_combine(seed, std::string(""));
-                    return seed;
-                }
+            if (isNull()) {
+                boost::hash_combine(seed, std::string(""));
+            } else {
                 int32_t length;
                 const char* buf = getObject_withoutNull(length);
                 for (int32_t i = 0; i < length; i++) {
                     boost::hash_combine(seed, buf[i]);
                 }
-                return seed;
             }
+            return;
         case ValueType::tDECIMAL:
             getDecimal().hash(seed);
-            return seed;
+            return;
         case ValueType::tPOINT:
-            return getGeographyPointValue().hashCombine(seed);
+            getGeographyPointValue().hashCombine(seed);
+            return;
         case ValueType::tGEOGRAPHY:
-            return getGeographyValue().hashCombine(seed);
+            getGeographyValue().hashCombine(seed);
+            return;
         default:
             vassert(false);     // should never reach here
-            return seed;
     }
 }
 
@@ -3976,7 +3973,9 @@ namespace std {
         using argument_type = voltdb::NValue;
         using result_type = size_t;
         result_type operator()(argument_type const& o) const noexcept {
-            return o.hashCombine(0);
+            size_t seed = 0;
+            o.hashCombine(seed);
+            return seed;
         }
     };
 }
