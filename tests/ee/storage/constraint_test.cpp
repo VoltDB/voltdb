@@ -140,8 +140,8 @@ TEST_F(ConstraintTest, NotNull) {
     for (int ctr = 0; ctr < 4; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
+        addColumn(name, ValueType::tBIGINT,
+                  NValue::getTupleStorageSize(voltdb::ValueType::tBIGINT),
                   allow_null[ctr]);
     }
     setTable();
@@ -186,8 +186,8 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
+        addColumn(name, ValueType::tBIGINT,
+                  NValue::getTupleStorageSize(ValueType::tBIGINT),
                   allow_null[ctr]);
     }
 
@@ -247,8 +247,8 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+        addColumn(name, ValueType::tBIGINT,
+                  NValue::getTupleStorageSize(ValueType::tBIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;
@@ -304,7 +304,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+        addColumn(name, ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;
@@ -350,7 +350,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+        addColumn(name, ValueType::tBIGINT, NValue::getTupleStorageSize(ValueType::tBIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;

@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREINDEXSCANEXECUTOR_H
-#define HSTOREINDEXSCANEXECUTOR_H
+#pragma once
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
@@ -56,66 +55,17 @@
 namespace voltdb {
 
 class AbstractTempTable;
-class PersistentTable;
-
 class AbstractExpression;
-
 //
 // Inline PlanNodes
 //
 class IndexScanPlanNode;
 class ProjectionPlanNode;
-class LimitPlanNode;
-
 class AggregateExecutorBase;
 class InsertExecutor;
+class CountingPostfilter;
 
-struct CountingPostfilter;
-
-class IndexScanExecutor : public AbstractExecutor
-{
-public:
-    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode)
-        , m_projector()
-        , m_searchKeyBackingStore(NULL)
-        , m_aggExec(NULL)
-        , m_insertExec(NULL)
-    {}
-    ~IndexScanExecutor();
-
-    /** This is a helper function to get the "next tuple" during an
-     *   index scan, called by p_execute of both this class and
-     *   NestLoopIndexExecutor. */
-    static inline bool getNextTuple(IndexLookupType lookupType,
-                                    TableTuple* tuple,
-                                    TableIndex* index,
-                                    IndexCursor* cursor,
-                                    int activeNumOfSearchKeys) {
-        if (lookupType == INDEX_LOOKUP_TYPE_EQ
-            || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
-            *tuple = index->nextValueAtKey(*cursor);
-            if (! tuple->isNullTuple()) {
-                return true;
-            }
-        }
-
-        if ((lookupType != INDEX_LOOKUP_TYPE_EQ
-             && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
-            || activeNumOfSearchKeys == 0) {
-            *tuple = index->nextValue(*cursor);
-        }
-
-        return ! tuple->isNullTuple();
-    }
-
-private:
-    bool p_init(AbstractPlanNode*,
-                const ExecutorVector& executorVector);
-    bool p_execute(const NValueArray &params);
-    void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
-
-
+class IndexScanExecutor : public AbstractExecutor {
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
@@ -124,7 +74,7 @@ private:
 
     // Inline Projection
     ProjectionPlanNode* m_projectionNode;
-    OptimizedProjector m_projector;
+    OptimizedProjector m_projector{};
 
     // Search key
     AbstractExpression** m_searchKeyArray;
@@ -138,15 +88,43 @@ private:
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<int> m_projectionAllTupleArrayPtr;
     boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
     // So Valgrind doesn't complain:
-    char* m_searchKeyBackingStore;
+    char* m_searchKeyBackingStore = nullptr;
 
-    AggregateExecutorBase* m_aggExec;
-    InsertExecutor *m_insertExec;
+    AggregateExecutorBase* m_aggExec = nullptr;
+    InsertExecutor *m_insertExec = nullptr;
+
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
+    bool p_execute(const NValueArray &params);
+    void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+public:
+    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+        : AbstractExecutor(engine, abstractNode) {}
+    ~IndexScanExecutor();
+
+    /** This is a helper function to get the "next tuple" during an
+     *   index scan, called by p_execute of both this class and
+     *   NestLoopIndexExecutor. */
+    static bool getNextTuple(
+            IndexLookupType lookupType,
+            TableTuple* tuple,
+            TableIndex* index,
+            IndexCursor* cursor,
+            int activeNumOfSearchKeys) {
+        if (lookupType == IndexLookupType::Equal || lookupType == IndexLookupType::GeoContains) {
+            *tuple = index->nextValueAtKey(*cursor);
+            if (! tuple->isNullTuple()) {
+                return true;
+            }
+        }
+        if ((lookupType != IndexLookupType::Equal && lookupType != IndexLookupType::GeoContains) ||
+                activeNumOfSearchKeys == 0) {
+            *tuple = index->nextValue(*cursor);
+        }
+        return ! tuple->isNullTuple();
+    }
 };
 
 }
 
-#endif

@@ -200,7 +200,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int limit = CountingPostfilter::NO_LIMIT;
         int offset = CountingPostfilter::NO_OFFSET;
         if (limit_node) {
-            limit_node->getLimitAndOffsetByReference(params, limit, offset);
+            std::tie(limit, offset) = limit_node->getLimitAndOffset(params);
         }
         // Initialize the postfilter
         CountingPostfilter postfilter(m_tmpOutputTable, predicate, limit, offset);

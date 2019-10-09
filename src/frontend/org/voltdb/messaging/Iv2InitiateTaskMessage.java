@@ -182,8 +182,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public int getParameterCount() {
         assert(m_invocation != null);
-        if (m_invocation.getParams() == null)
+        if (m_invocation.getParams() == null) {
             return 0;
+        }
         return m_invocation.getParams().size();
     }
 
@@ -241,8 +242,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         byte flags = 0;
-        if (m_isSinglePartition) flags |= SINGLE_PARTITION_MASK;
-        if (m_nPartitions != null) flags |= N_PARTITION_MASK;
+        if (m_isSinglePartition) {
+            flags |= SINGLE_PARTITION_MASK;
+        }
+        if (m_nPartitions != null) {
+            flags |= N_PARTITION_MASK;
+        }
 
         //Should never generate a response if we have to forward to a replica
         //if (m_shouldReturnResultTables) flags |= SHOULD_RETURN_TABLES_MASK;
@@ -303,21 +308,24 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");
         sb.append("CONNECTION ID: ").append(m_connectionId).append("\n");
-        if (m_isReadOnly)
+        if (m_isReadOnly) {
             sb.append("  READ, ");
-        else
+        } else {
             sb.append("  WRITE, ");
-        if (m_isSinglePartition)
+        }
+        if (m_isSinglePartition) {
             sb.append("SINGLE PARTITION, ");
-        else
-        if (getNPartCount() != 0)
+        } else
+        if (getNPartCount() != 0) {
             sb.append("N PARTITION (").append(m_nPartitions).append("), ");
-        else
+        } else {
             sb.append("MULTI PARTITION, ");
-        if (isForReplay())
+        }
+        if (isForReplay()) {
             sb.append("FOR REPLAY, ");
-        else
+        } else {
             sb.append("NOT REPLAY, ");
+        }
         sb.append("COORD ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
     }

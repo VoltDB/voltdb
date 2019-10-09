@@ -25,7 +25,9 @@ package org.voltdb.export;
 
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
@@ -50,10 +52,11 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             "CREATE TABLE T1 EXPORT TO TARGET FOO1 ON INSERT, DELETE (a integer not null, b integer not nulL);" +
             " PARTITION table T1 ON COLUMN a;" +
             "CREATE TABLE T3 EXPORT TO TARGET FOO3 ON UPDATE (a integer not null, b integer not nulL);";
+    private static List<String> streamNames = new ArrayList<>();
 
     @Before
     public void setUp() throws Exception {
-
+        streamNames.addAll(Arrays.asList("T1", "T3"));
     }
 
     @After
@@ -74,9 +77,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     @Test
     public void testInsertDeleteUpdate() throws Exception {
-        if (!MiscUtils.isPro()) {
-            return;
-        }
         resetDir();
         VoltFile.resetSubrootForThisProcess();
 
@@ -117,7 +117,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         insertToStream("T1", 0, 100, client, data);
         client.callProcedure("@AdHoc", "delete from T1 where a < 10000;");
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T1", 200, false);
         m_verifier.verifyRows();
 
@@ -125,19 +125,19 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         insertToStream("T3", 0, 100, client, data);
         client.callProcedure("@AdHoc", "update T3 set b = 100 where a < 10000;");
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
         client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T3", 300, true);
 
         client.callProcedure("@AdHoc", "delete from T3 where a < 10000;");
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T3", 400, true);
 
         //test alter table add column
@@ -145,7 +145,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON INSERT;");
         insertToStreamWithNewColumn("T3", 600, 100, client, data);
         client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
         checkTupleCount(client, "T3", 500, true);
     }
 

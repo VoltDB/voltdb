@@ -59,6 +59,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
@@ -159,7 +160,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
     public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
     public static final long MIGRATE_ROWS_DELETE_CID    = Long.MIN_VALUE + 11;
-    public static final long SCHEDULER_MANAGER_CID      = Long.MIN_VALUE + 12;
+    public static final long TASK_MANAGER_CID           = Long.MIN_VALUE + 12;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
@@ -316,7 +317,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 catch (IOException e) {
                     String msg = "Client interface failed to bind to"
                             + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
-                    CoreUtils.printPortsInUse(hostLog);
+                    MiscUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
@@ -1051,10 +1052,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             try {
-                ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
-                int partition = TheHashinator.getPartitionForParameter(
-                        ppi.type, invocationParameter);
+                int partition = -1;
+                if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+                    // Directed procedure running on partition
+                    partition = response.getInvocation().getPartitionDestination();
+                    assert partition != -1;
+                } else {
+                     // Regular partitioned procedure
+                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                    Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
+                    partition = TheHashinator.getPartitionForParameter(
+                          ppi.type, invocationParameter);
+                }
                 m_dispatcher.createTransaction(cihm.connection.connectionId(),
                         response.getInvocation(),
                         catProc.getReadonly(),
@@ -1250,8 +1259,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                             true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
-                }
-                else {
+                } else if (message instanceof SiteFailureForwardMessage) {
+                    SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;
+                    m_messenger.notifyOfHostDown(CoreUtils.getHostIdFromHSId(msg.m_reportingHSId));
+                } else {
                     // m_d is for test only
                     m_d.offer(message);
                 }

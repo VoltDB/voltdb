@@ -27,24 +27,24 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.JsonSerializer;
-import org.codehaus.jackson.map.SerializerProvider;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -68,10 +68,7 @@ public class VoltTrace implements Runnable {
     private static volatile VoltTrace s_tracer;
     private static volatile TraceEventFilter s_tracingFilter = null;
     // Current process id. Used by all trace events.
-    private static final int s_pid;
-    static {
-        s_pid = Integer.parseInt(CoreUtils.getPID());
-    }
+    private static final int s_pid = CLibrary.getpid();
 
     /***********************************
      *   Member Variables of VoltTrace
@@ -358,11 +355,11 @@ public class VoltTrace implements Runnable {
         // Put the trace events of DURATION_BEGIN or ASYNC_BGEIN type in the filter
         public void put(TraceEventType eventType, TraceEventWrapper beginWrapper, long beginTime, String eventId) {
             if (TraceEventType.DURATION_BEGIN.equals(eventType)) {
-                m_durationEvents.addLast(new Pair(beginWrapper, beginTime));
+                m_durationEvents.addLast(Pair.of(beginWrapper, beginTime));
                 return;
             }
             if (TraceEventType.ASYNC_BEGIN.equals(eventType)) {
-                m_asyncEvents.put(eventId, new Pair(beginWrapper, beginTime));
+                m_asyncEvents.put(eventId, Pair.of(beginWrapper, beginTime));
                 return;
             }
             return;

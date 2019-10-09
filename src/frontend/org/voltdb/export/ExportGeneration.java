@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -801,6 +802,7 @@ public class ExportGeneration implements Generation {
             }
 
             // Remove source and partition entry if empty
+            exportLog.info("Drained source for " + tableName + ", partition " + partitionId);
             sources.remove(tableName);
             if (sources.isEmpty()) {
                 m_dataSourcesByPartition.remove(partitionId);
@@ -810,7 +812,6 @@ public class ExportGeneration implements Generation {
 
         //Do closing outside the synchronized block. Do not wait on future since
         // we're invoked from the source's executor thread.
-        exportLog.info("Drained on unused partition " + partitionId + ": " + source);
         source.closeAndDelete();
     }
 
@@ -951,6 +952,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void sync() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
@@ -1038,6 +1040,8 @@ public class ExportGeneration implements Generation {
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
+        TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        targets.addAll(exportTargets);
         synchronized (m_dataSourcesByPartition) {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
                 Integer partition = partitionDataSourceMap.getKey();
@@ -1046,8 +1050,8 @@ public class ExportGeneration implements Generation {
                         continue;
                     }
 
-                    // no target match
-                    if (!exportTargets.contains(source.getTarget())) {
+                    // no target match (case insensitive)
+                    if (!targets.contains(source.getTarget())) {
                         continue;
                     }
 

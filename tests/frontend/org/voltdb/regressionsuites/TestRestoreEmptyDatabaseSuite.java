@@ -193,7 +193,8 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-            assertEquals(results[0].getRowCount(), 84);
+            // 6 tables with 12 rows each in the result == 72
+            assertEquals(results[0].getRowCount(), 72);
         }
         catch (Exception ex)
         {

@@ -48,44 +48,44 @@ void IndexStats::populateIndexStatsSchema(
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
 
     // index name
-    types.push_back(VALUE_TYPE_VARCHAR);
+    types.push_back(ValueType::tVARCHAR);
     columnLengths.push_back(4096); // This means if user's index name length exceed 4096, problem may happen.
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // table name
-    types.push_back(VALUE_TYPE_VARCHAR);
+    types.push_back(ValueType::tVARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // index type
-    types.push_back(VALUE_TYPE_VARCHAR);
+    types.push_back(ValueType::tVARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // is unique
-    types.push_back(VALUE_TYPE_TINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    types.push_back(ValueType::tTINYINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // is countable
-    types.push_back(VALUE_TYPE_TINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    types.push_back(ValueType::tTINYINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tTINYINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // entry count
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // memory usage
-    types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    types.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 }

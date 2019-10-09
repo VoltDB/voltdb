@@ -228,6 +228,7 @@ function async-export() {
         --autotune=false \
         --latencytarget=10 \
         --ratelimit=500 \
+        --usetableexport=true \
         --timeout=300
 }
 

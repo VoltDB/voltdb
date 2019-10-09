@@ -107,10 +107,6 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        if (joinType != JoinRelType.INNER) {        // We support inner join for now
-            // change/remove this when we support more join types
-            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
-        }
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
         mjpn.setJoinType(JoinType.INNER);
 

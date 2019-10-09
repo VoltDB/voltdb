@@ -505,7 +505,7 @@ public class CatalogDiffEngine {
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
             suspect instanceof Constraint ||
-            suspect instanceof ProcedureSchedule)
+            suspect instanceof Task)
         {
             return null;
         }
@@ -571,6 +571,11 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Connector) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
+
+        else if (suspect instanceof ThreadPool) {
             m_requiresNewExportGeneration = true;
             return null;
         }
@@ -964,11 +969,11 @@ public class CatalogDiffEngine {
         if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
         }
-        if (suspect instanceof Connector && "enabled".equals(field)) {
+        if (suspect instanceof Connector && ("enabled".equals(field) || "loaderclass".equals(field) || "threadpoolname".equals(field))) {
             m_requiresNewExportGeneration = true;
             return null;
         }
-        if (suspect instanceof Connector && "loaderclass".equals(field)) {
+        if (suspect instanceof ThreadPool) {
             m_requiresNewExportGeneration = true;
             return null;
         }
@@ -1043,7 +1048,7 @@ public class CatalogDiffEngine {
             }
         }
 
-        if (suspect instanceof ProcedureSchedule && (field.equals("enabled") || field.equals("onError"))) {
+        if (suspect instanceof Task && (field.equals("enabled") || field.equals("onError"))) {
             return null;
         }
 

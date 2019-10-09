@@ -57,8 +57,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.collect.ImmutableMap;
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class TestSQLParser extends JUnit4LocalClusterTest {
@@ -757,99 +757,215 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
     }
 
     @Test
-    public void testCreateSchedule() {
+    public void testCreateTask() {
         // Positive test cases of base create scheduler
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D;",
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D ON ERROR ABORT;",
-                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "onError", "ABORT"));
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D ON ERROR STOP;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "onError", "STOP"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS USING a.b.c.D;",
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D RUN ON PARTITIONS;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D", "scope", "PARTITIONS"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D AS USER me;",
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D AS USER me;",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D", "asUser", "me"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D DISABLED;",
-                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "disabled", "DISABLED"));
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D DISABLE;",
+                ImmutableMap.of("name", "blah", "class", "a.b.c.D", "disabled", "DISABLE"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah USING a.b.c.D WITH 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
+        validateCreateTaskMatcher("CREATE TASK blah FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
                 ImmutableMap.of("name", "blah", "class", "a.b.c.D", "parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500"));
 
-        // Positive test cases of delay scheduler
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999"));
+        // Positive test cases of delay schedule
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "intervalSchedule", "DELAY", "interval", "15",
+                        "timeUnit", "SECONDS"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 ON ERROR ABORT AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "onError", "ABORT"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc ON ERROR STOP;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "DELAY").put("interval", "15").put("timeUnit", "SECONDS")
+                        .put("onError", "STOP").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS DELAY 5999 AS proc;",
-                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "delay", "5999"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc RUN ON PARTITIONS;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("scope", "PARTITIONS")
+                        .put("procedure", "proc").put("intervalSchedule", "DELAY").put("interval", "15")
+                        .put("timeUnit", "SECONDS").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS USER me AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "asUser", "me"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc AS USER me;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "DELAY").put("interval", "15").put("timeUnit", "SECONDS")
+                        .put("asUser", "me").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 DISABLED AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "delay", "5999", "disabled", "DISABLED"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc DISABLE;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "DELAY").put("interval", "15").put("timeUnit", "SECONDS")
+                        .put("disabled", "DISABLE").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah DELAY 5999 AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
-                ImmutableMap.of("name", "blah", "delay", "5999", "procedure", "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE proc WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "DELAY").put("interval", "15").put("timeUnit", "SECONDS")
+                        .put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
 
-        // Positive test cases of cron scheduler
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS proc;",
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE DELAY 15 SECONDS PROCEDURE FROM CLASS a.b.c.D WITH (1, 2, 'ABC');",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("intervalSchedule", "DELAY")
+                        .put("interval", "15").put("timeUnit", "SECONDS").put("generatorClass", "a.b.c.D")
+                        .put("parameters", "1, 2, 'ABC'").build());
+
+        // Positive test cases of cron schedule
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc;",
                 ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# ON ERROR ABORT AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "onError",
-                        "ABORT"));
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc ON ERROR STOP;", ImmutableMap
+                        .of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "onError", "STOP"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS CRON */5 ? 1-4,7 L W 1,3# AS proc;",
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc RUN ON PARTITIONS;",
                 ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "cron",
                         "*/5 ? 1-4,7 L W 1,3#"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS USER me AS proc;",
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc AS USER me;",
                 ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "asUser", "me"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# DISABLED AS proc;", ImmutableMap
-                .of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "disabled", "DISABLED"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc DISABLE;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "cron", "*/5 ? 1-4,7 L W 1,3#", "disabled",
+                        "DISABLE"));
 
-        validateCreateScheduleMatcher(
-                "CREATE SCHEDULE blah CRON */5 ? 1-4,7 L W 1,3# AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
-                ImmutableMap.of("name", "blah", "cron", "*/5 ? 1-4,7 L W 1,3#", "procedure",
-                        "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE proc WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("cron", "*/5 ? 1-4,7 L W 1,3#").put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .build());
 
-        // Positive test cases of interval scheduler
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS proc;",
-                ImmutableMap.of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES"));
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE CRON */5 ? 1-4,7 L W 1,3# PROCEDURE FROM CLASS a.b.c.D WITH (1, 2, 'ABC');",
+                ImmutableMap.of("name", "blah", "cron", "*/5 ? 1-4,7 L W 1,3#", "generatorClass", "a.b.c.D",
+                        "parameters", "1, 2, 'ABC'"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES ON ERROR ABORT AS proc;", ImmutableMap
-                .of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "onError", "ABORT"));
+        // Positive test cases of interval schedule
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "intervalSchedule", "EVERY", "interval", "5",
+                        "timeUnit", "MINUTES"));
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah RUN ON PARTITIONS EVERY 5 MINUTES AS proc;",
-                ImmutableMap.of("name", "blah", "scope", "PARTITIONS", "procedure", "proc", "interval", "5", "timeUnit",
-                        "MINUTES"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc ON ERROR STOP;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "EVERY").put("interval", "5").put("timeUnit", "MINUTES")
+                        .put("onError", "STOP").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS USER me AS proc;", ImmutableMap
-                .of("name", "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "asUser", "me"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc RUN ON PARTITIONS;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("intervalSchedule", "EVERY")
+                        .put("interval", "5").put("timeUnit", "MINUTES").put("procedure", "proc")
+                        .put("scope", "PARTITIONS").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES DISABLED AS proc;", ImmutableMap.of("name",
-                "blah", "procedure", "proc", "interval", "5", "timeUnit", "MINUTES", "disabled", "DISABLED"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc AS USER me;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "EVERY").put("interval", "5").put("timeUnit", "MINUTES")
+                        .put("asUser", "me").build());
 
-        validateCreateScheduleMatcher("CREATE SCHEDULE blah EVERY 5 MINUTES AS proc 12, 'dhsaf8 jdsf8ladsfj ;', -500;",
-                ImmutableMap.of("name", "blah", "interval", "5", "timeUnit", "MINUTES", "procedure",
-                        "proc 12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc DISABLE;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "EVERY").put("interval", "5").put("timeUnit", "MINUTES")
+                        .put("disabled", "DISABLE").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE proc WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("intervalSchedule", "EVERY").put("interval", "5").put("timeUnit", "MINUTES")
+                        .put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE EVERY 5 MINUTES PROCEDURE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("intervalSchedule", "EVERY")
+                        .put("interval", "5").put("timeUnit", "MINUTES").put("generatorClass", "a.b.c.D")
+                        .put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
+
+        // Positive test cases of custom schedule with parameters
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "scheduleClass", "a.b.c.D", "scheduleParameters",
+                        "12, 'dhsaf8 jdsf8ladsfj ;', -500"));
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc ON ERROR STOP;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .put("onError", "STOP").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc RUN ON PARTITIONS;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("scheduleClass", "a.b.c.D")
+                        .put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").put("procedure", "proc")
+                        .put("scope", "PARTITIONS").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc AS USER me;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .put("asUser", "me").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc DISABLE;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .put("disabled", "DISABLE").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE proc WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500) PROCEDURE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("scheduleClass", "a.b.c.D")
+                        .put("scheduleParameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").put("generatorClass", "a.b.c.D")
+                        .put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
+
+        // Positive test cases of custom schedule without parameters
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc;",
+                ImmutableMap.of("name", "blah", "procedure", "proc", "scheduleClass", "a.b.c.D"));
+
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc ON ERROR STOP;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("onError", "STOP").build());
+
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc RUN ON PARTITIONS;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("scheduleClass", "a.b.c.D")
+                        .put("procedure", "proc").put("scope", "PARTITIONS").build());
+
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc AS USER me;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("asUser", "me").build());
+
+        validateCreateTaskMatcher("CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc DISABLE;",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("disabled", "DISABLE").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE proc WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("procedure", "proc")
+                        .put("scheduleClass", "a.b.c.D").put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500").build());
+
+        validateCreateTaskMatcher(
+                "CREATE TASK blah ON SCHEDULE FROM CLASS a.b.c.D PROCEDURE FROM CLASS a.b.c.D WITH (12, 'dhsaf8 jdsf8ladsfj ;', -500);",
+                ImmutableMap.<String, String>builder().put("name", "blah").put("scheduleClass", "a.b.c.D")
+                        .put("generatorClass", "a.b.c.D").put("parameters", "12, 'dhsaf8 jdsf8ladsfj ;', -500")
+                        .build());
     }
 
-    private static final Set<String> s_allCreateScheduleGroups = ImmutableSet.of("name", "scope", "class",
-            "asUser", "disabled", "parameters", "procedure", "delay", "cron", "onError", "interval", "timeUnit");
+    private static final Set<String> s_allCreateTaskGroups = ImmutableSet.of("name", "class", "intervalSchedule",
+            "interval", "timeUnit", "cron", "procedure", "parameters", "onError", "scope", "asUser", "disabled",
+            "scheduleClass", "scheduleParameters", "generatorClass");
 
-    private static void validateCreateScheduleMatcher(String statement, Map<String, String> expectedGroupValues) {
-        Matcher matcher = SQLParser.matchCreateSchedule(statement);
+    private static void validateCreateTaskMatcher(String statement, Map<String, String> expectedGroupValues) {
+        Matcher matcher = SQLParser.matchCreateTask(statement);
         assertTrue(statement, matcher.matches());
-        assertEquals(s_allCreateScheduleGroups.size(), matcher.groupCount());
+        assertEquals(s_allCreateTaskGroups.size(), matcher.groupCount());
 
-        for (String group : s_allCreateScheduleGroups) {
+        for (String group : s_allCreateTaskGroups) {
             assertEquals("Statement: " + statement + " group: " + group, expectedGroupValues.get(group),
                     matcher.group(group));
         }

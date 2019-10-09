@@ -91,7 +91,7 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
@@ -154,6 +154,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Manages pending tasks.
     final SiteTaskerQueue m_pendingSiteTasks;
+
+    private final TickProducer m_tickProducer;
 
     /*
      * There is really no legitimate reason to touch the initiator mailbox from the site,
@@ -679,11 +681,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                       m_siteId,
                                       m_indexStats);
             m_memStats = memStats;
+            m_tickProducer = new TickProducer(pendingSiteTasks, siteId);
         } else {
             // MPI doesn't need to track these stats
             m_tableStats = null;
             m_indexStats = null;
             m_memStats = null;
+            m_tickProducer = null;
         }
     }
 
@@ -748,8 +752,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
-        int configuredTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
-        final int exportFlushTimeout = configuredTimeout > 0 ? configuredTimeout : 4*1000;
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting
@@ -772,8 +774,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_isLowestSiteId,
-                        exportFlushTimeout);
+                        m_isLowestSiteId);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -789,8 +790,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_isLowestSiteId,
-                        exportFlushTimeout);
+                        m_isLowestSiteId);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else if (m_backend.isIPC) {
@@ -809,8 +809,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
-                            m_isLowestSiteId,
-                            exportFlushTimeout);
+                            m_isLowestSiteId);
             }
             else {
                 /* This seems very bad. */
@@ -1509,11 +1508,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     m_partitionId,
                     catalogTable.getTypeName());
             // assign the stats to the other partition's value
-            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
+            ExportManagerInterface.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
                     StreamStartAction.REJOIN, tableEntry.getValue());
         }
         if (m_sysprocContext.isLowestSiteId()) {
-            ExportManager.instance().updateDanglingExportStates(StreamStartAction.REJOIN, exportSequenceNumbers);
+            ExportManagerInterface.instance().updateDanglingExportStates(StreamStartAction.REJOIN, exportSequenceNumbers);
         }
 
         if (drSequenceNumbers != null) {
@@ -1640,7 +1639,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
-        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        Cluster newCluster = m_context.catalog.getClusters().get("cluster");
+        CatalogMap<Table> tables = newCluster.getDatabases().get("database").getTables();
 
         boolean DRCatalogChange = false;
         for (Table t : tables) {
@@ -1685,6 +1685,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //No need to quiesce as there is no rolling of generation OLD datasources will be polled and pushed until there is no more data.
         //m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
+
+        m_tickProducer.changeTickInterval(newCluster.getGlobalflushinterval());
+
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent(EventType.CATALOG_UPDATE, txnId, uniqueId, m_lastCommittedSpHandle,

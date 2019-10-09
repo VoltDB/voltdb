@@ -388,7 +388,9 @@ public class RejoinProducer extends JoinProducerBase {
                     clusterCreateTime = event.clusterCreateTime;
 
                     // Tells EE which DR version going to use
-                    siteConnection.setDRProtocolVersion(event.drVersion);
+                    if (event.drVersion != 0) {
+                        siteConnection.setDRProtocolVersion(event.drVersion);
+                    }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");

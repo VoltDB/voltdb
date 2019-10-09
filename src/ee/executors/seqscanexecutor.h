@@ -43,49 +43,41 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESEQSCANEXECUTOR_H
-#define HSTORESEQSCANEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 #include "execution/VoltDBEngine.h"
 
-namespace voltdb
-{
+namespace voltdb {
     class AggregateExecutorBase;
-    struct CountingPostfilter;
     class InsertExecutor;
 
     class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-            , m_aggExec(NULL)
-            , m_insertExec(NULL)
-        {}
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    const ExecutorVector& executorVector);
-        bool p_execute(const NValueArray& params);
-
-    private:
-        /**
-         * Output a tuple.  This may send the tuple to an
-         * inline insert or aggregate node, or it may send the
-         * tuple to the output table.
-         */
-        void outputTuple(TableTuple& tuple);
-
         // These are logically local variables to p_execute.
         // But we need to share them between p_execute and
         // outputTuple, so we save them here.  They come out of
         // the plan node anyway, so their lifetime is managed
         // by the plan node.  We don't need to worry about
         // freeing them.
-        AggregateExecutorBase* m_aggExec;
-        InsertExecutor* m_insertExec;
+        AggregateExecutorBase* m_aggExec = nullptr;
+        InsertExecutor* m_insertExec = nullptr;
+
+        /**
+         * Output a tuple.  This may send the tuple to an
+         * inline insert or aggregate node, or it may send the
+         * tuple to the output table.
+         */
+        void outputTuple(TableTuple& tuple);
+    public:
+        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+            : AbstractExecutor(engine, abstract_node) {}
+    protected:
+        bool p_init(AbstractPlanNode* abstract_node,
+                    const ExecutorVector& executorVector);
+        bool p_execute(const NValueArray& params);
+
     };
 }
 
-#endif

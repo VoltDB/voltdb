@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <tuple>
 #include "indexscanexecutor.h"
 
 #include "executors/aggregateexecutor.h"
@@ -60,12 +61,11 @@
 
 using namespace voltdb;
 
-bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
-                               const ExecutorVector& executorVector)
-{
+bool IndexScanExecutor::p_init(
+        AbstractPlanNode *abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init IndexScan Executor");
 
-    m_projectionNode = NULL;
+    m_projectionNode = nullptr;
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
     vassert(m_node);
@@ -77,7 +77,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     // If we have an inline insert node, then the output
     // schema is the ususal DML schema.  Otherwise it's in the
     // plan node.  So, create output table based on output schema from the plan.
-    if (m_insertExec != NULL) {
+    if (m_insertExec != nullptr) {
         setDMLCountOutputTable(executorVector.limits());
     } else {
         setTempOutputTable(executorVector, m_node->getTargetTable()->name());
@@ -86,12 +86,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     // INLINE PROJECTION
     //
-    m_projectionNode = static_cast<ProjectionPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    m_projectionNode = static_cast<ProjectionPlanNode*>(
+            m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
     //
     // Optimize the projection if we can.
     //
-    if (m_projectionNode != NULL) {
+    if (m_projectionNode != nullptr) {
         m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
         m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
                              m_node->getTargetTable()->schema());
@@ -100,27 +100,24 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
-    vassert(m_aggExec == NULL || m_insertExec == NULL);
+    vassert(m_aggExec == nullptr || m_insertExec == nullptr);
 
     //
     // Make sure that we have search keys and that they're not null
     //
     m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
-    m_searchKeyArrayPtr =
-            boost::shared_array<AbstractExpression*>
-    (new AbstractExpression*[m_numOfSearchkeys]);
+    m_searchKeyArrayPtr = boost::shared_array<AbstractExpression*>(
+            new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyArray = m_searchKeyArrayPtr.get();
 
-    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-    {
-        if (m_node->getSearchKeyExpressions()[ctr] == NULL)
-        {
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_node->getSearchKeyExpressions()[ctr] == nullptr) {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
             return false;
+        } else {
+            m_searchKeyArrayPtr[ctr] = m_node->getSearchKeyExpressions()[ctr];
         }
-        m_searchKeyArrayPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr];
     }
 
     //output table should be temptable
@@ -143,9 +140,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_sortDirection = m_node->getSortDirection();
 
     m_hasOffsetRankOptimization = m_node->hasOffsetRankOptimization();
-
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
-
     return true;
 }
 
@@ -165,7 +160,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
     // TODO: we may need to comment out this assertion for merge join.
-    vassert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+    vassert(m_lookupType != IndexLookupType::Equal ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
@@ -175,18 +170,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     // INLINE LIMIT
     //
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(
+            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
-    if (limit_node != NULL) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    if (limit_node != nullptr) {
+        std::tie(limit, offset) = limit_node->getLimitAndOffset(params);
     }
 
     //
     // POST EXPRESSION
     //
     AbstractExpression* post_expression = m_node->getPredicate();
-    if (post_expression != NULL) {
+    if (post_expression != nullptr) {
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
@@ -220,14 +216,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     TableTuple temp_tuple;
 
-    if (m_aggExec != NULL || m_insertExec != NULL) {
+    if (m_aggExec != nullptr || m_insertExec != nullptr) {
         const TupleSchema * temp_tuple_schema;
-        if (m_projectionNode != NULL) {
+        if (m_projectionNode != nullptr) {
             temp_tuple_schema = m_projectionNode->getOutputTable()->schema();
         } else {
             temp_tuple_schema = tableIndex->getTupleSchema();
         }
-        if (m_aggExec != NULL) {
+        if (m_aggExec != nullptr) {
             temp_tuple = m_aggExec->p_execute_init(params, &pmp, temp_tuple_schema, m_outputTable, &postfilter);
         } else {
             // We may actually find out during initialization
@@ -254,7 +250,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
             // We should have as many expressions in the
             // projection node as there are columns in the
             // input schema if there is an inline projection.
-            vassert(m_projectionNode != NULL
+            vassert(m_projectionNode != nullptr
                        ? (temp_tuple.getSchema()->columnCount() == m_projectionNode->getOutputColumnExpressions().size())
                        : true);
         }
@@ -265,9 +261,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     // Short-circuit an empty scan
     if (m_node->isEmptyScan()) {
         VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
-        if (m_aggExec != NULL) {
+        if (m_aggExec != nullptr) {
             m_aggExec->p_execute_finish();
-        } else if (m_insertExec != NULL) {
+        } else if (m_insertExec != nullptr) {
             m_insertExec->p_execute_finish();
         }
         return true;
@@ -282,7 +278,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
 
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
+        NValue candidateValue = m_searchKeyArray[ctr]->eval(nullptr, nullptr);
         // When any part of the search key is NULL, the result is false when it compares to anything.
         //   do early return optimization, our index comparator may not handle null comparison correctly.
         // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
@@ -294,8 +290,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
 
         try {
             searchKey.setNValue(ctr, candidateValue);
-        }
-        catch (const SQLException &e) {
+        } catch (const SQLException &e) {
             // This next bit of logic handles underflow, overflow and search key length
             // exceeding variable length column size (variable lenght mismatch) when
             // setting up the search keys.
@@ -310,15 +305,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
             // currently, it's expected to always be an overflow or underflow
             //
             // Note that only one if these three bits will ever be asserted (cf. below).
-            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW |
+                            SQLException::TYPE_UNDERFLOW |
+                            SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                 throw e;
-            }
-
+            } else if (localLookupType != IndexLookupType::Equal && ctr == activeNumOfSearchKeys - 1) {
             // handle the case where this is a comparison, rather than equality match
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
-            if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
 
                 // We have three cases, one for overflow, one for underflow
                 // and one for TYPE_VAR_LENGTH_MISMATCH.  These are
@@ -326,33 +320,31 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                 // definitions of throwCastSQLValueOutOfRangeException,
                 // whence these all come.
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+                    if (localLookupType == IndexLookupType::Greater ||
+                            localLookupType == IndexLookupType::GreaterEqual) {
 
                         // gt or gte when key overflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
-                    }
-                    else {
+                    } else {
                         // for overflow on reverse scan, we need to
                         // do a forward scan to find the correct start
                         // point, which is exactly what LTE would do.
                         // so, set the lookupType to LTE and the missing
                         // searchkey will be handled by extra post filters
-                        localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                        localLookupType = IndexLookupType::LessEqual;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+                    if (localLookupType == IndexLookupType::Less ||
+                            localLookupType == IndexLookupType::LessEqual) {
 
                         // lt or lte when key underflows returns nothing except inline agg
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
-                    }
-                    else {
+                    } else {
                         // don't allow GTE because it breaks null handling
-                        localLookupType = INDEX_LOOKUP_TYPE_GT;
+                        localLookupType = IndexLookupType::Greater;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
@@ -361,13 +353,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                     // search will be performed on shrinked key, so update lookup operation
                     // to account for it
                     switch (localLookupType) {
-                        case INDEX_LOOKUP_TYPE_LT:
-                        case INDEX_LOOKUP_TYPE_LTE:
-                            localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                        case IndexLookupType::Less:
+                        case IndexLookupType::LessEqual:
+                            localLookupType = IndexLookupType::LessEqual;
                             break;
-                        case INDEX_LOOKUP_TYPE_GT:
-                        case INDEX_LOOKUP_TYPE_GTE:
-                            localLookupType = INDEX_LOOKUP_TYPE_GT;
+                        case IndexLookupType::Greater:
+                        case IndexLookupType::GreaterEqual:
+                            localLookupType = IndexLookupType::Greater;
                             break;
                         default:
                             vassert(!"IndexScanExecutor::p_execute - can't index on not equals");
@@ -390,40 +382,38 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
                 if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
                     localSortDirection = SORT_DIRECTION_TYPE_ASC;
                 }
-            }
-            // if a EQ comparison is out of range, then return no tuples
-            else {
+            } else { // if a EQ comparison is out of range, then return no tuples
                 earlyReturnForSearchKeyOutOfRange = true;
-                break;
             }
             break;
         }
     }
 
     if (earlyReturnForSearchKeyOutOfRange) {
-        if (m_aggExec != NULL) {
+        if (m_aggExec != nullptr) {
             m_aggExec->p_execute_finish();
         }
-        if (m_insertExec != NULL) {
+        if (m_insertExec != nullptr) {
             m_insertExec->p_execute_finish();
         }
         return true;
     }
 
     vassert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
+    VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d",
+            searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
 
     //
     // END EXPRESSION
     //
     AbstractExpression* end_expression = m_node->getEndExpression();
-    if (end_expression != NULL) {
+    if (end_expression != nullptr) {
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
-    if (initial_expression != NULL) {
+    if (initial_expression != nullptr) {
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
@@ -432,7 +422,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression* skipNullExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
-    if (skipNullExpr != NULL) {
+    if (skipNullExpr != nullptr) {
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
@@ -453,29 +443,29 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     if (activeNumOfSearchKeys > 0) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
-
-        if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            tableIndex->moveToKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-            tableIndex->moveToLessThanKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-            // find the entry whose key is less than or equal to search key
-            // as the start point to do a reverse scan
-            tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
-            tableIndex->moveToCoveringCell(&searchKey, indexCursor);
-        }
-        else {
-            return false;
+        switch(localLookupType) {
+            case IndexLookupType::Equal:
+                tableIndex->moveToKey(&searchKey, indexCursor);
+                break;
+            case IndexLookupType::Greater:
+                tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
+                break;
+            case IndexLookupType::GreaterEqual:
+                tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
+                break;
+            case IndexLookupType::Less:
+                tableIndex->moveToLessThanKey(&searchKey, indexCursor);
+                break;
+            case IndexLookupType::LessEqual:
+                // find the entry whose key is less than or equal to search key
+                // as the start point to do a reverse scan
+                tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
+                break;
+            case IndexLookupType::GeoContains:
+                tableIndex->moveToCoveringCell(&searchKey, indexCursor);
+                break;
+            default:
+                return false;
         }
     } else {
         bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
@@ -497,12 +487,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     // We have different nextValue() methods for different lookup types
     //
-    while (postfilter.isUnderLimit() &&
-           getNextTuple(localLookupType,
-                        &tuple,
-                        tableIndex,
-                        &indexCursor,
-                        activeNumOfSearchKeys)) {
+    while (postfilter.isUnderLimit() && getNextTuple(
+                localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
         if (tuple.isPendingDelete()) {
             continue;
         }
@@ -512,26 +498,25 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
-        if (skipNullExpr != NULL) {
+        if (skipNullExpr != nullptr) {
             if (skipNullExpr->eval(&tuple, NULL).isTrue()) {
                 VOLT_DEBUG("Index scan: find out null rows or columns.");
                 continue;
             } else {
-                skipNullExpr = NULL;
+                skipNullExpr = nullptr;
             }
         }
         //
         // First check whether the end_expression is now false
         //
-        if (end_expression != NULL && !end_expression->eval(&tuple, NULL).isTrue()) {
+        if (end_expression != nullptr && !end_expression->eval(&tuple, nullptr).isTrue()) {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             break;
         }
         //
         // Then apply our post-predicate and LIMIT/OFFSET to do further filtering
         //
-        if (postfilter.eval(&tuple, NULL)) {
-
+        if (postfilter.eval(&tuple, nullptr)) {
             if (m_projector.numSteps() > 0) {
                 m_projector.exec(temp_tuple, tuple);
                 outputTuple(postfilter, temp_tuple);
@@ -543,32 +528,29 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    if (m_aggExec != NULL) {
+    if (m_aggExec != nullptr) {
         m_aggExec->p_execute_finish();
-    }
-    else if (m_insertExec != NULL) {
+    } else if (m_insertExec != nullptr) {
         m_insertExec->p_execute_finish();
     }
-
-
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
 }
 
 void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
-    if (m_aggExec != NULL) {
+    if (m_aggExec != nullptr) {
         m_aggExec->p_execute_tuple(tuple);
         return;
-    }
-    else if (m_insertExec != NULL) {
+    } else if (m_insertExec != nullptr) {
         m_insertExec->p_execute_tuple(tuple);
         return;
+    } else {
+        //
+        // Insert the tuple into our output table
+        //
+        vassert(m_tmpOutputTable);
+        m_tmpOutputTable->insertTempTuple(tuple);
     }
-    //
-    // Insert the tuple into our output table
-    //
-    vassert(m_tmpOutputTable);
-    m_tmpOutputTable->insertTempTuple(tuple);
 }
 
 IndexScanExecutor::~IndexScanExecutor() {

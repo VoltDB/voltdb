@@ -90,7 +90,8 @@ public class ExportToSocketTestVerifier {
             for (String part : row) {
                 sb.append(part).append(" ");
             }
-            System.out.println("RowVerifier received:" + sb.toString());
+            System.out.println("RowVerifier received on partition "
+                    + m_partitionId + ":" + sb.toString());
         }
         m_data.offer(row);
     }

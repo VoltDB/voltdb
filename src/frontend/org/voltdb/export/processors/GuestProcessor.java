@@ -41,6 +41,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
+import org.voltdb.export.Generation;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
@@ -172,9 +173,10 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
     @Override
-    public void setExportGeneration(ExportGeneration generation) {
+    public void setExportGeneration(Generation generation) {
         assert generation != null;
-        m_generation = generation;
+        assert generation instanceof ExportGeneration;
+        m_generation = (ExportGeneration) generation;
     }
 
     private class ExportRunner implements Runnable {
@@ -392,7 +394,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     if (edb.isLegacy()) {
                                         cont.updateStartTime(System.currentTimeMillis());
                                         if (firstRowOfBlock) {
-                                            edb.onBlockStart(row);
+                                            edb.onBlockStart();
                                             firstRowOfBlock = false;
                                         }
                                         edb.processRow(length, rowdata);
@@ -430,7 +432,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 if (edb.isLegacy()) {
                                     edb.onBlockCompletion();
                                 }
-                                if (row != null) {
+                                else if (row != null) {
                                     edb.onBlockCompletion(row);
                                 }
                                 // Make sure to discard after onBlockCompletion so that if completion
@@ -563,5 +565,4 @@ public class GuestProcessor implements ExportDataProcessor {
         m_targetsByTableName.clear();
         m_generation = null;
     }
-
 }

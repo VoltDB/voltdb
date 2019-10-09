@@ -106,6 +106,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.messaging.SocketJoiner;
 import org.voltcore.network.CipherExecutor;
@@ -152,7 +153,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -177,7 +178,6 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
-import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
 import org.voltdb.settings.DbSettings;
@@ -193,6 +193,7 @@ import org.voltdb.sysprocs.VerifyCatalogAndWriteJar;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
@@ -352,7 +353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ElasticService m_elasticService = null;
 
     // Scheduler manager
-    private SchedulerManager m_schedulerManager = null;
+    private TaskManager m_taskManager = null;
 
     // Snapshot IO agent
     private SnapshotIOAgent m_snapshotIOAgent = null;
@@ -1519,8 +1520,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            m_schedulerManager = new SchedulerManager(m_clientInterface, getStatsAgent(), m_myHostId);
-            m_globalServiceElector.registerService(() -> m_schedulerManager.promoteToLeader(m_catalogContext));
+            m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
+                    m_config.m_startAction == StartAction.JOIN,
+                    // Task manager is read only if db is paused or this is a replica
+                    () -> m_mode == OperationMode.PAUSED || getReplicationRole() == ReplicationRole.REPLICA);
+            m_globalServiceElector.registerService(() -> m_taskManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
             if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
@@ -1712,9 +1716,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
-
-            // TODO determine if this is actually a good place for this
-            m_schedulerManager.start(m_catalogContext);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -1933,7 +1934,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    ExportManager.instance().becomeLeader(spInitiator.getPartitionId());
+                    ExportManagerInterface.instance().becomeLeader(spInitiator.getPartitionId());
                 }
             }
         }
@@ -2693,50 +2694,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + m_config.m_pathToDeployment, false, null);
             }
 
-            /*
-             * Check for invalid deployment file settings (enterprise-only) in the community edition.
-             * Trick here is to print out all applicable problems and then stop, rather than stopping
-             * after the first one is found.
-             */
-            if (!m_config.m_isEnterprise) {
-                boolean shutdownDeployment = false;
-                boolean shutdownAction = false;
-
-                // check license features for community version
-                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
-                    consoleLog.error("Command logging is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if (deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
-                    consoleLog.warn("Database Replication is not supported " +
-                            "in the community edition of VoltDB.");
-                }
-                // check the start action for the community edition
-                if (m_config.m_startAction == StartAction.JOIN) {
-                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
-                            "\" is not supported in the community edition of VoltDB.");
-                    shutdownAction = true;
-                }
-
-                // if the process needs to stop, try to be helpful
-                if (shutdownAction || shutdownDeployment) {
-                    String msg = "This process will exit. Please run VoltDB with ";
-                    if (shutdownDeployment) {
-                        msg += "a deployment file compatible with the community edition";
-                    }
-                    if (shutdownDeployment && shutdownAction) {
-                        msg += " and ";
-                    }
-
-                    if (shutdownAction && !shutdownDeployment) {
-                        msg += "the CREATE start action";
-                    }
-                    msg += ".";
-
-                    VoltDB.crashLocalVoltDB(msg, false, null);
-                }
-            }
+            checkForEnterpriseFeatures(deployment, true);
 
             // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = deployment.getHeartbeat();
@@ -2920,45 +2878,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 config.m_hostCount = deployment.getCluster().getHostcount();
             }
-            /*
-             * Check for invalid deployment file settings (enterprise-only) in the community edition.
-             * Trick here is to print out all applicable problems and then stop, rather than stopping
-             * after the first one is found.
-             */
-            if (!config.m_isEnterprise) {
-                boolean shutdownDeployment = false;
-                boolean shutdownAction = false;
 
-                // check license features for community version
-                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
-                    consoleLog.error("Command logging is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if (m_config.m_startAction == StartAction.JOIN) {
-                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
-                            "\" is not supported in the community edition of VoltDB.");
-                    shutdownAction = true;
-                }
-
-                // if the process needs to stop, try to be helpful
-                if (shutdownAction || shutdownDeployment) {
-                    String msg = "This process will exit. Please run VoltDB with ";
-                    if (shutdownDeployment) {
-                        msg += "a deployment file compatible with the community edition";
-                    }
-                    if (shutdownDeployment && shutdownAction) {
-                        msg += " and ";
-                    }
-
-                    if (shutdownAction && !shutdownDeployment) {
-                        msg += "the CREATE start action";
-                    }
-                    msg += ".";
-
-                    VoltDB.crashLocalVoltDB(msg, false, null);
-                }
-            }
+            checkForEnterpriseFeatures(deployment, false);
             return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
             /*
@@ -2968,6 +2889,50 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.fatal(e.getMessage());
             VoltDB.crashLocalVoltDB(e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Check for invalid deployment file settings (enterprise-only) in the community edition. Trick here is to print out
+     * all applicable problems and then stop, rather than stopping after the first one is found.
+     */
+    private void checkForEnterpriseFeatures(DeploymentType deployment, boolean checkForDr) {
+        if (!m_config.m_isEnterprise) {
+            boolean shutdownDeployment = false;
+            boolean shutdownAction = false;
+
+            // check license features for community version
+            if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
+                consoleLog.error("Command logging is not supported in the community edition of VoltDB.");
+                shutdownDeployment = true;
+            }
+            if (checkForDr && deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
+                consoleLog.warn("Database Replication is not supported in the community edition of VoltDB.");
+            }
+            // check the start action for the community edition
+            if (m_config.m_startAction == StartAction.JOIN) {
+                consoleLog.error("Start action \"" + m_config.m_startAction.name()
+                        + "\" is not supported in the community edition of VoltDB.");
+                shutdownAction = true;
+            }
+
+            // if the process needs to stop, try to be helpful
+            if (shutdownAction || shutdownDeployment) {
+                String msg = "This process will exit. Please run VoltDB with ";
+                if (shutdownDeployment) {
+                    msg += "a deployment file compatible with the community edition";
+                }
+                if (shutdownDeployment && shutdownAction) {
+                    msg += " and ";
+                }
+
+                if (shutdownAction && !shutdownDeployment) {
+                    msg += "the CREATE start action";
+                }
+                msg += ".";
+
+                VoltDB.crashLocalVoltDB(msg, false, null);
+            }
         }
     }
 
@@ -3661,7 +3626,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } catch (Throwable t) { }
 
-                m_schedulerManager.shutdown();
+                m_taskManager.shutdown();
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
@@ -3717,7 +3682,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // shut down Export and its connectors.
-                ExportManager.instance().shutdown();
+                ExportManagerInterface.instance().shutdown();
 
                 // After sites are terminated, shutdown the DRProducer.
                 // The DRProducer is shared by all sites; don't kill it while any site is active.
@@ -3767,7 +3732,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
 
-                ExportManager.instance().shutdown();
                 m_computationService.shutdown();
                 m_computationService.awaitTermination(1, TimeUnit.DAYS);
                 m_computationService = null;
@@ -4010,7 +3974,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
+                ExportManagerInterface.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
                         requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic service throughput settings
@@ -4046,9 +4010,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 4.5. (added)
                 // Update the NT procedure service AFTER stats are cleared in the previous step
                 m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
-
-                // 4.6 Update scheduler (asynchronously)
-                m_schedulerManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
@@ -4089,6 +4050,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_producerDRGateway.updateCatalog(m_catalogContext,
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
+
+                // 7 Update tasks (asynchronously) after replica change if it occurred
+                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
 
                 new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
@@ -4259,6 +4223,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
+                notifyOfShutdown();
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
                 shutdownInitiators();
                 m_isRunning = false;
@@ -4376,10 +4341,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // Allow export datasources to start consuming their binary deques safely
         // as at this juncture the initial truncation snapshot is already complete
-        ExportManager.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
+        ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
 
         // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-        ExportManager.instance().clientInterfaceStarted(m_clientInterface);
+        ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
 
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
@@ -4462,6 +4427,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_statusTracker.set(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
+            m_taskManager.evaluateReadOnlyMode();
         }
         m_mode = mode;
     }
@@ -4610,10 +4576,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
-            ExportManager.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
+            ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
 
             // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-            ExportManager.instance().clientInterfaceStarted(m_clientInterface);
+            ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData();
@@ -4641,6 +4607,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+
+        m_taskManager.start(m_catalogContext);
 
         if (m_elasticService != null) {
             try {
@@ -4754,7 +4722,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_producerDRGateway.completeInitialization();
             }
         } catch (Exception ex) {
-            CoreUtils.printPortsInUse(hostLog);
+            MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR producer", false, ex);
         }
     }
@@ -4776,7 +4744,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                    VoltDB.getDefaultReplicationInterface());
             }
         } catch (Exception ex) {
-            CoreUtils.printPortsInUse(hostLog);
+            MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
         }
     }
@@ -5029,8 +4997,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         int partitions = getLocalPartitionCount();
         int replicates = m_configuredReplicationFactor;
         int importPartitions = ImportManager.getPartitionsCount();
-        int exportTableCount = ExportManager.instance().getExportTablesCount();
-        int exportNonceCount = ExportManager.instance().getConnCount();
+        int exportTableCount = ExportManagerInterface.instance().getExportTablesCount();
+        int exportNonceCount = ExportManagerInterface.instance().getConnCount();
 
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
 
@@ -5244,8 +5212,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public SchedulerManager getSchedulerManager() {
-        return m_schedulerManager;
+    public TaskManager getTaskManager() {
+        return m_taskManager;
+    }
+
+    @Override
+    public void notifyOfShutdown() {
+        if (m_messenger != null) {
+            Set<Integer> liveHosts = m_messenger.getLiveHostIds();
+            liveHosts.remove(m_messenger.getHostId());
+            SiteFailureForwardMessage msg = new SiteFailureForwardMessage();
+            msg.m_reportingHSId = CoreUtils.getHSIdFromHostAndSite(m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID);
+            for (int hostId : liveHosts) {
+                m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
+            }
+        }
     }
 }
 

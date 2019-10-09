@@ -32,9 +32,9 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.sched.SchedulerManager;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -350,7 +350,12 @@ public interface VoltDBInterface
     public ElasticService getElasticService();
 
     /**
-     * @return The instance of {@link SchedulerManager} which is running in this instance
+     * @return The instance of {@link TaskManager} which is running in this instance
      */
-    public SchedulerManager getSchedulerManager();
+    public TaskManager getTaskManager();
+
+    /**
+     * notify surviving node upon shutting itself down
+     */
+    public void notifyOfShutdown();
 }

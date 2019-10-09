@@ -61,7 +61,9 @@ static inline std::string const enrich(std::string const& a) noexcept {
 }
 #else   // On DEBUG build, enrich our exception message with stack trace of the place it is thrown.
 static inline std::string enrich(std::string src) {
-    return src.append("\nSTACK TRACE:").append(voltdb::StackTrace::stringStackTrace("\t"));
+    return src.append("\nSTACK TRACE:")
+        .append(voltdb::StackTrace::stringStackTrace("\t"))
+        .substr(0, 2048);
 }
 #endif
 

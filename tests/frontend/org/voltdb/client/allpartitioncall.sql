@@ -29,3 +29,7 @@ CREATE PROCEDURE FROM CLASS org.voltdb.client.MultiPartitionProcedureSample;
 
 CREATE PROCEDURE PARTITION ON TABLE TABLE_INT_PARTITION COLUMN value_number1
 FROM CLASS org.voltdb.client.PartitionFailureTestProc;
+
+CREATE PROCEDURE DIRECTED FROM CLASS org.voltdb.client.PartitionedTestProc;
+
+CREATE PROCEDURE PartitionedSQLTestProc DIRECTED AS SELECT COUNT(*) FROM TABLE_INT_PARTITION;

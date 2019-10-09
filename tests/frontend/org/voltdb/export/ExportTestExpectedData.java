@@ -25,6 +25,7 @@ package org.voltdb.export;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -42,7 +43,7 @@ public class ExportTestExpectedData {
     public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
     public final Map<String, Integer> m_expectedRowCount = new HashMap<>();
 
-    private final Map<String, ServerListener> m_severSockets;
+    private final Map<String, ServerListener> m_serverSockets;
     // TODO: support per-table replicated stream check
     private final boolean m_replicated;
     private final boolean m_exact;
@@ -52,15 +53,14 @@ public class ExportTestExpectedData {
 
     public ExportTestExpectedData(Map<String, ServerListener> serverSockets, boolean isExportReplicated, boolean exact,
             int copies) {
-        m_severSockets = serverSockets;
+        m_serverSockets = serverSockets;
         m_replicated = isExportReplicated;
         m_exact = exact;
         m_copies = copies;
     }
 
     public synchronized void addRow(Client client, String tableName, Object partitionHash, Object[] data) {
-        long partition = ((ClientImpl) client).getPartitionForParameter(VoltType.typeFromObject(partitionHash)
-                .getValue(), partitionHash);
+        long partition = getPartitionFromHashinator(client, partitionHash);
         ExportToSocketTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null) {
             verifier = new ExportToSocketTestVerifier(tableName, (int) partition);
@@ -77,11 +77,36 @@ public class ExportTestExpectedData {
         }
     }
 
+    // All export tests using verifiers should ensure their clients have
+    // an initialized hashinator, otherwise some calls to addRow() will be directed to
+    // a partitionId of -1
+    private long getPartitionFromHashinator(Client client, Object partitionHash) {
+        long partition = ((ClientImpl) client).getPartitionForParameter(
+                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+        if (partition != -1) {
+            return partition;
+        }
+        int sleptTimes = 0;
+        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
+            try {
+                Thread.sleep(1);
+                sleptTimes++;
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        assertTrue(sleptTimes < 60000);
+        partition = ((ClientImpl) client).getPartitionForParameter(
+                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+        assertTrue(partition != -1);
+        return partition;
+    }
+
     public synchronized void verifyRows() throws Exception {
         /*
          * Process the row data in each table
          */
-        for (Entry<String, ServerListener> f : m_severSockets.entrySet()) {
+        for (Entry<String, ServerListener> f : m_serverSockets.entrySet()) {
             String tableName = f.getKey();
             System.out.println("Processing Table:" + tableName);
 
@@ -114,7 +139,7 @@ public class ExportTestExpectedData {
     }
 
     public synchronized void ignoreRow(String tableName, long rowId) {
-        ServerListener listener = m_severSockets.get(tableName);
+        ServerListener listener = m_serverSockets.get(tableName);
         if (listener != null) {
             listener.ignoreRow(rowId);
         }
