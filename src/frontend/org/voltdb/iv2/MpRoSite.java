@@ -43,7 +43,6 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
-import org.voltdb.SysprocFaultInjection;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
@@ -348,11 +347,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public InitiatorMailbox getInitiatorMailbox() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
-        }
-
-        @Override
-        public SysprocFaultInjection getInjectedFault() {
-            return VoltDB.instance().getInjectedFault();
         }
     };
 

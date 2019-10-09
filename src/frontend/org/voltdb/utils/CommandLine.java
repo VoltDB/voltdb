@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
+import org.voltdb.SysprocFaultInjection;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.ExporterVersion;
@@ -143,6 +144,7 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
         cl.m_missingHostCount = m_missingHostCount;
+        cl.m_injectedFaults = m_injectedFaults;
 
         return cl;
     }
@@ -468,6 +470,11 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine setForceVoltdbCreate(boolean forceVoltdbCreate)
     {
         m_forceVoltdbCreate = forceVoltdbCreate;
+        return this;
+    }
+
+    public CommandLine injectFaults(List<SysprocFaultInjection> faults) {
+        m_injectedFaults = faults;
         return this;
     }
 
@@ -810,6 +817,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("e2");
         } else if (m_exporterVersion == ExporterVersion.E3) {
             cmdline.add("e3");
+        }
+
+        if (!m_injectedFaults.isEmpty()) {
+            cmdline.add("injectfault");
+            cmdline.add(Joiner.on(',').skipNulls().join(m_injectedFaults));
         }
 
         return cmdline;

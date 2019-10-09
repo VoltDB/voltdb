@@ -23,6 +23,8 @@ import java.util.Map;
 import org.voltdb.DependencyPair;
 import org.voltdb.DependencyPair.TableDependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SysprocFaultInjection;
+import org.voltdb.SysprocFaultInjection.FaultType;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -66,6 +68,7 @@ public class SwapTablesCore extends AdHocBase {
                 };
                 registerUndoAction(undoSwapDR);
                 VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
+                SysprocFaultInjection.check(FaultType.SwapTablesCoreFragment);
             }
             return new TableDependencyPair(SysProcFragmentId.PF_swapTables, dummy);
         }
@@ -90,6 +93,7 @@ public class SwapTablesCore extends AdHocBase {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
         VoltTable[] result = runAdHoc(ctx, serializedBatchData);
 
+        SysprocFaultInjection.check(FaultType.SwapTablesCoreRun);
         String stmt = new String(
                 decodeSerializedBatchData(serializedBatchData).getSecond()[0].sql,
                 Constants.UTF8ENCODING);

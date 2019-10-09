@@ -973,10 +973,10 @@ public class MockVoltDB implements VoltDBInterface
      }
 
     @Override
-    public void injectFault(SysprocFaultInjection injection) {}
+    public void injectFault(List<SysprocFaultInjection> injection) {}
 
     @Override
-    public SysprocFaultInjection getInjectedFault() {
+    public List<SysprocFaultInjection> getInjectedFault() {
         return null;
     }
 }

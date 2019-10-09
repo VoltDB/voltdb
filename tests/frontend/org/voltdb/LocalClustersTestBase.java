@@ -308,7 +308,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
                         m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
-                        false, config.builder, getClass().getSimpleName(), m_methodName, false, ImmutableMap.of());
+                        false, config.builder, getClass().getSimpleName(), m_methodName, false, ImmutableMap.of(), null);
 
                 System.out.println("Creating client for cluster " + clusterNumber);
                 c = lc.createAdminClient(cc);

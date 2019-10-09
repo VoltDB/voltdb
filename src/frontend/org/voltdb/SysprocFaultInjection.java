@@ -17,16 +17,11 @@
 package org.voltdb;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class SysprocFaultInjection {
 
-    private enum FaultType {
-        None,
-        Exception,
-        Crash,
-    }
-
-    private enum FaultInjectionType {
+    public enum FaultType {
         /* SwapTablesCore */
         SwapTablesCoreRun,
         SwapTablesCoreFragment,
@@ -52,59 +47,78 @@ public class SysprocFaultInjection {
     }
 
     private FaultType m_type;
-    private FaultInjectionType m_injectionType;
-    private Exception m_exception;
     private boolean m_once;
     private byte[] m_bitmap;
+    // The host that hits the fault
+    private int m_hostId;
 
-    public SysprocFaultInjection(FaultType faultType, FaultInjectionType injection, boolean once, Exception exception) {
+    public SysprocFaultInjection(FaultType faultType, int hostId, boolean once) {
         m_type = faultType;
-        m_injectionType = injection;
         m_once = once;
-        m_exception = exception;
-        m_bitmap = new byte[FaultInjectionType.values().length];
+        m_hostId = hostId;
+        m_bitmap = new byte[FaultType.values().length];
         Arrays.fill(m_bitmap, (byte)0);
     }
 
     /**
-     * Check if there is any injected fault, trigger the fault if it is set.
-     * @param injection The injected fault, can be null.
+     * For test only. Check if there is any injected fault, trigger the fault if it is set.
+     * @param type The injected fault type.
      * @throws Exception
      */
-    public static void check(SysprocFaultInjection injection) throws Exception {
-        if (injection == null) return;
-        injection.checkInjectedFault();
+    public static void check(FaultType type) {
+        List<SysprocFaultInjection> faults = VoltDB.instance().getInjectedFault();
+        if (faults == null) {
+            return;
+        }
+        int hostId = VoltDB.instance().getHostMessenger().getHostId();
+        for (SysprocFaultInjection fault : faults) {
+            if (type == fault.m_type && hostId == fault.m_hostId) {
+                fault.checkInjectedFault();
+            }
+        }
     }
 
-    public void checkInjectedFault() throws Exception {
+    public void checkInjectedFault() {
         if (m_once) {
-            injectOnce();
+            injectFaultOnce();
         } else {
-            inject();
+            injectFault();
         }
     }
 
-    private void inject() throws Exception {
-        if (m_type == FaultType.Crash) {
-            VoltDB.crashLocalVoltDB("Kill the server due to injected fault: " + m_injectionType);
-        } else if (m_type == FaultType.Exception) {
-            assert (m_exception != null);
-            throw m_exception;
+    private void injectFault() {
+        VoltDB.crashLocalVoltDB("Kill the server due to the injected fault: " + m_type);
+    }
+
+    private void injectFaultOnce() {
+        if (m_bitmap[m_type.ordinal()] == 0) {
+            m_bitmap[m_type.ordinal()] = 1;
+            VoltDB.crashLocalVoltDB("Kill the server due to the injected fault: " + m_type);
         }
     }
 
-    private void injectOnce() throws Exception {
-        if (m_type == FaultType.Crash) {
-            if (m_bitmap[m_injectionType.ordinal()] == (byte)0) {
-                m_bitmap[m_injectionType.ordinal()] = (byte)1;
-                VoltDB.crashLocalVoltDB("Kill the server due to injected fault: " + m_injectionType);
-            }
-        } else if (m_type == FaultType.Exception) {
-            assert (m_exception != null);
-            if (m_bitmap[m_injectionType.ordinal()] == (byte)0) {
-                m_bitmap[m_injectionType.ordinal()] = (byte)1;
-                throw m_exception;
-            }
+    // Valid argument: [FaultType]:[hostId]:[once]
+    // Example: SwapTablesCoreRun:1:false
+    //          BalancePartitionsFirstFragment:0:true
+    public static SysprocFaultInjection parse(String arg) {
+        String[] args = arg.split(":");
+        if (args.length != 3) {
+            return null;
         }
+        String typeStr = args[0];
+        int hostId = Integer.valueOf(args[1]);
+        boolean once = Boolean.valueOf(args[2]);
+        FaultType faultType;
+        try {
+            faultType = FaultType.valueOf(FaultType.class, typeStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+
+        return new SysprocFaultInjection(faultType, hostId, once);
+    }
+
+    public String toString() {
+        return m_type.toString() + ":" + m_hostId + ":" + m_once;
     }
 }

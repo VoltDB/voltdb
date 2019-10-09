@@ -49,6 +49,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.NativeLibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
+import org.voltdb.SysprocFaultInjection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -566,6 +567,10 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.pathToDeployment(pathToDeployment);
         m_voltdbroot = pathToVoltDBRoot;
         m_compiled = true;
+    }
+
+    public void setInjectFaults(List<SysprocFaultInjection> faults) {
+        templateCmdLine.injectFaults(faults);
     }
 
     public void setFilePrefix(VoltFile filePrefix) {
@@ -2236,7 +2241,7 @@ public class LocalCluster extends VoltServerConfig {
             Map<String, String> javaProps) throws IOException {
         return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort,
                 remoteReplicationPort, pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, null,
-                callingMethodName, enableSPIMigration, javaProps);
+                callingMethodName, enableSPIMigration, javaProps, null);
     }
 
     public static LocalCluster createLocalCluster(
@@ -2244,7 +2249,8 @@ public class LocalCluster extends VoltServerConfig {
             int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
             DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
             String callingClassName, String callingMethodName,
-            boolean enableSPIMigration, Map<String, String> javaProps) throws IOException {
+            boolean enableSPIMigration, Map<String, String> javaProps,
+            List<SysprocFaultInjection> injectFaults) throws IOException {
         if (builder == null) {
             builder = new VoltProjectBuilder();
         }
@@ -2265,6 +2271,9 @@ public class LocalCluster extends VoltServerConfig {
             for (Map.Entry<String, String> prop : javaProps.entrySet()) {
                 lc.setJavaProperty(prop.getKey(), prop.getValue());
             }
+        }
+        if (injectFaults != null) {
+            lc.setInjectFaults(injectFaults);
         }
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);

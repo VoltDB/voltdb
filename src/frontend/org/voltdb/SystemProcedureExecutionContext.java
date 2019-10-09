@@ -125,6 +125,4 @@ public interface SystemProcedureExecutionContext {
                                                List<DBBPool.BBContainer> outputBuffers);
 
     public InitiatorMailbox getInitiatorMailbox();
-
-    public SysprocFaultInjection getInjectedFault();
 }

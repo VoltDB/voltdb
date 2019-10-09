@@ -29,6 +29,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SysprocFaultInjection;
+import org.voltdb.SysprocFaultInjection.FaultType;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -84,6 +86,7 @@ public class UpdateSettings extends VoltSystemProcedure {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " reached settings update barrier.");
             }
+            SysprocFaultInjection.check(FaultType.UpdateSettingsFirstFragment);
             return success;
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrierAggregate) {
@@ -101,6 +104,7 @@ public class UpdateSettings extends VoltSystemProcedure {
                 throw new SettingsException(msg, e);
             }
             log.info("Saved new cluster settings state");
+            SysprocFaultInjection.check(FaultType.UpdateSettingsFirstFragmentAggregate);
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrierAggregate,
                     getVersionResponse(stat.getVersion()));
 
@@ -114,12 +118,14 @@ public class UpdateSettings extends VoltSystemProcedure {
                     getVoltDB().settingsUpdate(settings, version);
 
             context.updateSettings(catalogContext);
+            SysprocFaultInjection.check(FaultType.UpdateSettingsSecondFragment);
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
+            SysprocFaultInjection.check(FaultType.UpdateSettingsSecondFragmentAggregate);
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateSettings));
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsAggregate, result);
 
@@ -156,6 +162,7 @@ public class UpdateSettings extends VoltSystemProcedure {
             throw new VoltAbortException(msg);
         }
         final int version = stat.getVersion();
+        SysprocFaultInjection.check(FaultType.UpdateSettingsRun);
 
         executeSysProcPlanFragments(
                 createBarrierFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsBarrierAggregate);
