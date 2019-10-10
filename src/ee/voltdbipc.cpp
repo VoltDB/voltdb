@@ -975,6 +975,9 @@ int VoltDBIPC::callJavaUserDefinedFunction() {
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateStart(int functionId) {
+    ReferenceSerializeOutput udfOutput(m_udfBuffer, MAX_MSG_SZ);
+    udfOutput.writeInt(sizeof(functionId));
+    udfOutput.writeInt(functionId);
     return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateStart);
 }
 
