@@ -67,7 +67,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // only once on the node.
             JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
             // Analyze join conditions
-            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            tableNode.analyzeJoinExpressions(m_parsedStmt);
             // these just shouldn't happen right?
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 

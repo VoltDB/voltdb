@@ -284,7 +284,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             // Analyze join and filter conditions
-            joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            joinTree.analyzeJoinExpressions(m_parsedStmt);
             // a query that is a little too quirky or complicated.
             if (!m_parsedStmt.m_noTableSelectionList.isEmpty()) {
                 throw new PlanningErrorException("Join with filters that do not depend on joined tables is not supported in VoltDB");
@@ -704,8 +704,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean canHaveNLJ = true;
         boolean canHaveNLIJ = true;
         if (innerPlan instanceof IndexScanPlanNode) {
-            if (hasInnerOuterIndexExpression(
-                        joinNode.getRightNode().getTableAlias(), innerAccessPath.indexExprs,
+            if (hasInnerOuterIndexExpression(joinNode.getRightNode().getTableAlias(), innerAccessPath.indexExprs,
                         innerAccessPath.initialExpr, innerAccessPath.endExprs)) {
                 canHaveNLJ = false;
             }
@@ -779,7 +778,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // right child node.
             if (needInnerSendReceive) {
                 // This trick only works once per plan.
-                if (outerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class) || innerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class)) {
+                if (outerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class) ||
+                        innerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class)) {
                     return null;
                 }
                 innerPlan = addSendReceivePair(innerPlan);

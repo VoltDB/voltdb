@@ -24,6 +24,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.ExpressionType;
@@ -50,6 +51,7 @@ public abstract class JoinNode implements Cloneable {
     public final List<AbstractExpression> m_whereOuterList = new ArrayList<>();
     public final List<AbstractExpression> m_whereInnerList = new ArrayList<>();
     public final List<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
+    protected Set<String> m_tableAliases = new HashSet<>();
 
     // All possible access paths for this node
     public List<AccessPath> m_accessPaths = new ArrayList<>();
@@ -314,7 +316,7 @@ public abstract class JoinNode implements Cloneable {
      * Reconstruct a join tree from the list of tables always appending the next node to the right.
      *
      * @param tableNodes the list of tables to build the tree from.
-     * @param JoinType the join type for all the joins
+     * @param joinType the join type for all the joins
      * @return The reconstructed tree
      */
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes, JoinType joinType) {
@@ -368,9 +370,10 @@ public abstract class JoinNode implements Cloneable {
         return false;
     }
 
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+        m_tableAliases = new HashSet<>(stmt.m_joinTree.generateTableJoinOrder());
     }
 
     /**

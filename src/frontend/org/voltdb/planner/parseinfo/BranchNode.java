@@ -22,6 +22,7 @@ import java.util.*;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.JoinType;
 
@@ -99,11 +100,11 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         JoinNode leftChild = getLeftNode();
         JoinNode rightChild = getRightNode();
-        leftChild.analyzeJoinExpressions(noneList);
-        rightChild.analyzeJoinExpressions(noneList);
+        leftChild.analyzeJoinExpressions(stmt);
+        rightChild.analyzeJoinExpressions(stmt);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
@@ -147,7 +148,7 @@ public class BranchNode extends JoinNode {
         // for the currently supported two table joins but could change if number of tables > 2.
         // Constant Value Expression may fall into this category.
         classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
-                m_joinInnerList, m_joinInnerOuterList, noneList);
+                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList);
 
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
@@ -164,16 +165,16 @@ public class BranchNode extends JoinNode {
         // 3. The two-sided expressions. Same as the inner only conditions.
         // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
         classifyJoinExpressions(whereList, outerTables, innerTables,  m_whereOuterList,
-                m_whereInnerList, m_whereInnerOuterList, noneList);
+                m_whereInnerList, m_whereInnerOuterList, stmt.m_noTableSelectionList);
 
         // Apply implied transitive constant filter to where expressions
         applyTransitiveEquivalence(m_whereOuterList, m_whereInnerList, m_whereInnerOuterList);
 
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
-        pushDownExpressions(noneList);
+        pushDownExpressions(stmt.m_noTableSelectionList);
 
-        Iterator<AbstractExpression> iter = noneList.iterator();
+        Iterator<AbstractExpression> iter = stmt.m_noTableSelectionList.iterator();
         while (iter.hasNext()) {
             AbstractExpression noneExpr = iter.next();
             // Allow only CVE(TRUE/FALSE) for now.
