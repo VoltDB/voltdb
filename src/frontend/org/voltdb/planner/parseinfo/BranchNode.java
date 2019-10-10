@@ -17,13 +17,7 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -38,9 +32,9 @@ public class BranchNode extends JoinNode {
     // Join type
     private JoinType m_joinType;
     // Left child
-    private JoinNode m_leftNode = null;
+    private JoinNode m_leftNode;
     // Right child
-    private JoinNode m_rightNode = null;
+    private JoinNode m_rightNode;
     // index into the query catalog cache for a table alias
 
     /**
@@ -97,6 +91,11 @@ public class BranchNode extends JoinNode {
     public JoinNode getRightNode() {
         assert(m_rightNode != null);
         return m_rightNode;
+    }
+
+    @Override
+    public String getTableAlias() {
+        return null;
     }
 
     @Override
@@ -204,8 +203,7 @@ public class BranchNode extends JoinNode {
      *  3. The WHERE expressions must be preserved for the FULL join type.
      * @param joinNode JoinNode
      */
-    protected void pushDownExpressions(List<AbstractExpression> noneList)
-    {
+    protected void pushDownExpressions(List<AbstractExpression> noneList) {
         JoinType joinType = getJoinType();
         if (joinType == JoinType.FULL) {
             return;
@@ -221,8 +219,7 @@ public class BranchNode extends JoinNode {
     }
 
     private void pushDownExpressionsRecursively(List<AbstractExpression> pushDownExprList,
-            List<AbstractExpression> noneList)
-    {
+            List<AbstractExpression> noneList) {
         // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
         // WHERE expressions.
         Collection<String> outerTables = getLeftNode().generateTableJoinOrder();
@@ -239,7 +236,7 @@ public class BranchNode extends JoinNode {
     public void explain_recurse(StringBuilder sb, String indent) {
 
         // Node id. Must be unique within a given tree
-        sb.append(indent).append("JOIN NODE id: " + m_id).append("\n");
+        sb.append(indent).append("JOIN NODE id: ").append(m_id).append("\n");
 
         // Join expression associated with this node
         if (m_joinExpr != null) {
@@ -273,36 +270,30 @@ public class BranchNode extends JoinNode {
 
     @Override
     protected void collectEquivalenceFilters(
-            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes) {
+            Map<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
+            Deque<JoinNode> joinNodes) {
         //* enable to debug */ System.out.println("DEBUG: Branch cEF in  " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
         if ( ! m_whereInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList, equivalenceSet);
         }
         if ( ! m_whereOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereOuterList, equivalenceSet);
         }
         if ( ! m_whereInnerOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerOuterList, equivalenceSet);
         }
         if ( ! m_joinInnerOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList, equivalenceSet);
         }
         // One-sided join criteria can not be used to infer single partitioining for a
         // non-inner query. In general, they do not prevent results from being generated
         // on the partitions that don't have partition-key-qualified rows.
         if (m_joinType == JoinType.INNER) {
             if ( ! m_joinInnerList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
-                                                          equivalenceSet);
+                ExpressionUtil.collectPartitioningFilters(m_joinInnerList, equivalenceSet);
             }
             if ( ! m_joinOuterList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(m_joinOuterList,
-                                                          equivalenceSet);
+                ExpressionUtil.collectPartitioningFilters(m_joinOuterList, equivalenceSet);
             }
         }
 
@@ -356,25 +347,23 @@ public class BranchNode extends JoinNode {
 
             // Leaf nodes don't have a significant join type,
             // test for them first and never attempt to start a new tree at a leaf.
-            if ( ! (child instanceof BranchNode)) {
-                continue;
-            }
-
-            if (((BranchNode)child).m_joinType == m_joinType) {
-                // The join type for this node is the same as the root's one
-                // Keep walking down the tree
-                child.extractSubTree(leafNodes);
-            } else {
-                // The join type for this join differs from the root's one
-                // Terminate the sub-tree
-                leafNodes.add(child);
-                // Replace the join node with the temporary node having the id negated
-                JoinNode tempNode = new TableLeafNode(
-                        -child.m_id, child.m_joinExpr, child.m_whereExpr, null);
-                if (child == m_leftNode) {
-                    m_leftNode = tempNode;
+            if (child instanceof BranchNode) {
+                if (((BranchNode) child).m_joinType == m_joinType) {
+                    // The join type for this node is the same as the root's one
+                    // Keep walking down the tree
+                    child.extractSubTree(leafNodes);
                 } else {
-                    m_rightNode = tempNode;
+                    // The join type for this join differs from the root's one
+                    // Terminate the sub-tree
+                    leafNodes.add(child);
+                    // Replace the join node with the temporary node having the id negated
+                    JoinNode tempNode = new TableLeafNode(
+                            -child.m_id, child.m_joinExpr, child.m_whereExpr, null);
+                    if (child == m_leftNode) {
+                        m_leftNode = tempNode;
+                    } else {
+                        m_rightNode = tempNode;
+                    }
                 }
             }
         }
@@ -406,14 +395,15 @@ public class BranchNode extends JoinNode {
 
     @Override
     public boolean hasSubqueryScans() {
-        if ((m_leftNode != null) && m_leftNode.hasSubqueryScans()) {
+        if (m_leftNode != null && m_leftNode.hasSubqueryScans()) {
             return true;
+        } else {
+            return m_rightNode != null && m_rightNode.hasSubqueryScans();
         }
-        return (m_rightNode != null && m_rightNode.hasSubqueryScans());
     }
 
     @Override
-    protected void listNodesJoinOrderRecursive(ArrayList<JoinNode> nodes, boolean appendBranchNodes) {
+    protected void listNodesJoinOrderRecursive(List<JoinNode> nodes, boolean appendBranchNodes) {
         m_leftNode.listNodesJoinOrderRecursive(nodes, appendBranchNodes);
         m_rightNode.listNodesJoinOrderRecursive(nodes, appendBranchNodes);
         if (appendBranchNodes) {
@@ -422,7 +412,7 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    protected void queueChildren(ArrayDeque<JoinNode> joinNodes) {
+    protected void queueChildren(Deque<JoinNode> joinNodes) {
         joinNodes.add(m_leftNode);
         joinNodes.add(m_rightNode);
     }
@@ -434,18 +424,14 @@ public class BranchNode extends JoinNode {
         if (Math.abs(m_leftNode.m_id) == Math.abs(node.m_id)) {
             m_leftNode = node;
             return true;
-        }
-        if (Math.abs(m_rightNode.m_id) == Math.abs(node.m_id)) {
+        } else if (Math.abs(m_rightNode.m_id) == Math.abs(node.m_id)) {
             m_rightNode = node;
             return true;
-        }
-        if (m_leftNode.replaceChild(node)) {
+        } else if (m_leftNode.replaceChild(node)) {
             return true;
+        } else {
+            return m_rightNode.replaceChild(node);
         }
-        if (m_rightNode.replaceChild(node)) {
-            return true;
-        }
-        return false;
     }
 
     /**

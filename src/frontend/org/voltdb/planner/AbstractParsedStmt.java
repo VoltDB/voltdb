@@ -1639,7 +1639,7 @@ public abstract class AbstractParsedStmt {
      * TupleValueExpressions, ConstantValueExpressions, or ParameterValueExpressions,
      * that they are constrained to equal.
      */
-    HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
+    Map<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
         m_joinTree.analyzeJoinExpressions(m_noTableSelectionList);
         return m_joinTree.getAllEquivalenceFilters();
@@ -2064,7 +2064,7 @@ public abstract class AbstractParsedStmt {
             return;
         }
 
-        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence =
+        Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence =
                 analyzeValueEquivalence();
         for (ParsedColInfo colInfo : candidateColumns) {
             AbstractExpression colExpr = colInfo.m_expression;
@@ -2303,7 +2303,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // Collect value equivalence expression for the SQL statement
-        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+        Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
 
         // If no value equivalence filter defined in SQL statement, there's no use to continue
         if (valueEquivalence.isEmpty()) {

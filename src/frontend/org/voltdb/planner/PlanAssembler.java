@@ -364,7 +364,7 @@ public class PlanAssembler {
             // This throws off the accounting of equivalence join filters until they can be
             // normalized in analyzeJoinFilters, but that normalization process happens on a
             // per-join-order basis, and so, so must this analysis.
-            HashMap<AbstractExpression, Set<AbstractExpression>>
+            Map<AbstractExpression, Set<AbstractExpression>>
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
             Collection<StmtTableScan> scans = parsedStmt.allScans();
             m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);

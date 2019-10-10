@@ -306,7 +306,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // detected, skip the plan generation for that particular ordering.
                 // If this causes all plans to be skipped, commonly the case, the PlanAssembler
                 // should propagate an error message identifying partitioning as the problem.
-                HashMap<AbstractExpression, Set<AbstractExpression>>
+                Map<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
                 Collection<StmtTableScan> scans = m_parsedStmt.allScans();
                 m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
