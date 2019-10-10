@@ -130,10 +130,9 @@ public:
         output.writeDouble(getLatitude());
     }
 
-    size_t hashCombine(std::size_t seed) const {
+    void hashCombine(std::size_t& seed) const {
         MiscUtil::hashCombineFloatingPoint(seed, m_longitude);
         MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
-        return seed;
     }
 
     std::string toString() const {
