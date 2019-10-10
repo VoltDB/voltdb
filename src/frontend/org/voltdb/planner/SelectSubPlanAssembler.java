@@ -53,10 +53,10 @@ import org.voltdb.utils.PermutationGenerator;
 public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /** The list of generated plans. This allows their generation in batches.*/
-    ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<>();
+    Deque<AbstractPlanNode> m_plans = new ArrayDeque<>();
 
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
-    private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
+    private Deque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
     private static final Runtime RUN_TIME = Runtime.getRuntime();
     // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
@@ -97,7 +97,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Compute every permutation of the list of involved tables and put them in a deque.
      * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
-    public static ArrayDeque<JoinNode> queueJoinOrders(JoinNode joinNode, boolean findAll) {
+    public static Deque<JoinNode> queueJoinOrders(JoinNode joinNode, boolean findAll) {
         assert(joinNode != null);
 
         // Clone the original
@@ -106,7 +106,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
         // Generate possible join orders for each sub-tree separately
-        ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
+        List<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
         ArrayDeque<JoinNode> joinOrders = new ArrayDeque<>();
         queueSubJoinOrders(joinOrderList, 0, new ArrayList<>(), joinOrders, findAll);
@@ -114,29 +114,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     private static void queueSubJoinOrders(List<List<JoinNode>> joinOrderList, int joinOrderListIdx,
-            ArrayList<JoinNode> currentJoinOrder, ArrayDeque<JoinNode> joinOrders, boolean findAll) {
+            List<JoinNode> currentJoinOrder, Deque<JoinNode> joinOrders, boolean findAll) {
         if (!findAll && joinOrders.size() > 0) {
             // At least find one valid join order
-            return;
-        }
-
-        if (joinOrderListIdx == joinOrderList.size()) {
+        } else if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
             JoinNode joinTree = JoinNode.reconstructJoinTreeFromSubTrees(currentJoinOrder);
             joinOrders.add(joinTree);
-            return;
-        }
-        // Recursive step
-        List<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
-        for (JoinNode headTree: nextTrees) {
-            ArrayList<JoinNode> updatedJoinOrder = new ArrayList<>();
-            // Order is important: The top sub-trees must be first
-            for (JoinNode node : currentJoinOrder) {
-                updatedJoinOrder.add((JoinNode)node.clone());
+        } else {
+            // Recursive step
+            List<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
+            for (JoinNode headTree : nextTrees) {
+                ArrayList<JoinNode> updatedJoinOrder = new ArrayList<>();
+                // Order is important: The top sub-trees must be first
+                for (JoinNode node : currentJoinOrder) {
+                    updatedJoinOrder.add((JoinNode) node.clone());
+                }
+                updatedJoinOrder.add((JoinNode) headTree.clone());
+                queueSubJoinOrders(joinOrderList, joinOrderListIdx + 1, updatedJoinOrder, joinOrders, findAll);
             }
-            updatedJoinOrder.add((JoinNode)headTree.clone());
-            queueSubJoinOrders(joinOrderList, joinOrderListIdx + 1, updatedJoinOrder, joinOrders, findAll);
         }
     }
 
@@ -147,8 +144,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param subTrees the list of join trees.
      * @return The list containing the list of trees of all possible permutations of the input trees
      */
-    private static ArrayList<List<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
-        ArrayList<List<JoinNode>> permutations = new ArrayList<>();
+    private static List<List<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
+        List<List<JoinNode>> permutations = new ArrayList<>();
         for (JoinNode subTree : subTrees) {
             permutations.add(generateJoinOrdersForTree(subTree));
         }
@@ -389,7 +386,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         JoinType joinType = parentNode.getJoinType();
         // For LEFT and FULL join types, the outer join expressions are kept as a pre-join predicate
         // at the join node to pre-qualify the outer rows
-        List<AbstractExpression> joinOuterList =  (joinType == JoinType.INNER) ?
+        List<AbstractExpression> joinOuterList =  joinType == JoinType.INNER ?
                 parentNode.m_joinOuterList : null;
         if (outerChildNode instanceof BranchNode) {
             generateOuterAccessPaths((BranchNode)outerChildNode);
@@ -484,9 +481,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // Don't bother generating these redundant or inferior access paths unless there is
         // an inner-outer expression and a chance that NLIJ will be taken out of the running.
-        boolean mayNeedInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
-                (m_partitioning.getCountOfPartitionedTables() > 0) &&
-                (parentNode.getJoinType() != JoinType.INNER) &&
+        boolean mayNeedInnerSendReceive = ! m_partitioning.wasSpecifiedAsSingle() &&
+                m_partitioning.getCountOfPartitionedTables() > 0 &&
+                parentNode.getJoinType() != JoinType.INNER &&
                 ! innerTable.getIsReplicated();
 // too expensive/complicated to test here? (parentNode.m_leftNode has a replicated result?) &&
 
@@ -542,16 +539,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 }
                 m_plans.add(plan);
             }
-            return;
-        }
-
-        // If we have drained heap memory, don't recurse further on.
-        if (! m_plans.isEmpty() && m_plans.size() % PLAN_ESTIMATE_PERIOD == 0 && shouldStopPlanning()) {
-            return;
-        }
-        for (AccessPath path : joinNode.m_accessPaths) {
-            joinNode.m_currentAccessPath = path;
-            generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
+        } else if (! m_plans.isEmpty() && m_plans.size() % PLAN_ESTIMATE_PERIOD == 0 && shouldStopPlanning()) {
+            // If we have drained heap memory, don't recurse further on.
+        } else {
+            for (AccessPath path : joinNode.m_accessPaths) {
+                joinNode.m_currentAccessPath = path;
+                generateSubPlanForJoinNodeRecursively(rootNode, nextNode + 1, nodes);
+            }
         }
     }
 
@@ -580,9 +574,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return null;
             }
             // Join Node
-            IndexSortablePlanNode answer = getSelectSubPlanForJoin(branchJoinNode,
-                                                              outerScanPlan,
-                                                              innerScanPlan);
+            IndexSortablePlanNode answer = getSelectSubPlanForJoin(branchJoinNode, outerScanPlan, innerScanPlan);
             // Propagate information used for order by clauses in window functions
             // and the statement level order by clause.  This is only if the
             // branch node is an inner join.
@@ -633,7 +625,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private IndexSortablePlanNode getSelectSubPlanForJoin(
             BranchNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
         // Filter (post-join) expressions
-        ArrayList<AbstractExpression> whereClauses  = new ArrayList<>();
+        List<AbstractExpression> whereClauses  = new ArrayList<>();
         whereClauses.addAll(joinNode.m_whereInnerList);
         whereClauses.addAll(joinNode.m_whereInnerOuterList);
         if (joinNode.getJoinType() == JoinType.FULL) {
@@ -726,14 +718,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             canHaveNLJ = false;
         }
 
-        AbstractJoinPlanNode ajNode = null;
+        AbstractJoinPlanNode ajNode;
         if (canHaveNLJ) {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             // get all the clauses that join the applicable two tables
             // Copy innerAccessPath.joinExprs to leave it unchanged,
             // avoiding accumulation of redundant expressions when
             // joinClauses gets built up for various alternative plans.
-            ArrayList<AbstractExpression> joinClauses = new ArrayList<>(innerAccessPath.joinExprs);
+            List<AbstractExpression> joinClauses = new ArrayList<>(innerAccessPath.joinExprs);
             if ((innerPlan instanceof IndexScanPlanNode) ||
                 (innerPlan instanceof NestLoopIndexPlanNode
                     && innerPlan.getChild(0) instanceof MaterializedScanPlanNode)) {
@@ -850,7 +842,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private static boolean hasInnerOuterIndexExpression(
             String innerTableAlias, Collection<AbstractExpression> indexExprs,
             Collection<AbstractExpression> initialExpr, Collection<AbstractExpression> endExprs) {
-        HashSet<AbstractExpression> indexedExprs = new HashSet<>();
+        Set<AbstractExpression> indexedExprs = new HashSet<>();
         indexedExprs.addAll(indexExprs);
         indexedExprs.addAll(initialExpr);
         indexedExprs.addAll(endExprs);
@@ -859,7 +851,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             Collection<TupleValueExpression> indexedTVEs =
                     indexed.findAllTupleValueSubexpressions();
             for (AbstractExpression indexedTVExpr : indexedTVEs) {
-                if ( ! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTableAlias)) {
+                if (! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTableAlias)) {
                     return true;
                 }
             }
