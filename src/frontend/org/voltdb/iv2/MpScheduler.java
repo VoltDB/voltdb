@@ -324,9 +324,7 @@ public class MpScheduler extends Scheduler
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters,
-                    message,
-                    localId,
-                    true);
+                    message);
             safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
