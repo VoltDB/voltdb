@@ -848,12 +848,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         indexedExprs.addAll(endExprs);
         // Find an outer TVE by ignoring any TVEs based on the inner table.
         for (AbstractExpression indexed : indexedExprs) {
-            Collection<TupleValueExpression> indexedTVEs =
-                    indexed.findAllTupleValueSubexpressions();
-            for (AbstractExpression indexedTVExpr : indexedTVEs) {
-                if (! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTableAlias)) {
-                    return true;
-                }
+            if (! indexed.findAllTupleValueSubexpressions().stream()
+                    .allMatch(e -> TupleValueExpression.isOperandDependentOnTable(e, innerTableAlias))) {
+                return true;
             }
         }
         return false;
