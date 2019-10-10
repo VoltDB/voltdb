@@ -478,6 +478,11 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine clearInjectedFaults() {
+        m_injectedFaults.clear();
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term

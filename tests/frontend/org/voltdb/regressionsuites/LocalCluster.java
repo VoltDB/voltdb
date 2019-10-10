@@ -573,6 +573,10 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.injectFaults(faults);
     }
 
+    public void clearInjectedFaults() {
+        templateCmdLine.clearInjectedFaults();
+    }
+
     public void setFilePrefix(VoltFile filePrefix) {
         m_filePrefix = filePrefix;
     }
