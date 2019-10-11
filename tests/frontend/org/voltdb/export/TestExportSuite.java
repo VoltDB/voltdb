@@ -27,7 +27,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -228,27 +227,29 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             params = convertValsToParams("S_NO_NULLS", i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
+
+        String snapshotDir = "/tmp/" + System.getProperty("user.name");
+
         // this blocks until the snapshot is complete
-        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testExportPlusSnapshot", (byte)1).getResults();
+        client.callProcedure("@SnapshotSave", snapshotDir, "testExportPlusSnapshot", (byte) 1).getResults();
 
         // verify. copied from TestSaveRestoreSysprocSuite
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final PrintStream ps = new PrintStream(baos);
         final PrintStream original = System.out;
-        new java.io.File("/tmp/" + System.getProperty("user.name")).mkdir();
+        new java.io.File(snapshotDir).mkdir();
         try {
             System.setOut(ps);
             final String args[] = new String[] {
                     "testExportPlusSnapshot",
                     "--dir",
-                    "/tmp/" + System.getProperty("user.name")
+                    snapshotDir
             };
             SnapshotVerifier.main(args);
             ps.flush();
             final String reportString = baos.toString("UTF-8");
-            assertTrue(reportString.startsWith("Snapshot valid\n"));
-        } catch (final UnsupportedEncodingException e) {}
-        finally {
+            assertTrue(reportString, reportString.contains("Snapshot valid\n"));
+        } finally {
             System.setOut(original);
         }
 
