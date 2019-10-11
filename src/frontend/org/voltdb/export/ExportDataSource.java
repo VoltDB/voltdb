@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -97,7 +96,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_siteId;
     private String m_exportTargetName = "";
     private long m_tupleCount = 0;
-    private AtomicInteger m_tuplesPending = new AtomicInteger(0);
     private long m_lastQueuedTimestamp = 0;
     private long m_lastAckedTimestamp = 0;
     private long m_averageLatency = 0; // for current counting-session
@@ -518,8 +516,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_lastReleasedSeqNo = releaseSeqNo;
-        int tuplesDeleted = m_gapTracker.truncate(releaseSeqNo);
-        m_tuplesPending.addAndGet(-tuplesDeleted);
+        m_gapTracker.truncate(releaseSeqNo);
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
         // Next poll starts from this number, if it sit in between buffers and stream is active, next poll will
@@ -682,8 +679,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // an export client configured
                     exportingRole = (m_coordinator.isMaster() && m_client != null  ? "TRUE" : "FALSE");
                 }
+
+                // Note: pending tuples are calculated regardless of any gaps
+                int tPend = (int) (m_tupleCount - m_lastReleasedSeqNo);
+
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
-                        exportingRole, m_tupleCount, m_tuplesPending.get(),
+                        exportingRole, m_tupleCount, tPend,
                         m_lastQueuedTimestamp, m_lastAckedTimestamp,
                         avgLatency, maxLatency, m_queueGap, m_status.toString());
             }
@@ -716,9 +717,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             final BBContainer cont = DBBPool.wrapBB(buffer);
 
+            // Count the tuples even if already acked by another replica
+            assert(lastSequenceNumber > m_tupleCount);
+            m_tupleCount = lastSequenceNumber;
+
             // Drop already acked buffer
             if (isAcked(lastSequenceNumber)) {
-                m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Dropping already acked buffer. " +
                             " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
@@ -763,8 +767,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
 
                 m_lastQueuedTimestamp = sb.getTimestamp();
-                m_tupleCount += newTuples;
-                m_tuplesPending.addAndGet((int)newTuples);
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -860,18 +862,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                     // From snapshot restore the stream internal state and sequence number
                     // should start from beginning
-                    long seqNo = 0L;
+                    m_tupleCount = 0L;
                     if (action == StreamStartAction.RECOVER || action == StreamStartAction.REJOIN) {
-                        seqNo = sequenceNumber;
-                        m_coordinator.setInitialSequenceNumber(seqNo);
+                        m_tupleCount = sequenceNumber;
+                        m_coordinator.setInitialSequenceNumber(m_tupleCount);
                     }
-                    m_tupleCount = seqNo;
 
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(seqNo, action);
+                    resetStateInRejoinOrRecover(m_tupleCount, action);
 
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncating tracker via snapshot truncation to " + seqNo +
+                        exportLog.debug("Truncating tracker via snapshot truncation to " + m_tupleCount +
                                 ", action is " + action +
                                 ", tracker map is " + m_gapTracker.toString());
                     }
@@ -1194,8 +1195,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 // Discard the blocks
                 for (StreamBlock sb : blocksToDelete) {
-                    int tuplesDeleted = m_gapTracker.truncate(sb.lastSequenceNumber());
-                    m_tuplesPending.addAndGet(-tuplesDeleted);
+                    m_gapTracker.truncate(sb.lastSequenceNumber());
                     sb.discard();
                 }
             }
@@ -1549,7 +1549,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         // Rejoin or recovery should be on a transaction boundary (except maybe in a gap situation)
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
-        m_tuplesPending.set(m_gapTracker.sizeInSequence());
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " reset state in " + action
                     + ", initial seqNo " + initialSequenceNumber + ", last released/committed " + m_lastReleasedSeqNo
