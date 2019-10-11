@@ -100,7 +100,7 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
+    public boolean analyzeJoinExpressions(AbstractParsedStmt stmt) {
         JoinNode leftChild = getLeftNode();
         JoinNode rightChild = getRightNode();
         leftChild.analyzeJoinExpressions(stmt);
@@ -109,12 +109,9 @@ public class BranchNode extends JoinNode {
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        List<AbstractExpression> joinList = new ArrayList<>();
-        List<AbstractExpression> whereList = new ArrayList<>();
-
         // Collect node's own join and where expressions
-        joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
-        whereList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+        List<AbstractExpression> joinList = new ArrayList<>(ExpressionUtil.uncombineAny(getJoinExpression()));
+        List<AbstractExpression> whereList = new ArrayList<>(ExpressionUtil.uncombineAny(getWhereExpression()));
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
         if (! (leftChild instanceof BranchNode)) {
@@ -147,8 +144,11 @@ public class BranchNode extends JoinNode {
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
         // for the currently supported two table joins but could change if number of tables > 2.
         // Constant Value Expression may fall into this category.
-        classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
-                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList);
+        if (! classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
+                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList)) {
+            // current JOIN order is not plannable because of #4 above.
+            return false;
+        }
 
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
@@ -192,7 +192,7 @@ public class BranchNode extends JoinNode {
                 iter.remove();
             }
         }
-
+        return true;
     }
 
     /**

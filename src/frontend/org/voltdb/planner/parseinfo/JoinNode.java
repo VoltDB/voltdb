@@ -370,10 +370,16 @@ public abstract class JoinNode implements Cloneable {
         return false;
     }
 
-    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
+    /**
+     * Analyze the m_joinTree structure to extract useful components.
+     * @param stmt parsed statement
+     * @return true if the Join expression is successfully analyzed, and can be added as a plan candidate.
+     */
+    public boolean analyzeJoinExpressions(AbstractParsedStmt stmt) {
         m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
         m_tableAliases = new HashSet<>(stmt.m_joinTree.generateTableJoinOrder());
+        return true;
     }
 
     /**
@@ -450,7 +456,7 @@ public abstract class JoinNode implements Cloneable {
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
      */
-    protected static void classifyJoinExpressions(Collection<AbstractExpression> exprList,
+    protected static boolean classifyJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<String> outerTables, Collection<String> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
             List<AbstractExpression> innerOuterList, List<AbstractExpression> noneList) {
@@ -467,8 +473,10 @@ public abstract class JoinNode implements Cloneable {
                 final boolean
                         outer = tableAliasSet.stream().anyMatch(outerSet::contains),
                         inner = tableAliasSet.stream().anyMatch(innerSet::contains);
-                assert outer || inner : "Outer and inner tables does not contain all the aliases used";
-                if (outer && inner) {
+                // assert outer || inner : "Outer and inner tables does not contain all the aliases used";
+                if (! outer && ! inner) {   // alias not found in either outer/inner table. This happens in multi-join query.
+                    return false;
+                } else if (outer && inner) {
                     innerOuterList.add(expr);
                 } else if (outer) {
                     outerList.add(expr);
@@ -477,6 +485,7 @@ public abstract class JoinNode implements Cloneable {
                 }
             }
         }
+        return true;
     }
 
     private static Set<String> getTablesForExpression(AbstractExpression expr) {

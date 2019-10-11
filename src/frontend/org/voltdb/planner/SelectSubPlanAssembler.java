@@ -278,12 +278,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // no more join orders => no more plans to generate
             if (joinTree == null) {
                 return null;
-            }
-
-            // Analyze join and filter conditions
-            joinTree.analyzeJoinExpressions(m_parsedStmt);
-            // a query that is a little too quirky or complicated.
-            if (!m_parsedStmt.m_noTableSelectionList.isEmpty()) {
+            } else if (! joinTree.analyzeJoinExpressions(m_parsedStmt)) {
+                // current join order is not plannable
+                return null;
+            } else if (! m_parsedStmt.m_noTableSelectionList.isEmpty()) {
+                // a query that is a little too quirky or complicated.
                 throw new PlanningErrorException("Join with filters that do not depend on joined tables is not supported in VoltDB");
             }
 

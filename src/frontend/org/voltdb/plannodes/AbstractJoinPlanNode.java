@@ -360,8 +360,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
                 index = tve.setColumnIndexUsingSchema(inner_schema);
                 if (index == -1) {
                     throw new RuntimeException(
-                            "Unable to resolve column index for join TVE: " +
-                            tve.toString());
+                            "Unable to resolve column index for join TVE: " + tve.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
