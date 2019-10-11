@@ -243,6 +243,16 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     }
 
+    public void testIndexScan() {
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
+                + "{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}},"
+                + "{\"COLUMN_NAME\":\"III\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]}],"
+                + "\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"RIGHT\":"
+                + "{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":2}},\"TARGET_TABLE_NAME\":\"RI5\",\"TARGET_TABLE_ALIAS\":\"RI5\",\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI5_IND_I_II_III\"}],\"EXECUTE_LIST\":[1],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
 
     public void testFullMJ() {
         // TODO: ambiguous plan generated

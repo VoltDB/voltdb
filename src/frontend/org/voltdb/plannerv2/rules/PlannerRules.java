@@ -238,7 +238,7 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
 
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
-            VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SEQSCAN,
+            VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,
             VoltPCalcScanToIndexRule.INSTANCE,
             VoltPSortIndexScanRemoveRule.INSTANCE_SORT_INDEXSCAN,
             VoltPSortIndexScanRemoveRule.INSTANCE_SORT_CALC_INDEXSCAN,
