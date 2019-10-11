@@ -18,12 +18,15 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import org.voltcore.utils.Pair;
+import org.voltdb.expressions.*;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.JoinType;
 
 /**
@@ -99,8 +102,29 @@ public class BranchNode extends JoinNode {
         return null;
     }
 
+    private static void collectTVEs(AbstractExpression expr, Set<TupleValueExpression> acc) {
+        if (expr == null) {
+            return;
+        } else if (expr instanceof TupleValueExpression) {
+            acc.add((TupleValueExpression) expr);
+        } else if (expr instanceof ComparisonExpression || expr instanceof ConjunctionExpression) {
+            collectTVEs(expr.getLeft(), acc);
+            collectTVEs(expr.getRight(), acc);
+        } else if (expr instanceof FunctionExpression) {
+            expr.getArgs().forEach(e -> collectTVEs(e, acc));
+        }
+    }
+
+    private static boolean validWhere(AbstractExpression where, Set<String> rels) {
+        final Set<TupleValueExpression> tves = new HashSet<>();
+        collectTVEs(where, tves);
+        return tves.stream()
+                .map(tve -> Pair.of(tve.getTableName(), tve.getTableAlias()))
+                .allMatch(pair -> rels.contains(pair.getFirst()) || rels.contains(pair.getSecond()));
+    }
+
     @Override
-    public boolean analyzeJoinExpressions(AbstractParsedStmt stmt) {
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         JoinNode leftChild = getLeftNode();
         JoinNode rightChild = getRightNode();
         leftChild.analyzeJoinExpressions(stmt);
@@ -127,8 +151,17 @@ public class BranchNode extends JoinNode {
             rightChild.m_whereInnerList.clear();
         }
 
-        Collection<String> outerTables = leftChild.generateTableJoinOrder();
-        Collection<String> innerTables = rightChild.generateTableJoinOrder();
+        final Collection<String> outerTables = leftChild.generateTableJoinOrder();
+        final Collection<String> innerTables = rightChild.generateTableJoinOrder();
+        if (! whereList.isEmpty()) {        // validate that all TVEs in WHERE clause have corresponding tables from outer or inner relations.
+            final Set<String> rels = ImmutableSet.<String>builder()
+                    .addAll(outerTables)
+                    .addAll(innerTables)
+                    .build();
+            if (! whereList.stream().allMatch(expr -> validWhere(expr, rels))) {
+                throw new SubPlanAssembler.SkipCurrentPlanException();
+            }
+        }
 
         // Classify join expressions into the following categories:
         // 1. The OUTER-only join conditions. If any are false for a given outer tuple,
@@ -143,12 +176,11 @@ public class BranchNode extends JoinNode {
         // and either accept or reject that particular combination.
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
         // for the currently supported two table joins but could change if number of tables > 2.
+        // When that occurs, the call throws SkipCurrentPlanException, signaling its caller to continue with
+        // next possible plan.
         // Constant Value Expression may fall into this category.
-        if (! classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
-                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList)) {
-            // current JOIN order is not plannable because of #4 above.
-            return false;
-        }
+        classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
+                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList);
 
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
@@ -192,7 +224,6 @@ public class BranchNode extends JoinNode {
                 iter.remove();
             }
         }
-        return true;
     }
 
     /**

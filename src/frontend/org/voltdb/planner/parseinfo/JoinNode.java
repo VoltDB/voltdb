@@ -27,6 +27,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
@@ -373,13 +374,11 @@ public abstract class JoinNode implements Cloneable {
     /**
      * Analyze the m_joinTree structure to extract useful components.
      * @param stmt parsed statement
-     * @return true if the Join expression is successfully analyzed, and can be added as a plan candidate.
      */
-    public boolean analyzeJoinExpressions(AbstractParsedStmt stmt) {
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
         m_tableAliases = new HashSet<>(stmt.m_joinTree.generateTableJoinOrder());
-        return true;
     }
 
     /**
@@ -456,13 +455,10 @@ public abstract class JoinNode implements Cloneable {
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
      */
-    protected static boolean classifyJoinExpressions(Collection<AbstractExpression> exprList,
+    protected static void classifyJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<String> outerTables, Collection<String> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
             List<AbstractExpression> innerOuterList, List<AbstractExpression> noneList) {
-        final String outerTableStr = String.join(", ", outerTables),
-                innerTableStr = String.join(", ", innerTables);
-        System.out.format("Outer tables: %s\nInner tables: %s\n= = = = = = = = = =\n", outerTableStr, innerTableStr);
         final Set<String> outerSet = new HashSet<>(outerTables);
         final Set<String> innerSet = new HashSet<>(innerTables);
         for (AbstractExpression expr : exprList) {
@@ -473,9 +469,10 @@ public abstract class JoinNode implements Cloneable {
                 final boolean
                         outer = tableAliasSet.stream().anyMatch(outerSet::contains),
                         inner = tableAliasSet.stream().anyMatch(innerSet::contains);
-                // assert outer || inner : "Outer and inner tables does not contain all the aliases used";
-                if (! outer && ! inner) {   // alias not found in either outer/inner table. This happens in multi-join query.
-                    return false;
+                if (! outer && ! inner) {
+                    // alias not found in either outer/inner table. This happens in multi-join query.
+                    // See also BranchNode#analyzeJoinExpression().
+                    throw new SubPlanAssembler.SkipCurrentPlanException();
                 } else if (outer && inner) {
                     innerOuterList.add(expr);
                 } else if (outer) {
@@ -485,7 +482,6 @@ public abstract class JoinNode implements Cloneable {
                 }
             }
         }
-        return true;
     }
 
     private static Set<String> getTablesForExpression(AbstractExpression expr) {

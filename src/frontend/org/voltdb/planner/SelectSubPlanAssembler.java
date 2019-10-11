@@ -278,10 +278,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // no more join orders => no more plans to generate
             if (joinTree == null) {
                 return null;
-            } else if (! joinTree.analyzeJoinExpressions(m_parsedStmt)) {
-                // current join order is not plannable
-                return null;
-            } else if (! m_parsedStmt.m_noTableSelectionList.isEmpty()) {
+            }
+            joinTree.analyzeJoinExpressions(m_parsedStmt);
+            if (! m_parsedStmt.m_noTableSelectionList.isEmpty()) {
                 // a query that is a little too quirky or complicated.
                 throw new PlanningErrorException("Join with filters that do not depend on joined tables is not supported in VoltDB");
             }
@@ -302,11 +301,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // detected, skip the plan generation for that particular ordering.
                 // If this causes all plans to be skipped, commonly the case, the PlanAssembler
                 // should propagate an error message identifying partitioning as the problem.
-                Map<AbstractExpression, Set<AbstractExpression>>
-                    valueEquivalence = joinTree.getAllEquivalenceFilters();
-                Collection<StmtTableScan> scans = m_parsedStmt.allScans();
-                m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
-                if ( ! m_partitioning.isJoinValid() ) {
+                m_partitioning.analyzeForMultiPartitionAccess(
+                        m_parsedStmt.allScans(), joinTree.getAllEquivalenceFilters());
+                if (! m_partitioning.isJoinValid()) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.
                     // Don't throw a planning error here, in case the problem is just with this
@@ -317,7 +314,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     continue;
                 }
             }
-
             generateMorePlansForJoinTree(joinTree);
         }
         return m_plans.poll();
