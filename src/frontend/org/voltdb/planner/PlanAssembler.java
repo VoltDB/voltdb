@@ -1262,25 +1262,20 @@ public class PlanAssembler {
     private boolean needProjectionNode (AbstractPlanNode root) {
         if (!root.planNodeClassNeedsProjectionNode()) {
             return false;
-        }
-        // If there is a complexGroupby at his point, it means that
-        // display columns contain all the order by columns and
-        // does not require another projection node on top of sort node.
+        } else if (m_parsedSelect.hasComplexGroupby() || m_parsedSelect.hasComplexAgg()) {
+            // If there is a complexGroupby at his point, it means that
+            // display columns contain all the order by columns and
+            // does not require another projection node on top of sort node.
 
-        // If there is a complex aggregation case, the projection plan node is already added
-        // right above the group by plan node. In future, we may inline that projection node.
-        if (m_parsedSelect.hasComplexGroupby() || m_parsedSelect.hasComplexAgg()) {
+            // If there is a complex aggregation case, the projection plan node is already added
+            // right above the group by plan node. In future, we may inline that projection node.
             return false;
-        }
-
-        if (root instanceof AbstractReceivePlanNode &&
-                m_parsedSelect.hasPartitionColumnInGroupby()) {
+        } else {
             // Top aggregate has been removed, its schema is exactly the same to
             // its local aggregate node.
-            return false;
+            return !(root instanceof AbstractReceivePlanNode) ||
+                    !m_parsedSelect.hasPartitionColumnInGroupby();
         }
-
-        return true;
     }
 
     // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
@@ -1288,28 +1283,21 @@ public class PlanAssembler {
         if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             assert(parsedStmt != null);
             return true;
+        } else {
+            return false;
         }
-
-        return false;
     }
 
     /** Returns true if this DELETE can be executed in the EE as a truncate operation */
     static private boolean deleteIsTruncate(ParsedDeleteStmt stmt, AbstractPlanNode plan) {
         if (!(plan instanceof SeqScanPlanNode)) {
             return false;
-        }
-
-        // Assume all index scans have filters in this context, so only consider seq scans.
-        SeqScanPlanNode seqScanNode = (SeqScanPlanNode)plan;
-        if (seqScanNode.getPredicate() != null) {
+        } else if (((SeqScanPlanNode)plan).getPredicate() != null) {
+            // Assume all index scans have filters in this context, so only consider seq scans.
             return false;
+        } else {
+            return !stmt.hasLimitOrOffset();
         }
-
-        if (stmt.hasLimitOrOffset()) {
-            return false;
-        }
-
-        return true;
     }
 
     private CompiledPlan getNextDeletePlan() {
@@ -1344,8 +1332,7 @@ public class PlanAssembler {
         // nodes and use a truncate delete node.
         if (deleteIsTruncate(m_parsedDelete, subSelectRoot)) {
             deleteNode.setTruncate(true);
-        }
-        else {
+        } else {
 
             // User may have specified an ORDER BY ... LIMIT clause
             if (m_parsedDelete.orderByColumns().size() > 0
@@ -1412,13 +1399,13 @@ public class PlanAssembler {
         if (isSinglePartitionPlan) {
             plan.rootPlanGraph = deleteNode;
             return plan;
+        } else {
+            // Add a compensating sum of modified tuple counts or a limit 1
+            // AND a send on top of the union-like receive node.
+            boolean isReplicated = targetTable.getIsreplicated();
+            plan.rootPlanGraph = addCoordinatorToDMLNode(deleteNode, isReplicated);
+            return plan;
         }
-
-        // Add a compensating sum of modified tuple counts or a limit 1
-        // AND a send on top of the union-like receive node.
-        boolean isReplicated = targetTable.getIsreplicated();
-        plan.rootPlanGraph = addCoordinatorToDMLNode(deleteNode, isReplicated);
-        return plan;
     }
 
     /**
@@ -1451,13 +1438,13 @@ public class PlanAssembler {
         if (m_partitioning.wasSpecifiedAsSingle()) {
             retval.rootPlanGraph = swapNode;
             return retval;
+        } else {
+            // Add a compensating sum of modified tuple counts or a limit 1
+            // AND a send on top of the union-like receive node.
+            boolean isReplicated = theTable.getIsreplicated();
+            retval.rootPlanGraph = addCoordinatorToDMLNode(swapNode, isReplicated);
+            return retval;
         }
-
-        // Add a compensating sum of modified tuple counts or a limit 1
-        // AND a send on top of the union-like receive node.
-        boolean isReplicated = theTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(swapNode, isReplicated);
-        return retval;
     }
 
     private CompiledPlan getNextUpdatePlan() {
@@ -1466,9 +1453,7 @@ public class PlanAssembler {
         AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
         if (subSelectRoot == null) {
             return null;
-        }
-
-        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
+        } else if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
             // Recursion here, now that subAssembler.nextPlan() has been called,
             // simply jumps ahead to the next plan (if any).
             return getNextUpdatePlan();
@@ -1519,10 +1504,7 @@ public class PlanAssembler {
                 updateNode.setUpdateIndexes(true);
             }
         }
-        ProjectionPlanNode projectionNode =
-                new ProjectionPlanNode(proj_schema);
-
-
+        final ProjectionPlanNode projectionNode = new ProjectionPlanNode(proj_schema);
         // add the projection inline (TODO: this will break if more than one
         // layer is below this)
         //
@@ -1553,14 +1535,14 @@ public class PlanAssembler {
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             retval.rootPlanGraph = updateNode;
             return retval;
+        } else {
+            // Send the local result counts to the coordinator.
+            // Add a compensating sum of modified tuple counts or a limit 1
+            // AND a send on top of the union-like receive node.
+            boolean isReplicated = targetTable.getIsreplicated();
+            retval.rootPlanGraph = addCoordinatorToDMLNode(updateNode, isReplicated);
+            return retval;
         }
-
-        // Send the local result counts to the coordinator.
-        // Add a compensating sum of modified tuple counts or a limit 1
-        // AND a send on top of the union-like receive node.
-        boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(updateNode, isReplicated);
-        return retval;
     }
 
     private CompiledPlan getNextMigratePlan() {
@@ -1597,8 +1579,7 @@ public class PlanAssembler {
         return plan;
     }
 
-    static private AbstractExpression castExprIfNeeded(
-            AbstractExpression expr, Column column) {
+    static private AbstractExpression castExprIfNeeded( AbstractExpression expr, Column column) {
         if (expr.getValueType().getValue() != column.getType() ||
                 expr.getValueSize() != column.getSize()) {
             expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
@@ -1664,8 +1645,7 @@ public class PlanAssembler {
 
             //  Use the subquery's plan as the basis for the insert plan.
             retval = subquery.getBestCostPlan();
-        }
-        else {
+        } else {
             retval = new CompiledPlan(m_isLargeQuery);
         }
         retval.setReadOnly(false);
@@ -1716,7 +1696,7 @@ public class PlanAssembler {
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
         for (Column col : targetTableColumns) {
             boolean needsValue = (!m_parsedInsert.m_isUpsert) &&
-                    (col.getNullable() == false) && (col.getDefaulttype() == 0);
+                    ! col.getNullable() && col.getDefaulttype() == 0;
             if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
                 // This check could be done during parsing?
                 throw new PlanningErrorException("Column " + col.getName()
@@ -1792,8 +1772,7 @@ public class PlanAssembler {
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
-        }
-        else {
+        } else {
             insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
 
@@ -1831,8 +1810,7 @@ public class PlanAssembler {
             LimitPlanNode limitNode = new LimitPlanNode();
             sumOrLimitNode = limitNode;
             limitNode.setLimit(1);
-        }
-        else {
+        } else {
             // create the nodes being pushed on top of dmlRoot.
             AggregatePlanNode countNode = new AggregatePlanNode();
             sumOrLimitNode = countNode;
@@ -1941,10 +1919,8 @@ public class PlanAssembler {
 
         for (ParsedColInfo col : cols) {
             n.addSortExpression(col.m_expression,
-                    col.m_ascending ? SortDirectionType.ASC
-                                  : SortDirectionType.DESC);
+                    col.m_ascending ? SortDirectionType.ASC : SortDirectionType.DESC);
         }
-
         return n;
     }
 
@@ -1986,8 +1962,8 @@ public class PlanAssembler {
         AbstractPlanNode probe;
         for (probe = root;
                 ! ((probe instanceof AbstractJoinPlanNode)
-                    || (probe instanceof AbstractScanPlanNode))
-                && (probe != null);
+                    || probe instanceof AbstractScanPlanNode)
+                && probe != null;
             probe = (probe.getChildCount() > 0) ? probe.getChild(0) : null) {
             // Count the number of window functions between the
             // root and the join/scan node.  Note that we know we
@@ -2007,8 +1983,8 @@ public class PlanAssembler {
             // Finally, count the number of non-serial aggregate
             // nodes.  A hash or partial aggregate operation invalidates
             // the ordering, but a serial aggregation does not.
-            if ((probe.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)
-                    || (probe.getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE)) {
+            if (probe.getPlanNodeType() == PlanNodeType.HASHAGGREGATE
+                    || probe.getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
                 numberHashAggregates += 1;
             }
         }
@@ -2017,7 +1993,7 @@ public class PlanAssembler {
             // scan or join node at all.  This seems unlikely
             // to be right.  Maybe this should be an assert?
             return true;
-        } else if ( ! (probe instanceof IndexSortablePlanNode)) {
+        } else if (! (probe instanceof IndexSortablePlanNode)) {
             //
             //   o If the SLOB cannot use the index, then we
             //     need an order by node always.
@@ -2097,16 +2073,17 @@ public class PlanAssembler {
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
     private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
-                parsedStmt instanceof ParsedDeleteStmt);
+        assert parsedStmt instanceof ParsedSelectStmt ||
+                parsedStmt instanceof ParsedUnionStmt ||
+                parsedStmt instanceof ParsedDeleteStmt;
 
         if (! isOrderByNodeRequired(parsedStmt, root)) {
             return root;
+        } else {
+            OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
+            orderByNode.addAndLinkChild(root);
+            return orderByNode;
         }
-
-        OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-        orderByNode.addAndLinkChild(root);
-        return orderByNode;
     }
 
     /**
@@ -2114,8 +2091,7 @@ public class PlanAssembler {
      * @param root top of the original plan
      * @return new plan's root node
      */
-    private AbstractPlanNode handleSelectLimitOperator(AbstractPlanNode root)
-    {
+    private AbstractPlanNode handleSelectLimitOperator(AbstractPlanNode root) {
         // The coordinator's top limit graph fragment for a MP plan.
         // If planning "order by ... limit", getNextSelectPlan()
         // will have already added an order by to the coordinator frag.
@@ -2134,8 +2110,7 @@ public class PlanAssembler {
             sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
-            }
-            else {
+            } else {
                 canPushDown = m_parsedSelect.getCanPushdownLimit();
             }
         }
@@ -2175,8 +2150,7 @@ public class PlanAssembler {
                 // Inline the distributed limit.
                 distributedPlan.addInlinePlanNode(distLimit);
                 sendNode.addAndLinkChild(distributedPlan);
-            }
-            else {
+            } else {
                 distLimit.addAndLinkChild(distributedPlan);
                 // Add the distributed work back to the plan
                 sendNode.addAndLinkChild(distLimit);
@@ -2212,14 +2186,12 @@ public class PlanAssembler {
             LimitPlanNode topLimit) {
         if (isInlineLimitPlanNodePossible(root)) {
             root.addInlinePlanNode(topLimit);
-        }
-        else if (root instanceof ProjectionPlanNode &&
+        } else if (root instanceof ProjectionPlanNode &&
                 isInlineLimitPlanNodePossible(root.getChild(0)) ) {
             // In future, inlined this projection node for OrderBy and Aggregate
             // Then we could delete this ELSE IF block.
             root.getChild(0).addInlinePlanNode(topLimit);
-        }
-        else {
+        } else {
             topLimit.addAndLinkChild(root);
             root = topLimit;
         }
@@ -2233,11 +2205,7 @@ public class PlanAssembler {
      * @return
      */
     static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
-        if (pn instanceof OrderByPlanNode ||
-            pn.getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            return true;
-        }
-        return false;
+        return pn instanceof OrderByPlanNode || pn.getPlanNodeType() == PlanNodeType.AGGREGATE;
     }
 
 
@@ -2253,15 +2221,14 @@ public class PlanAssembler {
         // re-aggregation plan node.
         if (root instanceof AbstractReceivePlanNode) {
             root = reAggNode;
-        }
-        else {
+        } else {
             List<AbstractPlanNode> recList = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
             reAggParent = receiveNode.getParent(0);
             boolean result = reAggParent.replaceChild(receiveNode, reAggNode);
-            assert(result);
+            assert result;
         }
         reAggNode.addAndLinkChild(receiveNode);
         reAggNode.m_isCoordinatingAggregator = true;
@@ -2284,11 +2251,10 @@ public class PlanAssembler {
         // If it is a normal joined query, replace the node under the
         // receive node with materialized view scan node.
         if (sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin) {
-            AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
 
             // Fix the node after Re-aggregation node.
-            joinNode.clearParents();
+            sendNodeChild.clearParents();
 
             assert(mvFixInfo.m_scanNode != null);
             mvFixInfo.m_scanNode.clearParents();
@@ -2300,11 +2266,10 @@ public class PlanAssembler {
             // If reAggNode has parent node before we put it under join node,
             // its parent will be the parent of the new join node. Update the root node.
             if (reAggParent != null) {
-                reAggParent.replaceChild(reAggNode, joinNode);
+                reAggParent.replaceChild(reAggNode, sendNodeChild);
                 root = reAggParent;
-            }
-            else {
-                root = joinNode;
+            } else {
+                root = sendNodeChild;
             }
         }
 
@@ -2336,9 +2301,7 @@ public class PlanAssembler {
             // matches the order demanded by the ORDER BY clause.
             if (! parsedSelect.isGrouped()) {
                 return false;
-            }
-
-            if (isChangedToSerialAggregate() && ! m_multiPartition) {
+            } else if (isChangedToSerialAggregate() && ! m_multiPartition) {
                 return false;
             }
 
@@ -2348,8 +2311,7 @@ public class PlanAssembler {
                         SortDirectionType.INVALID) {
                     predeterminedOrdering = true;
                 }
-            }
-            else if (root instanceof AbstractJoinPlanNode) {
+            } else if (root instanceof AbstractJoinPlanNode) {
                 if (((AbstractJoinPlanNode)root).getSortDirection() !=
                         SortDirectionType.INVALID) {
                     predeterminedOrdering = true;
@@ -2360,12 +2322,10 @@ public class PlanAssembler {
                 // to cover (at least) the ORDER BY columns.
                 // Yet, any additional non-ORDER-BY columns in the GROUP BY
                 // clause will need partial aggregation.
-                if (parsedSelect.groupByIsAnOrderByPermutation()) {
-                    return false;
-                }
+                return !parsedSelect.groupByIsAnOrderByPermutation();
+            } else {
+                return true;
             }
-
-            return true;
         }
 
     }
@@ -2377,19 +2337,15 @@ public class PlanAssembler {
             // scan on sub-query does not support index, early exit here
             // In future, support sub-query edge cases.
             return candidate;
-        }
-
-        // For join node, find outer sequential scan plan node
-        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
+        } else if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
+            // For join node, find outer sequential scan plan node
             assert(candidate.getChildCount() == 2);
             return findSeqScanCandidateForGroupBy(candidate.getChild(0));
-        }
-
-        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+        } else if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             return findSeqScanCandidateForGroupBy(candidate.getChild(0));
+        } else {
+            return null;
         }
-
-        return null;
     }
 
     /**
@@ -2409,9 +2365,7 @@ public class PlanAssembler {
             IndexGroupByInfo gbInfo) {
         if (! m_parsedSelect.isGrouped()) {
             return false;
-        }
-
-        if (candidate instanceof IndexScanPlanNode) {
+        } else if (candidate instanceof IndexScanPlanNode) {
             calculateIndexGroupByInfo((IndexScanPlanNode) candidate, gbInfo);
             if (gbInfo.m_coveredGroupByColumns != null &&
                     !gbInfo.m_coveredGroupByColumns.isEmpty()) {
@@ -2419,8 +2373,9 @@ public class PlanAssembler {
                 // of the GROUP BY columns and can be serialized
                 gbInfo.m_indexAccess = candidate;
                 return true;
+            } else {
+                return false;
             }
-            return false;
         }
 
         AbstractPlanNode sourceSeqScan = findSeqScanCandidateForGroupBy(candidate);
@@ -2433,8 +2388,7 @@ public class PlanAssembler {
         if (sourceSeqScan.getParentCount() > 0) {
             parent = sourceSeqScan.getParent(0);
         }
-        AbstractPlanNode indexAccess = indexAccessForGroupByExprs(
-                (SeqScanPlanNode)sourceSeqScan, gbInfo);
+        AbstractPlanNode indexAccess = indexAccessForGroupByExprs((SeqScanPlanNode)sourceSeqScan, gbInfo);
 
         if (indexAccess.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
             // does not find proper index to replace sequential scan
@@ -2450,10 +2404,10 @@ public class PlanAssembler {
             parent.replaceChild(0, indexAccess);
 
             return false;
+        } else {
+            // parent is null and switched to index scan from sequential scan
+            return true;
         }
-
-        // parent is null and switched to index scan from sequential scan
-        return true;
     }
 
     /**
@@ -2477,16 +2431,16 @@ public class PlanAssembler {
         // is optimized away by an index.  This may be turned
         // into an inline order by in a MergeReceivePlanNode.
         IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
-        AbstractPlanNode cnode = null;
-        int winfunc = (scanNode == null) ? WindowFunctionScoreboard.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
+        AbstractPlanNode cnode;
+        int winfunc = scanNode == null ? WindowFunctionScoreboard.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
         // If we have an index which is compatible with the statement
         // level order by, and we have a window function which can't
         // use the index we have to ignore the statement level order by
         // index use.  We will need to order the input according to the
         // window function first, and that will in general invalidate the
         // statement level order by ordering.
-        if ((WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
-                || (WindowFunctionScoreboard.NO_INDEX_USE == winfunc)) {
+        if (WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc
+                || WindowFunctionScoreboard.NO_INDEX_USE == winfunc) {
             // No index.  Calculate the expression order here and stuff it into
             // the order by node.  Note that if we support more than one window
             // function this would be the case when scanNode.getWindowFunctionUsesIndex()
@@ -2503,7 +2457,7 @@ public class PlanAssembler {
             // We choose to make this dontsort rather than dosort because the
             // Java default value for boolean is false, and we want to sort by
             // default.
-            boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
+            boolean[] dontsort = new boolean[winExpr.getOrderbySize()];
             List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
             List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
             OrderByPlanNode onode = new OrderByPlanNode();
@@ -2563,8 +2517,8 @@ public class PlanAssembler {
             }
             // Any other kind of scan or join plan
             // node cannot have a useful index.
-            if ((root instanceof AbstractScanPlanNode)
-                    || (root instanceof AbstractJoinPlanNode)) {
+            if (root instanceof AbstractScanPlanNode
+                    || root instanceof AbstractJoinPlanNode) {
                 return null;
             }
             if (root.getChildCount() == 0) {
@@ -2660,10 +2614,10 @@ public class PlanAssembler {
                     outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                     outputColumnIndex += 1) {
                 ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
-                AbstractExpression rootExpr = col.m_expression;
-                AbstractExpression agg_input_expr = null;
-                SchemaColumn schema_col = null;
-                SchemaColumn top_schema_col = null;
+                final AbstractExpression rootExpr = col.m_expression;
+                final AbstractExpression agg_input_expr;
+                final SchemaColumn schema_col;
+                final SchemaColumn top_schema_col;
                 if (rootExpr instanceof AggregateExpression) {
                     AggregateExpression tempRoot = (AggregateExpression)rootExpr;
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
@@ -2726,7 +2680,7 @@ public class PlanAssembler {
                             agg_expression_type == ExpressionType.AGGREGATE_SUM) {
                             if (is_distinct &&
                                     ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
-                                            canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
+                                            canPushDownDistinctAggregation((AggregateExpression)rootExpr))) {
                                 topAggNode = null;
                             } else {
                                 // for aggregate distinct when group by
@@ -2735,23 +2689,22 @@ public class PlanAssembler {
                                 // effect to assign the top_expression_type.
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
                             }
-                        }
-                        /*
-                         * For min() and max(), the pushed-down aggregate node
-                         * doesn't change. An extra aggregate node of the same
-                         * type is added to the coordinator. The input schema
-                         * and the output schema of the top aggregate node is
-                         * the same as the output schema of the pushed-down
-                         * aggregate node.
-                         *
-                         * APPROX_COUNT_DISTINCT can be similarly pushed down, but
-                         * must be split into two different functions, which is
-                         * done later, from pushDownAggregate().
-                         */
-                        else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
+                        } else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
                                  agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
                                  agg_expression_type != ExpressionType.USER_DEFINED_AGGREGATE) {
+                            /*
+                             * For min() and max(), the pushed-down aggregate node
+                             * doesn't change. An extra aggregate node of the same
+                             * type is added to the coordinator. The input schema
+                             * and the output schema of the top aggregate node is
+                             * the same as the output schema of the pushed-down
+                             * aggregate node.
+                             *
+                             * APPROX_COUNT_DISTINCT can be similarly pushed down, but
+                             * must be split into two different functions, which is
+                             * done later, from pushDownAggregate().
+                             */
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -2773,7 +2726,7 @@ public class PlanAssembler {
                     // All complex aggregations have been simplified,
                     // cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
                     // has already been broken down.
-                    assert( ! rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class));
+                    assert ! rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class);
 
                     /*
                      * These columns are the pass through columns that are not being
@@ -2786,7 +2739,7 @@ public class PlanAssembler {
                             col.m_columnName, col.m_alias,
                             col.m_expression,
                             outputColumnIndex);
-                    AbstractExpression topExpr = null;
+                    AbstractExpression topExpr;
                     if (col.m_groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
                     } else {
@@ -2840,8 +2793,7 @@ public class PlanAssembler {
         gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
                 index, fromTableAlias, bindings);
         gbInfo.m_canBeFullySerialized =
-                (gbInfo.m_coveredGroupByColumns.size() ==
-                m_parsedSelect.groupByColumns().size());
+                gbInfo.m_coveredGroupByColumns.size() == m_parsedSelect.groupByColumns().size();
     }
 
     // Turn sequential scan to index scan for group by if possible
@@ -2861,21 +2813,19 @@ public class PlanAssembler {
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
         List<Integer> maxCoveredGroupByColumns = new ArrayList<>();
-        ArrayList<AbstractExpression> maxCoveredBindings = null;
+        List<AbstractExpression> maxCoveredBindings = null;
         Index pickedUpIndex = null;
         boolean foundAllGroupByCoveredIndex = false;
 
         for (Index index : allIndexes) {
-            if ( ! IndexType.isScannable(index.getType())) {
+            if (! IndexType.isScannable(index.getType())) {
                 continue;
-            }
-
-            if ( ! index.getPredicatejson().isEmpty()) {
+            } else if ( ! index.getPredicatejson().isEmpty()) {
                 // do not try to look at Partial/Sparse index
                 continue;
             }
 
-            ArrayList<AbstractExpression> bindings = new ArrayList<>();
+            List<AbstractExpression> bindings = new ArrayList<>();
             List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
                     index, fromTableAlias, bindings);
 
@@ -2892,16 +2842,16 @@ public class PlanAssembler {
         }
         if (pickedUpIndex == null) {
             return root;
+        } else {
+            IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
+                    root, null, pickedUpIndex, SortDirectionType.INVALID);
+            indexScanNode.setForGroupingOnly();
+            indexScanNode.setBindings(maxCoveredBindings);
+
+            gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
+            gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;
+            return indexScanNode;
         }
-
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
-                root, null, pickedUpIndex, SortDirectionType.INVALID);
-        indexScanNode.setForGroupingOnly();
-        indexScanNode.setBindings(maxCoveredBindings);
-
-        gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
-        gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;
-        return indexScanNode;
     }
 
     private List<Integer> calculateGroupbyColumnsCovered(Index index,
@@ -2912,18 +2862,17 @@ public class PlanAssembler {
         List<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns();
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
-            List<ColumnRef> indexedColRefs =
-                    CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-
-            for (int j = 0; j < indexedColRefs.size(); j++) {
-                String indexColumnName = indexedColRefs.get(j).getColumn().getName();
+            final List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(
+                    index.getColumns(), "index");
+            for (ColumnRef indexedColRef : indexedColRefs) {
+                String indexColumnName = indexedColRef.getColumn().getName();
 
                 // ignore order of keys in GROUP BY expr
                 int ithCovered = 0;
                 boolean foundPrefixedColumn = false;
                 for (; ithCovered < groupBys.size(); ithCovered++) {
                     AbstractExpression gbExpr = groupBys.get(ithCovered).m_expression;
-                    if ( ! (gbExpr instanceof TupleValueExpression)) {
+                    if (!(gbExpr instanceof TupleValueExpression)) {
                         continue;
                     }
 
@@ -2935,7 +2884,7 @@ public class PlanAssembler {
                         break;
                     }
                 }
-                if ( ! foundPrefixedColumn) {
+                if (!foundPrefixedColumn) {
                     // no prefix match any more
                     break;
                 }
@@ -2947,15 +2896,13 @@ public class PlanAssembler {
                     break;
                 }
             }
-        }
-        else {
+        } else {
             StmtTableScan fromTableScan = m_parsedSelect.getStmtTableScanByAlias(fromTableAlias);
             // either pure expression index or mix of expressions and simple columns
-            List<AbstractExpression> indexedExprs = null;
+            final List<AbstractExpression> indexedExprs;
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
-            }
-            catch (JSONException e) {
+            } catch (JSONException e) {
                 e.printStackTrace();
                 // This case sounds impossible
                 return coveredGroupByColumns;
@@ -2978,7 +2925,6 @@ public class PlanAssembler {
                     break;
                 }
             }
-
         }
         return coveredGroupByColumns;
     }
@@ -2994,9 +2940,7 @@ public class PlanAssembler {
      * @param distNode    The aggregate node executed on each partition
      * @param coordNode   The aggregate node executed on the coordinator
      */
-    private static void fixDistributedApproxCountDistinct(
-            AggregatePlanNode distNode,
-            AggregatePlanNode coordNode) {
+    private static void fixDistributedApproxCountDistinct(AggregatePlanNode distNode, AggregatePlanNode coordNode) {
 
         assert (distNode != null);
         assert (coordNode != null);
@@ -3035,9 +2979,7 @@ public class PlanAssembler {
      * @param distNode    The aggregate node executed on each partition
      * @param coordNode   The aggregate node executed on the coordinator
      */
-    private static void fixDistributedUserDefinedAggregate(
-            AggregatePlanNode distNode,
-            AggregatePlanNode coordNode) {
+    private static void fixDistributedUserDefinedAggregate(AggregatePlanNode distNode, AggregatePlanNode coordNode) {
 
         assert (distNode != null);
         assert (coordNode != null);
@@ -3138,8 +3080,7 @@ public class PlanAssembler {
             // Add the top node
             coordNode.addAndLinkChild(accessPlanTemp);
             rootAggNode = coordNode;
-        }
-        else {
+        } else {
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
             for (int i = 0; i < rootAggNode.getAggregateTypesSize(); ++i) {
@@ -3164,12 +3105,11 @@ public class PlanAssembler {
             ParsedSelectStmt selectStmt, AbstractPlanNode root) {
         if ( ! selectStmt.hasComplexAgg()) {
             return root;
+        } else {
+            ProjectionPlanNode proj = new ProjectionPlanNode(selectStmt.getFinalProjectionSchema());
+            proj.addAndLinkChild(root);
+            return proj;
         }
-
-        ProjectionPlanNode proj =
-                new ProjectionPlanNode(selectStmt.getFinalProjectionSchema());
-        proj.addAndLinkChild(root);
-        return proj;
     }
 
     /**
@@ -3199,13 +3139,12 @@ public class PlanAssembler {
      *         Otherwise null -- when the plan is single-partition when
      *         its "coordinator" part contains a push-blocking node type.
      */
-    protected AbstractPlanNode checkLimitPushDownViability(
-            AbstractPlanNode root) {
+    protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
         List<ParsedColInfo> orderBys = m_parsedSelect.orderByColumns();
         boolean orderByCoversAllGroupBy = m_parsedSelect.groupByIsAnOrderByPermutation();
 
-        while ( ! (receiveNode instanceof ReceivePlanNode)) {
+        while (! (receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
             // Delete the aggregate node case to handle ENG-6485,
@@ -3213,28 +3152,22 @@ public class PlanAssembler {
             // TODO: We might want to optimize/push down "limit" for some cases
             if ( ! (receiveNode instanceof OrderByPlanNode) &&
                     ! (receiveNode instanceof ProjectionPlanNode) &&
-                    ! isValidAggregateNodeForLimitPushdown(receiveNode,
-                            orderBys, orderByCoversAllGroupBy) ) {
+                    ! isValidAggregateNodeForLimitPushdown(
+                            receiveNode, orderBys, orderByCoversAllGroupBy)) {
                 return null;
-            }
-
-            if (receiveNode instanceof OrderByPlanNode) {
-                // if grouping by the partition key,
-                // limit can still push down if ordered by aggregate values.
-                if (! m_parsedSelect.hasPartitionColumnInGroupby() &&
-                        isOrderByAggregationValue(m_parsedSelect.orderByColumns())) {
-                    return null;
-                }
-            }
-
-            // Traverse...
-            if (receiveNode.getChildCount() == 0) {
+            } else if (receiveNode instanceof OrderByPlanNode &&
+                    // if grouping by the partition key,
+                    // limit can still push down if ordered by aggregate values.
+                    ! m_parsedSelect.hasPartitionColumnInGroupby() &&
+                    isOrderByAggregationValue(m_parsedSelect.orderByColumns())) {
                 return null;
+            } else if (receiveNode.getChildCount() == 0) {
+                // Traverse...
+                return null;
+            } else { // nothing that allows pushing past has multiple inputs
+                assert (receiveNode.getChildCount() == 1);
+                receiveNode = receiveNode.getChild(0);
             }
-
-            // nothing that allows pushing past has multiple inputs
-            assert(receiveNode.getChildCount() == 1);
-            receiveNode = receiveNode.getChild(0);
         }
         return receiveNode.getChild(0);
     }
@@ -3251,24 +3184,17 @@ public class PlanAssembler {
                 }
             }
         }
-
         return false;
     }
 
     private static boolean isValidAggregateNodeForLimitPushdown(
-            AbstractPlanNode aggregateNode,
-            List<ParsedColInfo> orderBys,
-            boolean orderByCoversAllGroupBy) {
-        if (aggregateNode instanceof AggregatePlanNode == false) {
+            AbstractPlanNode aggregateNode, List<ParsedColInfo> orderBys, boolean orderByCoversAllGroupBy) {
+        if (! (aggregateNode instanceof AggregatePlanNode)) {
             return false;
-        }
-
-        if (aggregateNode.getParentCount() == 0) {
+        } else if (aggregateNode.getParentCount() == 0) {
             return false;
-        }
-
-        // Limitation: can only push past coordinating aggregation nodes
-        if ( ! ((AggregatePlanNode)aggregateNode).m_isCoordinatingAggregator) {
+        } else if (! ((AggregatePlanNode)aggregateNode).m_isCoordinatingAggregator) {
+            // Limitation: can only push past coordinating aggregation nodes
             return false;
         }
 
@@ -3276,8 +3202,7 @@ public class PlanAssembler {
         AbstractPlanNode orderByNode = null;
         if (parent instanceof OrderByPlanNode) {
             orderByNode = parent;
-        }
-        else if ( parent instanceof ProjectionPlanNode &&
+        } else if (parent instanceof ProjectionPlanNode &&
                 parent.getParentCount() > 0 &&
                 parent.getParent(0) instanceof OrderByPlanNode) {
             // Xin really wants inline project with aggregation
@@ -3291,11 +3216,7 @@ public class PlanAssembler {
             return false;
         }
 
-        if (( ! orderByCoversAllGroupBy) || isOrderByAggregationValue(orderBys)) {
-            return false;
-        }
-
-        return true;
+        return orderByCoversAllGroupBy && ! isOrderByAggregationValue(orderBys);
     }
 
     /**
@@ -3377,14 +3298,12 @@ public class PlanAssembler {
      *         removed.
      */
     private static Set<String> getIndexedColumnSetForTable(Table table) {
-        HashSet<String> columns = new HashSet<>();
-
+        Set<String> columns = new HashSet<>();
         for (Index index : table.getIndexes()) {
             for (ColumnRef colRef : index.getColumns()) {
                 columns.add(colRef.getColumn().getTypeName());
             }
         }
-
         return columns;
     }
 
@@ -3436,15 +3355,13 @@ public class PlanAssembler {
             if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
                 joinNode.setJoinType(JoinType.INNER);
             }
-        }
-        else if (joinNode.getJoinType() == JoinType.RIGHT) {
+        } else if (joinNode.getJoinType() == JoinType.RIGHT) {
             // Get all the outer tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
             if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
                 joinNode.setJoinType(JoinType.INNER);
             }
-        }
-        else if (joinNode.getJoinType() == JoinType.FULL) {
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
             // Get all the outer tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
             if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
@@ -3455,8 +3372,7 @@ public class PlanAssembler {
             if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
                 if (JoinType.FULL == joinNode.getJoinType()) {
                     joinNode.setJoinType(JoinType.RIGHT);
-                }
-                else {
+                } else {
                     // LEFT join was just removed
                     joinNode.setJoinType(JoinType.INNER);
                 }
@@ -3525,15 +3441,9 @@ public class PlanAssembler {
      */
     private static boolean isNullRejecting(Collection<String> tableAliases,
             List<AbstractExpression> exprs) {
-        for (AbstractExpression expr : exprs) {
-            for (String tableAlias : tableAliases) {
-                if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
-                    // We are done at this level
-                    return true;
-                }
-            }
-        }
-        return false;
+        return exprs.stream().anyMatch(expr ->
+                tableAliases.stream().anyMatch(alias ->
+                        ExpressionUtil.isNullRejectingExpression(expr, alias)));
     }
 
 }

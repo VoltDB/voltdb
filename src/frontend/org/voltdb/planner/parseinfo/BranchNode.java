@@ -109,21 +109,21 @@ public class BranchNode extends JoinNode {
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<>();
+        List<AbstractExpression> joinList = new ArrayList<>();
+        List<AbstractExpression> whereList = new ArrayList<>();
 
         // Collect node's own join and where expressions
         joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         whereList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
-        if ( ! (leftChild instanceof BranchNode)) {
+        if (! (leftChild instanceof BranchNode)) {
             joinList.addAll(leftChild.m_joinInnerList);
             leftChild.m_joinInnerList.clear();
             whereList.addAll(leftChild.m_whereInnerList);
             leftChild.m_whereInnerList.clear();
         }
-        if ( ! (rightChild instanceof BranchNode)) {
+        if (! (rightChild instanceof BranchNode)) {
             joinList.addAll(rightChild.m_joinInnerList);
             rightChild.m_joinInnerList.clear();
             whereList.addAll(rightChild.m_whereInnerList);
@@ -290,10 +290,10 @@ public class BranchNode extends JoinNode {
         // non-inner query. In general, they do not prevent results from being generated
         // on the partitions that don't have partition-key-qualified rows.
         if (m_joinType == JoinType.INNER) {
-            if ( ! m_joinInnerList.isEmpty()) {
+            if (! m_joinInnerList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(m_joinInnerList, equivalenceSet);
             }
-            if ( ! m_joinOuterList.isEmpty()) {
+            if (! m_joinOuterList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(m_joinOuterList, equivalenceSet);
             }
         }
@@ -343,8 +343,7 @@ public class BranchNode extends JoinNode {
      */
     @Override
     protected void extractSubTree(List<JoinNode> leafNodes) {
-        JoinNode[] children = {m_leftNode, m_rightNode};
-        for (JoinNode child : children) {
+        for (JoinNode child : new JoinNode[]{m_leftNode, m_rightNode}) {
 
             // Leaf nodes don't have a significant join type,
             // test for them first and never attempt to start a new tree at a leaf.
@@ -376,8 +375,7 @@ public class BranchNode extends JoinNode {
     @Override
     public boolean hasOuterJoin() {
         assert(m_leftNode != null && m_rightNode != null);
-        return m_joinType != JoinType.INNER ||
-                m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
+        return m_joinType != JoinType.INNER || m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
     }
 
     /**
