@@ -191,8 +191,4 @@ public interface ExportManagerInterface {
     default public void onDrainedSource(String tableName, int partition) {
         // No-op
     }
-
-    default public Object getLastAckedSeqNumberCursor() {
-        return null;
-    }
 }
