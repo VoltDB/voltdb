@@ -243,7 +243,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     }
 
-    public void testIndexScan() {
+    public void testIndexScanWithOrderBy() {
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
         .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
         .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
@@ -251,6 +251,20 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                 + "{\"COLUMN_NAME\":\"III\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]}],"
                 + "\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"RIGHT\":"
                 + "{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":2}},\"TARGET_TABLE_NAME\":\"RI5\",\"TARGET_TABLE_ALIAS\":\"RI5\",\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI5_IND_I_II_III\"}],\"EXECUTE_LIST\":[1],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
+
+    public void testIndexScan() {
+        m_tester.sql("SELECT II FROM RI5 WHERE ii = 2 and I - II > 0")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], expr#5=[-($t0, $t1)], expr#6=[0], expr#7=[>($t5, $t6)], expr#8=[AND($t4, $t7)], II=[$t1], $condition=[$t8], index=[RI5_IND_II_INVALIDEQ1_1])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\","
+                + "\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}}]}],"
+                + "\"PREDICATE\":{\"TYPE\":13,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":2,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,"
+                + "\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}},"
+                + "\"TARGET_TABLE_NAME\":\"RI5\",\"TARGET_TABLE_ALIAS\":\"RI5\",\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"INVALID\","
+                + "\"TARGET_INDEX_NAME\":\"RI5_IND_II\",\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":2}],\"COMPARE_NOTDISTINCT\":[false],"
+                + "\"END_EXPRESSION\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},"
+                + "\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":2}}}],\"EXECUTE_LIST\":[1],\"IS_LARGE_QUERY\":false}")
         .pass();
     }
 
