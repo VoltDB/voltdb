@@ -236,10 +236,10 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
 
     public void testLeftNLIJWithWherePredicate() {
         // verify the column types with EE
-        // The ri3.ii > 4 and where ri3.iii + ri3.ii = 3 can be pushed down because it's on the inner join side
+        // The ri3.ii > 4 and where ri3.iii + ri3.ii = 3 and r1.si is NULL can be pushed down because it's on the inner join side
         // and r1.i < 2 must stay at the join
         // @TODO
-        m_tester.sql("select r1.i from R1 left join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2 where ri3.iii + ri3.ii = 3")
+        m_tester.sql("select r1.i from R1 left join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2 where ri3.iii + ri3.ii = 3 and r1.si is NULL")
                 .pass();
     }
 
