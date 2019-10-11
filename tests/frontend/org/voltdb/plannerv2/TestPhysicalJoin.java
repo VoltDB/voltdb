@@ -203,4 +203,52 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
                         "      VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI2_IND1_ASCEQ0_0])\n")
                 .pass();
     }
+
+    public void testFullNLIJWithPostPredicate() {
+        // verify the column types with EE
+        // The ri3.ii > 4 and r1.i < 2 must stay at the join level - full join
+        m_tester.sql("select r1.i from R1 full join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $2), $3, $1)], joinType=[full], split=[1], innerIndex=[RI3_IND1_HASH], postPredicate=[AND($3, $1)])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[<($t0, $t6)], I=[$t0], $f6=[$t7], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[4], expr#5=[>($t2, $t4)], II=[$t2], $f4=[$t5], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI3]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[RI3_IND1_HASH_INVALIDEQ1_1])\n")
+                .pass();
+    }
+
+    public void testLeftNLIJWithPostPredicate() {
+        // verify the column types with EE
+        // The ri3.ii > 4 can be pushed down because it's on the inner join side
+        // and r1.i < 2 must stay at the join
+        // @TODO
+        m_tester.sql("select r1.i from R1 left join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2")
+                .pass();
+    }
+
+    public void testInnerNLIJWithPostPredicate() {
+        // verify the column types with EE
+        // The ri3.ii > 4 and r1.i < 2 can be pushed down
+        // @TODO
+        m_tester.sql("select r1.i from R1 join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2")
+                .pass();
+    }
+
+    public void testLeftNLIJWithWherePredicate() {
+        // verify the column types with EE
+        // The ri3.ii > 4 and where ri3.iii + ri3.ii = 3 can be pushed down because it's on the inner join side
+        // and r1.i < 2 must stay at the join
+        // @TODO
+        m_tester.sql("select r1.i from R1 left join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2 where ri3.iii + ri3.ii = 3")
+                .pass();
+    }
+
+    public void testNLIJWithWherePredicate() {
+        // verify the column types with EE
+        // The post predicate ri3.ii > 4 and r1.i < 2 can be pushed down
+        // WHERE where ri3.iii + ri3.ii = 3 and r1.si = 3 also can be pushed down
+        m_tester.sql("select r1.i from R1 join ri3 on r1.i = ri3.ii and ri3.ii > 4 and r1.i < 2 where ri3.iii + ri3.ii = 3 and r1.si = 3")
+                .pass();
+    }
+
 }

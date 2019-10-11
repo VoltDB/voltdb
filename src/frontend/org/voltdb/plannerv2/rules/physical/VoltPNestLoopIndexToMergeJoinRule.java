@@ -32,11 +32,11 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.util.Pair;
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
@@ -53,7 +53,6 @@ import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;
@@ -542,28 +541,31 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         final RelNode outerNode = m_matchType.getOuterNode(call);
         assert(outerNode instanceof VoltPhysicalTableSequentialScan);
         final VoltPhysicalTableScan outerSeqScan = (VoltPhysicalTableSequentialScan) outerNode;
+        final RexBuilder builder = outerSeqScan.getCluster().getRexBuilder();
         final RexProgram outerProgram = m_matchType.getCombinedOuterProgram(call);
         final RexNode joinCondition = ((Join)call.rels[0]).getCondition();
         int numOuterFieldsForJoin = m_matchType.getNumOuterFieldsForJoin(call);
 
         final Table table = outerSeqScan.getVoltTable().getCatalogTable();
-        final List<Column> columns = CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
         final Iterable<Index> iterable = () -> outerSeqScan.getVoltTable().getCatalogTable().getIndexes().iterator();
         return StreamSupport.stream(iterable.spliterator(), false)
                 .map(index -> IndexUtil.getCalciteRelevantAccessPathForIndex(
-                        table, columns, joinCondition, outerProgram,
-                        index, SortDirectionType.INVALID, numOuterFieldsForJoin, false))
-                .filter(accessPath -> accessPath != null && isIndexScannable(accessPath.getIndex()))
-                .map(accessPath -> {
-                    try {
-                        return Pair.of(VoltRexUtil.createIndexCollation(
-                                accessPath.getIndex(), table, outerSeqScan.getCluster().getRexBuilder(),
+                        builder, table, joinCondition, outerProgram,
+                        index, SortDirectionType.INVALID, numOuterFieldsForJoin,
+                        false, false))
+                .filter(accessPathOpt -> accessPathOpt.isPresent())
+                .map(accessPathOpt -> {
+                        Pair<AccessPath, RexNode> accessPathPair = accessPathOpt.get();
+                        AccessPath accessPath = accessPathPair.left;
+                        try {
+                            return Pair.of(VoltRexUtil.createIndexCollation(
+                                accessPath.getIndex(), table, builder,
                                 outerSeqScan.getProgram()),
                                 accessPath.getIndex());
-                    } catch (JSONException e) {
-                        throw new CalcitePlanningException(e.getMessage());
-                    }
-                })
+                        } catch (JSONException e) {
+                            throw new CalcitePlanningException(e.getMessage());
+                        }
+                    })
                 .collect(Collectors.toList());
     }
 
