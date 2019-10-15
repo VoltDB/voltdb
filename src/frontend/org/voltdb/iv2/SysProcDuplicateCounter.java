@@ -45,10 +45,9 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            TransactionInfoBaseMessage message,
-            long leaderHSID)
+            TransactionInfoBaseMessage message)
     {
-        super(destinationHSId, realTxnId, expectedHSIds, message, leaderHSID);
+        super(destinationHSId, realTxnId, expectedHSIds, message);
     }
 
     /**
@@ -105,7 +104,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
         // needs to be a three long array to work
         int[] hashes = new int[] { (int) hash, 0, 0 };
 
-        return checkCommon(hashes, message.isRecovering(), message, false);
+        return checkCommon(hashes, message.isRecovering(), null, message, false);
     }
 
     @Override

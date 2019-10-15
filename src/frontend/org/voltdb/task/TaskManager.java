@@ -39,6 +39,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -103,8 +104,6 @@ public final class TaskManager {
     private final Set<Integer> m_locallyLedPartitions = new HashSet<>();
     // Partition tasks are disabled while a host is performing the initial join work
     private boolean m_enableTasksOnPartitions;
-    // Supplier to indicate if this manager should be in read-only mode
-    private final BooleanSupplier m_readOnlySupplier;
     private final SimpleClientResponseAdapter m_adapter = new SimpleClientResponseAdapter(
             ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
 
@@ -124,6 +123,8 @@ public final class TaskManager {
     // Used to execute the schedulers and scheduled procedures for partitioned schedules
     private final ScheduledExecutorHolder m_partitionedExecutor = new ScheduledExecutorHolder("PARTITIONED");
 
+    // Supplier to indicate if this manager should be in read-only mode
+    final BooleanSupplier m_readOnlySupplier;
     final ClientInterface m_clientInterface;
     final StatsAgent m_statsAgent;
 
@@ -653,9 +654,9 @@ public final class TaskManager {
         return Pair.of(null, new InitializableFactory<>(constructor, initMethod, parameters, takesHelper, hash));
     }
 
-    ListenableFuture<?> execute(Runnable runnable) {
+    private ListenableFuture<?> execute(Runnable runnable) {
         try {
-            return addExceptionListener(m_managerExecutor.submit(runnable));
+            return addExceptionListener(m_managerExecutor.submit(runnable), null);
         } catch (RejectedExecutionException e) {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("NONE", "Could not execute " + runnable), e);
@@ -664,9 +665,9 @@ public final class TaskManager {
         }
     }
 
-    <T> ListenableFuture<T> execute(Callable<T> callable) {
+    private <T> ListenableFuture<T> execute(Callable<T> callable) {
         try {
-            return addExceptionListener(m_managerExecutor.submit(callable));
+            return addExceptionListener(m_managerExecutor.submit(callable), null);
         } catch (RejectedExecutionException e) {
             if (log.isDebugEnabled()) {
                 log.debug(generateLogMessage("NONE", "Could not execute " + callable), e);
@@ -679,14 +680,19 @@ public final class TaskManager {
         return m_authSystem.getUser(userName);
     }
 
-    static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future) {
+    static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future,
+            Consumer<Throwable> exceptionHandler) {
         future.addListener(() -> {
             try {
                 if (!future.isCancelled()) {
                     future.get();
                 }
-            } catch (Exception e) {
-                log.error(generateLogMessage("NONE", "Unexpected exception encountered"), e);
+            } catch (Throwable t) {
+                if (exceptionHandler == null) {
+                    log.error(generateLogMessage("NONE", "Unexpected exception encountered"), t);
+                } else {
+                    exceptionHandler.accept(t);
+                }
             }
         }, MoreExecutors.newDirectExecutorService());
         return future;
@@ -1457,19 +1463,28 @@ public final class TaskManager {
             m_stats.addProcedureCall(m_scheduledAction.getExecutionTime(), m_scheduledAction.getWaitTime(), failed);
 
             if (failed) {
-                String onError = m_handler.m_definition.getOnerror();
+                if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE && m_readOnlySupplier.getAsBoolean()
+                        && !m_scheduler.isReadOnly()) {
+                    // Hit a race going into read only mode so just ignore or debug log
+                    if (log.isDebugEnabled() && response instanceof ClientResponseImpl) {
+                        log.debug(generateLogMessage("Ignoring server unavailable response in read only mode: "
+                                + ((ClientResponseImpl) response).toStatusJSONString()));
+                    }
+                } else {
+                    String onError = m_handler.m_definition.getOnerror();
 
-                boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
-                if (!isIgnore || log.isDebugEnabled()) {
-                    String message = "Procedure " + m_scheduledAction.getProcedure() + " with parameters "
-                            + Arrays.toString(m_scheduledAction.getProcedureParameters()) + " failed: "
-                            + m_scheduledAction.getResponse().getStatusString();
+                    boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
+                    if (!isIgnore || log.isDebugEnabled()) {
+                        String message = "Procedure " + m_scheduledAction.getProcedure() + " with parameters "
+                                + Arrays.toString(m_scheduledAction.getProcedureParameters()) + " failed: "
+                                + m_scheduledAction.getResponse().getStatusString();
 
-                    if (isIgnore || "LOG".equalsIgnoreCase(onError)) {
-                        log.log(isIgnore ? Level.DEBUG : Level.INFO, generateLogMessage(message), null);
-                    } else {
-                        errorOccurred(message);
-                        return;
+                        if (isIgnore || "LOG".equalsIgnoreCase(onError)) {
+                            log.log(isIgnore ? Level.DEBUG : Level.INFO, generateLogMessage(message), null);
+                        } else {
+                            errorOccurred(message);
+                            return;
+                        }
                     }
                 }
             } else if (log.isTraceEnabled() && response instanceof ClientResponseImpl) {
@@ -1559,6 +1574,19 @@ public final class TaskManager {
             }
 
             return procedure;
+        }
+
+        ListenableFuture<?> addExceptionListener(ListenableFuture<?> future) {
+            return TaskManager.addExceptionListener(future, this::errorOccurred);
+        }
+
+        /**
+         * Log an error message and shutdown the scheduler with the error state
+         *
+         * @param t Throwable to log with the error message
+         */
+        void errorOccurred(Throwable t) {
+            errorOccurred("Task encountered an unexpected error", t);
         }
 
         /**

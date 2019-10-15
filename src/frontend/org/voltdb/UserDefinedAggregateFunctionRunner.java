@@ -17,24 +17,21 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectStreamClass;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
-import java.util.Vector;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Vector;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.catalog.CatalogMap;
+import org.voltcore.utils.ByteBufferInputStream;
 import org.voltdb.catalog.Function;
-import org.voltdb.utils.SerializationHelper;
-import org.voltdb.utils.JavaBuiltInFunctions;
-import org.voltdb.compiler.statements.CreateFunction;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
-import org.voltdb.UserDefinedFunctionRunner;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * This class maintains the necessary information for each UDAF including the class instance
@@ -57,6 +54,32 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
     final boolean[] m_boxUpByteArray;
     final VoltType m_returnType;
     final int m_paramCount;
+
+    public static Object readObject(ByteBuffer buffer) throws IOException, ClassNotFoundException {
+        // Sanity check the size against the remaining buffer size.
+        if (VAR_LEN_SIZE > buffer.remaining()) {
+            throw new RuntimeException(String.format(
+                    "Can't read varbinary size as %d byte integer " + "from buffer with %d bytes remaining.",
+                    VAR_LEN_SIZE, buffer.remaining()));
+        }
+        final int len = buffer.getInt();
+        if (len == VoltTable.NULL_STRING_INDICATOR) {
+            return null;
+        }
+        if (len < 0) {
+            throw new RuntimeException("Invalid object length.");
+        }
+        int originalLimit = buffer.limit();
+        buffer.limit(buffer.position() + len);
+        ByteBuffer slice = buffer.slice();
+        buffer.position(buffer.limit());
+        buffer.limit(originalLimit);
+
+        try (ByteBufferInputStream bis = new ByteBufferInputStream(slice);
+                ObjectInput in = new UDAFObjectInputStream(bis)) {
+            return in.readObject();
+        }
+    }
 
     public UserDefinedAggregateFunctionRunner(Function catalogFunction, Class<?> funcClass) {
         this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
@@ -152,6 +175,23 @@ public class UserDefinedAggregateFunctionRunner extends UserDefinedFunctionRunne
     public void clearFunctionInstance(int udafIndex) {
         if (udafIndex == m_functionInstances.size() - 1) {
             m_functionInstances.clear();
+        }
+    }
+
+    static class UDAFObjectInputStream extends ObjectInputStream {
+        public UDAFObjectInputStream(InputStream in) throws IOException {
+            super(in);
+        }
+
+        @Override
+        protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+            String name = desc.getName();
+            try {
+                return Class.forName(name, true,
+                        VoltDB.instance().getCatalogContext().m_catalogInfo.m_jarfile.getLoader());
+            } catch (ClassNotFoundException ex) {
+                throw ex;
+            }
         }
     }
 }
