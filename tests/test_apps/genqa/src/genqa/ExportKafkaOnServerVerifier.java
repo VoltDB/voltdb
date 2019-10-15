@@ -50,6 +50,7 @@ import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
+import kafka.consumer.ConsumerTimeoutException;
 
 import org.I0Itec.zkclient.ZkClient;
 import org.voltdb.iv2.TxnEgo;
@@ -197,8 +198,20 @@ public class ExportKafkaOnServerVerifier {
             System.out.println("Consumer waiting count: " + m_cdl.getCount());
             try {
                 ConsumerIterator<byte[], byte[]> it = m_stream.iterator();
-                while (it.hasNext()) {
-                    byte msg[] = it.next().message();
+                while (true) {
+                    byte msg[] = new byte[0];
+                    try {
+                        // this can cause intermitten timeout exceptions that need to be retried.
+                        if ( ! it.hasNext() ) {
+                            break;
+                        }
+                        msg = it.next().message();
+                    } catch ( ConsumerTimeoutException ek ) {
+                        System.out.println("consumer timeout, retrying");
+                        ek.printStackTrace();
+                        continue;
+                    }
+
                     String smsg = new String(msg);
                     String row[] = RoughCSVTokenizer.tokenize(smsg);
                     try {
@@ -238,7 +251,8 @@ public class ExportKafkaOnServerVerifier {
                     } catch (ValidationErr ex) {
                         System.out.println("Validation ERROR " + ex);
                     }
-                }
+                  }
+
 
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -253,9 +267,10 @@ public class ExportKafkaOnServerVerifier {
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
     void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
-        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
-        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_TABLE2";
-        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
+
+        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE_KAFKA";
+        final String topic2 = topicPrefix + "EXPORT_REPLICATED_TABLE_KAFKA";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE_KAFKA";
 
         List<Future<Long>> doneFutures = new ArrayList<>();
 

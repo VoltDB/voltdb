@@ -179,6 +179,7 @@ public class AsyncExportClient
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
+                TransactionCounts.incrementAndGet(INSERT);
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 // log.info("Success " + trace);
@@ -248,6 +249,14 @@ public class AsyncExportClient
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
+
+    // If testing Table/Export, count inserts, deletes, update fore & aft
+
+    private static int INSERT = 1;
+    private static int DELETE = 2;
+    private static int UPDATE_OLD = 3;
+    private static int UPDATE_NEW = 4;
+    private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
@@ -377,8 +386,7 @@ public class AsyncExportClient
                         log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
                         clientRef.get().callProcedure(
                                 new NullCallback(),
-                                "MigrateExport");
-                                // "MigrateExport", r.nextInt(10));
+                                "MigrateExport", i);
                     }
                     catch (Exception e) {
                         log.fatal("Exception: " + e);
@@ -406,7 +414,9 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
+
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
@@ -468,10 +478,19 @@ public class AsyncExportClient
         }
     }
 
+    private static long get_table_count(String sqlTable) {
+        long count = 0;
+        try {
+            count = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
+        }
+        catch (Exception e) {
+            System.err.println("Exception in get_table_count: " + e);
+            System.err.println("SELECT COUNT from table " + sqlTable + " failed");
+        }
+        return count;
+    }
+
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
-     *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
@@ -591,18 +610,25 @@ public class AsyncExportClient
                     + "increase --timeout arg for slower clients" );
                 }
                 Long pending = stats.getLong("TUPLE_PENDING");
+                String stream = stats.getString("SOURCE");
+                String target = stats.getString("TARGET");
+                String active = stats.getString("ACTIVE");
+                Long partition = stats.getLong("PARTITION_ID");
+
+                // don't wait for inactive partitions.
+                // there are cases where ACTIVE==FALSE is a bug that won't get caught here anyway
+                if (active.equalsIgnoreCase("FALSE"))
+                    continue;
                 if ( pending != lastPending) {
                     // reset the timer if we are making progress
                     maxTime = Instant.now().plusSeconds(timeout);
-                    pending = lastPending;
+                    lastPending = pending;
                 }
-                String stream = stats.getString("SOURCE");
-                Long partition = stats.getLong("PARTITION_ID");
-                log.info("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
+                // switch this message to debug out?
+                log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
                 if (pending != 0) {
                     passedThisTime = false;
                     log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
-
                     break;
                 }
             }

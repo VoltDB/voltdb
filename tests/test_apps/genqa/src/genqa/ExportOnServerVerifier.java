@@ -362,7 +362,7 @@ public class ExportOnServerVerifier {
                     Long rowTxnId = Long.parseLong(row[6].trim());
                     Long rowId = Long.parseLong(row[7].trim());
 
-                    if (TxnEgo.getPartitionId(rowTxnId) != partition) {
+                    if (TxnEgo.getPartitionId(rowTxnId) != partition && TxnEgo.getPartitionId(rowTxnId) != 16383 ) {
                         log.error("ERROR: mismatched exported partition for txid " + rowTxnId +
                                 ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                 ", while export record says " + partition);
