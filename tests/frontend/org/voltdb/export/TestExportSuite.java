@@ -202,7 +202,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
         // Make sure some are exported and seen by me
         assertTrue((m_verifier.getExportedDataCount() - icnt > 0));
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
     }
 
     //
