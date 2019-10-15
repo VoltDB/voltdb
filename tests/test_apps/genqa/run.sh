@@ -41,7 +41,7 @@ RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
 VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
 POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
-CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB:"
+CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
