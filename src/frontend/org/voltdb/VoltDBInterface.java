@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -361,15 +360,4 @@ public interface VoltDBInterface
      * notify surviving node upon shutting itself down
      */
     public void notifyOfShutdown();
-
-    /**
-     * Inject a fault (exception or crashLocalDB) in system procedures
-     */
-    public void injectFault(List<SysprocFaultInjection> injection);
-
-    /**
-     * Get the injected fault
-     * @return SysprocFaultInjection
-     */
-    public List<SysprocFaultInjection> getInjectedFault();
 }

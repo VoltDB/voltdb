@@ -174,8 +174,6 @@ public class VoltDB {
         /** specifies which version of exporter the system will use */
         public ExporterVersion m_exporterVersion = ExporterVersion.UNDEFINED;
 
-        public List<SysprocFaultInjection> m_injectedFaults = new ArrayList<>();
-
         /** enable ssl */
         public boolean m_sslEnable = System.getenv("ENABLE_SSL") == null ?
                 Boolean.getBoolean("ENABLE_SSL") :
@@ -708,22 +706,6 @@ public class VoltDB {
                     m_exporterVersion = ExporterVersion.E2;
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
-                } else if (arg.equals("injectfault")) {
-                    while (++i < args.length && args[i].indexOf(',') != -1) {
-                        String[] faultStrs = args[i].split(",");
-                        for (String faultStr : faultStrs) {
-                            SysprocFaultInjection fault = SysprocFaultInjection.parse(faultStr);
-                            if (fault != null) {
-                                m_injectedFaults.add(fault);
-                            }
-                        }
-                    }
-                    if (i < args.length) {
-                        SysprocFaultInjection fault = SysprocFaultInjection.parse(args[i]);
-                        if (fault != null) {
-                            m_injectedFaults.add(fault);
-                        }
-                    }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

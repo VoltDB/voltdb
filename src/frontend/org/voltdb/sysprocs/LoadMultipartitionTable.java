@@ -23,8 +23,6 @@ import java.util.Map;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
-import org.voltdb.SysprocFaultInjection;
-import org.voltdb.SysprocFaultInjection.FaultType;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -77,7 +75,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             // add the partition id
             long currentPartition = context.getPartitionId();
             result.addRow(currentPartition);
-            SysprocFaultInjection.check(FaultType.LoadMultipartitionTableFragment);
             try {
                 // voltLoadTable is void. Assume success or exception.
                 context.getSiteProcedureConnection().loadTable(m_runner.getTxnState(), tableName, toInsert,
@@ -98,7 +95,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             long[] modifiedTuples = new long[context.getNumberOfPartitions()];
             List<VoltTable> deps = dependencies.get(SysProcFragmentId.PF_distribute);
             assert(deps.size() > 0);
-            SysprocFaultInjection.check(FaultType.LoadMultipartitionTableAggregate);
 
             // go through all the deps and find one mod tuple count per partition
             for (VoltTable t : deps) {
@@ -246,7 +242,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 executed += executeSQL(false);
             }
         }
-        SysprocFaultInjection.check(FaultType.LoadMultipartitionTableRun);
         // execute any leftover batched statements
         if (queued > executed) {
             executed += executeSQL(true);

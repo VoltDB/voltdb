@@ -403,9 +403,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Using Boolean so if this is accessed before assignment the caller will get an NPE
     private Boolean m_eligibleAsLeader = null;
 
-    // Test only field, simulate different types of failures in system procedures.
-    private List<SysprocFaultInjection> m_faults;
-
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
@@ -983,11 +980,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (config.m_forceVoltdbCreate) {
                     deleteInitializationMarkers(config);
                 }
-            }
-
-            // Implant injected faults
-            if (!config.m_injectedFaults.isEmpty()) {
-                injectFault(config.m_injectedFaults);
             }
 
             // If there's no deployment provide a default and put it under voltdbroot.
@@ -5247,16 +5239,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
         }
-    }
-
-    @Override
-    public void injectFault(List<SysprocFaultInjection> injection) {
-        m_faults = injection;
-    }
-
-    @Override
-    public List<SysprocFaultInjection> getInjectedFault() {
-        return m_faults;
     }
 }
 

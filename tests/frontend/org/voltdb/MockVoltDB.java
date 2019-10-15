@@ -971,12 +971,4 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void notifyOfShutdown() {
      }
-
-    @Override
-    public void injectFault(List<SysprocFaultInjection> injection) {}
-
-    @Override
-    public List<SysprocFaultInjection> getInjectedFault() {
-        return null;
-    }
 }
