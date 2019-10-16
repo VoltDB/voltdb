@@ -530,7 +530,7 @@ public class MpScheduler extends Scheduler
                 final Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
 
                 // Message is from a dead host
-                if (!liveHosts.contains(CoreUtils.hsIdToString(message.m_sourceHSId))) {
+                if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(message.m_sourceHSId))) {
                     return;
                 }
 
