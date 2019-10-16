@@ -523,7 +523,19 @@ public class MpScheduler extends Scheduler
         } else {
             advanceRepairTruncationHandle(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
-            assert(txn != null);
+            if (txn == null) {
+                // The thread (updateReplicas) could wipe out duplicate counters for run-everywhere system procedures
+                // if the duplicate counters contain only the partition masters from failed hosts.
+                // If a response from a failed partition master get here after the transaction has been declared completed, ignore it.
+                final Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                if (liveHosts.contains(CoreUtils.getHostIdFromHSId(message.m_sourceHSId))) {
+                    // This should not happen
+                    tmLog.warn("Received InitiateResponseMessage after the transaction is completed from " + CoreUtils.hsIdToString(message.m_sourceHSId));
+                    assert(false);
+                }
+                // Message is from a dead host
+                return;
+            }
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
