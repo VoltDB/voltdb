@@ -539,7 +539,7 @@ public class ExportCoordinator {
                                 else {
                                     int host = buf.getInt();
                                     try {
-                                        ExportSequenceNumberTracker tracker = ExportSequenceNumberTracker.deserialize(buf);
+                                        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker(buf);
                                         if (exportLog.isDebugEnabled()) {
                                             exportLog.debug("Received tracker from " + host + ": " + tracker);
                                         }
@@ -1019,9 +1019,6 @@ public class ExportCoordinator {
             return false;
         }
 
-        // Always truncate the trackers to the acked seqNo
-        m_trackers.forEach((k, v) -> v.truncate(ackedSeqNo));
-
         if (m_safePoint == 0L || m_safePoint > ackedSeqNo) {
             // Not waiting for safe point or not reached safe point
             return false;
@@ -1078,8 +1075,8 @@ public class ExportCoordinator {
             return m_isMaster;
         }
 
-        // Note: the trackers are truncated so the seqNo should not be past the first gap
-        Pair<Long, Long> gap = leaderTracker.getFirstGap();
+        // Get the first gap covering or following this sequence number
+        Pair<Long, Long> gap = leaderTracker.getFirstGap(exportSeqNo);
         assert (gap == null || exportSeqNo <= gap.getSecond());
         if (gap == null || exportSeqNo < (gap.getFirst() - 1)) {
 
@@ -1118,7 +1115,7 @@ public class ExportCoordinator {
             if (m_leaderHostId.equals(hostId)) {
                 continue;
             }
-            Pair<Long, Long> rgap = m_trackers.get(hostId).getFirstGap();
+            Pair<Long, Long> rgap = m_trackers.get(hostId).getFirstGap(exportSeqNo);
             if (rgap != null) {
                 assert (exportSeqNo <= rgap.getSecond());
             }

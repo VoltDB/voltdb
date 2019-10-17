@@ -90,6 +90,18 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
         m_map = TreeRangeSet.create(other.m_map);
     }
 
+    public ExportSequenceNumberTracker(ByteBuffer buf) throws IOException {
+
+        m_map = TreeRangeSet.create();
+        int count = buf.getInt();
+        for (int i = 0; i < count; i++) {
+            long start = buf.getLong();
+            long end = buf.getLong();
+            append(start, end);
+        }
+        m_hasSentinel = buf.get() == 1;
+    }
+
     public int size() {
         return m_map.asRanges().size();
     }
@@ -437,20 +449,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             tracker.append(start(entry), end(entry));
         }
         tracker.m_hasSentinel = m_hasSentinel;
-        return tracker;
-    }
-
-    public static ExportSequenceNumberTracker deserialize(ByteBuffer buf) throws IOException {
-
-        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
-
-        int count = buf.getInt();
-        for (int i = 0; i < count; i++) {
-            long start = buf.getLong();
-            long end = buf.getLong();
-            tracker.append(start, end);
-        }
-        tracker.m_hasSentinel = buf.get() == 1;
         return tracker;
     }
 }
