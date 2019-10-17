@@ -280,7 +280,7 @@ public class KafkaExportClient extends ExportClientBase {
             m_producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapVal);
         }
 
-        m_producerConfig.setProperty(ProducerConfig.BLOCK_ON_BUFFER_FULL_CONFIG, "true");
+        m_producerConfig.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
 
         LOG.info("Configuring Kafka export client: %s", m_producerConfig);
     }
