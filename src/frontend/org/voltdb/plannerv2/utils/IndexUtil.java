@@ -65,17 +65,16 @@ public class IndexUtil {
      * @param sortDirection sort direction to use
      * @param numOuterFieldsForJoin number of fields that come from outer table (-1 if not a join)
      * @param isInnerTable if the table is the inner relation
-     * @param keepAccessPathOtherExpressions indicator whether to keep or delete AccessPath.other expressions
+     * @param isFullOrLeftJoin is this AccessPath for a node participating in a FULL of Left join
      *
-     * @return A valid access path using the data and
-     *         AccessPath.other expressions converted to a Calcite one
-     *         or null if none found.
+     * @return A valid access path using the data and in case of joins, all the pre-join predicate
+     *         expressions (have have to stay at the join level for a FULL / LEFT joins).
      */
     public static Optional<Pair<AccessPath, RexNode>> getCalciteRelevantAccessPathForIndex(
             RexBuilder builder, Table table, RexLocalRef condRef, RexProgram program,
             Index index, SortDirectionType sortDirection, int numOuterFieldsForJoin,
             boolean isInnerTable,
-            boolean keepAccessPathOtherExpressions) {
+            boolean isFullOrLeftJoin) {
         if (condRef == null) {
             return Optional.empty();
         }
@@ -88,13 +87,13 @@ public class IndexUtil {
                 sortDirection,
                 numOuterFieldsForJoin,
                 isInnerTable,
-                keepAccessPathOtherExpressions);
+                isFullOrLeftJoin);
     }
     public static Optional<Pair<AccessPath, RexNode>> getCalciteRelevantAccessPathForIndex(
             RexBuilder builder, Table table, RexNode joinCondition, RexProgram program,
             Index index, SortDirectionType sortDirection, int numOuterFieldsForJoin,
             boolean isInnerTable,
-            boolean keepAccessPathOtherExpressions) {
+            boolean isFullOrLeftJoin) {
         if (joinCondition == null) {
             return Optional.empty();
         }
@@ -117,17 +116,34 @@ public class IndexUtil {
                                 tableScan, voltToCalciteCondMap.keySet(), index, sortDirection),
                         voltToCalciteCondMap.keySet(), null, null));
         // Build a new Calcite expression consisting of expressions that are not part of
-        // index expressions (the other Volt expressions from the selected accesspath)
+        // index expressions and can't be pushed down to the inner node
         return accessPathOpt.map(accessPath -> {
-                List<RexNode> rexExprs = accessPath.getOtherExprs().stream()
-                    .map(otherExpr -> voltToCalciteCondMap.get(otherExpr))
+            if (numOuterFieldsForJoin == -1) {
+                // Not a join. All OTHER expressions can stay to be pushed down
+                // to a IndexScan during the Calite-to-Volt plan conversion
+                return Pair.of(accessPath, null);
+            }
+
+            List<AbstractExpression> otherExpressions = Lists.newArrayList(accessPath.getOtherExprs());
+            List<RexNode> rexExprs = otherExpressions.stream()
+                    .filter(otherExpr -> {
+                        int tableIdxToRemove = (isInnerTable) ? 0 : 1;
+                            // This is an inner index scan participating in a FULL or Left join
+                            // The "OTHER" join expressions that has TVEs from the outer
+                            // node only has to stay at the join level. Remove them from the
+                            // AccessPath.other list
+                            return otherExpr.findAllTupleValueSubexpressions().stream()
+                                    .allMatch(tve -> {
+                                        return tve.getTableIndex() == tableIdxToRemove;
+                                    });
+                    })
+                    .map(otherExpr -> {
+                        accessPath.getOtherExprs().remove(otherExpr);
+                        return voltToCalciteCondMap.get(otherExpr);
+                    })
                     .collect(Collectors.toList());
-                if (!keepAccessPathOtherExpressions) {
-                    // Clear the "other" expressions to avoid the duplication
-                    accessPath.getOtherExprs().clear();
-                }
-                return Pair.of(accessPath, RexUtil.composeConjunction(builder, rexExprs, false));
-            });
+            return Pair.of(accessPath, RexUtil.composeConjunction(builder, rexExprs, false));
+        });
     }
 
     /**

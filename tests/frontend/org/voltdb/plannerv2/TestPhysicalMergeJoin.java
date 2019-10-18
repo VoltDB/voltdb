@@ -23,7 +23,6 @@
 
 package org.voltdb.plannerv2;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
 public class TestPhysicalMergeJoin extends Plannerv2TestCase {
@@ -176,7 +175,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         // NLIJ because  RI1.TI > RI3.PK gets pushed to the ON condition and the join is not an equi one anymore.
         m_tester.sql("select RI1.ti from RI1 inner join RI3 on RI1.I = RI3.II where RI1.TI > RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t1], split=[1])\n" +
-                            "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $3), >($1, $2))], joinType=[inner], split=[1], innerIndex=[RI3_IND1_HASH], postPredicate=[>($1, $2)])\n" +
+                            "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $3), >($1, $2))], joinType=[inner], split=[1], innerIndex=[RI3_IND1_HASH])\n" +
                             "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
                             "      VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
                             "    VoltPhysicalCalc(expr#0..3=[{inputs}], PK=[$t0], II=[$t2], split=[1])\n" +
@@ -189,7 +188,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         m_tester.sql("select RI1.ti from RI1 inner join RI3 on RI1.I = RI3.II and RI1.TI > RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], TI=[$t1], split=[1])\n" +
                         "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $3), >($1, $2))], joinType=[inner], " +
-                        "split=[1], innerIndex=[RI3_IND1_HASH], postPredicate=[>($1, $2)])\n" +
+                        "split=[1], innerIndex=[RI3_IND1_HASH])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], " +
                         "expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
@@ -204,7 +203,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         m_tester.sql("select RI2.I from RI2 inner join RI3 on RI2.I = RI3.II and RI2.BI = RI3.PK")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
                         "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $2), =($1, $3))], joinType=[inner], " +
-                        "split=[1], innerIndex=[RI3_IND1_HASH], postPredicate=[=($1, $3)])\n" +
+                        "split=[1], innerIndex=[RI3_IND1_HASH])\n" +
                         "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], BI=[$t2], split=[1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], " +
                         "proj#0..3=[{exprs}])\n" +
@@ -221,7 +220,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
         // RI2_IND2 ON RI2 (i, bi); --- the order is reversed BI and I
         m_tester.sql("select RI2.I from RI2 inner join RI1 on RI2.BI = RI1.BI and RI2.I = RI1.SI")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t2], split=[1])\n" +
-                            "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($3, $0), =($2, $1))], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I], postPredicate=[=($3, $0)])\n" +
+                            "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($3, $0), =($2, $1))], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
                             "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):INTEGER], BI=[$t2], SI0=[$t4], split=[1])\n" +
                             "      VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n" +
                             "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], BI=[$t2], split=[1])\n" +

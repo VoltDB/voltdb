@@ -35,8 +35,6 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.catalog.Index;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -55,8 +53,9 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
     // Needed for cost estimates
     private final Index m_innerIndex;
     private final AccessPath m_accessPath;
-    // PostPredicate, part of the original join condition which is not an index expression
-    private final RexNode m_postPredicate;
+    // Volt's PreJoinPredicate, part of the original join condition that can't be pushed down
+    // to the access path expressions. Outer join contitions for LEFT/FULL joins, for example
+    private final RexNode m_preJoinPredicate;
 
     public VoltPhysicalNestLoopIndexJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
@@ -81,15 +80,15 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         Preconditions.checkNotNull(accessPath, "Inner access path is null");
         m_innerIndex = index;
         m_accessPath = accessPath;
-        m_postPredicate = postPredicate;
+        m_preJoinPredicate = postPredicate;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.item("innerIndex", m_innerIndex.getTypeName());
-        if (m_postPredicate != null && !m_postPredicate.isAlwaysTrue()) {
-            pw.item("postPredicate",m_postPredicate.toString());
+        if (m_preJoinPredicate != null && !m_preJoinPredicate.isAlwaysTrue()) {
+            pw.item("postPredicate",m_preJoinPredicate.toString());
         }
         return pw;
     }
@@ -120,25 +119,12 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         nlipn.addInlinePlanNode(innerIndexScan);
 
         // Avoid a trivial post condition
-        if (m_postPredicate != null && !m_postPredicate.isAlwaysTrue()) {
-            // Can be more smart here and push certain conditions that involved
-            // an inner or outer table only down to children depending on the join type
-            // FULL, LEFT or INNER
-            nlipn.setJoinPredicate(
+        if (m_preJoinPredicate != null && !m_preJoinPredicate.isAlwaysTrue()) {
+            nlipn.setPreJoinPredicate(
                 RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(),
-                        m_postPredicate, getRowType()));
+                        m_preJoinPredicate, getRowType()));
         }
 
-        // We need to adjust the index scan's predicate - all TVE expressions there belong to the scan node
-        // and their indexes have to be set to 1 because its an inner table
-        // All other index scan expressions are part of a join expressions and should already have
-        // the correct TVE index set
-        // Set join predicate
-        final AbstractExpression postPredicate = innerIndexScan.getPredicate();
-        if (postPredicate != null) {
-            postPredicate.findAllSubexpressionsOfClass(TupleValueExpression.class)
-                    .forEach(expr -> ((TupleValueExpression) expr).setTableIndex(1));
-        }
         // Inline LIMIT / OFFSET
         addLimitOffset(nlipn);
         // Set output schema
@@ -173,7 +159,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         return new VoltPhysicalNestLoopIndexJoin(getCluster(),
                 getTraitSet(), left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()),
-                m_innerIndex, m_accessPath, m_postPredicate, null, null);
+                m_innerIndex, m_accessPath, m_preJoinPredicate, null, null);
     }
 
     @Override
@@ -181,7 +167,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(getSystemFieldList());
         return new VoltPhysicalNestLoopIndexJoin(getCluster(), traits, left, right, condition,
                 variablesSet, joinType, isSemiJoinDone(), systemFieldList, m_innerIndex, m_accessPath,
-                m_postPredicate, offset, limit);
+                m_preJoinPredicate, offset, limit);
     }
 
 }
