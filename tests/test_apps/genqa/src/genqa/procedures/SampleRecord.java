@@ -67,10 +67,11 @@ public class SampleRecord
         this.type_not_null_bigint       = nextBigint(rand);
         this.type_null_timestamp        = nextTimestamp(rand, true);
         this.type_not_null_timestamp    = nextTimestamp(rand); // typically set to NOW at INSERT, but left as random here in case other Sample class users still depend on it
-        this.type_null_float            = nextFloat(rand, true);
-        this.type_not_null_float        = nextFloat(rand);
+
         this.type_null_decimal          = nextDecimal(rand, true);
         this.type_not_null_decimal      = nextDecimal(rand);
+        this.type_null_float            = nextFloat(rand, true);
+        this.type_not_null_float        = nextFloat(rand);
         this.type_null_varchar25        = nextVarchar(rand, true, 1, 25);
         this.type_not_null_varchar25    = nextVarchar(rand, 1, 25);
         this.type_null_varchar128       = nextVarchar(rand, true, 25, 128);
@@ -93,10 +94,10 @@ public class SampleRecord
             type_not_null_bigint       + ", " +
             type_null_timestamp        + ", " +
             type_not_null_timestamp    + ", " +
-            type_null_float            + ", " +
-            type_not_null_float        + ", " +
             type_null_decimal          + ", " +
             type_not_null_decimal      + ", " +
+            type_null_float            + ", " +
+            type_not_null_float        + ", " +
             type_null_varchar25        + ", " +
             type_not_null_varchar25    + ", " +
             type_null_varchar128       + ", " +
