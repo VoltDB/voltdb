@@ -40,7 +40,7 @@ public class UpdateClassesThread extends BenchmarkThread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final byte[] jarData;
-    final long cycletime = 3000;
+    final long cycletime = 5000;
 
     public UpdateClassesThread(Client client, long duration_secs) {
         log.info("UpdateClasses initializing...");
