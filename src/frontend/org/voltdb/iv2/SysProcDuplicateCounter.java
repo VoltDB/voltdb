@@ -62,7 +62,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
      * that dependency.
      */
     @Override
-    MatchStatus offer(FragmentResponseMessage message)
+    HashResult offer(FragmentResponseMessage message)
     {
         long hash = 0;
         for (int i = 0; i < message.getTableCount(); i++) {

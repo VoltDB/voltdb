@@ -47,14 +47,26 @@ public class DuplicateCounter
     private final static String FAIL_MSG = "Stored procedure %s succeeded on one partition but failed on another partition.";
     private final static String MISMATCH_MSG = "Stored procedure %s generated different SQL queries at different partitions.";
 
-    public static enum MatchStatus{
+    public static enum HashResult{
         MISMATCH(0),
         DONE(1),
         WAITING(2),
         ABORT(3);
         final int status;
-        MatchStatus(int status) {
+        HashResult(int status) {
             this.status = status;
+        }
+        int get() {
+            return status;
+        }
+        public boolean isDone() {
+            return status == DONE.get();
+        }
+        public boolean isMismatch() {
+            return status == MISMATCH.get();
+        }
+        public boolean isAbort() {
+            return status == ABORT.get();
         }
     }
 
@@ -73,7 +85,7 @@ public class DuplicateCounter
     Map<Long, ResponseResult> m_responses = Maps.newTreeMap();
 
     // Flag indicating that the the hashes from replicas match with the hash from partition master
-    private boolean m_allMatched = true;
+    private boolean m_hashMatched = true;
 
     Set<Long> m_replicas = Sets.newHashSet();
 
@@ -114,14 +126,14 @@ public class DuplicateCounter
         return m_txnId;
     }
 
-    MatchStatus updateReplicas(List<Long> replicas) {
+    HashResult updateReplicas(List<Long> replicas) {
         m_expectedHSIds.retainAll(replicas);
         m_replicas.retainAll(replicas);
         if (m_expectedHSIds.isEmpty()) {
             finalizeMatchResult();
-            return MatchStatus.DONE;
+            return HashResult.DONE;
         }
-        return MatchStatus.WAITING;
+        return HashResult.WAITING;
     }
 
     void addReplicas(long[] newReplicas) {
@@ -194,7 +206,7 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected MatchStatus checkCommon(int[] hashes, boolean recovering, VoltMessage message, boolean txnSucceed)
+    protected HashResult checkCommon(int[] hashes, boolean recovering, VoltMessage message, boolean txnSucceed)
     {
         if (!recovering) {
             m_lastResponse = message;
@@ -207,11 +219,11 @@ public class DuplicateCounter
                 } else if (m_txnSucceed != txnSucceed) {
                     tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
                     logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
-                    return MatchStatus.ABORT;
+                    return HashResult.ABORT;
                 } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
                     tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
                     logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
-                    return MatchStatus.MISMATCH;
+                    return HashResult.MISMATCH;
                 }
             } else {
                 m_responses.put(message.m_sourceHSId, new ResponseResult(hashes, txnSucceed, message));
@@ -230,11 +242,11 @@ public class DuplicateCounter
 
         m_expectedHSIds.remove(message.m_sourceHSId);
         if (!m_expectedHSIds.isEmpty()) {
-            return MatchStatus.WAITING;
+            return HashResult.WAITING;
         }
 
         finalizeMatchResult();
-        return MatchStatus.DONE;
+        return HashResult.DONE;
     }
 
     private void finalizeMatchResult() {
@@ -268,7 +280,7 @@ public class DuplicateCounter
                     logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
                     misMatchLogged = true;
                 }
-                m_allMatched = false;
+                m_hashMatched = false;
                 m_misMatchedReplicas.add(entry.getKey());
             } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
                 if (!misMatchLogged) {
@@ -276,30 +288,31 @@ public class DuplicateCounter
                     logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
                     misMatchLogged = true;
                 }
-                m_allMatched = false;
+                m_hashMatched = false;
                 m_misMatchedReplicas.add(entry.getKey());
             }
         }
     }
 
-    public boolean allResponsesMatched() {
+    public boolean isSuccess() {
         assert(m_expectedHSIds.isEmpty());
-        return m_allMatched;
+        return m_hashMatched;
     }
 
-    MatchStatus offer(FragmentResponseMessage message) {
+    HashResult offer(FragmentResponseMessage message) {
         // No check on fragment message
         return checkCommon(ZERO_HASHES, message.isRecovering(), message, false);
     }
 
-    MatchStatus offer(CompleteTransactionResponseMessage message) {
+    HashResult offer(CompleteTransactionResponseMessage message) {
         return checkCommon(ZERO_HASHES, message.isRecovering(), message, false);
     }
-    MatchStatus offer(DummyTransactionResponseMessage message) {
+
+    HashResult offer(DummyTransactionResponseMessage message) {
         return checkCommon(ZERO_HASHES, false, message, false);
     }
 
-    MatchStatus offer(InitiateResponseMessage message) {
+    HashResult offer(InitiateResponseMessage message) {
         ClientResponseImpl r = message.getClientResponseData();
         return checkCommon(r.getHashes(),
                 message.isRecovering(),

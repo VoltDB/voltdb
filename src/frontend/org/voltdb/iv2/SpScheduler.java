@@ -54,7 +54,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.iv2.DuplicateCounter.MatchStatus;
+import org.voltdb.iv2.DuplicateCounter.HashResult;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -291,8 +291,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
         for (Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
             DuplicateCounter counter = entry.getValue();
-            MatchStatus result = counter.updateReplicas(m_replicaHSIds);
-            if (result == MatchStatus.DONE) {
+            HashResult result = counter.updateReplicas(m_replicaHSIds);
+            if (result.isDone()) {
                 doneCounters.add(entry.getKey());
             }
         }
@@ -827,9 +827,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                                   "hash", message.getClientResponseData().getHashes()[0]*/));
         }
         if (counter != null) {
-            MatchStatus result = counter.offer(message);
-            if (result == MatchStatus.DONE) {
-                if (counter.allResponsesMatched()) {
+            HashResult result = counter.offer(message);
+            if (result.isDone()) {
+                if (counter.isSuccess()) {
                     m_duplicateCounters.remove(dcKey);
                     final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                     setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
@@ -1203,9 +1203,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
                                                       "status", message.getStatusCode()));
             }
-            MatchStatus result = counter.offer(message);
-            if (result == MatchStatus.DONE) {
-                if (counter.allResponsesMatched()) {
+            HashResult result = counter.offer(message);
+            if (result.isDone()) {
+                if (counter.isSuccess()) {
                     if (txn != null && txn.isDone()) {
                         setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
                     }
@@ -1340,7 +1340,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         if (counter != null) {
-            txnDone = counter.offer(msg) == MatchStatus.DONE;
+            txnDone = counter.offer(msg).isDone();
         }
 
         if (txnDone) {
@@ -1499,8 +1499,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return;
         }
 
-        MatchStatus result = counter.offer(message);
-        if (result == MatchStatus.DONE) {
+        HashResult result = counter.offer(message);
+        if (result.isDone()) {
             // DummyTransactionResponseMessage ends on SPI
             m_duplicateCounters.remove(dcKey);
             setRepairLogTruncationHandle(spHandle, false);
