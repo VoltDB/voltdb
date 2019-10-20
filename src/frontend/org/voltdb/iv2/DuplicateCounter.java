@@ -261,6 +261,10 @@ public class DuplicateCounter
         ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
         assert (leaderResponse != null);
         m_responseHashes = leaderResponse.hashes;
+        if (m_responseHashes == null) {
+            tmLog.warn("Response from partition leader ha no hash");
+            return;
+        }
         m_lastResponse = leaderResponse.message;
         int pos = -1;
         boolean misMatchLogged = false;
@@ -282,10 +286,12 @@ public class DuplicateCounter
                 }
                 m_hashMatched = false;
                 m_misMatchedReplicas.add(entry.getKey());
-            } else if ((pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
+            } else if (res.hashes == null || (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
                 if (!misMatchLogged) {
                     tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    if (res.hashes != null) {
+                        logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    }
                     misMatchLogged = true;
                 }
                 m_hashMatched = false;
