@@ -96,6 +96,8 @@ public class DuplicateCounter
     // Their hashes are compared between partitions, not between replicas of the same partition
     final boolean m_everySiteMPSysProc;
 
+    // Used for repair
+    final boolean m_repair;
     static class ResponseResult {
         final int[] hashes;
         final boolean success;
@@ -113,6 +115,16 @@ public class DuplicateCounter
             List<Long> expectedHSIds,
             TransactionInfoBaseMessage openMessage,
             long leaderHSID) {
+        this(destinationHSId, realTxnId, expectedHSIds, openMessage, leaderHSID, false);
+    }
+
+    DuplicateCounter(
+            long destinationHSId,
+            long realTxnId,
+            List<Long> expectedHSIds,
+            TransactionInfoBaseMessage openMessage,
+            long leaderHSID,
+            boolean repair) {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
@@ -120,6 +132,7 @@ public class DuplicateCounter
         m_leaderHSID = leaderHSID;
         m_everySiteMPSysProc = (TxnEgo.getPartitionId(realTxnId) == MpInitiator.MP_INIT_PID);
         m_replicas.addAll(expectedHSIds);
+        m_repair = repair;
     }
 
     long getTxnId() {
@@ -211,7 +224,7 @@ public class DuplicateCounter
         if (!recovering) {
             m_lastResponse = message;
             // Every partition sys proc InitiateResponseMessage
-            if (m_everySiteMPSysProc) {
+            if (m_everySiteMPSysProc || m_repair) {
                 int pos = -1;
                 if (m_responseHashes == null) {
                     m_responseHashes = hashes;
@@ -253,7 +266,7 @@ public class DuplicateCounter
 
         // If the DuplicateCounter is used from MP run-every-site system procedure, hash mismatch is checked as responses come
         // in from every partition.
-        if (m_everySiteMPSysProc || m_responses.isEmpty()) {
+        if (m_everySiteMPSysProc || m_responses.isEmpty() || m_repair) {
             return;
         }
 
