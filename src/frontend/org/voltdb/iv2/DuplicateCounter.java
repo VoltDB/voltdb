@@ -261,12 +261,8 @@ public class DuplicateCounter
         ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
         assert (leaderResponse != null);
         m_responseHashes = leaderResponse.hashes;
-        if (m_responseHashes == null) {
-            tmLog.warn("Response from partition leader ha no hash");
-            return;
-        }
         m_lastResponse = leaderResponse.message;
-        int pos = -1;
+
         boolean misMatchLogged = false;
         for (Iterator<Map.Entry<Long, ResponseResult>> it = m_responses.entrySet().iterator(); it.hasNext();) {
             Map.Entry<Long, ResponseResult> entry = it.next();
@@ -278,15 +274,20 @@ public class DuplicateCounter
             }
 
             ResponseResult res = entry.getValue();
-            if (leaderResponse.success != entry.getValue().success) {
+            if (leaderResponse.success != res.success) {
                 if (!misMatchLogged) {
                     tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, -1);
                     misMatchLogged = true;
                 }
                 m_hashMatched = false;
                 m_misMatchedReplicas.add(entry.getKey());
-            } else if (res.hashes == null || (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
+                continue;
+            }
+            int pos = -1;
+            // Response hashes can be null from dummy or failed transaction responses.
+            if (m_responseHashes != null && res.hashes != null &&
+                    (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
                 if (!misMatchLogged) {
                     tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
                     if (res.hashes != null) {
