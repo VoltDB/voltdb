@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
@@ -214,7 +215,7 @@ public class TestExportClientBasic extends JUnit4LocalClusterTest {
             m_client.callProcedure("@AdHoc", "INSERT INTO s1 VALUES(" + i + ", " +  i + ")");
             m_client.callProcedure("@Quiesce");
         }
-        waitForAllExportToDrain(m_client);
+        waitForAllExportToDrain(m_client, m_count);
         verifyExport();
     }
 
@@ -283,22 +284,30 @@ public class TestExportClientBasic extends JUnit4LocalClusterTest {
         return numRows;
     }
 
-    private void waitForAllExportToDrain(Client client) throws Exception {
+    private void waitForAllExportToDrain(Client client, int expectedCount) throws Exception {
         boolean drained = false;
         while (!drained) {
             ClientResponse cr = client.callProcedure("@Statistics", "EXPORT", 0);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             VoltTable stats = cr.getResults()[0];
             drained = true;
+            int foundCount = 0;
             while (stats.advanceRow()) {
+                if (Boolean.parseBoolean(stats.getString("ACTIVE"))) {
+                    foundCount += stats.getLong("TUPLE_COUNT");
+                }
                 if (stats.getLong("TUPLE_PENDING") > 0) {
-                    System.out.println("Tuple pending for " +
+                    System.out.println("For " +
                             stats.getString("SOURCE") + ":" + stats.getLong("PARTITION_ID") +
-                            ": " + stats.getLong("TUPLE_PENDING"));
+                            ": TUPLE_PENDING=" + stats.getLong("TUPLE_PENDING") +
+                            ", TUPLE_COUNT=" + stats.getLong("TUPLE_COUNT"));
                     drained = false;
                     break;
                 }
             }
+            // When making sure it's drained, also make sure that export actually sent all the data (TUPLE_COUNT).
+            // Otherwise we may exit drain before records were pushed out from EE.
+            drained &= (foundCount == expectedCount);
             if (!drained) {
                 Thread.sleep(250);
             }
@@ -306,15 +315,16 @@ public class TestExportClientBasic extends JUnit4LocalClusterTest {
     }
 
     private class TestHttpRequestHandler implements HttpRequestHandler {
-        private int m_numResponses = 0;
+        private AtomicInteger m_numResponses = new AtomicInteger(0);
+
         @Override
         public void handle(HttpRequest httpRequest, HttpResponse httpResponse, HttpContext httpContext) throws HttpException, IOException
         {
-            m_numResponses++;
+            m_numResponses.incrementAndGet();
         }
 
         public int getNumResponses() {
-            return m_numResponses;
+            return m_numResponses.get();
         }
     }
 }
