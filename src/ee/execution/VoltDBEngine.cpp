@@ -2501,9 +2501,8 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 int64_t VoltDBEngine::exportAction(bool syncAction,
                                    int64_t uso,
                                    int64_t seqNo,
-                                   std::string tableSignature) {
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableSignature);
-
+                                   std::string tableName) {
+    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableName);
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
         // ignore trying to sync a non-exported table
@@ -2527,13 +2526,13 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableSignature) {
+void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableName) {
 
     // defaults mean failure
     ackOffset = 0;
     seqNo = -1;
 
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableSignature);
+    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableName);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {

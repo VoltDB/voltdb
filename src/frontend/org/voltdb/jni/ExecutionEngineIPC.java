@@ -1547,18 +1547,18 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String tableName) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(uso);
             m_data.putLong(seqNo);
-            if (mTableSignature == null) {
+            if (tableName == null) {
                 m_data.putInt(-1);
             } else {
-                m_data.putInt(mTableSignature.getBytes("UTF-8").length);
-                m_data.put(mTableSignature.getBytes("UTF-8"));
+                m_data.putInt(tableName.getBytes("UTF-8").length);
+                m_data.put(tableName.getBytes("UTF-8"));
             }
             m_data.flip();
             m_connection.write();
@@ -1572,7 +1572,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             if (result_offset < 0) {
                 System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
                     uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
-                    ", tableSignature: " + mTableSignature);
+                    ", tableName: " + tableName);
             }
         } catch (final IOException e) {
             throw new RuntimeException(e);

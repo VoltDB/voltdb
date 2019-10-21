@@ -1113,20 +1113,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
-   jbyteArray tableSignature) {
+   jbyteArray tableNameBytes) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *tableNameChars = env->GetByteArrayElements(tableNameBytes, NULL);
+    std::string tableName(reinterpret_cast<char *>(tableNameChars), env->GetArrayLength(tableNameBytes));
+    env->ReleaseByteArrayElements(tableNameBytes, tableNameChars, JNI_ABORT);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
             return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
-                                        signature);
+                                        tableName);
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
@@ -1147,14 +1147,14 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *tableNameChars = env->GetByteArrayElements(tableSignature, NULL);
+    std::string tableName(reinterpret_cast<char *>(tableNameChars), env->GetArrayLength(tableSignature));
+    env->ReleaseByteArrayElements(tableSignature, tableNameChars, JNI_ABORT);
     try {
         jlong data[2];
         size_t ackOffset;
         int64_t seqNo;
-        engine->getUSOForExportTable(ackOffset, seqNo, signature);
+        engine->getUSOForExportTable(ackOffset, seqNo, tableName);
         data[0] = ackOffset;
         data[1] = seqNo;
         jlongArray retval = env->NewLongArray(2);

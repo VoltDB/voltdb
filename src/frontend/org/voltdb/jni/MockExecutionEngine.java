@@ -198,7 +198,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String tableName) {
     }
 
     @Override
