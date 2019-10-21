@@ -351,7 +351,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     if (edb.isLegacy()) {
                         cont.updateStartTime(System.currentTimeMillis());
                         if (firstRowOfBlock) {
-                            edb.onBlockStart(row);
+                            edb.onBlockStart();
                             firstRowOfBlock = false;
                         }
                         edb.processRow(length, rowdata);
@@ -375,8 +375,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 }
                 if (edb.isLegacy()) {
                     edb.onBlockCompletion();
-                }
-                if (row != null) {
+                } else if (row != null) {
                     edb.onBlockCompletion(row);
                 }
                 // Make sure to discard after onBlockCompletion so that if completion
