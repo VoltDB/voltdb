@@ -118,6 +118,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger drLog = new VoltLogger("DRAGENT");
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     private static final double m_taskLogReplayRatio =
             Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
@@ -1409,10 +1410,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void exportAction(boolean syncAction,
                              long uso,
                              Long sequenceNumber,
-                             Integer partitionId, String tableSignature)
+                             Integer partitionId, String tableName)
     {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("exportAction syncAction=" + syncAction + " uso=" + uso +
+                    " sequenceNumber=" + sequenceNumber + " partitionId=" + partitionId + " table=" + tableName);
+        }
         m_ee.exportAction(syncAction, uso, sequenceNumber,
-                          partitionId, tableSignature);
+                          partitionId, tableName);
     }
 
     @Override
@@ -1482,7 +1487,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
-                    catalogTable.getSignature());
+                    catalogTable.getTypeName());
             // assign the stats to the other partition's value
             ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
                     StreamStartAction.REJOIN, tableEntry.getValue());

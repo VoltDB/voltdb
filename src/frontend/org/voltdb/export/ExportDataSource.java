@@ -714,9 +714,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
-        if (exportLog.isTraceEnabled()) {
-            exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
-                    lastSequenceNumber + "], poll=" + poll);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("pushExportBufferImpl [" + startSequenceNumber + "," +
+                    lastSequenceNumber + "], poll=" + poll + " m_tupleCount=" + m_tupleCount);
         }
         if (buffer != null) {
             // header space along is 8 bytes
@@ -848,8 +848,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     if (sequenceNumber < 0) {
                         if (sequenceNumber == -1L && m_gapTracker.isEmpty()) {
-                            // ENG-17199: we are creating EDS instances for all partitions on replicated tables
-                            // but only partition 0 is used and can be truncated
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Ignoring truncation for partition " + m_partitionId);
                             }

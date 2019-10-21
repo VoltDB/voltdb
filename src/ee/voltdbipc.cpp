@@ -357,14 +357,14 @@ typedef struct {
     int32_t isSync;
     int64_t offset;
     int64_t seqNo;
-    int32_t tableSignatureLength;
-    char tableSignature[0];
+    int32_t tableNameLength;
+    char tableName[0];
 }__attribute__((packed)) export_action;
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t tableSignatureLength;
-    char tableSignature[0];
+    int32_t tableNameLength;
+    char tableName[0];
 }__attribute__((packed)) get_uso;
 
 typedef struct {
@@ -1496,12 +1496,12 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     export_action *action = (export_action*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
-    std::string tableSignature(action->tableSignature, tableSignatureLength);
+    int32_t tableNameLength = ntohl(action->tableNameLength);
+    std::string tableName(action->tableName, tableNameLength);
     int64_t result = m_engine->exportAction(action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->seqNo)),
-                                         tableSignature);
+                                         tableName);
 
     // write offset across bigendian.
     result = htonll(result);
@@ -1512,12 +1512,12 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
     get_uso *get = (get_uso*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    int32_t tableSignatureLength = ntohl(get->tableSignatureLength);
-    std::string tableSignature(get->tableSignature, tableSignatureLength);
+    int32_t tableNameLength = ntohl(get->tableNameLength);
+    std::string tableName(get->tableName, tableNameLength);
 
     size_t ackOffset;
     int64_t seqNo;
-    m_engine->getUSOForExportTable(ackOffset, seqNo, tableSignature);
+    m_engine->getUSOForExportTable(ackOffset, seqNo, tableName);
 
     // write offset across bigendian.
     int64_t ackOffsetI64 = static_cast<int64_t>(ackOffset);
