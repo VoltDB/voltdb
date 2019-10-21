@@ -240,7 +240,7 @@ public class ExportKafkaOnServerVerifier {
 
                         Integer partition = Integer.parseInt(row[3].trim());
 
-                        if (TxnEgo.getPartitionId(rowTxnId) != partition) {
+                        if (TxnEgo.getPartitionId(rowTxnId) != partition && TxnEgo.getPartitionId(rowTxnId) != 16383) {
                             System.err.println("ERROR mismatched exported partition for txid " + rowTxnId +
                                     ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                     ", while export record says " + partition);
