@@ -279,8 +279,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 throw new AssertionError("Need to specify a planner phase.");
             }
 
-            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.OUTER_JOIN, m_transformedNode);
-            if (m_ruleSetIndex == PlannerRules.Phase.OUTER_JOIN.ordinal() && ! m_expectedTransforms.isEmpty()) {
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.LOGICAL_JOIN, m_transformedNode);
+            if (m_ruleSetIndex == PlannerRules.Phase.LOGICAL_JOIN.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
                 anyMatch(m_expectedTransforms, actualTransform);
             }

@@ -51,18 +51,19 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
     public VoltPhysicalMergeJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, String outerIndex, String innerIndex) {
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode whereCondition,
+            String outerIndex, String innerIndex) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, outerIndex, innerIndex, null, null);
+                semiJoinDone, systemFieldList, whereCondition, outerIndex, innerIndex, null, null);
     }
 
     private VoltPhysicalMergeJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, String outerIndex,
-            String innerIndex, RexNode offset, RexNode limit) {
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode whereCondition,
+            String outerIndex, String innerIndex, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, offset, limit);
+                semiJoinDone, systemFieldList, whereCondition, offset, limit);
         Preconditions.checkNotNull(outerIndex, "Outer index is null");
         Preconditions.checkNotNull(innerIndex, "Inner index is null");
         m_outerIndexName = outerIndex;
@@ -74,14 +75,14 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
                      RelNode right, JoinRelType joinType, boolean semiJoinDone) {
         return new VoltPhysicalMergeJoin(getCluster(), traitSet, left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()),
-                m_outerIndexName, m_innerIndexName);
+                whereCondition, m_outerIndexName, m_innerIndexName, m_offset, m_limit);
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
         return new VoltPhysicalMergeJoin(getCluster(), traits, left, right, condition,
                 variablesSet, joinType, isSemiJoinDone(), ImmutableList.copyOf(getSystemFieldList()),
-                m_outerIndexName, m_innerIndexName, offset, limit);
+                whereCondition, m_outerIndexName, m_innerIndexName, offset, limit);
     }
 
     @Override
@@ -126,6 +127,9 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
 
         mjpn.setJoinPredicate(RexConverter.convertJoinPred(
                 getInput(0).getRowType().getFieldCount(), getCondition(), outerProgram, innerIndexScan.getProgram()));
+        mjpn.setWherePredicate(RexConverter.convertJoinPred(
+                getInput(0).getRowType().getFieldCount(), getWhereCondition(), outerProgram, innerIndexScan.getProgram()));
+
         // Inline LIMIT / OFFSET
         addLimitOffset(mjpn);
         // Set output schema

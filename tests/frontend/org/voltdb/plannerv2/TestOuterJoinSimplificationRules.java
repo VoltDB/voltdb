@@ -33,7 +33,7 @@ public class TestOuterJoinSimplificationRules extends Plannerv2TestCase {
         setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
         init();
-        m_tester.phase(Phase.OUTER_JOIN);
+        m_tester.phase(Phase.LOGICAL_JOIN);
     }
 
     @Override public void tearDown() throws Exception {

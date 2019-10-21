@@ -442,7 +442,8 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         return new VoltPhysicalMergeJoin(
                 join.getCluster(), join.getTraitSet(), outerChild, innerChild, join.getCondition(),
                 join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-                ImmutableList.copyOf(join.getSystemFieldList()), ourterCollationName, innerCollationName);
+                ImmutableList.copyOf(join.getSystemFieldList()),  join.getWhereCondition(),
+                ourterCollationName, innerCollationName);
     }
 
     private RelNode newIndexScan(Index index, RelCollation indexCollation, RelNode oldNode, Calc oldCalc) {

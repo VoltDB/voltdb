@@ -19,7 +19,6 @@ package org.voltdb.plannerv2.rules.physical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;

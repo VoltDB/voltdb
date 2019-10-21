@@ -307,14 +307,24 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
 
     public void testFullNLJWithPredicates2() {
         m_tester.sql("select 1 from r3 full join r1 on r3.pk = r1.i where r3.ii is null and r1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[1], EXPR$0=[$t4], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($0, $2)], joinType=[full], whereCondition=[AND(IS NULL($1), IS NULL($3))], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], PK=[$t0], II=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
     }
 
     public void testFullNLJWithPredicates3() {
         m_tester.sql("select 1 from r3 full join r1 on r3.pk = r1.i and r1.bi = 5 where r3.ii is null and r1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[1], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[AND(=($0, $2), =($4, 5))], joinType=[full], whereCondition=[AND(IS NULL($1), IS NULL($3))], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], PK=[$t0], II=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2], BI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
     }
 
     public void testLeftNLJWithPredicates1() {
@@ -342,14 +352,24 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
 
     public void testLeftNLJWithPredicates3() {
         m_tester.sql("select 1 from r3 left join r1 on r3.pk = r1.i where r3.ii >0 and r1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[1], EXPR$0=[$t4], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($0, $2)], joinType=[left], whereCondition=[IS NULL($3)], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[0], expr#4=[>($t2, $t3)], PK=[$t0], II=[$t2], $condition=[$t4], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
     }
 
     public void testLeftNLJWithPredicates4() {
         m_tester.sql("select 1 from r3 left join r1 on r3.pk = r1.i and r1.bi = 5 where r3.ii is null and r1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[1], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($0, $2)], joinType=[left], whereCondition=[IS NULL($3)], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[IS NULL($t2)], PK=[$t0], II=[$t2], $condition=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[=($t3, $t6)], I=[$t0], TI=[$t2], BI=[$t3], $condition=[$t7], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
     }
 
     public void testLeftToInnerNLJWithPredicates1() {

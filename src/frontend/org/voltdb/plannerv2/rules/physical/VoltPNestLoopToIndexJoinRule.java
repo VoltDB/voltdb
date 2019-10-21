@@ -149,7 +149,8 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         return new VoltPhysicalNestLoopIndexJoin(
                 join.getCluster(), join.getTraitSet(), outerScan, innerChild, join.getCondition(),
                 join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-                ImmutableList.copyOf(join.getSystemFieldList()), index, accessPath, preJoinPredicate);
+                ImmutableList.copyOf(join.getSystemFieldList()),
+                join.getWhereCondition(), index, accessPath, preJoinPredicate);
     }
 
     @Override

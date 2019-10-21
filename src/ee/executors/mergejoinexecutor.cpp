@@ -123,6 +123,7 @@ struct IndexTableCursor : public TableCursor {
     IndexTableCursor(IndexScanPlanNode* indexNode, PersistentTable* persistTable):
         TableCursor(persistTable), tableIndex(persistTable->index(indexNode->getTargetIndexName())),
         indexCursor(tableIndex->getTupleSchema()),
+        post_expression(indexNode->getPredicate()),
         projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION))) {
         tableIndex->moveToEnd(true, indexCursor);
         if (projectionNode) {
@@ -145,8 +146,23 @@ struct IndexTableCursor : public TableCursor {
     }
 
     bool getNextTuple(TableTuple* tuple) override {
-        *tuple = tableIndex->nextValue(indexCursor);
-        return ! tuple->isNullTuple();
+        if (post_expression != NULL) {
+            while (getNextTupleDo(tuple)) {
+                if (post_expression->eval(tuple, NULL).isTrue()) {
+                    return true;
+                }
+            }
+//             bool hasMore = false;
+//             do {
+//                 hasMore = getNextTupleDo(tuple);
+//                 if (hasMore && post_expression->eval(tuple, NULL).isTrue()) {
+//                     return true;
+//                 }
+//             } while (hasMore);
+            return false;
+        } else {
+            return getNextTupleDo(tuple);
+        }
     }
 
     std::unique_ptr<TableCursor> clone() const override {
@@ -154,9 +170,16 @@ struct IndexTableCursor : public TableCursor {
     }
 
 private:
+
+    bool getNextTupleDo(TableTuple* tuple) {
+        *tuple = tableIndex->nextValue(indexCursor);
+        return ! tuple->isNullTuple();
+    }
+
     // Persistent table
     TableIndex *tableIndex;
     IndexCursor indexCursor;
+    AbstractExpression* post_expression;
     // Possible projection
     ProjectionPlanNode* projectionNode;
     int numOfProjectColumns = -1;

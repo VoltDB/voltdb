@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.rules;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptRule;
@@ -52,6 +51,7 @@ import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcJoinMergeRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
@@ -100,9 +100,9 @@ public class PlannerRules {
                 return PlannerRules.MP_FALLBACK;
             }
         },
-        OUTER_JOIN {
+        LOGICAL_JOIN {
             @Override public RuleSet getRules() {
-                return PlannerRules.HEP_OUTER_JOIN;
+                return PlannerRules.HEP_LOGICAL_JOIN;
             }
         },
         PHYSICAL_CONVERSION {
@@ -209,11 +209,11 @@ public class PlannerRules {
             MPSetOpsQueryFallBackRule.INSTANCE
     );
 
-    private static final RuleSet HEP_OUTER_JOIN = RuleSets.ofList(
+    private static final RuleSet HEP_LOGICAL_JOIN = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
-            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT
+            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT,
+            VoltLCalcJoinMergeRule.INSTANCE
     );
-
 
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
@@ -276,7 +276,7 @@ public class PlannerRules {
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(LOGICAL,
                     MP_FALLBACK,
-                    HEP_OUTER_JOIN,
+                    HEP_LOGICAL_JOIN,
                     PHYSICAL_CONVERSION,
                     PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
                     INLINE)
