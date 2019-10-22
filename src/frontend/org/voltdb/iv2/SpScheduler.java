@@ -709,28 +709,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
-
-        // We currently send the final response into the ether, since we don't
-        // have the original ClientInterface HSID stored.  It would be more
-        // useful to have the original ClienInterface HSId somewhere handy.
-
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(),
                 expectedHSIds,
                 message);
-        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
+            safeAddToDuplicateCounterMap(dcKey, counter);
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             Iv2InitiateTaskMessage localWork =
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             doLocalInitiateOffer(localWork);
+        } else {
+            updateOrAddDuplicateCounter(dcKey, counter,needsRepair);
         }
 
         // is remote repair necessary?
@@ -753,8 +751,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message.getTxnId(),
                 expectedHSIds,
                 message);
-        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
             // Sanity check that we really need repair.
@@ -764,12 +762,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // Not sure what to do in this event.  Crash for now
                 throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
             }
+            safeAddToDuplicateCounterMap(dcKey, counter);
+
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             FragmentTaskMessage localWork =
                 new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             doLocalFragmentOffer(localWork);
+        } else {
+            updateOrAddDuplicateCounter(dcKey, counter,needsRepair);
         }
 
         // is remote repair necessary?
@@ -777,6 +779,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
+        }
+    }
+
+    private void updateOrAddDuplicateCounter(final DuplicateCounterKey dcKey, DuplicateCounter counter, List<Long> needsRepair) {
+        DuplicateCounter theCounter = m_duplicateCounters.get(dcKey);
+        if (theCounter == null) {
+            safeAddToDuplicateCounterMap(dcKey, counter);
+        } else {
+            // The partition leader on the local site is being migrated away, but the migration fails. The local site
+            // can be elected again as leader. In this case, update the duplicate counter.
+            theCounter.updateReplicas(needsRepair);
         }
     }
 
