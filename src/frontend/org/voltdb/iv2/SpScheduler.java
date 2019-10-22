@@ -717,18 +717,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message);
 
         final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
+        updateOrAddDuplicateCounter(dcKey, counter);
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
-            safeAddToDuplicateCounterMap(dcKey, counter);
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             Iv2InitiateTaskMessage localWork =
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             doLocalInitiateOffer(localWork);
-        } else {
-            updateOrAddDuplicateCounter(dcKey, counter,needsRepair);
         }
 
         // is remote repair necessary?
@@ -742,9 +740,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void handleFragmentTaskMessageRepair(List<Long> needsRepair, FragmentTaskMessage message)
     {
+        if (needsRepair.contains(m_mailbox.getHSId()) && m_outstandingTxns.get(message.getTxnId()) != null) {
+            // Sanity check that we really need repair.
+            hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
+                    "This shouldn't be possible.");
+            // Not sure what to do in this event.  Crash for now
+            throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
+        }
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
-
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
@@ -753,25 +757,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message);
 
         final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
+        updateOrAddDuplicateCounter(dcKey, counter);
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
-            // Sanity check that we really need repair.
-            if (m_outstandingTxns.get(message.getTxnId()) != null) {
-                hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
-                        "This shouldn't be possible.");
-                // Not sure what to do in this event.  Crash for now
-                throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
-            }
-            safeAddToDuplicateCounterMap(dcKey, counter);
-
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             FragmentTaskMessage localWork =
                 new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             doLocalFragmentOffer(localWork);
-        } else {
-            updateOrAddDuplicateCounter(dcKey, counter,needsRepair);
         }
 
         // is remote repair necessary?
@@ -782,14 +776,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private void updateOrAddDuplicateCounter(final DuplicateCounterKey dcKey, DuplicateCounter counter, List<Long> needsRepair) {
+    private void updateOrAddDuplicateCounter(final DuplicateCounterKey dcKey, DuplicateCounter counter) {
         DuplicateCounter theCounter = m_duplicateCounters.get(dcKey);
         if (theCounter == null) {
             safeAddToDuplicateCounterMap(dcKey, counter);
         } else {
             // The partition leader on the local site is being migrated away, but the migration fails. The local site
             // can be elected again as leader. In this case, update the duplicate counter.
-            theCounter.updateReplicas(needsRepair);
+            theCounter.updateReplicas(counter.m_expectedHSIds);
         }
     }
 
