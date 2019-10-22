@@ -96,8 +96,9 @@ public class DuplicateCounter
     // Their hashes are compared between partitions, not between replicas of the same partition
     final boolean m_everySiteMPSysProc;
 
-    // Used for repair
-    final boolean m_repair;
+    // Used for transaction repair. In this case, Duplicate Counter may not have local site.
+    final boolean m_transactionRepair;
+
     static class ResponseResult {
         final int[] hashes;
         final boolean success;
@@ -132,7 +133,7 @@ public class DuplicateCounter
         m_leaderHSID = leaderHSID;
         m_everySiteMPSysProc = (TxnEgo.getPartitionId(realTxnId) == MpInitiator.MP_INIT_PID);
         m_replicas.addAll(expectedHSIds);
-        m_repair = repair;
+        m_transactionRepair = repair;
     }
 
     long getTxnId() {
@@ -224,7 +225,7 @@ public class DuplicateCounter
         if (!recovering) {
             m_lastResponse = message;
             // Every partition sys proc InitiateResponseMessage
-            if (m_everySiteMPSysProc || m_repair) {
+            if (m_everySiteMPSysProc || m_transactionRepair) {
                 int pos = -1;
                 if (m_responseHashes == null) {
                     m_responseHashes = hashes;
@@ -266,7 +267,7 @@ public class DuplicateCounter
 
         // If the DuplicateCounter is used from MP run-every-site system procedure, hash mismatch is checked as responses come
         // in from every partition.
-        if (m_everySiteMPSysProc || m_responses.isEmpty() || m_repair) {
+        if (m_everySiteMPSysProc || m_responses.isEmpty() || m_transactionRepair) {
             return;
         }
 

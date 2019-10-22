@@ -722,7 +722,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message.getTxnId(),
                 expectedHSIds,
                 message,
-                m_mailbox.getHSId());
+                m_mailbox.getHSId(),
+                true);
         safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
