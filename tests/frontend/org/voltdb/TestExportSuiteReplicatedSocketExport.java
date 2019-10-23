@@ -26,11 +26,9 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -43,8 +41,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportLocalClusterBase;
-import org.voltdb.export.TestExportBase;
 import org.voltdb.export.SocketExportTestServer;
+import org.voltdb.export.TestExportBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 
@@ -221,7 +219,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
         return builder;
     }
 }
