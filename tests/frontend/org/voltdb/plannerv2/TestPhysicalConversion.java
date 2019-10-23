@@ -477,35 +477,4 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                 .transform("VoltPhysicalValues(tuples=[[]], split=[1])\n")
                 .pass();
     }
-
-    public void testSingleValueAggregateElimination() {
-        m_tester.sql("select I from R1, (\n" +
-                "   select MAX(i) from R2 where i > (\n" +
-                "      select COUNT(R2.i) from R1 " +
-                "      where i is not distinct from R2.i " +
-                "      group by i order by i))" +
-                "as ta2")
-                .transform("VoltPhysicalCalc(expr#0..6=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalNestLoopJoin(condition=[true], joinType=[inner], split=[1])\n" +
-                        "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "    VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], split=[1], coordinator=[false], type=[serial])\n" +
-                        "      VoltPhysicalCalc(expr#0..7=[{inputs}], I=[$t0], split=[1])\n" +
-                        "        VoltPhysicalNestLoopJoin(condition=[AND(=($0, $6), >($0, $7))], joinType=[inner], split=[1])\n" +
-                        "          VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "          VoltPhysicalCalc(expr#0..2=[{inputs}], I1=[$t2], EXPR$0=[$t0], split=[1])\n" +
-                        "            VoltPhysicalSort(sort0=[$1], dir0=[ASC], split=[1])\n" +
-                        "              VoltPhysicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t2], I=[$t0], I1=[$t1], split=[1])\n" +
-                        "                VoltPhysicalHashAggregate(group=[{0, 1}], EXPR$0=[COUNT($2)], split=[1], coordinator=[false], type=[hash])\n" +
-                        "                  VoltPhysicalCalc(expr#0..7=[{inputs}], I=[$t0], I1=[$t7], $f1=[$t7], split=[1])\n" +
-                        "                    VoltPhysicalNestLoopJoin(condition=[true], joinType=[inner], split=[1])\n" +
-                        "                      VoltPhysicalNestLoopJoin(condition=[CASE(IS NULL($0), IS NULL($6), IS NULL($6), IS NULL($0), =(CAST($0):INTEGER NOT NULL, CAST($6):INTEGER NOT NULL))], joinType=[inner], split=[1])\n" +
-                        "                        VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "                        VoltPhysicalHashAggregate(group=[{0}], split=[1], coordinator=[false], type=[hash])\n" +
-                        "                          VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], split=[1])\n" +
-                        "                            VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "                      VoltPhysicalHashAggregate(group=[{0}], split=[1], coordinator=[false], type=[hash])\n" +
-                        "                        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], split=[1])\n" +
-                        "                          VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-                .pass();
-    }
 }

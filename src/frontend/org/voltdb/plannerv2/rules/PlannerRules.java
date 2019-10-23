@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.rules;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptRule;
@@ -48,17 +47,7 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitJoinMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
-import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
-import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
-import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
-import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
-import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
-import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
+import org.voltdb.plannerv2.rules.logical.*;
 import org.voltdb.plannerv2.rules.physical.*;
 
 import com.google.common.collect.ImmutableList;
@@ -152,6 +141,7 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
+            VoltLAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             // Joins
             VoltLJoinRule.INSTANCE,
 
@@ -209,7 +199,6 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
-            VoltPAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
