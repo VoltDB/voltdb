@@ -192,10 +192,11 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort) throws IOException {
-        return suite(classzz, isCommandLogTest, replicationPort, true);
+        return suite(classzz, isCommandLogTest, replicationPort, MultiConfigSuiteBuilder.ReuseServer.DEFAULT);
     }
 
-    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort, boolean reuseServer) throws IOException {
+    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort,
+            MultiConfigSuiteBuilder.ReuseServer reuseServer) throws IOException {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder

@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -332,7 +331,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
                                                  BackendTarget.NATIVE_EE_JNI);
         boolean success = config.compile(project);
         assert(success);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;
     }

@@ -31,7 +31,6 @@ import java.nio.file.Files;
 
 import org.apache.commons.io.FileUtils;
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
@@ -328,7 +327,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         m_nonEmptyConfig.setNewCli(false);
         boolean compile = m_nonEmptyConfig.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(m_nonEmptyConfig, false);
+        builder.addServerConfig(m_nonEmptyConfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
         m_emptyConfig = new LocalCluster("empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);

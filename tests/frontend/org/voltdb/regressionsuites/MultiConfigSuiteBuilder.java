@@ -28,13 +28,13 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google_voltpatches.common.base.Predicate;
-import com.google_voltpatches.common.base.Predicates;
-
 import org.junit.Test;
-import org.voltdb.FlakyTestStandardRunner;
 import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.FlakyTestRule.FlakyTestRunner;
+import org.voltdb.FlakyTestStandardRunner;
+
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Predicates;
 
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -188,16 +188,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         if (DEBUG) {
             System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (1): "+config);
         }
-        return addServerConfig(config, true);
+        return addServerConfig(config, ReuseServer.DEFAULT);
     }
 
-    public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
+    public boolean addServerConfig(VoltServerConfig config, ReuseServer reuseServer) {
         if (DEBUG) {
             System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (2): "+config+", "+reuseServer);
         }
 
-        if (config.isValgrind()) {
-            reuseServer = false;
+        if (reuseServer == ReuseServer.DEFAULT && config.isValgrind()) {
+            reuseServer = ReuseServer.NEVER;
         }
 
         final String enabled_configs = System.getenv().get("VOLT_REGRESSIONS");
@@ -266,7 +266,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             rs.setConfig(config);
             // The last test method for the current cluster configuration will need to
             // shutdown the cluster completely after finishing the test.
-            rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
+            rs.m_completeShutdown = reuseServer == ReuseServer.NEVER || (i == methods.size() - 1);
 
             if (DEBUG) {
                 if (i < 3 || i > 145) {
@@ -294,5 +294,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
     public void addTestSuite(Class<? extends TestCase> testClass) {
         // don't let users do this
         throw new RuntimeException("Unsupported Usage");
+    }
+
+    public enum ReuseServer {
+        ALWAYS, NEVER, DEFAULT;
     }
 }
