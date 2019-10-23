@@ -783,7 +783,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             // The partition leader on the local site is being migrated away, but the migration fails. The local site
             // can be elected again as leader. In this case, update the duplicate counter.
-            theCounter.updateReplicas(counter.m_expectedHSIds);
+
+            // If local site is already in the duplicate counter, retain it.
+            List<Long> expectedHSIDs = new ArrayList<Long>(counter.m_expectedHSIds);
+            if (!expectedHSIDs.contains(m_mailbox.getHSId())) {
+                expectedHSIDs.add(m_mailbox.getHSId());
+            }
+            theCounter.updateReplicas(expectedHSIDs);
         }
     }
 
