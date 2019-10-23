@@ -59,21 +59,7 @@ import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
 import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
-import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
-import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
-import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
-import org.voltdb.plannerv2.rules.physical.VoltPNestLoopIndexToMergeJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPNestLoopToIndexJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortIndexScanRemoveRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortScanToIndexRule;
-import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
+import org.voltdb.plannerv2.rules.physical.*;
 
 import com.google.common.collect.ImmutableList;
 
@@ -223,6 +209,7 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
+            VoltPAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
