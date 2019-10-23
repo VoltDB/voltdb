@@ -355,13 +355,15 @@ public class ExportCoordinator {
                                 exportLog.debug(getNewLeaderMessage());
                             }
 
-                            // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
-                            // Note: cannot initiate a coordinator task directly from here, must go
-                            // through another runnable and the invocation path.
                             if (isPartitionLeader() && m_trackers.isEmpty()) {
+                                // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
+                                // Note: cannot initiate a coordinator task directly from here, must go
+                                // through another runnable and the invocation path.
                                 requestTrackers();
+                            } else {
+                                // Reset the safe point to force a Mastership re-evaluation
+                                resetSafePoint();
                             }
-
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
 
