@@ -123,8 +123,8 @@ public class MpProcedureTask extends ProcedureTask
         // could be null if not a sysproc
         final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(spName);
 
-        // certain system procs can and can't be restarted
-        // Right now these are swap table, update logging and load MP table.
+        // For MP system procs can't be restarted, flush the queue and
+        // return a proper response to client.
         if (m_isRestart && sysproc != null && !sysproc.isRestartable())
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
