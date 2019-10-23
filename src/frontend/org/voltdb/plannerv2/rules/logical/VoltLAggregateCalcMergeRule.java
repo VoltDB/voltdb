@@ -29,7 +29,7 @@ import java.util.List;
 
 /**
  * Logical rule that eliminates LogicalAggregate node with SINGLE_VALUE aggregate function
- * that sits on top of a LogicalCalc node.
+ * that sits on top of a LogicalCalc node. {@link org.apache.calcite.sql.fun.SqlSingleValueAggFunction}
  */
 public class VoltLAggregateCalcMergeRule extends RelOptRule {
     public static final VoltLAggregateCalcMergeRule INSTANCE = new VoltLAggregateCalcMergeRule();
