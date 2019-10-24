@@ -780,6 +780,46 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
+    public void testENG17134() throws Exception {
+        // Multiple table joins, including non-inner joins.
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE PRPLISCLAIMINFO (REGISTNO varchar(22));\n" +
+                        "CREATE TABLE PRPLISDISPATCHSURVEYLOG (REGISTNO varchar(22) NOT NULL);\n" +
+                        "CREATE TABLE PRPLISMAININFO (REGISTNO varchar(22), MAKECODE varchar(10));\n" +
+                        "CREATE TABLE PRPLISORGANIZATIONCACHE (COMCODE varchar(10));\n" +
+                        "CREATE INDEX PRPLISORGANIZATIONCACHE_INDEX1 ON PRPLISORGANIZATIONCACHE (COMCODE);\n" +
+                        "CREATE TABLE PRPLISRISKINFO (REGISTNO varchar(22), RISKLEVEL integer);\n",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            assertEquals("Insertions failed?", ClientResponse.SUCCESS,
+                    env.m_client.callProcedure("@AdHoc",
+                            "INSERT INTO PRPLISCLAIMINFO VALUES('foo');\n" +
+                                    "INSERT INTO PRPLISDISPATCHSURVEYLOG  VALUES('foo');\n" +
+                                    "INSERT INTO PRPLISMAININFO VALUES('foo', 'baz');\n" +
+                                    "INSERT INTO PRPLISORGANIZATIONCACHE VALUES('baz');\n" +
+                                    "INSERT INTO PRPLISRISKINFO VALUES('foo', 1);\n")
+                            .getStatus());
+            final String query = "SELECT COUNT(*) FROM PRPLISCLAIMINFO a\n" +
+                    "LEFT JOIN PRPLISDISPATCHSURVEYLOG b on a.registno = b.registno \n" +
+                    "JOIN PRPLISMAININFO d on a.registno = d.registno \n" +
+                    "JOIN PRPLISRISKINFO c on a.registno = c.registno \n" +
+                    "LEFT JOIN PRPLISORGANIZATIONCACHE e on e.comcode = d.makecode \n" +
+                    "WHERE C.RISKLEVEL =1;";
+            final ClientResponse response = env.m_client.callProcedure("@AdHoc", query);
+            assertEquals(String.format("Query \"%s\" should have succeeded", query),
+                    ClientResponse.SUCCESS, response.getStatus());
+            final VoltTable result = response.getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(String.format("Query \"%s\" should return 1", query),
+                    1, result.getLong(0));
+        } finally {
+            env.tearDown();
+        }
+    }
+
+
+    @Test
     public void testIndexViolationOnView() {
         // Test that tuple insert that violates index functions of a view should fail gracefully: ENG-15787
         final TestEnv env = new TestEnv("CREATE TABLE R3(i INTEGER NOT NULL, IPV6 VARCHAR(100));\n" +

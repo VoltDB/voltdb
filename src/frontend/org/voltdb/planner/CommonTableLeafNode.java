@@ -32,6 +32,7 @@
  */
 package org.voltdb.planner;
 
+import java.util.Deque;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
@@ -57,12 +58,9 @@ public class CommonTableLeafNode extends JoinNode {
 
     @Override
     public Object clone() {
-        AbstractExpression joinExpr = (m_joinExpr != null) ?
-                (AbstractExpression) m_joinExpr.clone() : null;
-        AbstractExpression whereExpr = (m_whereExpr != null) ?
-                (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new CommonTableLeafNode(m_id, joinExpr, whereExpr, m_commonTableScan);
-        return newNode;
+        AbstractExpression joinExpr = m_joinExpr != null ? m_joinExpr.clone() : null;
+        AbstractExpression whereExpr =m_whereExpr != null ? m_whereExpr.clone() : null;
+        return new CommonTableLeafNode(m_id, joinExpr, whereExpr, m_commonTableScan);
     }
 
     @Override
@@ -72,8 +70,7 @@ public class CommonTableLeafNode extends JoinNode {
 
     @Override
     public JoinNode cloneWithoutFilters() {
-        JoinNode newNode = new CommonTableLeafNode(m_id, null, null, m_commonTableScan);
-        return newNode;
+        return new CommonTableLeafNode(m_id, null, null, m_commonTableScan);
     }
 
     @Override
@@ -90,6 +87,10 @@ public class CommonTableLeafNode extends JoinNode {
     public boolean hasSubqueryScans() {
         // No subquery scans here.
         return false;
+    }
+
+    @Override
+    protected void queueChildren(Deque<JoinNode> joinNodes) {
     }
 }
 

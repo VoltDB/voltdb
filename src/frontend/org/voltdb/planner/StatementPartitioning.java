@@ -17,11 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
@@ -388,7 +384,7 @@ public class StatementPartitioning implements Cloneable{
      *         The caller can raise an alarm if there is more than one.
      */
     public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> scans,
-            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
+            Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
         //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess w/ scans:" + scans.size() + " filters:" + valueEquivalence.size());
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< >();

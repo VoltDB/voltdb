@@ -17,6 +17,7 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.Deque;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
@@ -49,24 +50,25 @@ public class TableLeafNode extends JoinNode {
      */
     @Override
     public Object clone() {
-        AbstractExpression joinExpr = (m_joinExpr != null) ?
-                (AbstractExpression) m_joinExpr.clone() : null;
-        AbstractExpression whereExpr = (m_whereExpr != null) ?
-                (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new TableLeafNode(m_id, joinExpr, whereExpr, m_tableScan);
-        return newNode;
+        final AbstractExpression joinExpr = (m_joinExpr != null) ? m_joinExpr.clone() : null;
+        final AbstractExpression whereExpr = (m_whereExpr != null) ? m_whereExpr.clone() : null;
+        return new TableLeafNode(m_id, joinExpr, whereExpr, m_tableScan);
     }
 
     @Override
     public JoinNode cloneWithoutFilters() {
-        JoinNode newNode = new TableLeafNode(m_id, null, null, m_tableScan);
-        return newNode;
+        return new TableLeafNode(m_id, null, null, m_tableScan);
     }
 
     @Override
-    public StmtTableScan getTableScan() { return m_tableScan; }
+    public StmtTableScan getTableScan() {
+        return m_tableScan;
+    }
 
-    @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
+    @Override
+    public String getTableAlias() {
+        return m_tableScan.getTableAlias();
+    }
 
     @Override
     public boolean hasSubqueryScans() {
@@ -76,4 +78,8 @@ public class TableLeafNode extends JoinNode {
 
     @Override
     public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) { }
+
+    @Override
+    protected void queueChildren(Deque<JoinNode> joinNodes) {
+    }
 }
