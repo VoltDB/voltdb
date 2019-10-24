@@ -136,6 +136,14 @@ public class Cartographer extends StatsSource
         return partitions;
     }
 
+    public static long getHsidFromPartitionChild(String child) {
+        return Long.parseLong(child.substring(0, child.indexOf('_')));
+    }
+
+    public static int getHostIdFromPartitionChild(String child) {
+        return CoreUtils.getHostIdFromHSId(getHsidFromPartitionChild(child));
+    }
+
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
     // local client interface so we can keep the CIs implementation
@@ -228,33 +236,6 @@ public class Cartographer extends StatsSource
         }
     };
 
-    /**
-     * A dummy iterator that wraps an UnmodifiableIterator<Integer> and provides the
-     * Iterator<Object>
-     */
-    private static class DummyIterator implements Iterator<Object> {
-        private final Iterator<Integer> i;
-
-        private DummyIterator(Iterator<Integer> i) {
-            this.i = i;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return i.hasNext();
-        }
-
-        @Override
-        public Object next() {
-            return i.next();
-        }
-
-        @Override
-        public void remove() {
-            i.remove();
-        }
-    }
-
     public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor, boolean partitionDetectionEnabled) {
         super(false);
         m_hostMessenger = hostMessenger;
@@ -289,9 +270,8 @@ public class Cartographer extends StatsSource
 
         //make a copy of the master list for the topology statistics to avoid any concurrent modification
         //since the master list may be updated while the topology statistics is being built.
-        Set<Integer> masters = new HashSet<>();
-        masters.addAll(m_allMasters);
-        return new DummyIterator(masters.iterator());
+        Set<Object> masters = new HashSet<>(m_allMasters);
+        return masters.iterator();
     }
 
     @Override
@@ -495,7 +475,7 @@ public class Cartographer extends StatsSource
         try {
             List<String> children = m_zk.getChildren(zkpath, null);
             for (String child : children) {
-                retval.add(Long.valueOf(child.split("_")[0]));
+                retval.add(getHsidFromPartitionChild(child));
             }
         }
         catch (KeeperException.NoNodeException e) {
@@ -544,7 +524,7 @@ public class Cartographer extends StatsSource
                 List<String> children = p.getSecond().get();
                 List<Long> sites = new ArrayList<Long>();
                 for (String child : children) {
-                    sites.add(Long.valueOf(child.split("_")[0]));
+                    sites.add(getHsidFromPartitionChild(child));
                 }
                 retval.put(partition, sites);
             } catch (KeeperException.NoNodeException e) {
@@ -805,8 +785,7 @@ public class Cartographer extends StatsSource
                 boolean hostHasReplicas = false;
                 for (String replica : partition.getReplicas()) {
                     final String split[] = replica.split("/");
-                    final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
-                    final int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                    final int hostId = getHostIdFromPartitionChild(split[split.length - 1]);
                     if (hostId == hid) {
                         hostHasReplicas = true;
                     }

@@ -87,6 +87,7 @@ public class VoltDB {
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
+    public static final int DEFAULT_KIPLING_PORT = 9092;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
     // Staged filenames for advanced deployments
@@ -349,6 +350,8 @@ public class VoltDB {
                 System.getProperty("DISABLE_PLACEMENT_RESTORE", System.getenv("DISABLE_PLACEMENT_RESTORE")));
 
         public String m_recoveredPartitions = "";
+
+        public HostAndPort m_kiplingInterface = HostAndPort.fromParts("", DEFAULT_KIPLING_PORT);
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -706,6 +709,9 @@ public class VoltDB {
                     m_exporterVersion = ExporterVersion.E2;
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
+                } else if (arg.equalsIgnoreCase("kiplingInterface")) {
+                    m_kiplingInterface = MiscUtils.getHostAndPortFromHostnameColonPort(args[++i].trim(),
+                            VoltDB.DEFAULT_KIPLING_PORT);
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

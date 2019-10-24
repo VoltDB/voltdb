@@ -101,6 +101,7 @@ public interface ExportManagerInterface {
     public static void initialize(
             FeaturesType deploymentFeatures,
             int myHostId,
+            VoltDB.Configuration configuration,
             CatalogContext catalogContext,
             boolean isRejoin,
             boolean forceCreate,
@@ -110,8 +111,10 @@ public interface ExportManagerInterface {
     {
         ExportMode mode = getExportFeatureMode(deploymentFeatures);
         Class<?> exportMgrClass = Class.forName(mode.m_mgrClassName);
-        Constructor<?> constructor = exportMgrClass.getConstructor(int.class, CatalogContext.class, HostMessenger.class);
-        ExportManagerInterface em = (ExportManagerInterface) constructor.newInstance(myHostId, catalogContext, messenger);
+        Constructor<?> constructor = exportMgrClass.getConstructor(int.class, VoltDB.Configuration.class,
+                CatalogContext.class, HostMessenger.class);
+        ExportManagerInterface em = (ExportManagerInterface) constructor.newInstance(myHostId, configuration,
+                catalogContext, messenger);
         m_self.set(em);
         if (forceCreate) {
             em.clearOverflowData();

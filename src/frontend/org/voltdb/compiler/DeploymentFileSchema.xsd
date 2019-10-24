@@ -53,6 +53,7 @@
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="tasks" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
+      <xs:element name="kipling" minOccurs="0" maxOccurs="1" type="kiplingType" />
     </xs:all>
   </xs:complexType>
 
@@ -392,6 +393,18 @@
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="defaultpoolsize" type="threadPoolSize"/>
+  </xs:complexType>
+
+  <xs:complexType name="kiplingType">
+    <xs:attribute name="enabled" type="xs:boolean" default="false" />
+    <xs:attribute name="threadCount" default="20">
+      <xs:simpleType>
+        <xs:restriction base="xs:int">
+          <xs:minInclusive value="0"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="clusterId" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
