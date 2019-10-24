@@ -670,8 +670,10 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
     }
     resetUDFOutputBuffer();
 
-    // Serialize buffer size, function ID, and udaf index
-    m_udfOutput.writeInt(bufferSizeNeeded);
+    // size of data
+    m_udfOutput.writeInt(bufferSizeNeeded - sizeof(int32_t));
+
+    // Serialize function ID, and udaf index
     m_udfOutput.writeInt(functionId);
     m_udfOutput.writeInt(udafIndex);
 
@@ -729,8 +731,10 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
     }
     resetUDFOutputBuffer();
 
+    // size of data
+    m_udfOutput.writeInt(bufferSizeNeeded - sizeof(int32_t));
+
     // serialize data
-    m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
     m_udfOutput.writeInt(udafIndex);
     m_udfOutput.writeInt(argCount);

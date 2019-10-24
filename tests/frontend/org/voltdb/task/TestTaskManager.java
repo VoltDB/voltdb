@@ -674,6 +674,8 @@ public class TestTaskManager {
      */
     @Test
     public void readOnlyMode() throws Exception {
+        when(m_response.getStatus())
+                .then(m -> m_readOnly ? ClientResponse.SERVER_UNAVAILABLE : ClientResponse.SUCCESS);
         m_readOnly = true;
 
         Task task1 = createTask(TestActionScheduler.class, TaskScope.DATABASE);
@@ -783,6 +785,11 @@ public class TestTaskManager {
 
         // Go back to read only mode
         m_readOnly = true;
+
+        // Let the tasks run a bit before calling evaluateReadOnlyMode so they should see server unavailable errors
+        Thread.sleep(5);
+        validateStats(2);
+
         m_taskManager.evaluateReadOnlyMode().get();
         Thread.sleep(5);
         validateStats(2, null, r -> {
@@ -873,7 +880,7 @@ public class TestTaskManager {
         task.setName(name);
         task.setScope(scope.getId());
         task.setUser(USER_NAME);
-        task.setOnerror("ABORT");
+        task.setOnerror("STOP");
         return task;
     }
 

@@ -266,9 +266,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "9.1";
+    static final String m_defaultVersionString = "9.2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q9.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q9.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -569,6 +569,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
     }
 
+    public String getExportCursorPath(PathsType.Exportcursor path) {
+        if (isRunningWithOldVerbs()) {
+            return path.getPath();
+        }
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportCursor()).getPath();
+    }
+
     @Override
     public String getVoltDBRootPath() {
         try {
@@ -611,6 +618,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public String getLargeQuerySwapPath() {
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
+    }
+
+    @Override
+    public String getExportCursorPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportCursor()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
