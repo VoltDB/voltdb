@@ -38,6 +38,7 @@ import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.net.HostAndPort;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -143,6 +144,7 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
         cl.m_missingHostCount = m_missingHostCount;
+        cl.m_kiplingInterface = m_kiplingInterface;
 
         return cl;
     }
@@ -532,6 +534,10 @@ public class CommandLine extends VoltDB.Configuration
         m_vemTag = tag;
     }
 
+    public CommandLine setKiplingInterface(HostAndPort kiplingInterface) {
+        m_kiplingInterface = kiplingInterface;
+        return this;
+    }
 
     // Return a command line list compatible with ProcessBuilder.command()
     public List<String> createCommandLine() {
@@ -810,6 +816,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("e2");
         } else if (m_exporterVersion == ExporterVersion.E3) {
             cmdline.add("e3");
+        }
+
+        if (m_kiplingInterface != null) {
+            cmdline.add("kiplingInterface");
+            cmdline.add(m_kiplingInterface.toString());
         }
 
         return cmdline;

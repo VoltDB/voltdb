@@ -42,7 +42,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
@@ -52,7 +51,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportManagerInterface;
-import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -674,6 +672,7 @@ public class Inits {
                 ExportManagerInterface.initialize(
                         features,
                         m_rvdb.m_myHostId,
+                        m_config,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
                         //If durability is off and we are told not to join but create by mesh clear overflow.

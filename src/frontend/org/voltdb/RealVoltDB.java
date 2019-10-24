@@ -569,6 +569,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
     }
 
+    @Override
     public String getExportCursorPath(PathsType.Exportcursor path) {
         if (isRunningWithOldVerbs()) {
             return path.getPath();
@@ -2916,6 +2917,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // check license features for community version
             if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                 consoleLog.error("Command logging is not supported in the community edition of VoltDB.");
+                shutdownDeployment = true;
+            }
+            if (deployment.getKipling() != null && deployment.getKipling().isEnabled()) {
+                consoleLog.error("Kipling is not supported in the community edition of VoltDB.");
                 shutdownDeployment = true;
             }
             if (checkForDr && deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {

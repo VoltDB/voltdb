@@ -151,6 +151,7 @@ public class ExportManager implements ExportManagerInterface
      */
     public ExportManager(
             int myHostId,
+            VoltDB.Configuration configuration,
             CatalogContext catalogContext,
             HostMessenger messenger)
     throws ExportManager.SetupException
@@ -509,7 +510,9 @@ public class ExportManager implements ExportManagerInterface
             long bufferPtr,
             ByteBuffer buffer) {
         //For validating that the memory is released
-        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
+        if (bufferPtr != 0) {
+            DBBPool.registerUnsafeMemory(bufferPtr);
+        }
         ExportManagerInterface instance = ExportManagerInterface.instance();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
@@ -556,6 +559,7 @@ public class ExportManager implements ExportManagerInterface
         }
     }
 
+    @Override
     public void updateDanglingExportStates(StreamStartAction action,
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
         ExportGeneration generation = m_generation.get();
