@@ -974,6 +974,7 @@ public class CatalogDiffEngine {
             return null;
         }
         if (suspect instanceof Connector && "enabled".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         if (suspect instanceof Connector && "loaderclass".equals(field)) {

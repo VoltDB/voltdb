@@ -136,6 +136,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     String tableName = source.getTableName().toLowerCase();
                     String groupName = m_targetsByTableName.get(tableName);
+                    EXPORTLOG.debug("readyForData m_startPolling:" + m_startPolling);
                     // skip export tables that don't have an enabled connector and are still in catalog
                     if (source.getClient() == null) {
                         EXPORTLOG.warn("Table " + tableName + " has no configured connector.");
