@@ -17,20 +17,14 @@
 
 package org.voltdb.jni;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamClass;
-import java.io.ObjectOutput;
-import java.io.ByteArrayInputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectInput;
-import java.lang.reflect.Array;
-
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -41,8 +35,8 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.UserDefinedScalarFunctionRunner;
 import org.voltdb.UserDefinedAggregateFunctionRunner;
+import org.voltdb.UserDefinedScalarFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -50,12 +44,11 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
@@ -895,25 +888,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    class UDAFObjectInputStream extends ObjectInputStream {
-
-        public UDAFObjectInputStream(InputStream in) throws IOException {
-            super(in);
-        }
-
-        @Override
-        protected Class<?> resolveClass(ObjectStreamClass desc)
-            throws IOException, ClassNotFoundException
-            {
-                String name = desc.getName();
-                try {
-                    return Class.forName(name, true, VoltDB.instance().getCatalogContext().m_catalogInfo.m_jarfile.getLoader());
-                } catch (ClassNotFoundException ex) {
-                    throw ex;
-                }
-            }
-    }
-
     public int callJavaUserDefinedAggregateStart(int functionId) {
         UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
         try {
@@ -960,21 +934,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedAggregateCombine() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         int udafIndex = m_udfBuffer.getInt();
-        Object workerObject = null;
         try {
             assert(udafRunner != null);
-            // get the worker's byte array from the buffer
-            byte[] workerByteArray = UserDefinedAggregateFunctionRunner.readVarbinary(m_udfBuffer);
-            // convert worker's byte array to the object
-            ByteArrayInputStream bis = new ByteArrayInputStream(workerByteArray);
-            ObjectInput in = new UDAFObjectInputStream(bis);
-            try {
-                workerObject = in.readObject();
-            } finally {
-                try {
-                    in.close();
-                } catch (IOException exIgnored) {}
-            }
+
+            Object workerObject = UserDefinedAggregateFunctionRunner.readObject(m_udfBuffer);
             // call the combine method with the deserialized worker object
             udafRunner.combine(workerObject, udafIndex);
             // Write the result to the shared buffer.

@@ -17,20 +17,17 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
@@ -49,12 +46,13 @@ public abstract class JoinNode implements Cloneable {
     protected AbstractExpression m_whereExpr = null;
 
     // Buckets for children expression classification
-    public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
+    protected Set<String> m_tableAliases = new HashSet<>();
 
     // All possible access paths for this node
     public List<AccessPath> m_accessPaths = new ArrayList<>();
@@ -110,8 +108,7 @@ public abstract class JoinNode implements Cloneable {
 
     /// For debug purposes:
     @Override
-    public String toString()
-    {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         explain_recurse(sb, "");
         return sb.toString();
@@ -119,7 +116,7 @@ public abstract class JoinNode implements Cloneable {
 
     public void explain_recurse(StringBuilder sb, String indent) {
         // Node id. Must be unique within a given tree
-        sb.append(indent).append("JOIN NODE id: " + m_id).append("\n");
+        sb.append(indent).append("JOIN NODE id: ").append(m_id).append("\n");
         // Table
         sb.append(indent).append("table alias: ").append(getTableAlias()).append("\n");
         // Join expression associated with this node
@@ -161,34 +158,29 @@ public abstract class JoinNode implements Cloneable {
      * So ALL manner of where clause but ONLY inner-outer column=column JOIN clauses can
      * influence partitioning.
      */
-    public HashMap<AbstractExpression, Set<AbstractExpression> > getAllEquivalenceFilters()
-    {
-        HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet =
-                new HashMap< >();
-        ArrayDeque<JoinNode> joinNodes = new ArrayDeque<>();
+    public Map<AbstractExpression, Set<AbstractExpression>> getAllEquivalenceFilters() {
+        Map<AbstractExpression, Set<AbstractExpression>> equivalenceSet = new HashMap<>();
+        Deque<JoinNode> joinNodes = new ArrayDeque<>();
         // Iterate over the join nodes to collect their join and where equivalence filter expressions
         joinNodes.add(this);
-        while ( ! joinNodes.isEmpty()) {
+        while (! joinNodes.isEmpty()) {
             JoinNode joinNode = joinNodes.poll();
             joinNode.collectEquivalenceFilters(equivalenceSet, joinNodes);
         }
         return equivalenceSet;
     }
 
-    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
-                                                     Set<AbstractExpression>> equivalenceSet,
-                                             ArrayDeque<JoinNode> joinNodes) {
+    protected void collectEquivalenceFilters(Map<AbstractExpression,
+            Set<AbstractExpression>> equivalenceSet, Deque<JoinNode> joinNodes) {
         if ( ! m_whereInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList, equivalenceSet);
         }
         // HSQL sometimes tags single-table filters in inner joins as join clauses
         // rather than where clauses? OR does analyzeJoinExpressions correct for this?
         // If so, these CAN contain constant equivalences that get used as the basis for equivalence
         // conditions that determine partitioning, so process them as where clauses.
         if ( ! m_joinInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerList, equivalenceSet);
         }
     }
 
@@ -196,9 +188,9 @@ public abstract class JoinNode implements Cloneable {
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
     public AbstractExpression getAllFilters() {
-        ArrayDeque<JoinNode> joinNodes = new ArrayDeque<>();
-        ArrayDeque<AbstractExpression> in = new ArrayDeque<>();
-        ArrayDeque<AbstractExpression> out = new ArrayDeque<>();
+        Deque<JoinNode> joinNodes = new ArrayDeque<>();
+        Deque<AbstractExpression> in = new ArrayDeque<>();
+        Deque<AbstractExpression> out = new ArrayDeque<>();
         // Iterate over the join nodes to collect their join and where expressions
         joinNodes.add(this);
         while (!joinNodes.isEmpty()) {
@@ -214,40 +206,40 @@ public abstract class JoinNode implements Cloneable {
 
         // this chunk of code breaks the code into a list of expression that
         // all have to be true for the where clause to be true
-        AbstractExpression inExpr = null;
+        AbstractExpression inExpr;
         while ((inExpr = in.poll()) != null) {
             if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                 in.add(inExpr.getLeft());
                 in.add(inExpr.getRight());
-            }
-            else {
+            } else {
                 out.add(inExpr);
             }
         }
         return ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, out);
     }
 
-    protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }
+    protected abstract void queueChildren(Deque<JoinNode> joinNodes);
 
     /**
      * Get the WHERE expression for a single-table statement.
      */
-    public AbstractExpression getSimpleFilterExpression()
-    {
+    public AbstractExpression getSimpleFilterExpression() {
         if (m_whereExpr != null) {
             if (m_joinExpr != null) {
                 return ExpressionUtil.combine(m_whereExpr, m_joinExpr);
+            } else {
+                return m_whereExpr;
             }
-            return m_whereExpr;
+        } else {
+            return m_joinExpr;
         }
-        return m_joinExpr;
     }
 
     /**
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
     public List<JoinNode> generateLeafNodesJoinOrder() {
-        ArrayList<JoinNode> leafNodes = new ArrayList<>();
+        List<JoinNode> leafNodes = new ArrayList<>();
         listNodesJoinOrderRecursive(leafNodes, false);
         return leafNodes;
     }
@@ -256,18 +248,12 @@ public abstract class JoinNode implements Cloneable {
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
     public Collection<String> generateTableJoinOrder() {
-        List<JoinNode> leafNodes = generateLeafNodesJoinOrder();
-        Collection<String> tables = new ArrayList<>();
-        for (JoinNode node : leafNodes) {
-            tables.add(node.getTableAlias());
-        }
-        return tables;
+        return generateLeafNodesJoinOrder().stream()
+                .map(JoinNode::getTableAlias)
+                .collect(Collectors.toList());
     }
 
-    @SuppressWarnings("static-method")
-    public String getTableAlias() {
-        return null;
-    }
+    public abstract String getTableAlias();
 
     /**
      * Returns nodes in the order they are joined in the tree by iterating the tree depth-first
@@ -278,7 +264,7 @@ public abstract class JoinNode implements Cloneable {
         return nodes;
     }
 
-    protected void listNodesJoinOrderRecursive(ArrayList<JoinNode> nodes, boolean appendBranchNodes) {
+    protected void listNodesJoinOrderRecursive(List<JoinNode> nodes, boolean appendBranchNodes) {
         nodes.add(this);
     }
 
@@ -286,7 +272,9 @@ public abstract class JoinNode implements Cloneable {
      * Returns true if one of the tree nodes has outer join
      */
     @SuppressWarnings("static-method")
-    public boolean hasOuterJoin() { return false; }
+    public boolean hasOuterJoin() {
+        return false;
+    }
 
     /**
      * Returns a list of immediate sub-queries which are part of this query.
@@ -329,7 +317,7 @@ public abstract class JoinNode implements Cloneable {
      * Reconstruct a join tree from the list of tables always appending the next node to the right.
      *
      * @param tableNodes the list of tables to build the tree from.
-     * @param JoinType the join type for all the joins
+     * @param joinType the join type for all the joins
      * @return The reconstructed tree
      */
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes, JoinType joinType) {
@@ -349,7 +337,10 @@ public abstract class JoinNode implements Cloneable {
     }
 
     @SuppressWarnings("static-method")
-    protected JoinNode cloneWithoutFilters() { assert(false); return null; }
+    protected JoinNode cloneWithoutFilters() {
+        assert(false);
+        return null;
+    }
 
     /**
      * Reconstruct a join tree from the list of sub-trees connecting the sub-trees in the order
@@ -376,13 +367,18 @@ public abstract class JoinNode implements Cloneable {
 
     protected boolean replaceChild(JoinNode node) {
         // can't replace self
-        assert (Math.abs(m_id) != Math.abs(node.m_id));
+        assert Math.abs(m_id) != Math.abs(node.m_id);
         return false;
     }
 
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    /**
+     * Analyze the m_joinTree structure to extract useful components.
+     * @param stmt parsed statement
+     */
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+        m_tableAliases = new HashSet<>(stmt.m_joinTree.generateTableJoinOrder());
     }
 
     /**
@@ -394,22 +390,18 @@ public abstract class JoinNode implements Cloneable {
      * @param innerOuterTableExprs inner-outer tables expressions
      */
     protected static void applyTransitiveEquivalence(List<AbstractExpression> outerTableExprs,
-            List<AbstractExpression> innerTableExprs,
-            List<AbstractExpression> innerOuterTableExprs)
-    {
-        List<AbstractExpression> simplifiedOuterExprs = applyTransitiveEquivalence(innerTableExprs, innerOuterTableExprs);
-        List<AbstractExpression> simplifiedInnerExprs = applyTransitiveEquivalence(outerTableExprs, innerOuterTableExprs);
+            List<AbstractExpression> innerTableExprs, List<AbstractExpression> innerOuterTableExprs) {
+        final List<AbstractExpression>
+                simplifiedOuterExprs = applyTransitiveEquivalence(innerTableExprs, innerOuterTableExprs),
+                simplifiedInnerExprs = applyTransitiveEquivalence(outerTableExprs, innerOuterTableExprs);
         outerTableExprs.addAll(simplifiedOuterExprs);
         innerTableExprs.addAll(simplifiedInnerExprs);
     }
 
-    private static List<AbstractExpression>
-    applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs,
-                               List<AbstractExpression> twoTableExprs)
-    {
-        ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<>();
-        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 =
-                new HashMap< >();
+    private static List<AbstractExpression> applyTransitiveEquivalence(
+            List<AbstractExpression> singleTableExprs, List<AbstractExpression> twoTableExprs) {
+        List<AbstractExpression> simplifiedExprs = new ArrayList<>();
+        Map<AbstractExpression, Set<AbstractExpression>> eqMap1 = new HashMap<>();
         ExpressionUtil.collectPartitioningFilters(singleTableExprs, eqMap1);
 
         for (AbstractExpression expr : twoTableExprs) {
@@ -458,7 +450,7 @@ public abstract class JoinNode implements Cloneable {
      * The inner tables are the tables reachable from the inner node of the join
      * @param exprList expression list to split
      * @param outerTables outer table
-     * @param innerTable outer table
+     * @param innerTables outer table
      * @param outerList expressions with outer table only
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
@@ -466,45 +458,38 @@ public abstract class JoinNode implements Cloneable {
     protected static void classifyJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<String> outerTables, Collection<String> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
-            List<AbstractExpression> innerOuterList, List<AbstractExpression> noneList)
-    {
-        HashSet<String> tableAliasSet = new HashSet<>();
-        HashSet<String> outerSet = new HashSet<>(outerTables);
-        HashSet<String> innerSet = new HashSet<>(innerTables);
+            List<AbstractExpression> innerOuterList, List<AbstractExpression> noneList) {
+        final Set<String> outerSet = new HashSet<>(outerTables);
+        final Set<String> innerSet = new HashSet<>(innerTables);
         for (AbstractExpression expr : exprList) {
-            tableAliasSet.clear();
-            getTablesForExpression(expr, tableAliasSet);
-            String tableAliases[] = tableAliasSet.toArray(new String[0]);
+            final Set<String> tableAliasSet = getTablesForExpression(expr);
             if (tableAliasSet.isEmpty()) {
                 noneList.add(expr);
             } else {
-                boolean outer = false;
-                boolean inner = false;
-                for (String alias : tableAliases) {
-                    outer = outer || outerSet.contains(alias);
-                    inner = inner || innerSet.contains(alias);
-                }
-                if (outer && inner) {
+                final boolean
+                        outer = tableAliasSet.stream().anyMatch(outerSet::contains),
+                        inner = tableAliasSet.stream().anyMatch(innerSet::contains);
+                if (! outer && ! inner) {
+                    // alias not found in either outer/inner table. This happens in multi-join query.
+                    // See also BranchNode#analyzeJoinExpression().
+                    throw new SubPlanAssembler.SkipCurrentPlanException();
+                } else if (outer && inner) {
                     innerOuterList.add(expr);
                 } else if (outer) {
                     outerList.add(expr);
-                } else if (inner) {
-                    innerList.add(expr);
                 } else {
-                    // can not be, right?
-                    assert(false);
+                    innerList.add(expr);
                 }
             }
         }
     }
 
-    private static void getTablesForExpression(AbstractExpression expr, HashSet<String> tableAliasSet)
-    {
-        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-        for (TupleValueExpression tupleExpr : tves) {
-            String tableAlias = tupleExpr.getTableAlias();
-            tableAliasSet.add(tableAlias);
-        }
+    private static Set<String> getTablesForExpression(AbstractExpression expr) {
+        return ExpressionUtil
+                .getTupleValueExpressions(expr)
+                .stream()
+                .map(TupleValueExpression::getTableAlias)
+                .collect(Collectors.toSet());
     }
 
     @SuppressWarnings("static-method")

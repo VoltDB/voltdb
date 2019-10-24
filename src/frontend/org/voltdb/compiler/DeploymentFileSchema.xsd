@@ -134,6 +134,11 @@
               <xs:attribute name="path" type="xs:string" default="large_query_swap"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="exportcursor" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="path" type="xs:string" default="export_cursor"/>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 

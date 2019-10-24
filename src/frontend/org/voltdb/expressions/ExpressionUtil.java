@@ -510,7 +510,7 @@ public final class ExpressionUtil {
      */
     public static void collectPartitioningFilters(
             Collection<AbstractExpression> filterList,
-            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet) {
+            Map<AbstractExpression, Set<AbstractExpression>> equivalenceSet) {
         for (AbstractExpression expr : filterList) {
             if ( ! expr.isColumnEquivalenceFilter()) {
                 continue;

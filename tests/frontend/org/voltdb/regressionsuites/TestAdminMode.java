@@ -361,7 +361,7 @@ public class TestAdminMode extends RegressionSuite
         assertTrue(success);
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;
     }
