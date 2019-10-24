@@ -57,6 +57,25 @@ public class ExportStatsBase extends StatsSource {
             m_queueGap = queueGap;
             m_status = status;
         }
+
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(Columns.PARTITION_ID).append(":").append(m_partitionId).append(" ")
+              .append(Columns.SITE_ID).append(":").append(m_siteId).append(" ")
+              .append(Columns.SOURCE_NAME).append(":").append(m_sourceName).append(" ")
+              .append(Columns.EXPORT_TARGET).append(":").append(m_exportTarget).append(" ")
+              .append(Columns.ACTIVE).append(":").append(m_exportingRole).append(" ")
+              .append(Columns.TUPLE_COUNT).append(":").append(m_tupleCount).append(" ")
+              .append(Columns.TUPLE_PENDING).append(":").append(m_tuplesPending).append(" ")
+              .append(Columns.LAST_QUEUED_TIMESTAMP).append(":").append(m_lastQueuedTimestamp).append(" ")
+              .append(Columns.LAST_ACKED_TIMESTAMP).append(":").append(m_lastAckedTimestamp).append(" ")
+              .append(Columns.AVERAGE_LATENCY).append(":").append(m_averageLatency).append(" ")
+              .append(Columns.MAX_LATENCY).append(":").append(m_maxLatency).append(" ")
+              .append(Columns.QUEUE_GAP).append(":").append(m_queueGap).append(" ")
+              .append(Columns.STATUS).append(":").append(m_status);
+
+            return sb.toString();
+        }
     }
 
 
