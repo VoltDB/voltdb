@@ -102,7 +102,7 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
                         scan.getCluster(), scan.getTraitSet(), scan.getTable(), scan.getVoltTable(),
                         mergedProgram, index, accessPathData.left, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                         scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                        scan.getSplitCount(), indexCollation);
+                        scan.getSplitCount(), indexCollation, false);
                 equiv.put(nextIndexScan, calc);
             });
         }

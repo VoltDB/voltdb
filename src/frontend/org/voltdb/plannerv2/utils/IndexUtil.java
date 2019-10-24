@@ -125,7 +125,7 @@ public class IndexUtil {
             }
 
             List<AbstractExpression> otherExpressions = Lists.newArrayList(accessPath.getOtherExprs());
-            List<RexNode> rexExprs = otherExpressions.stream()
+            List<RexNode> otherExprs = otherExpressions.stream()
                     .filter(otherExpr -> {
                         int tableIdxToRemove = (isInnerTable) ? 0 : 1;
                             // This is an inner index scan participating in a FULL or Left join
@@ -142,7 +142,7 @@ public class IndexUtil {
                         return voltToCalciteCondMap.get(otherExpr);
                     })
                     .collect(Collectors.toList());
-            return Pair.of(accessPath, RexUtil.composeConjunction(builder, rexExprs, false));
+            return Pair.of(accessPath, RexUtil.composeConjunction(builder, otherExprs, false));
         });
     }
 

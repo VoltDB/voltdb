@@ -122,7 +122,7 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
                             scan.getTable(), scan.getVoltTable(), scan.getProgram(),
                             index, accessPath, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                             scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                            scan.getSplitCount(), indexCollation);
+                            scan.getSplitCount(), indexCollation, false);
 
                     final RelNode result;
                     if (calc == null) {

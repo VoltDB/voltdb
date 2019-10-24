@@ -404,7 +404,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                             newOuterChild = outerCalc.copy(outerCalc.getTraitSet(), ImmutableList.of(newOuterChild));
                         }
                         final RelNode newInnerChild = newIndexScan(innerIndexScan.getIndex(),
-                                innerIndexScan.getIndexCollation(), innerIndexScan, innerCalc);
+                                innerIndexScan.getIndexCollation(), innerIndexScan, innerCalc, true);
                         return newMergeJoin(join, newOuterChild, newInnerChild,
                                 "OuterMergeJoin" + outerNode.getId(), getIndexName(newInnerChild));
                     })
@@ -416,9 +416,9 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                         collationIndexPair.left, outerProgram, joinExpressionCollation, -1))
                 .map(collationIndexPair -> {
                     RelNode newOuterChild = newIndexScan(collationIndexPair.right,
-                            collationIndexPair.left, outerNode, outerCalc);
+                            collationIndexPair.left, outerNode, outerCalc, false);
                     RelNode newInnerChild = newIndexScan(innerIndexScan.getIndex(),
-                            innerIndexScan.getIndexCollation(), innerIndexScan, innerCalc);
+                            innerIndexScan.getIndexCollation(), innerIndexScan, innerCalc, true);
                     return newMergeJoin(join, newOuterChild, newInnerChild, getIndexName(newOuterChild), getIndexName(newInnerChild));
                     })
                 .collect(Collectors.toList());
@@ -446,7 +446,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                 ourterCollationName, innerCollationName);
     }
 
-    private RelNode newIndexScan(Index index, RelCollation indexCollation, RelNode oldNode, Calc oldCalc) {
+    private RelNode newIndexScan(Index index, RelCollation indexCollation, RelNode oldNode, Calc oldCalc, boolean inlinedInner) {
         assert(oldNode instanceof VoltPhysicalTableScan);
         VoltPhysicalTableScan oldScan = (VoltPhysicalTableScan) oldNode;
         // Remove all existing index expressions since we need to join the whole table
@@ -460,7 +460,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                 oldScan.getCluster(), oldScan.getTraitSet(), oldScan.getTable(), oldScan.getVoltTable(),
                 oldScan.getProgram(), index, accessPath, oldScan.getLimitRexNode(), oldScan.getOffsetRexNode(),
                 oldScan.getAggregateRelNode(), oldScan.getPreAggregateRowType(), oldScan.getPreAggregateProgram(),
-                oldScan.getSplitCount(), indexCollation);
+                oldScan.getSplitCount(), indexCollation, inlinedInner);
         if (oldCalc != null) {
             newNode = oldCalc.copy(oldCalc.getTraitSet(), newNode, oldCalc.getProgram());
         }

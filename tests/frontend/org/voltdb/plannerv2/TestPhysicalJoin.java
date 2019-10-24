@@ -223,16 +223,25 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
     }
 
     public void testFullNLIJWithPredicates2() {
-        // r3.ii is null and ri1.ti is null stay as pre-join predicate. The rest goes to the inner index scan
         m_tester.sql("select 1 from r3 full join ri1 on r3.pk = ri1.i where r3.ii is null and ri1.ti is null")
-                .transform("");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[1], EXPR$0=[$t4], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[full], whereCondition=[AND(IS NULL($1), IS NULL($3))], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], PK=[$t0], II=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n")
+                .pass();
     }
 
     public void testFullNLIJWithPredicates3() {
         m_tester.sql("select 1 from r3 full join ri1 on r3.pk = ri1.i and ri1.bi = 5 where r3.ii is null and ri1.ti is null")
-                .transform("\n");
- //               .pass();
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[1], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[AND(=($0, $2), =($3, 5))], joinType=[full], whereCondition=[AND(IS NULL($1), IS NULL($4))], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], PK=[$t0], II=[$t2], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], BI=[$t2], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n")
+                .pass();
     }
 
     public void testLeftlNLIJWithPredicates1() {
@@ -249,14 +258,24 @@ public class TestPhysicalJoin extends Plannerv2TestCase {
 
     public void testLeftNLIJWithPredicates2() {
         m_tester.sql("select 1 from r3 left join ri1 on r3.pk = ri1.i where r3.ii >0 and ri1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[1], EXPR$0=[$t4], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[left], whereCondition=[IS NULL($3)], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[0], expr#4=[>($t2, $t3)], PK=[$t0], II=[$t2], $condition=[$t4], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], TI=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n")
+                .pass();
     }
 
     public void testLeftNLIJWithPredicates3() {
         m_tester.sql("select 1 from r3 left join ri1 on r3.pk = ri1.i and ri1.bi = 5 where r3.ii is null and ri1.ti is null")
-                .transform("\n");
-//                .pass();
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[1], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[left], whereCondition=[IS NULL($4)], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I])\n" +
+                        "    VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[IS NULL($t2)], PK=[$t0], II=[$t2], $condition=[$t3], split=[1])\n" +
+                        "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
+                        "    VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[5], expr#5=[=($t2, $t4)], I=[$t0], BI=[$t2], TI=[$t3], $condition=[$t5], split=[1])\n" +
+                        "      VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDEQ1_1])\n")
+                .pass();
     }
 
     public void testLeftToInnerNLIJWithPredicates1() {

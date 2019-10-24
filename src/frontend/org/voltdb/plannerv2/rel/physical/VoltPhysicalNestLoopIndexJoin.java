@@ -35,6 +35,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -111,10 +112,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         nlipn.setJoinType(RelConverter.convertJointType(joinType));
         // Set children
         nlipn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
-        // Set inner node table index to "1" prior to its conversion to AbstractPlanNode
-        // The table index will be propagated to the inlined index scan's SkippNullPredicate.
-        assert getInput(1) instanceof VoltPhysicalTableIndexScan;
-        ((VoltPhysicalTableIndexScan) getInput(1)).setTableIdx(1);
+
         final AbstractPlanNode innerNode = inputRelNodeToPlanNode(this, 1);
         assert(innerNode instanceof IndexScanPlanNode);
         IndexScanPlanNode innerIndexScan = (IndexScanPlanNode) innerNode;
@@ -126,6 +124,12 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
                 RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(),
                         m_preJoinPredicate, getRowType()));
         }
+
+        // Set where predicate.
+        AbstractExpression whereCondition = RexConverter.convertJoinPred(getInput(0)
+                .getRowType().getFieldCount(),
+                getWhereCondition(), getRowType());
+        nlipn.setWherePredicate(whereCondition);
 
         // Inline LIMIT / OFFSET
         addLimitOffset(nlipn);
