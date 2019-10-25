@@ -104,15 +104,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
         //
         // TargetTableId
         //
         if (m_targetTableName == null) {
-            throw new Exception("ERROR: TargetTableName is null for PlanNode '" + toString() + "'");
+            throw new RuntimeException("ERROR: TargetTableName is null for PlanNode '" + toString() + "'");
         } else if (m_targetTableAlias == null) {
-            throw new Exception("ERROR: TargetTableAlias is null for PlanNode '" + toString() + "'");
+            throw new RuntimeException("ERROR: TargetTableAlias is null for PlanNode '" + toString() + "'");
         }
         //
         // Filter Expression
@@ -124,7 +124,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // All the schema columns better reference this table
         for (SchemaColumn col : m_tableScanSchema) {
             if (!m_targetTableName.equals(col.getTableName())) {
-                throw new Exception("ERROR: The scan column: " + col.getColumnName() +
+                throw new RuntimeException("ERROR: The scan column: " + col.getColumnName() +
                                     " in table: " + m_targetTableName + " refers to " +
                                     " table: " + col.getTableName());
             }

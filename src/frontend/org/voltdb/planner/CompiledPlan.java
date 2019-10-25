@@ -126,6 +126,15 @@ public class CompiledPlan {
         return nextId;
     }
 
+    public void validate() {
+        if (rootPlanGraph != null) {
+            rootPlanGraph.validate();
+        }
+        if (subPlanGraph != null) {
+            subPlanGraph.validate();
+        }
+    }
+
     /**
      * Mark the level of result determinism imposed by the statement, which can
      * save us from a difficult determination based on the plan graph.
@@ -163,8 +172,7 @@ public class CompiledPlan {
      * m_statementIsContentDeterministic is false we want to check this. This is
      * the one area in which content and limit-order determinism interact.
      */
-    public boolean hasDeterministicStatement()
-    {
+    public boolean hasDeterministicStatement() {
         return m_statementIsOrderDeterministic && isContentDeterministic();
     }
 
@@ -333,8 +341,7 @@ public class CompiledPlan {
     public String toString() {
         if (rootPlanGraph != null) {
             return "CompiledPlan: \n" + rootPlanGraph.toExplainPlanString();
-        }
-        else {
+        } else {
             return "CompiledPlan: [null plan graph]";
         }
     }

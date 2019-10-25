@@ -57,12 +57,12 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Make sure that they have the same # of columns and directions
         if (m_sortExpressions.size() != m_sortDirections.size()) {
-            throw new Exception("ERROR: PlanNode '" + toString() + "' has " +
+            throw new RuntimeException("ERROR: PlanNode '" + toString() + "' has " +
                                 "'" + m_sortExpressions.size() + "' sort expressions but " +
                                 "'" + m_sortDirections.size() + "' sort directions");
         }
@@ -70,10 +70,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // Make sure that none of the items are null
         for (int ctr = 0, cnt = m_sortExpressions.size(); ctr < cnt; ctr++) {
             if (m_sortExpressions.get(ctr) == null) {
-                throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
+                throw new RuntimeException("ERROR: PlanNode '" + toString() + "' has a null " +
                                     "sort expression at position " + ctr);
             } else if (m_sortDirections.get(ctr) == null) {
-                throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
+                throw new RuntimeException("ERROR: PlanNode '" + toString() + "' has a null " +
                                     "sort direction at position " + ctr);
             }
         }

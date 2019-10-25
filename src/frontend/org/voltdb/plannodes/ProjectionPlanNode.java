@@ -46,15 +46,17 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
-
+        if (m_outputSchema.isEmpty()) {
+            throw new RuntimeException("Projection plan node has empty output schema");
+        }
         // Validate Expression Trees
         for (int ctr = 0; ctr < m_outputSchema.size(); ctr++) {
             SchemaColumn column = m_outputSchema.getColumn(ctr);
             AbstractExpression exp = column.getExpression();
             if (exp == null) {
-                throw new Exception("ERROR: The Output Column Expression at position '" + ctr + "' is NULL");
+                throw new RuntimeException("ERROR: The Output Column Expression at position '" + ctr + "' is NULL");
             }
             exp.validate();
         }
@@ -97,8 +99,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
                                                col.toString());
                 }
                 new_schema.addColumn(col.copyAndReplaceWithTVE(colIndex));
-            }
-            else {
+            } else {
                 new_schema.addColumn(col.clone());
             }
             ++colIndex;

@@ -115,12 +115,15 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
-        if (m_subqueryNode != null && m_subqueryNode.getPlanNodeId() != m_subqueryNodeId)
-            throw new Exception("ERROR: A subquery plan node id mismatch");
-
+        if (m_subqueryNode != null) {
+            if (m_subqueryNode.getPlanNodeId() != m_subqueryNodeId) {
+                throw new RuntimeException("ERROR: A subquery plan node id mismatch");
+            }
+            m_subqueryNode.validate();
+        }
     }
 
     @Override

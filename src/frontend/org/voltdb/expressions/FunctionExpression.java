@@ -157,29 +157,29 @@ public class FunctionExpression extends AbstractExpression {
 
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
         //
         // Validate that there are no children other than the argument list (mandatory even if empty)
         //
         if (m_left != null) {
-            throw new Exception("ERROR: The left child expression '" + m_left + "' for '" + this + "' is not NULL");
+            throw new RuntimeException("ERROR: The left child expression '" + m_left + "' for '" + this + "' is not NULL");
         }
 
         if (m_right != null) {
-            throw new Exception("ERROR: The right child expression '" + m_right + "' for '" + this + "' is not NULL");
+            throw new RuntimeException("ERROR: The right child expression '" + m_right + "' for '" + this + "' is not NULL");
         }
 
         if (m_args == null) {
-            throw new Exception("ERROR: The function argument list for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The function argument list for '" + this + "' is NULL");
         }
 
         if (m_name == null) {
-            throw new Exception("ERROR: The function name for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The function name for '" + this + "' is NULL");
         }
         if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
             if (m_resultTypeParameterIndex < 0 || m_resultTypeParameterIndex >= m_args.size()) {
-                throw new Exception("ERROR: The function parameter argument index '" +
+                throw new RuntimeException("ERROR: The function parameter argument index '" +
                         m_resultTypeParameterIndex + "' for '" + this + "' is out of bounds");
             }
         }
@@ -188,7 +188,7 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public boolean hasEqualAttributes(AbstractExpression obj) {
-        if (obj instanceof FunctionExpression == false) {
+        if (! (obj instanceof FunctionExpression)) {
             return false;
         }
         FunctionExpression expr = (FunctionExpression) obj;

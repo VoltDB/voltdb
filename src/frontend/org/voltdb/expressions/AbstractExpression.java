@@ -149,7 +149,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         m_right = right;
     }
 
-    public void validate() throws Exception {
+    public void validate() {
         //
         // Validate our children first
         //
@@ -170,22 +170,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         // Expression Type
         //
         if (m_type == null) {
-            throw new Exception("ERROR: The ExpressionType for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The ExpressionType for '" + this + "' is NULL");
         }
 
         if (m_type == ExpressionType.INVALID) {
-            throw new Exception("ERROR: The ExpressionType for '" + this + "' is " + m_type);
+            throw new RuntimeException("ERROR: The ExpressionType for '" + this + "' is " + m_type);
         }
 
         //
         // Output Type
         //
         if (m_valueType == null) {
-            throw new Exception("ERROR: The output VoltType for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The output VoltType for '" + this + "' is NULL");
         }
 
         if (m_valueType == VoltType.INVALID) {
-            throw new Exception("ERROR: The output VoltType for '" + this + "' is " + m_valueType);
+            throw new RuntimeException("ERROR: The output VoltType for '" + this + "' is " + m_valueType);
         }
 
         //
@@ -194,7 +194,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         //
         Class<?> check_class = m_type.getExpressionClass();
         if (!check_class.isInstance(this)) {
-            throw new Exception("ERROR: Expression '" + this + "' is class type '" + getClass().getSimpleName() + "' but needs to be '" + check_class.getSimpleName() + "'");
+            throw new RuntimeException("ERROR: Expression '" + this + "' is class type '" +
+                    getClass().getSimpleName() + "' but needs to be '" + check_class.getSimpleName() + "'");
         }
     }
 

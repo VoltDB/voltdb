@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.json_voltpatches.JSONArray;
@@ -29,6 +30,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -125,7 +127,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         nextId = overrideId(nextId);
         for (AbstractPlanNode inNode : getInlinePlanNodes().values()) {
             // Inline nodes also need their ids to be overridden to make sure
-            // the subquery node ids are also globaly unique
+            // the subquery node ids are also globally unique
             nextId = inNode.resetPlanNodeIds(nextId);
         }
 
@@ -253,48 +255,44 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public void validate() throws Exception {
+    public void validate() {
+        /*if (m_outputSchema.isEmpty()) {
+            throw new RuntimeException("AbstractPlanNode's output schema is empty: " + toString());
+        }*/
         //
         // Make sure our children have us listed as their parents
         //
         for (AbstractPlanNode child : m_children) {
             if (!child.m_parents.contains(this)) {
-                throw new Exception("ERROR: The child PlanNode '" + child.toString() + "' does not " +
-                                    "have its parent PlanNode '" + toString() + "' in its parents list");
+                throw new RuntimeException("ERROR: The child PlanNode '" + child.toString() + "' does not " +
+                        "have its parent PlanNode '" + toString() + "' in its parents list");
             }
             child.validate();
         }
         //
         // Inline PlanNodes
         //
-        if (!m_inlineNodes.isEmpty()) {
-            for (AbstractPlanNode node : m_inlineNodes.values()) {
-                //
-                // Make sure that we're not attached to some kind of tree somewhere...
-                //
-                if (!node.m_children.isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has children inside of PlanNode '" + this + "'");
-                } else if (!node.m_parents.isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has parents inside of PlanNode '" + this + "'");
-                } else if (!node.isInline()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
-                } else if (!node.getInlinePlanNodes().isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
-                }
-                node.validate();
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            //
+            // Make sure that we're not attached to some kind of tree somewhere...
+            //
+            if (!node.m_children.isEmpty()) {
+                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has children inside of PlanNode '" + this + "'");
+            } else if (!node.m_parents.isEmpty()) {
+                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has parents inside of PlanNode '" + this + "'");
+            } else if (!node.isInline()) {
+                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
+            } else if (!node.getInlinePlanNodes().isEmpty()) {
+                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
             }
+            node.validate();
         }
     }
 
     public boolean hasReplicatedResult() {
         Map<String, StmtTargetTableScan> tablesRead = new TreeMap<>();
         getTablesAndIndexes(tablesRead, null);
-        for (StmtTableScan tableScan : tablesRead.values()) {
-            if (! tableScan.getIsReplicated()) {
-                return false;
-            }
-        }
-        return true;
+        return tablesRead.values().stream().allMatch(StmtTableScan::getIsReplicated);
     }
 
     /**
@@ -792,14 +790,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return whether this node has an inlined index scan node or not.
      */
     public boolean hasInlinedIndexScanOfTable(String tableName) {
-        for (int i = 0; i < getChildCount(); i++) {
-            AbstractPlanNode child = getChild(i);
-            if (child.hasInlinedIndexScanOfTable(tableName)) {
-                return true;
-            }
-        }
-
-        return false;
+        return IntStream.range(0, getChildCount()).anyMatch(i ->
+                getChild(i).hasInlinedIndexScanOfTable(tableName));
     }
 
 
@@ -952,9 +944,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
 
         // compare inline nodes
-        final Map<Integer, Entry<PlanNodeType, AbstractPlanNode>> inlineNodesById = new HashMap<>();
-        for (Entry<PlanNodeType, AbstractPlanNode> e : m_inlineNodes.entrySet())
-            inlineNodesById.put(e.getValue().getPlanNodeId(), e);
+        final Map<Integer, Entry<PlanNodeType, AbstractPlanNode>> inlineNodesById =
+                m_inlineNodes.entrySet().stream()
+                        .map(e -> Pair.of(e.getValue().getPlanNodeId(), e))
+                        .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond, (a, b) -> b));
         for (Entry<PlanNodeType, AbstractPlanNode> e : other.m_inlineNodes.entrySet()) {
             Entry<PlanNodeType, AbstractPlanNode> myE = inlineNodesById.get(e.getValue().getPlanNodeId());
             if (myE.getKey() != e.getKey()) return -1;

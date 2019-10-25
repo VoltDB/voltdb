@@ -347,12 +347,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // There needs to be at least one search key expression
         if (m_searchkeyExpressions.isEmpty()) {
-            throw new Exception("ERROR: There were no search key expressions defined for " + this);
+            throw new RuntimeException("ERROR: There were no search key expressions defined for " + this);
         }
 
         for (AbstractExpression exp : m_searchkeyExpressions) {

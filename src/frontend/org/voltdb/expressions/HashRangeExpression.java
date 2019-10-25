@@ -50,17 +50,17 @@ public class HashRangeExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A Hash Range expression has child expressions for '" + this + "'");
+            throw new RuntimeException("ERROR: A Hash Range expression has child expressions for '" + this + "'");
 
        if (m_hashColumn == Integer.MIN_VALUE)
-           throw new Exception("ERROR: A Hash Range has no hash column set for '" + this + "'");
+           throw new RuntimeException("ERROR: A Hash Range has no hash column set for '" + this + "'");
 
        if (m_ranges == null) {
-           throw new Exception("ERROR: A Hash Range has no ranges set for '" + this + "'");
+           throw new RuntimeException("ERROR: A Hash Range has no ranges set for '" + this + "'");
        }
     }
 

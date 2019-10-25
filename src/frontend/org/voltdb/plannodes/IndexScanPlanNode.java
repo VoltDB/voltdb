@@ -290,7 +290,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // There needs to be at least one search key expression

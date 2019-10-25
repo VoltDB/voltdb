@@ -49,12 +49,12 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // All Operation nodes need to have a target table
         if (m_targetTableName == null) {
-            throw new Exception("ERROR: The Target TableId is null for PlanNode '" + this + "'");
+            throw new RuntimeException("ERROR: The Target TableId is null for PlanNode '" + this + "'");
         }
     }
 

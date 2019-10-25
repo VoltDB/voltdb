@@ -160,11 +160,11 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A subquery expression has child expressions for '" + this + "'");
+            throw new RuntimeException("ERROR: A subquery expression has child expressions for '" + this + "'");
 
     }
 

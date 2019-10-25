@@ -105,7 +105,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
         //
         // We need to have an aggregate type and column
@@ -114,24 +114,24 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (m_aggregateTypes.size() != m_aggregateDistinct.size() ||
             m_aggregateDistinct.size() != m_aggregateExpressions.size() ||
             m_aggregateExpressions.size() != m_aggregateOutputColumns.size()) {
-            throw new Exception("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
+            throw new RuntimeException("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
         }
         if (m_aggregateTypes.isEmpty()|| m_aggregateTypes.contains(ExpressionType.INVALID)) {
-            throw new Exception("ERROR: Invalid Aggregate ExpressionType or No Aggregate Expression types for PlanNode '" + this + "'");
+            throw new RuntimeException("ERROR: Invalid Aggregate ExpressionType or No Aggregate Expression types for PlanNode '" + this + "'");
         }
         if (m_aggregateExpressions.isEmpty()) {
-            throw new Exception("ERROR: No Aggregate Expressions for PlanNode '" + this + "'");
+            throw new RuntimeException("ERROR: No Aggregate Expressions for PlanNode '" + this + "'");
         }
     }
 
     public boolean isTableCountStar() {
-        if (m_groupByExpressions.isEmpty() == false) {
+        if (! m_groupByExpressions.isEmpty()) {
             return false;
         }
         if (m_aggregateTypes.size() != 1) {
             return false;
         }
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false) {
+        if (! m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) {
             return false;
         }
 
@@ -139,13 +139,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public boolean isTableNonDistinctCount() {
-        if (m_groupByExpressions.isEmpty() == false) {
+        if (! m_groupByExpressions.isEmpty()) {
             return false;
         }
         if (m_aggregateTypes.size() != 1) {
             return false;
         }
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) == false) {
+        if (! m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT)) {
             return false;
         }
         // Does it have a distinct keyword?

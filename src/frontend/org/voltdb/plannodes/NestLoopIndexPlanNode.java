@@ -183,14 +183,14 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Check that we have an inline IndexScanPlanNode
         if (m_inlineNodes.isEmpty()) {
-            throw new Exception("ERROR: No inline PlanNodes are set for " + this);
+            throw new RuntimeException("ERROR: No inline PlanNodes are set for " + this);
         } else if (!m_inlineNodes.containsKey(PlanNodeType.INDEXSCAN)) {
-            throw new Exception("ERROR: No inline PlanNode with type '" + PlanNodeType.INDEXSCAN + "' was set for " + this);
+            throw new RuntimeException("ERROR: No inline PlanNode with type '" + PlanNodeType.INDEXSCAN + "' was set for " + this);
         }
     }
 

@@ -46,18 +46,16 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Make sure our value is not null
-        if (m_value == null && !m_isNull)
-        {
-            throw new Exception("ERROR: The constant value for '" + this +
+        if (m_value == null && !m_isNull) {
+            throw new RuntimeException("ERROR: The constant value for '" + this +
                                 "' is inconsistently null");
         // Make sure the value type is something we support here
-        } else if (m_valueType == VoltType.NULL ||
-                   m_valueType == VoltType.VOLTTABLE) {
-            throw new Exception("ERROR: Invalid constant value type '" + m_valueType + "' for '" + this + "'");
+        } else if (m_valueType == VoltType.NULL || m_valueType == VoltType.VOLTTABLE) {
+            throw new RuntimeException("ERROR: Invalid constant value type '" + m_valueType + "' for '" + this + "'");
         }
     }
 

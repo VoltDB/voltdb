@@ -159,17 +159,17 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         if ((m_right != null) || (m_left != null))
-            throw new Exception(
+            throw new RuntimeException(
                     "ERROR: A value expression has child expressions for '" +
                     this + "'");
 
         // Column Index
         if (m_columnIndex < 0) {
-            throw new Exception(
+            throw new RuntimeException(
                     "ERROR: Invalid column index '" + m_columnIndex +
                     "' for '" + this + "'");
         }

@@ -37,26 +37,26 @@ public class InComparisonExpression extends ComparisonExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
         //
         // Args list is not used by IN.
         //
         if (m_args != null) {
-            throw new Exception("ERROR: Args list was not null for '" + this + "'");
+            throw new RuntimeException("ERROR: Args list was not null for '" + this + "'");
         }
         //
         // We always need both a left node and a right node
         //
         if (m_left == null) {
-            throw new Exception("ERROR: The left node for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The left node for '" + this + "' is NULL");
         } else if (m_right == null) {
-            throw new Exception("ERROR: The right node for '" + this + "' is NULL");
+            throw new RuntimeException("ERROR: The right node for '" + this + "' is NULL");
         }
 
         // right needs to be vector or parameter
         if (!(m_right instanceof VectorValueExpression) && !(m_right instanceof ParameterValueExpression)) {
-            throw new Exception("ERROR: The right node for '" + this + "' is not a list or a parameter");
+            throw new RuntimeException("ERROR: The right node for '" + this + "' is not a list or a parameter");
         }
     }
 

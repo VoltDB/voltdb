@@ -65,14 +65,14 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Limit Amount
         if (m_limit < 0) {
-            throw new Exception("ERROR: The limit size is negative [" + m_limit + "]");
+            throw new RuntimeException("ERROR: The limit size is negative [" + m_limit + "]");
         } else if (m_offset < 0) {
-            throw new Exception("ERROR: The offset amount  is negative [" + m_offset + "]");
+            throw new RuntimeException("ERROR: The offset amount  is negative [" + m_offset + "]");
         }
 
         if (m_limitExpression != null) {
