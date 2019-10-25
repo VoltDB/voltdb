@@ -1754,7 +1754,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractPlanNode p = pns.get(0);
         AggregatePlanNode aggNode;
 
-        ArrayList<AbstractPlanNode> nodesList = p.findAllNodesOfType(PlanNodeType.AGGREGATE);
+        List<AbstractPlanNode> nodesList = p.findAllNodesOfType(PlanNodeType.AGGREGATE);
         assertEquals(1, nodesList.size());
         p = nodesList.get(0);
 

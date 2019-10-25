@@ -17,10 +17,8 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,17 +80,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     @Override
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
+            Collection<String> indexes) {
         if (m_tableScan != null) {
             if (m_tableScan instanceof StmtTargetTableScan) {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
                 getTablesAndIndexesFromSubqueries(tablesRead, indexes);
-            }
-            else if (m_tableScan instanceof StmtSubqueryScan) {
+            } else if (m_tableScan instanceof StmtSubqueryScan) {
                 getChild(0).getTablesAndIndexes(tablesRead, indexes);
-            }
-            else {
+            } else {
                 // This is the only other choice.
                 assert(m_tableScan instanceof StmtCommonTableScan);
                 getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
@@ -101,7 +96,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     protected void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
-                                                                      Collection<String> indexes) {
+                                                             Collection<String> indexes) {
         // Search the base and recursive plans.
         StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
         ctScan.getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
@@ -116,8 +111,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         //
         if (m_targetTableName == null) {
             throw new Exception("ERROR: TargetTableName is null for PlanNode '" + toString() + "'");
-        }
-        if (m_targetTableAlias == null) {
+        } else if (m_targetTableAlias == null) {
             throw new Exception("ERROR: TargetTableAlias is null for PlanNode '" + toString() + "'");
         }
         //
@@ -128,10 +122,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (SchemaColumn col : m_tableScanSchema)
-        {
-            if (!m_targetTableName.equals(col.getTableName()))
-            {
+        for (SchemaColumn col : m_tableScanSchema) {
+            if (!m_targetTableName.equals(col.getTableName())) {
                 throw new Exception("ERROR: The scan column: " + col.getColumnName() +
                                     " in table: " + m_targetTableName + " refers to " +
                                     " table: " + col.getTableName());
@@ -346,8 +338,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
             // It's just a cheap knock-off of the projection's
             m_hasSignificantOutputSchema = false;
-        }
-        else if (m_tableScanSchema.size() != 0) {
+        } else if (m_tableScanSchema.size() != 0) {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             int difftor = 0;
@@ -369,8 +360,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // a bit redundant but logically consistent
             m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
-        }
-        else {
+        } else {
             // We come here if m_tableScanSchema is empty.
             //
             // m_tableScanSchema might be empty for cases like
@@ -392,15 +382,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = childNode.getOutputSchema();
             // step to transfer derived table schema to upper level
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
-        }
-        else if (isCommonTableScan()) {
+        } else if (isCommonTableScan()) {
             m_tableSchema = new NodeSchema();
             StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
             for (SchemaColumn col : ctScan.getOutputSchema()) {
                 m_tableSchema.addColumn(col.clone());
             }
-        }
-        else {
+        } else {
             m_tableSchema = new NodeSchema();
             CatalogMap<Column> cols =
                     db.getTables().getExact(m_targetTableName).getColumns();
@@ -448,11 +436,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // if there are any, in that order.
         if (ins != null) {
             m_outputSchema = ins.getOutputSchema().clone();
-        }
-        else if (proj != null) {
+        } else if (proj != null) {
             m_outputSchema = proj.getOutputSchema().clone();
-        }
-        else {
+        } else {
             m_outputSchema = m_preAggOutputSchema;
             // With no inline projection to define the output columns,
             // iterate through the output schema TVEs
@@ -526,8 +512,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
-            HashSet<AbstractPlanNode> visited) {
+    protected void getScanNodeList_recurse(List<AbstractScanPlanNode> collected, Set<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
             return;
