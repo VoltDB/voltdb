@@ -102,11 +102,9 @@ public class DuplicateCounter
     static class ResponseResult {
         final int[] hashes;
         final boolean success;
-        final VoltMessage message;
-        public ResponseResult(int[] respHashes, boolean status, VoltMessage msg) {
+        public ResponseResult(int[] respHashes, boolean status) {
             hashes = respHashes;
             success = status;
-            message = msg;
         }
     }
 
@@ -157,7 +155,9 @@ public class DuplicateCounter
 
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
         if (misMatchPos >= 0) {
-            ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
+            if (recentMessage != null) {
+                ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
+            }
             ((InitiateResponseMessage) m_lastResponse).setMismatchPos(misMatchPos);
         }
         String msg = String.format(reason + " COMPARING: %d to %d\n"
@@ -168,7 +168,7 @@ public class DuplicateCounter
                 m_responseHashes[0],
                 m_openMessage.toString(),
                 m_lastResponse.toString(),
-                recentMessage.toString());
+                recentMessage != null ? recentMessage.toString():"");
         tmLog.error(msg);
     }
 
@@ -233,7 +233,12 @@ public class DuplicateCounter
                     return HashResult.MISMATCH;
                 }
             } else {
-                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes, txnSucceed, message));
+                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes, txnSucceed));
+
+                // Use the response message from local site
+                if (m_leaderHSID == message.m_sourceHSId) {
+                    m_lastResponse = message;
+                }
             }
         }
 
@@ -268,7 +273,6 @@ public class DuplicateCounter
         ResponseResult leaderResponse = m_responses.remove(m_leaderHSID);
         assert (leaderResponse != null);
         m_responseHashes = leaderResponse.hashes;
-        m_lastResponse = leaderResponse.message;
 
         boolean misMatchLogged = false;
         for (Iterator<Map.Entry<Long, ResponseResult>> it = m_responses.entrySet().iterator(); it.hasNext();) {
@@ -284,7 +288,7 @@ public class DuplicateCounter
             if (leaderResponse.success != res.success) {
                 if (!misMatchLogged) {
                     tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, -1);
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, -1);
                     misMatchLogged = true;
                 }
                 m_hashMatched = false;
@@ -298,7 +302,7 @@ public class DuplicateCounter
                 if (!misMatchLogged) {
                     tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
                     if (res.hashes != null) {
-                        logRelevantMismatchInformation("HASH MISMATCH", res.hashes, res.message, pos);
+                        logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, pos);
                     }
                     misMatchLogged = true;
                 }
