@@ -283,7 +283,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             } else if (!node.isInline()) {
                 throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
             } else if (!node.getInlinePlanNodes().isEmpty()) {
-                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
+                // NOTE: we support recursive inline nodes
+                //throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
             }
             node.validate();
         }

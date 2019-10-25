@@ -294,9 +294,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         super.validate();
 
         // There needs to be at least one search key expression
-        if (m_searchkeyExpressions.isEmpty()) {
+        // TODO: disabled this check. What is the purpose of m_searchkeyExpressions?
+        /*if (m_partialIndexPredicate == null && m_searchkeyExpressions.isEmpty()) {
             throw new PlanningErrorException("ERROR: There were no search key expressions defined for " + this);
-        }
+        }*/
 
         // Validate Expression Trees
         if (m_endExpression != null) {
