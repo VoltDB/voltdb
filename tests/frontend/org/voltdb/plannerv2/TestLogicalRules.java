@@ -409,6 +409,34 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "SI=[$t1], I=[$t0], TI=[$t2], $condition=[$t7])\n" +
                         "          VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
+
+        // ENG-13840
+        m_tester.sql("SELECT i FROM R2,\n" +
+                "(SELECT MAX(i) FROM R2\n" +
+                "    WHERE i > (SELECT COUNT(R2.i) FROM R1\n" +
+                "        WHERE i IS NOT DISTINCT FROM R2.i GROUP BY i ORDER BY i)) TA2")
+                .transform("VoltLogicalCalc(expr#0..6=[{inputs}], I=[$t0])\n" +
+                        "  VoltLogicalJoin(condition=[true], joinType=[inner])\n" +
+                        "    VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "    VoltLogicalAggregate(group=[{}], EXPR$0=[MAX($0)])\n" +
+                        "      VoltLogicalCalc(expr#0..7=[{inputs}], I=[$t0])\n" +
+                        "        VoltLogicalJoin(condition=[AND(=($0, $6), >($0, $7))], joinType=[inner])\n" +
+                        "          VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "          VoltLogicalCalc(expr#0..2=[{inputs}], I1=[$t2], EXPR$0=[$t0])\n" +
+                        "            VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
+                        "              VoltLogicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t2], I=[$t0], I1=[$t1])\n" +
+                        "                VoltLogicalAggregate(group=[{0, 1}], EXPR$0=[COUNT($2)])\n" +
+                        "                  VoltLogicalCalc(expr#0..7=[{inputs}], I=[$t0], I1=[$t7], $f1=[$t7])\n" +
+                        "                    VoltLogicalJoin(condition=[true], joinType=[inner])\n" +
+                        "                      VoltLogicalJoin(condition=[CASE(IS NULL($0), IS NULL($6), IS NULL($6), IS NULL($0), =(CAST($0):INTEGER NOT NULL, CAST($6):INTEGER NOT NULL))], joinType=[inner])\n" +
+                        "                        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                        "                        VoltLogicalAggregate(group=[{0}])\n" +
+                        "                          VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "                            VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "                      VoltLogicalAggregate(group=[{0}])\n" +
+                        "                        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "                          VoltLogicalTableScan(table=[[public, R2]])\n")
+                .pass();
     }
 
     public void testDistinct() {

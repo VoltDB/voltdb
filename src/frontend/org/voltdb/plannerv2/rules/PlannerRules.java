@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.rules;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptRule;
@@ -48,32 +47,8 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitJoinMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
-import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
-import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
-import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
-import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
-import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
-import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
-import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
-import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
-import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
-import org.voltdb.plannerv2.rules.physical.VoltPNestLoopIndexToMergeJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPNestLoopToIndexJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortIndexScanRemoveRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortScanToIndexRule;
-import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
+import org.voltdb.plannerv2.rules.logical.*;
+import org.voltdb.plannerv2.rules.physical.*;
 
 import com.google.common.collect.ImmutableList;
 
@@ -166,6 +141,7 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
+            VoltLAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             // Joins
             VoltLJoinRule.INSTANCE,
 
