@@ -306,7 +306,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         MiscUtils.copyFile(project.getPathToDeployment(),
                 Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls-and-allownulls.xml"));
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
         /*

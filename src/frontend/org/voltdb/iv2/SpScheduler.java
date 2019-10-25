@@ -711,21 +711,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
-
-        // We currently send the final response into the ether, since we don't
-        // have the original ClientInterface HSID stored.  It would be more
-        // useful to have the original ClienInterface HSId somewhere handy.
-
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(),
                 expectedHSIds,
                 message,
-                m_mailbox.getHSId(),
-                true);
-        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                m_mailbox.getHSId());
 
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
+        updateOrAddDuplicateCounter(dcKey, counter);
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -748,28 +743,27 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void handleFragmentTaskMessageRepair(List<Long> needsRepair, FragmentTaskMessage message)
     {
+        if (needsRepair.contains(m_mailbox.getHSId()) && m_outstandingTxns.get(message.getTxnId()) != null) {
+            // Sanity check that we really need repair.
+            hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
+                    "This shouldn't be possible.");
+            // Not sure what to do in this event.  Crash for now
+            throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
+        }
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
-
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
                 message.getTxnId(),
                 expectedHSIds,
                 message,
-                m_mailbox.getHSId(),
-                true);
-        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                m_mailbox.getHSId());
 
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), message.getSpHandle());
+        updateOrAddDuplicateCounter(dcKey, counter);
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
-            // Sanity check that we really need repair.
-            if (m_outstandingTxns.get(message.getTxnId()) != null) {
-                hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
-                        "This shouldn't be possible.");
-                // Not sure what to do in this event.  Crash for now
-                throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
-            }
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             FragmentTaskMessage localWork =
@@ -783,6 +777,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
+        }
+    }
+
+    private void updateOrAddDuplicateCounter(final DuplicateCounterKey dcKey, DuplicateCounter counter) {
+        DuplicateCounter theCounter = m_duplicateCounters.get(dcKey);
+        if (theCounter == null) {
+            counter.setTransactionRepair(true);
+            safeAddToDuplicateCounterMap(dcKey, counter);
+        } else {
+            // The partition leader on the local site is being migrated away, but the migration fails. The local site
+            // can be elected again as leader. In this case, update the duplicate counter.
+
+            // If local site is already in the duplicate counter, retain it.
+            List<Long> expectedHSIDs = new ArrayList<Long>(counter.m_expectedHSIds);
+            if (!expectedHSIDs.contains(m_mailbox.getHSId())) {
+                expectedHSIDs.add(m_mailbox.getHSId());
+            }
+            theCounter.setTransactionRepair(true);
+            theCounter.updateReplicas(expectedHSIDs);
         }
     }
 

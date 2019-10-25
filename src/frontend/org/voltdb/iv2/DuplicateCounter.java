@@ -97,7 +97,7 @@ public class DuplicateCounter
     final boolean m_everySiteMPSysProc;
 
     // Used for transaction repair. In this case, Duplicate Counter may not have local site.
-    final boolean m_transactionRepair;
+    boolean m_transactionRepair;
 
     static class ResponseResult {
         final int[] hashes;
@@ -116,16 +116,6 @@ public class DuplicateCounter
             List<Long> expectedHSIds,
             TransactionInfoBaseMessage openMessage,
             long leaderHSID) {
-        this(destinationHSId, realTxnId, expectedHSIds, openMessage, leaderHSID, false);
-    }
-
-    DuplicateCounter(
-            long destinationHSId,
-            long realTxnId,
-            List<Long> expectedHSIds,
-            TransactionInfoBaseMessage openMessage,
-            long leaderHSID,
-            boolean repair) {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
@@ -133,11 +123,14 @@ public class DuplicateCounter
         m_leaderHSID = leaderHSID;
         m_everySiteMPSysProc = (TxnEgo.getPartitionId(realTxnId) == MpInitiator.MP_INIT_PID);
         m_replicas.addAll(expectedHSIds);
-        m_transactionRepair = repair;
     }
 
     long getTxnId() {
         return m_txnId;
+    }
+
+    public void setTransactionRepair(boolean repair) {
+        m_transactionRepair = repair;
     }
 
     HashResult updateReplicas(List<Long> replicas) {

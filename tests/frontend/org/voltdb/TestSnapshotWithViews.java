@@ -335,7 +335,7 @@ public class TestSnapshotWithViews extends TestExportBase {
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
         compile = config.compile(project);

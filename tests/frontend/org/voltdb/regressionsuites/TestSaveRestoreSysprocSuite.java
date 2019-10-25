@@ -3992,7 +3992,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                                                  BackendTarget.NATIVE_EE_JNI);
         boolean success = config.compile(project);
         assert(success);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;
     }
