@@ -17,11 +17,7 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.exceptions.PlanningErrorException;
@@ -93,7 +89,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * @param eqSets
      */
     public void promoteSinglePartitionInfo(
-            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
+            Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets) {
         if (getScanPartitioning() == null) {
             throw new PlanningErrorException("Unsupported statement, subquery expressions are only supported for " +
@@ -138,7 +134,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     // (Xin): If it changes valueEquivalence, we have to update eqSets
     // Because HashSet stored a legacy hashcode for the non-final object.
     private void updateEqualSets(Set<AbstractExpression> values,
-            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
+            Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets,
             AbstractExpression tveKey, AbstractExpression spExpr) {
         boolean hasLegacyValues = false;

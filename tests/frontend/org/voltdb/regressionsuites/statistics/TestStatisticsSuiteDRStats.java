@@ -39,8 +39,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.dr2.DRProtocol;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
 import junit.framework.Test;
@@ -282,7 +282,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        return StatisticsTestSuiteBase.suite(TestStatisticsSuiteDRStats.class, false, REPLICATION_PORT, false);
+        return StatisticsTestSuiteBase.suite(TestStatisticsSuiteDRStats.class, false, REPLICATION_PORT,
+                MultiConfigSuiteBuilder.ReuseServer.NEVER);
     }
 
     private Client createClient(ClientConfig config, LocalCluster cluster) throws IOException {

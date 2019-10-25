@@ -22,6 +22,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.stream.Collectors;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -215,38 +219,32 @@ public class VoltFile extends File {
     }
 
     public static void recursivelyDelete(File file, boolean deleteRoot) throws IOException {
-        if (!file.exists()) {
-            return;
-        }
-
-        if (deleteRoot) {
-            recursivelyDelete(file);
-        }
-        else if (file.isDirectory()) {
-            for (File f : file.listFiles()) {
-                recursivelyDelete(f);
-            }
-        }
+        recursivelyDelete(file.toPath(), deleteRoot, true);
     }
 
     /*
      * One of those why doesn't Java ship with this functions
      */
     public static void recursivelyDelete(File f) throws IOException {
-        if (!f.exists()) {
-            return;
-        }
-        if (f.isDirectory()) {
-            for (File f1 : f.listFiles()) {
-                recursivelyDelete(f1);
-            }
-            if (!f.delete()) {
-                throw new IOException("Unable to delete directory " + f);
+        recursivelyDelete(f, true);
+    }
+
+    public static void recursivelyDelete(Path path, boolean deleteRoot, boolean retry) throws IOException {
+        if (Files.isDirectory(path)) {
+            for (Path child : Files.newDirectoryStream(path)) {
+                recursivelyDelete(child, true, true);
             }
         }
-        else {
-            if (!f.delete()) {
-                throw new IOException("Unable to delete file " + f);
+        if (deleteRoot) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (DirectoryNotEmptyException e) {
+                if (!retry) {
+                    throw new IOException(
+                            "Directory not empty " + path + ": " + Files.list(path).collect(Collectors.toList()));
+                }
+                // Something was added to the directory lets try to clean it out again
+                recursivelyDelete(path, true, false);
             }
         }
     }

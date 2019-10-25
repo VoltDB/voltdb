@@ -17,12 +17,8 @@
 
 package org.voltdb.compiler;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -471,8 +467,8 @@ public class MaterializedViewProcessor {
      * @param compiler The VoltCompiler
      * @throws VoltCompilerException
      */
-    private void checkViewSources(ArrayList<Table> tableList) throws VoltCompilerException {
-        HashSet<String> tableSet = new HashSet<>();
+    private void checkViewSources(List<Table> tableList) throws VoltCompilerException {
+        Set<String> tableSet = new HashSet<>();
         for (Table tbl : tableList) {
             if (! tableSet.add(tbl.getTypeName())) {
                 String errMsg = "Table " + tbl.getTypeName() + " appeared in the table list more than once: " +
@@ -496,7 +492,7 @@ public class MaterializedViewProcessor {
         int groupColCount = stmt.groupByColumns().size();
         int displayColCount = stmt.m_displayColumns.size();
         StringBuffer msg = new StringBuffer();
-        msg.append("Materialized view \"" + viewName + "\" ");
+        msg.append("Materialized view \"").append(viewName).append("\" ");
 
         if (stmt.getParameters().length > 0) {
             msg.append("contains placeholders (?), which are not allowed in the SELECT query for a view.");
@@ -512,13 +508,13 @@ public class MaterializedViewProcessor {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             // The columns must be equal.
             if (!outcol.m_expression.equals(gbcol.m_expression)) {
-                msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
+                msg.append("must exactly match the GROUP BY clause at index ").append(i).append(" of SELECT list.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
             // check if the expression return type is not unique indexable
             StringBuffer exprMsg = new StringBuffer();
             if (!outcol.m_expression.isValueTypeUniqueIndexable(exprMsg)) {
-                msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
+                msg.append("with ").append(exprMsg).append(" in GROUP BY clause not supported.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
 
@@ -540,9 +536,10 @@ public class MaterializedViewProcessor {
             // Note that this expression does not catch all aggregates.
             // An instance of avg() would cause the exception.
             // ENG-10945 - We can have count(*) anywhere after the group by columns and multiple count(*)(s)
-            if ( outcol.m_expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-                if ( countStarFound == false )
+            if (outcol.m_expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                if (! countStarFound) {
                     countStarFound = true;
+                }
                 continue;
             }
 
@@ -567,7 +564,7 @@ public class MaterializedViewProcessor {
 
         // Users can create SINGLE TABLE VIEWS without declaring count(*) in the stmt.
         // Multiple table views still need this restriction.
-        if (stmt.m_tableList.size() > 1 && countStarFound == false) {
+        if (stmt.m_tableList.size() > 1 && ! countStarFound) {
             msg.append("joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -606,39 +603,28 @@ public class MaterializedViewProcessor {
         if (stmt.hasSubquery()) {
             msg.append("cannot contain subquery sources.");
             throw m_compiler.new VoltCompilerException(msg.toString());
-        }
-
-        if (! stmt.m_joinTree.allInnerJoins()) {
+        } else if (! stmt.m_joinTree.allInnerJoins()) {
             throw m_compiler.new VoltCompilerException("Materialized view only supports INNER JOIN.");
-        }
-
-        if (stmt.orderByColumns().size() != 0) {
+        } else if (stmt.orderByColumns().size() != 0) {
             msg.append("with an ORDER BY clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
-        }
-
-        if (stmt.hasLimitOrOffset()) {
+        } else if (stmt.hasLimitOrOffset()) {
             msg.append("with a LIMIT or OFFSET clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
-        }
-
-        if (stmt.getHavingPredicate() != null) {
+        } else if (stmt.getHavingPredicate() != null) {
             msg.append("with a HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
-        }
-
-        // ENG-10892, since count(*) can be removed from SV table
-        if ((stmt.m_tableList.size() > 1 && displayColCount <= groupColCount) ||
-                displayColCount < groupColCount) {
+        } else if ((stmt.m_tableList.size() > 1 && displayColCount <= groupColCount) ||
+                displayColCount < groupColCount) { // ENG-10892, since count(*) can be removed from SV table
             msg.append("has too few columns.");
             throw m_compiler.new VoltCompilerException(msg.toString());
+        } else {
+            checkViewSources(stmt.m_tableList);
         }
-
-        checkViewSources(stmt.m_tableList);
      }
 
-    private static void processMaterializedViewColumn(Table srcTable, Column destColumn,
-                                                      ExpressionType type, TupleValueExpression colExpr) {
+    private static void processMaterializedViewColumn(
+            Table srcTable, Column destColumn, ExpressionType type, TupleValueExpression colExpr) {
 
         if (colExpr != null) {
             assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
@@ -650,9 +636,7 @@ public class MaterializedViewProcessor {
     }
 
     // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
-    private void compileFallbackQueriesAndUpdateCatalog(Database db,
-                                                        String query,
-                                                        List<VoltXMLElement> fallbackQueryXMLs,
+    private void compileFallbackQueriesAndUpdateCatalog(Database db, String query, List<VoltXMLElement> fallbackQueryXMLs,
                                                         MaterializedViewInfo matviewinfo) throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
@@ -868,19 +852,18 @@ public class MaterializedViewProcessor {
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
                     if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
                         continue;
-                    }
-
-                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, indexedColRefs, null, null)) {
+                    } else if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null,
+                            indexedColRefs, null, null)) {
                         continue;
-                    }
-                    if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
+                    } else if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs,
+                                null, srcColumnArray)) {
                             continue;
+                        } else {
+                            indexOptimalForMinMax = true;
                         }
-                        indexOptimalForMinMax = true;
                     }
-                }
-                else {
+                } else {
                     matchingCase = MatViewIndexMatchingGroupby.GB_COL_IDX_EXP;
                     // In this branch, group-by columns are simple columns, but the index contains complex columns.
                     // So it's only safe to access the index columns from indexedExprs.
@@ -890,36 +873,31 @@ public class MaterializedViewProcessor {
                     //                              for    index columns: convert    tve => col
                     if (isInvalidIndexCandidate(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
                         continue;
-                    }
-
-                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, null, indexedExprs, srcColumnArray)) {
+                    } else if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs,
+                            null, null, indexedExprs, srcColumnArray)) {
                         continue;
-                    }
-                    if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
+                    } else if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null,
+                                indexedExprs, null)) {
                             continue;
+                        } else {
+                            indexOptimalForMinMax = true;
                         }
-                        indexOptimalForMinMax = true;
                     }
                 }
-            }
-            else {
+            } else {
                 matchingCase = MatViewIndexMatchingGroupby.GB_EXP_IDX_EXP;
                 // This means group-by columns have complex columns.
                 // It's only safe to access the group-by columns from groupbyExprs.
                 // AND, indexedExprs must not be null in this case. (yeah!)
                 if ( indexedExprs == null ) {
                     continue;
-                }
-                if (isInvalidIndexCandidate(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
+                } else if (isInvalidIndexCandidate(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
                     continue;
-                }
-
-                if (! isGroupbyMatchingIndex(matchingCase, null, groupbyExprs, null, indexedExprs, null)) {
+                } else if (! isGroupbyMatchingIndex(matchingCase, null, groupbyExprs,
+                        null, indexedExprs, null)) {
                     continue;
-                }
-
-                if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
+                } else if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
                     if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                         continue;
                     }
@@ -946,10 +924,8 @@ public class MaterializedViewProcessor {
                     return null;
                 }
                 String predicatejson = index.getPredicatejson();
-                if ( ! predicatejson.isEmpty() &&
-                        ! SubPlanAssembler.evaluatePartialIndexPredicate(
-                                tableScan, coveringExprs,
-                                predicatejson, exactMatchCoveringExprs).getFirst()) {
+                if ( ! predicatejson.isEmpty() && ! SubPlanAssembler.evaluatePartialIndexPredicate(
+                        tableScan, coveringExprs, predicatejson, exactMatchCoveringExprs).getFirst()) {
                     // the partial index predicate does not match the MatView's
                     // where clause -- give up on this index
                     continue;
@@ -980,25 +956,20 @@ public class MaterializedViewProcessor {
             if (lengthInBytes < maximumDefaultColumnSize) {
                 column.setSize(viewColumnLength);
                 column.setInbytes(expr.getInBytes());
-            }
-            else {
+            } else {
                 // Declining to create a view column that is wider than the default.
                 // This ensures that if there are a large number of aggregates on a string
                 // column that we have a reasonable chance of not exceeding the static max row size limit.
                 column.setSize(maximumDefaultColumnSize);
                 column.setInbytes(true);
             }
-        }
-        else {
+        } else {
             column.setSize(voltTy.getMaxLengthInBytes());
         }
     }
 
     private static boolean isInvalidIndexCandidate(int idxSize, int gbSize, int diffAllowance) {
-        if ( idxSize < gbSize || idxSize > gbSize + diffAllowance ) {
-            return true;
-        }
-        return false;
+        return idxSize < gbSize || idxSize > gbSize + diffAllowance;
     }
 
     private static boolean isGroupbyMatchingIndex(
@@ -1008,41 +979,41 @@ public class MaterializedViewProcessor {
             List<Column> srcColumnArray) {
         // Compare group-by columns/expressions for different cases
         switch(matchingCase) {
-        case GB_COL_IDX_COL:
-            for (int i = 0; i < groupbyColRefs.size(); ++i) {
-                int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
-                int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
-                if (groupbyColIndex != indexedColIndex) {
-                    return false;
+            case GB_COL_IDX_COL:
+                for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                    int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
+                    int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
+                    if (groupbyColIndex != indexedColIndex) {
+                        return false;
+                    }
                 }
-            }
-            break;
-        case GB_COL_IDX_EXP:
-            for (int i = 0; i < groupbyColRefs.size(); ++i) {
-                AbstractExpression indexedExpr = indexedExprs.get(i);
-                if (! (indexedExpr instanceof TupleValueExpression)) {
-                    // Group-by columns are all simple columns, so indexedExpr must be tve.
-                    return false;
+                break;
+            case GB_COL_IDX_EXP:
+                for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                    AbstractExpression indexedExpr = indexedExprs.get(i);
+                    if (! (indexedExpr instanceof TupleValueExpression)) {
+                        // Group-by columns are all simple columns, so indexedExpr must be tve.
+                        return false;
+                    }
+                    int indexedColIdx = ((TupleValueExpression)indexedExpr).getColumnIndex();
+                    Column indexedColumn = srcColumnArray.get(indexedColIdx);
+                    Column groupbyColumn = groupbyColRefs.get(i).getColumn();
+                    if ( ! indexedColumn.equals(groupbyColumn) ) {
+                        return false;
+                    }
                 }
-                int indexedColIdx = ((TupleValueExpression)indexedExpr).getColumnIndex();
-                Column indexedColumn = srcColumnArray.get(indexedColIdx);
-                Column groupbyColumn = groupbyColRefs.get(i).getColumn();
-                if ( ! indexedColumn.equals(groupbyColumn) ) {
-                    return false;
+                break;
+            case GB_EXP_IDX_EXP:
+                for (int i = 0; i < groupbyExprs.size(); ++i) {
+                    if (! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
+                        return false;
+                    }
                 }
-            }
-            break;
-        case GB_EXP_IDX_EXP:
-            for (int i = 0; i < groupbyExprs.size(); ++i) {
-                if (! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
-                   return false;
-                }
-            }
-            break;
-        default:
-            assert(false);
-            // invalid option
-            return false;
+                break;
+            default:
+                assert(false);
+                // invalid option
+                return false;
         }
 
         // group-by columns/expressions are matched with the corresponding index

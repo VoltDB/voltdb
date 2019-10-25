@@ -112,32 +112,32 @@ function startvolt() {
 }
 
 function server() {
-    startvolt deployment.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment.xml ddl1.sql sp.jar
 
 }
 
 # run the voltdb server locally with kafka connector
 function server-kafka() {
-    startvolt deployment-kafka.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment-kafka.xml ddl1.sql sp.jar
 }
 
 function server-rabbitmq() {
     cp $RBMQ/rabbitmq.jar $VOLTDB_LIB/extension/
     cp ../../../../export-rabbitmq/voltdb-rabbitmq.jar $VOLTDB_LIB/extension/
-    startvolt deployment-rabbitmq.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment-rabbitmq.xml ddl1.sql sp.jar
 }
 
 # run the voltdb server locally with mysql connector
 function server-mysql() {
     cp $MYSQLLIB $VOLTDB_LIB/extension/
-    startvolt deployment_mysql.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_mysql.xml ddl1.sql sp.jar
 }
 
 
 # run the voltdb server locally with vertica connector
 function server-vertica() {
     cp $VERTICALIB $VOLTDB_LIB/extension/
-    startvolt deployment_vertica.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_vertica.xml ddl1.sql sp.jar
 }
 
 # run the voltdb server locally with postgresql connector
@@ -152,7 +152,7 @@ function server-vertica() {
 
 function server-pg() {
     cp $POSTGRESLIB $VOLTDB_LIB/extension/
-    startvolt deployment_pg_nocat.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_pg_nocat.xml ddl1.sql sp.jar
 }
 
 # to run the postgres jdbc geo export test manually:
@@ -166,7 +166,7 @@ function server-pg() {
 
 function server-pg-geo() {
     cp $POSTGRESLIB $VOLTDB_LIB/extension/
-    startvolt deployment_pg_nocat.xml ddl-all-nocat-geo.sql sp.jar
+    startvolt deployment_pg_nocat.xml ddl1.sql sp.jar
 
 }
 
@@ -179,7 +179,7 @@ function server-custom() {
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
     #$VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
-    startvolt deployment_custom.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_custom.xml ddl1.sql sp.jar
 }
 
 # run the client that drives the example

@@ -18,8 +18,8 @@
 package org.voltdb.planner;
 
 import java.util.ArrayDeque;
+import java.util.Deque;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -39,7 +39,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     final Table m_targetTable;
 
     /** The list of generated plans. This allows generation in batches.*/
-    final ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
+    final Deque<AbstractPlanNode> m_plans = new ArrayDeque<>();
 
     /** Only create access plans once - all are created in the first pass. */
     boolean m_generatedPlans = false;
@@ -50,7 +50,6 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      */
     WriterSubPlanAssembler(AbstractParsedStmt parsedStmt, StatementPartitioning partitioning) {
         super(parsedStmt, partitioning);
-
         assert(m_parsedStmt.m_tableList.size() == 1);
         m_targetTable = m_parsedStmt.m_tableList.get(0);
     }
@@ -67,9 +66,9 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // only once on the node.
             JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
             // Analyze join conditions
-            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            tableNode.analyzeJoinExpressions(m_parsedStmt);
             // these just shouldn't happen right?
-            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
+            assert m_parsedStmt.m_noTableSelectionList.isEmpty();
 
             m_generatedPlans = true;
             // This is either UPDATE or DELETE statement. Consolidate all expressions
@@ -77,17 +76,13 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
             tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
-                    null,
-                    tableNode.m_whereInnerList,
-                    null));
+                    null, tableNode.m_whereInnerList, null));
 
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
-
                 AbstractPlanNode plan = getAccessPlanForTable(tableNode);
                 m_plans.add(plan);
             }
-
         }
         return m_plans.poll();
     }

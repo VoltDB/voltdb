@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -52,8 +53,6 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncatePeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
-
-import org.junit.Test;
 
 import com.google_voltpatches.common.collect.Lists;
 
@@ -2599,8 +2598,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         //* enable for simplified config */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
         assertTrue(config.compile(project));
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        // add this config to the set of tests to run forcing it to always reuse the server. This makes memcheck
+        // failures harder to diagnose so if they do occur rerun the test without reuseServer set
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.ALWAYS);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
@@ -2614,7 +2614,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.ALWAYS);
 
         return builder;
     }

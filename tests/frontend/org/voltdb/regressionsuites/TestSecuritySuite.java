@@ -461,7 +461,7 @@ public class TestSecuritySuite extends RegressionSuite {
         if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         // Not testing a cluster and assuming security shouldn't be affected by this
 

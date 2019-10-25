@@ -522,7 +522,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;
     }
