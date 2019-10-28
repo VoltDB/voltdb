@@ -234,7 +234,12 @@ class NValue {
     /* Create a default NValue */
     NValue();
 
-        // todo: free() should not really be const
+    // todo: free() should not really be const
+
+    bool operator==(NValue const& rhs) const;
+    bool operator!=(NValue const& rhs) const {
+        return ! operator==(rhs);
+    }
 
     /* Release memory associated to object type NValues */
     void free() const;

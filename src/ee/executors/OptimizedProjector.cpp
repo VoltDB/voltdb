@@ -187,7 +187,7 @@ private:
 // for ordering: fields in source tuple may be referenced more
 // than once, or projection expression may not be a TVE.
 struct StepComparator {
-    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs) {
+    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs) const {
         return lhs.dstFieldIndex() < rhs.dstFieldIndex();
     }
 };
