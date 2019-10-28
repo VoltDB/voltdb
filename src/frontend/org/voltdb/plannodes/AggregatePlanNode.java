@@ -59,12 +59,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         ;
     }
 
-    protected List<ExpressionType> m_aggregateTypes = new ArrayList<>();
+    protected List<ExpressionType> mAggregateTypes = new ArrayList<>();
     // a list of whether the aggregate is over distinct elements
     // 0 is not distinct, 1 is distinct
-    protected List<Integer> m_aggregateDistinct = new ArrayList<>();
+    protected List<Integer> mAggregateDistinct = new ArrayList<>();
     // a list of column offsets/indexes not plan column guids.
-    protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
+    protected List<Integer> mAggregateOutputColumns = new ArrayList<>();
     // a list of IDs for user define aggregate functions
     protected List<Integer> m_userAggregateId = new ArrayList<>();
     // a list of booleans that represent whether it is a worker or a coordinator
@@ -73,7 +73,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Boolean> m_isPartition = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
-    protected List<AbstractExpression> m_aggregateExpressions =
+    protected List<AbstractExpression> mAggregateExpressions =
         new ArrayList<>();
 
     // At the moment these are guaranteed to be TVES.  This might always be true
@@ -101,7 +101,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public List<ExpressionType> getAggregateTypes() {
-        return m_aggregateTypes;
+        return mAggregateTypes;
     }
 
     @Override
@@ -111,55 +111,39 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // We need to have an aggregate type and column
         // We're not checking that it's a valid ExpressionType because this plannode is a temporary hack
         //
-        if (m_aggregateTypes.size() != m_aggregateDistinct.size() ||
-            m_aggregateDistinct.size() != m_aggregateExpressions.size() ||
-            m_aggregateExpressions.size() != m_aggregateOutputColumns.size()) {
+        final int numAggTypes = mAggregateTypes.size(),
+                numAggDist = mAggregateDistinct.size(),
+                numAggExpr = mAggregateExpressions.size(),
+                numAggOut = mAggregateOutputColumns.size();
+        final boolean eq = numAggTypes == numAggDist &&
+                numAggDist == numAggExpr &&
+                numAggExpr == numAggOut;
+        if (! eq) {
             throw new RuntimeException("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
+        } else if (mAggregateTypes.contains(ExpressionType.INVALID)) {
+            throw new RuntimeException("ERROR: Invalid Aggregate ExpressionType for PlanNode '" + this + "'");
         }
-        if (m_aggregateTypes.isEmpty()|| m_aggregateTypes.contains(ExpressionType.INVALID)) {
-            throw new RuntimeException("ERROR: Invalid Aggregate ExpressionType or No Aggregate Expression types for PlanNode '" + this + "'");
-        }
-        if (m_aggregateExpressions.isEmpty()) {
-            throw new RuntimeException("ERROR: No Aggregate Expressions for PlanNode '" + this + "'");
-        }
+        // NOTE: m_aggregateTypes can be empty, in queries such as from ENG-12105.
     }
 
     public boolean isTableCountStar() {
-        if (! m_groupByExpressions.isEmpty()) {
-            return false;
-        }
-        if (m_aggregateTypes.size() != 1) {
-            return false;
-        }
-        if (! m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) {
-            return false;
-        }
-
-        return true;
+        return m_groupByExpressions.isEmpty() &&
+                mAggregateTypes.size() == 1 &&
+                mAggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR);
     }
 
     public boolean isTableNonDistinctCount() {
-        if (! m_groupByExpressions.isEmpty()) {
-            return false;
-        }
-        if (m_aggregateTypes.size() != 1) {
-            return false;
-        }
-        if (! m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT)) {
-            return false;
-        }
-        // Does it have a distinct keyword?
-        if (m_aggregateDistinct.get(0) == 1) {
-            return false;
-        }
-        return true;
+        return m_groupByExpressions.isEmpty() &&
+                mAggregateTypes.size() == 1 &&
+                mAggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) &&
+                mAggregateDistinct.get(0) != 1;
     }
 
     public boolean isTableNonDistinctCountConstant() {
         if (!isTableNonDistinctCount()) {
             return false;
         }
-        AbstractExpression aggArgument = m_aggregateExpressions.get(0);
+        AbstractExpression aggArgument = mAggregateExpressions.get(0);
         ExpressionType argumentType = aggArgument.getExpressionType();
         // Is the expression a constant?
         return argumentType.equals(ExpressionType.VALUE_PARAMETER) ||
@@ -171,7 +155,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             return false;
         }
         // Is the expression a column?
-        AbstractExpression aggArgument = m_aggregateExpressions.get(0);
+        AbstractExpression aggArgument = mAggregateExpressions.get(0);
         if (! aggArgument.getExpressionType().equals(ExpressionType.VALUE_TUPLE)) {
             return false;
         }
@@ -192,42 +176,23 @@ public class AggregatePlanNode extends AbstractPlanNode {
         String columnName = tve.getColumnName();
         Column col = tbl.getColumns().get(columnName);
         // Is the column nullable?
-        if (col.getNullable()) {
-            return false;
-        }
-        return true;
+        return !col.getNullable();
     }
 
     // single min() without GROUP BY?
     public boolean isTableMin() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false) {
-            return false;
-        }
-        if (m_aggregateTypes.size() != 1) {
-            return false;
-        }
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false) {
-            return false;
-        }
-
-        return true;
+        return m_groupByExpressions.isEmpty() &&
+                mAggregateTypes.size() == 1 &&
+                mAggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN);
     }
 
     // single max() without GROUP BY?
     public boolean isTableMax() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false) {
-            return false;
-        }
-        if (m_aggregateTypes.size() != 1) {
-            return false;
-        }
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false) {
-            return false;
-        }
-
-        return true;
+        return m_groupByExpressions.isEmpty() &&
+                mAggregateTypes.size() == 1 &&
+                mAggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX);
     }
 
     // set predicate for SELECT MAX(X) FROM T WHERE X > / >= ? case
@@ -245,11 +210,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     // for single min() / max(), return the single aggregate expression
     public AbstractExpression getFirstAggregateExpression() {
-        return m_aggregateExpressions.get(0);
+        return mAggregateExpressions.get(0);
     }
 
     public int getAggregateTypesSize () {
-        return m_aggregateTypes.size();
+        return mAggregateTypes.size();
     }
 
     public List<AbstractExpression> getGroupByExpressions() {
@@ -322,7 +287,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
 
-        for (AbstractExpression agg_exp : m_aggregateExpressions) {
+        for (AbstractExpression agg_exp : mAggregateExpressions) {
             allTves = ExpressionUtil.getTupleValueExpressions(agg_exp);
             for (TupleValueExpression tve : allTves) {
                 tve.setColumnIndexUsingSchema(inputSchema);
@@ -372,24 +337,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public void addAggregate(ExpressionType aggType,
                              boolean isDistinct,
                              Integer aggOutputColumn,
-                             AbstractExpression aggInputExpr)
-    {
-        m_aggregateTypes.add(aggType);
-        if (isDistinct)
-        {
-            m_aggregateDistinct.add(1);
+                             AbstractExpression aggInputExpr) {
+        mAggregateTypes.add(aggType);
+        if (isDistinct) {
+            mAggregateDistinct.add(1);
+        } else {
+            mAggregateDistinct.add(0);
         }
-        else
-        {
-            m_aggregateDistinct.add(0);
-        }
-        m_aggregateOutputColumns.add(aggOutputColumn);
+        mAggregateOutputColumns.add(aggOutputColumn);
         if (aggType.isNullary()) {
             assert(aggInputExpr == null);
-            m_aggregateExpressions.add(null);
+            mAggregateExpressions.add(null);
         } else {
             assert(aggInputExpr != null);
-            m_aggregateExpressions.add(aggInputExpr.clone());
+            mAggregateExpressions.add(aggInputExpr.clone());
         }
         m_isWorker.add(true);
         m_isPartition.add(true);
@@ -404,19 +365,19 @@ public class AggregatePlanNode extends AbstractPlanNode {
         AggregateExpression aggExpr = new AggregateExpression(aggType);
         aggExpr.finalizeValueTypes();
 
-        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        int outputSchemaIndex = mAggregateOutputColumns.get(index);
         SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(aggExpr.getValueType());
         schemaExpr.setValueSize(aggExpr.getValueSize());
 
-        m_aggregateTypes.set(index, aggType);
+        mAggregateTypes.set(index, aggType);
     }
 
     // This method updates the return type of the distNode to be varbinary
     // and size to be 1048576 (which is the maximum)
     public void updateUserDefinedAggregate(int index) {
-        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        int outputSchemaIndex = mAggregateOutputColumns.get(index);
         SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(VoltType.VARBINARY);
@@ -435,12 +396,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_isPartition.set(index, false);
     }
 
-    public void addGroupByExpression(AbstractExpression expr)
-    {
-        if (expr == null) {
-            return;
+    public void addGroupByExpression(AbstractExpression expr) {
+        if (expr != null) {
+            m_groupByExpressions.add(expr.clone());
         }
-        m_groupByExpressions.add(expr.clone());
     }
 
     @Override
@@ -449,7 +408,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         stringer.key("AGGREGATE_COLUMNS");
         stringer.array();
-        for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
+        for (int ii = 0; ii < mAggregateTypes.size(); ii++) {
             stringer.object();
             // UDFTODO: You only put in the id, is_worker, is_partition when the id is not -1
             /*
@@ -464,10 +423,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.keySymbolValuePair(Members.IS_WORKER.name(), m_isWorker.get(ii));
             stringer.keySymbolValuePair(Members.IS_PARTITION.name(), m_isPartition.get(ii));
-            stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
-            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
-            stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
-            AbstractExpression ae = m_aggregateExpressions.get(ii);
+            stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), mAggregateTypes.get(ii).name());
+            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), mAggregateDistinct.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), mAggregateOutputColumns.get(ii));
+            AbstractExpression ae = mAggregateExpressions.get(ii);
             if (ae != null) {
                 stringer.key(Members.AGGREGATE_EXPRESSION.name());
                 stringer.object();
@@ -480,9 +439,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         if (! m_groupByExpressions.isEmpty()) {
             stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
-            for (int i = 0; i < m_groupByExpressions.size(); i++) {
+            for (AbstractExpression m_groupByExpression : m_groupByExpressions) {
                 stringer.object();
-                m_groupByExpressions.get(i).toJSONString(stringer);
+                m_groupByExpression.toJSONString(stringer);
                 stringer.endObject();
             }
             stringer.endArray();
@@ -523,17 +482,17 @@ public class AggregatePlanNode extends AbstractPlanNode {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
         String aggType = planNodeTypeToAggDescString(getPlanNodeType());
 
-        sb.append(aggType + " AGGREGATION ops: ");
+        sb.append(aggType).append(" AGGREGATION ops: ");
         String sep = "";
         int ii = 0;
-        for (ExpressionType e : m_aggregateTypes) {
+        for (ExpressionType e : mAggregateTypes) {
             sb.append(sep).append(e.symbol());
             sep = ", ";
             if (e != ExpressionType.AGGREGATE_COUNT_STAR) {
-                if (m_aggregateDistinct.get(ii) == 1) {
+                if (mAggregateDistinct.get(ii) == 1) {
                     sb.append(" DISTINCT");
                 }
-                AbstractExpression ae = m_aggregateExpressions.get(ii);
+                AbstractExpression ae = mAggregateExpressions.get(ii);
                 assert(ae != null);
                 sb.append("(");
                 sb.append(ae.explain(optionalTableName));
@@ -542,13 +501,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
             ++ii;
         }
         if (m_prePredicate != null) {
-            sb.append(" ONLY IF " + m_prePredicate.explain(optionalTableName));
+            sb.append(" ONLY IF ").append(m_prePredicate.explain(optionalTableName));
         }
         if (m_postPredicate != null) {
             // HAVING is always defined WRT to the current outputSchema (NOT inputschema).
             // This might be a little surprising to the user
             // -- maybe we can find some better way to describe the TVEs, here.
-            sb.append(" HAVING " + m_postPredicate.explain(AbstractParsedStmt.TEMP_TABLE_NAME));
+            sb.append(" HAVING ").append(m_postPredicate.explain(AbstractParsedStmt.TEMP_TABLE_NAME));
         }
 
         return sb.toString();
@@ -561,15 +520,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         int size = jarray.length();
         for (int i = 0; i < size; i++) {
             JSONObject tempObj = jarray.getJSONObject( i );
-            m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
-            m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
-            m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
+            mAggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
+            mAggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
+            mAggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
             if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
-                m_aggregateExpressions.add(null);
-            }
-            else {
-                m_aggregateExpressions.add(
+                mAggregateExpressions.add(null);
+            } else {
+                mAggregateExpressions.add(
                     AbstractExpression.fromJSONChild(tempObj, Members.AGGREGATE_EXPRESSION.name()));
             }
         }
@@ -611,7 +569,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (m_postPredicate != null) {
             collected.addAll(m_postPredicate.findAllSubexpressionsOfClass(aeClass));
         }
-        for (AbstractExpression ae : m_aggregateExpressions) {
+        for (AbstractExpression ae : mAggregateExpressions) {
             if (ae == null) {
                 // This is a place-holder for the "*" in "COUNT(*)".
                 // There are no subexpressions to find here.
@@ -670,10 +628,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             destination.addGroupByExpression(expr);
         }
 
-        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
-        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
-        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
-        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
+        List<ExpressionType> aggregateTypes = origin.mAggregateTypes;
+        List<Integer> aggregateDistinct = origin.mAggregateDistinct;
+        List<Integer> aggregateOutputColumns = origin.mAggregateOutputColumns;
+        List<AbstractExpression> aggregateExpressions = origin.mAggregateExpressions;
         for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
             destination.addAggregate(aggregateTypes.get(i),
                     aggregateDistinct.get(i) == 1,

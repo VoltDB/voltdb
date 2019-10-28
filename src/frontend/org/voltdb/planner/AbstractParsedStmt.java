@@ -363,25 +363,25 @@ public abstract class AbstractParsedStmt {
     private static Map<String, XMLElementExpressionParser> m_exprParsers =
             new HashMap<String, XMLElementExpressionParser>() {{
                 put("value",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseValueExpression(element));
+                        AbstractParsedStmt::parseValueExpression);
                 put("vector",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseVectorExpression(element));
+                        AbstractParsedStmt::parseVectorExpression);
                 put("columnref",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseColumnRefExpression(element));
+                        AbstractParsedStmt::parseColumnRefExpression);
                 put("operation",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseOperationExpression(element));
+                        AbstractParsedStmt::parseOperationExpression);
                 put("aggregation",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseAggregationExpression(element));
+                        AbstractParsedStmt::parseAggregationExpression);
                 put("asterisk",
                         (AbstractParsedStmt stmt, VoltXMLElement element) -> null);
                 put("win_aggregation",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseWindowedAggregationExpression(element));
+                        AbstractParsedStmt::parseWindowedAggregationExpression);
                 put("function",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseFunctionExpression(element));
+                        AbstractParsedStmt::parseFunctionExpression);
                 put("tablesubquery",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseSubqueryExpression(element));
+                        AbstractParsedStmt::parseSubqueryExpression);
                 put("row",
-                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseRowExpression(element));
+                        AbstractParsedStmt::parseRowExpression);
 
             }};
 

@@ -195,6 +195,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
         m_predicate = ExpressionUtil.cloneAndCombinePredicates(colExps);
+        if (m_predicate != null) {
+            m_predicate.finalizeValueTypes();
+        }
     }
 
     protected void setScanColumns(List<SchemaColumn> scanColumns) {

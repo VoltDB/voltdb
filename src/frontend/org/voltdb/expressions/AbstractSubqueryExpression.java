@@ -52,7 +52,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     protected AbstractPlanNode m_subqueryNode = null;
     // List of correlated parameter indexes that originate at the immediate parent's level
     // and need to be set by this SubqueryExpression on the EE side prior to the evaluation
-    private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
+    private List<Integer> m_parameterIdxList = new ArrayList<>();
 
     protected AbstractSubqueryExpression() {
         m_valueType = VoltType.BIGINT;

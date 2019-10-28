@@ -21,9 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.hsqldb_voltpatches.FunctionSQL;
-import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -142,8 +142,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         m_type = type;
     }
 
-    public AbstractExpression(ExpressionType type,
-            AbstractExpression left, AbstractExpression right) {
+    public AbstractExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         this(type);
         m_left = left;
         m_right = right;
@@ -204,25 +203,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         AbstractExpression clone;
         try {
             clone = (AbstractExpression)super.clone();
-        }
-        catch (CloneNotSupportedException e) {
+        } catch (CloneNotSupportedException e) {
             // umpossible
             return null;
         }
 
         if (m_left != null) {
-            AbstractExpression left_clone = m_left.clone();
-            clone.m_left = left_clone;
+            clone.m_left = m_left.clone();
         }
         if (m_right != null) {
-            AbstractExpression right_clone = m_right.clone();
-            clone.m_right = right_clone;
+            clone.m_right = m_right.clone();
         }
         if (m_args != null) {
-            clone.m_args = new ArrayList<>();
-            for (AbstractExpression argument : m_args) {
-                clone.m_args.add(argument.clone());
-            }
+            clone.m_args = m_args.stream()
+                    .map(AbstractExpression::clone)
+                    .collect(Collectors.toList());
         }
 
         return clone;
@@ -352,34 +347,34 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
         sb.append(linePrefix);
-        sb.append(getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ");
+        sb.append(getExpressionNodeNameForToString()).append(" [")
+                .append(getExpressionType().toString()).append("] : ");
         if (m_valueType != null) {
             sb.append(m_valueType.toSQLString());
             if (m_valueType.isVariableLength()) {
-                sb.append("(" + m_valueSize);
+                sb.append("(").append(m_valueSize);
                 if (m_valueType == VoltType.STRING) {
                     sb.append(m_inBytes ? " bytes" : " chars");
                 }
                 sb.append(")");
             }
-        }
-        else {
+        } else {
             sb.append("[null type]");
         }
         sb.append("\n");
 
         if (m_left != null) {
-            sb.append(linePrefix + "Left:\n");
+            sb.append(linePrefix).append("Left:\n");
             m_left.toStringHelper(linePrefix + INDENT, sb);
         }
 
         if (m_right != null) {
-            sb.append(linePrefix + "Right:\n");
+            sb.append(linePrefix).append("Right:\n");
             m_right.toStringHelper(linePrefix + INDENT, sb);
         }
 
         if (m_args != null) {
-            sb.append(linePrefix + "Args:\n");
+            sb.append(linePrefix).append("Args:\n");
             for (AbstractExpression arg : m_args) {
                 arg.toStringHelper(linePrefix + INDENT, sb);
             }
@@ -388,7 +383,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof AbstractExpression == false) {
+        if (! (obj instanceof AbstractExpression)) {
             return false;
         }
 
@@ -398,7 +393,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return false;
         }
 
-        if ( ! hasEqualAttributes(expr)) {
+        if (! hasEqualAttributes(expr)) {
             return false;
         }
 
@@ -418,20 +413,14 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         // Check that the children identify themselves as equal
-        if (expr.m_left != null) {
-            if (expr.m_left.equals(m_left) == false) {
-                return false;
-            }
+        if (expr.m_left != null && ! expr.m_left.equals(m_left)) {
+            return false;
         }
-        if (expr.m_right != null) {
-            if (expr.m_right.equals(m_right) == false) {
-                return false;
-            }
+        if (expr.m_right != null && ! expr.m_right.equals(m_right)) {
+            return false;
         }
         if (expr.m_args != null) {
-            if (expr.m_args.equals(m_args) == false) {
-                return false;
-            }
+            return expr.m_args.equals(m_args);
         }
 
         return true;
@@ -451,14 +440,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return true iff the two strings represent lists of the same expressions,
      * allowing for value type differences
      */
-    public static boolean areOverloadedJSONExpressionLists(
-            String jsontext1, String jsontext2) {
+    public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2) {
         try {
             List<AbstractExpression> list1 = fromJSONArrayString(jsontext1, null);
             List<AbstractExpression> list2 = fromJSONArrayString(jsontext2, null);
             return list1.equals(list2);
-        }
-        catch (JSONException je) {
+        } catch (JSONException je) {
             return false;
         }
     }
@@ -594,8 +581,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.object();
             toJSONString(stringer);
             stringer.endObject();
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             e.printStackTrace();
             return null;
         }
@@ -608,8 +594,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_valueType == null) {
             stringer.keySymbolValuePair(Members.VALUE_TYPE, VoltType.NULL.getValue());
             stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
-        }
-        else {
+        } else {
             stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
             if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
                 stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
@@ -660,8 +645,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             sortExpressions.get(ii).toJSONString(stringer);
             stringer.endObject();
             if (sortDirections != null) {
-                stringer.keySymbolValuePair(SortMembers.SORT_DIRECTION,
-                        sortDirections.get(ii).toString());
+                stringer.keySymbolValuePair(SortMembers.SORT_DIRECTION, sortDirections.get(ii).toString());
             }
             stringer.endObject();
         }
@@ -669,23 +653,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     protected void loadFromJSONObject(JSONObject obj) throws JSONException { }
-    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan)
-            throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException {
         loadFromJSONObject(obj);
     }
 
-    public static AbstractExpression fromJSONChild(
-            JSONObject jobj, String label) throws JSONException {
+    public static AbstractExpression fromJSONChild(JSONObject jobj, String label) throws JSONException {
         if (jobj.isNull(label)) {
             return null;
         }
         return fromJSONObject(jobj.getJSONObject(label), null);
-
     }
 
     public static AbstractExpression fromJSONChild(
-            JSONObject jobj, String label,  StmtTableScan tableScan)
-            throws JSONException {
+            JSONObject jobj, String label,  StmtTableScan tableScan) throws JSONException {
         if (jobj.isNull(label)) {
             return null;
         }
@@ -698,12 +678,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         AbstractExpression expr;
         try {
             expr = type.getExpressionClass().newInstance();
-        }
-        catch (InstantiationException e) {
-            e.printStackTrace();
-            return null;
-        }
-        catch (IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             e.printStackTrace();
             return null;
         }
@@ -713,15 +688,14 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.m_valueType = VoltType.get((byte) obj.getInt(Members.VALUE_TYPE));
         if (obj.has(Members.VALUE_SIZE)) {
             expr.m_valueSize = obj.getInt(Members.VALUE_SIZE);
-        }
-        else {
+        } else {
             expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
         }
 
         expr.m_left = fromJSONChild(obj, Members.LEFT, tableScan);
         expr.m_right = fromJSONChild(obj, Members.RIGHT, tableScan);
 
-        if ( ! obj.isNull(Members.ARGS)) {
+        if (! obj.isNull(Members.ARGS)) {
             JSONArray jarray = obj.getJSONArray(Members.ARGS);
             ArrayList<AbstractExpression> arguments = new ArrayList<>();
             loadFromJSONArray(arguments, jarray, tableScan);
@@ -766,8 +740,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 JSONObject tempObj = jarray.getJSONObject(ii);
                 sortExpressions.add(
                         fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION));
-                if (sortDirections == null ||
-                        ! tempObj.has(SortMembers.SORT_DIRECTION)) {
+                if (sortDirections == null || ! tempObj.has(SortMembers.SORT_DIRECTION)) {
                     continue;
                 }
                 String sdAsString = tempObj.getString(SortMembers.SORT_DIRECTION);
@@ -779,10 +752,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     public static List<AbstractExpression> fromJSONArrayString(
             String jsontext, StmtTableScan tableScan) throws JSONException {
-        JSONArray jarray = new JSONArray(jsontext);
-        List<AbstractExpression> result = new ArrayList<>();
-        loadFromJSONArray(result, jarray, tableScan);
-        return result;
+        return loadFromJSONArray(new ArrayList<>(), new JSONArray(jsontext), tableScan);
     }
 
     public static void fromJSONArrayString(String jsontext,
@@ -792,8 +762,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public static AbstractExpression fromJSONString(
-            String jsontext, StmtTableScan tableScan)
-                    throws JSONException {
+            String jsontext, StmtTableScan tableScan) throws JSONException {
         JSONObject jobject = new JSONObject(jsontext);
         return fromJSONObject(jobject, tableScan);
     }
@@ -915,11 +884,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         if (m_args != null) {
-            for (AbstractExpression expr: m_args) {
-                if (expressionSet.contains(expr)) {
-                    return true;
-                }
-            }
+            return m_args.stream().anyMatch(expressionSet::contains);
         }
         return false;
     }
@@ -931,11 +896,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public AbstractExpression replaceAVG () {
         if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
             AbstractExpression child = getLeft();
-            AbstractExpression left =
-                    new AggregateExpression(ExpressionType.AGGREGATE_SUM);
+            AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
             left.setLeft(child.clone());
-            AbstractExpression right =
-                    new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
+            AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
             right.setLeft(child.clone());
 
             return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE,
@@ -1018,8 +981,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param aeClass expression class to search for
      * @return whether the expression or any contained expressions are of the desired type
      */
-    public boolean hasAnySubexpressionOfClass(
-            Class< ? extends AbstractExpression> aeClass) {
+    public boolean hasAnySubexpressionOfClass(Class<? extends AbstractExpression> aeClass) {
         if (aeClass.isInstance(this)) {
             return true;
         }
@@ -1032,14 +994,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return true;
         }
 
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionOfClass(aeClass)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return m_args != null &&
+                m_args.stream().anyMatch(a -> a.hasAnySubexpressionOfClass(aeClass));
     }
 
     public boolean hasTVE() {
@@ -1074,11 +1030,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionWithPredicate(pred)) {
-                    return true;
-                }
-            }
+            return m_args.stream().anyMatch(e -> e.hasAnySubexpressionWithPredicate(pred));
         }
 
         return false;
@@ -1145,8 +1097,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (valueType == VoltType.DECIMAL) {
             m_valueType = VoltType.DECIMAL;
             m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
-        }
-        else {
+        } else {
             m_valueType = VoltType.FLOAT;
             m_valueSize = VoltType.FLOAT.getLengthInBytesForFixedTypes();
         }
@@ -1390,12 +1341,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return
      */
     public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg, boolean isMV) {
-        for (AbstractExpression expr : checkList) {
-            if (!expr.isValidExprForIndexesAndMVs(msg, isMV)) {
-                return false;
-            }
-        }
-        return true;
+        return checkList.stream().allMatch(e -> e.isValidExprForIndexesAndMVs(msg, isMV));
     }
 
     /**
@@ -1435,7 +1381,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public boolean isValueTypeIndexable(StringBuffer msg) {
         if (!m_valueType.isIndexable()) {
-            msg.append("expression of type " + m_valueType.getName());
+            msg.append("expression of type ").append(m_valueType.getName());
             return false;
         }
         return true;
@@ -1460,7 +1406,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return false;
         }
         if (!m_valueType.isUniqueIndexable()) {
-            msg.append("expression of type " + m_valueType.getName());
+            msg.append("expression of type ").append(m_valueType.getName());
             return false;
         }
         return true;
@@ -1517,8 +1463,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public static void toJSONArray(JSONStringer stringer, String keyString, List<AbstractExpression> exprs) throws JSONException {
-        stringer.key(keyString)
-                .array();
+        stringer.key(keyString).array();
         if (exprs != null) {
             for (AbstractExpression ae : exprs) {
                 stringer.object();
@@ -1539,7 +1484,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return m_left;
         }
         if (m_args != null && m_args.size() > 0) {
-            assert(m_left == null && m_right == null);
+            assert m_right == null;
             return m_args.get(0);
         }
         return null;
@@ -1560,11 +1505,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return false;
         }
         AbstractExpression rightExpr = getRight();
-        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
-                rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        return true;
+        return rightExpr instanceof TupleValueExpression ||
+                ! rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class);
     }
 
 }

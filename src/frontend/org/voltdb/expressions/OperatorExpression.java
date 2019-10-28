@@ -17,9 +17,7 @@
 
 package org.voltdb.expressions;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -93,8 +91,7 @@ public class OperatorExpression extends AbstractExpression {
     }
 
     @Override
-    public void refineValueType(VoltType neededType, int neededSize)
-    {
+    public void refineValueType(VoltType neededType, int neededSize) {
         if (! needsRightExpression()) {
             return;
         }
@@ -122,8 +119,7 @@ public class OperatorExpression extends AbstractExpression {
         VoltType rightType = m_right.getValueType();
         if (leftType == VoltType.FLOAT || rightType == VoltType.FLOAT) {
             operandType = VoltType.FLOAT;
-        }
-        else if (operandType != VoltType.FLOAT) {
+        } else if (operandType != VoltType.FLOAT) {
             if (leftType == VoltType.DECIMAL || rightType == VoltType.DECIMAL) {
                 operandType = VoltType.DECIMAL;
             }
@@ -140,8 +136,7 @@ public class OperatorExpression extends AbstractExpression {
     }
 
     @Override
-    public void finalizeValueTypes()
-    {
+    public void finalizeValueTypes() {
         finalizeChildValueTypes();
         ExpressionType type = getExpressionType();
         if (m_right == null) {
@@ -207,7 +202,7 @@ public class OperatorExpression extends AbstractExpression {
         case OPERATOR_NOT:
         case OPERATOR_IS_NULL:
         case OPERATOR_EXISTS:
-            msg.append("operator '" + getExpressionType().symbol() +"'");
+            msg.append("operator '").append(getExpressionType().symbol()).append("'");
             return false;
         default:
             return true;

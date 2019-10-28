@@ -1063,7 +1063,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         Map<String, String> subqueries = new TreeMap<>();
         String fullSb = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
         return subqueries.entrySet().stream().flatMap(q -> Stream.of(q.getKey(), q.getValue()))
-                .collect(Collectors.joining("\n", fullSb + "\n", ""));
+                .collect(Collectors.joining("\n", fullSb, ""));
     }
 
     private String extractExplainedSubquries(String explainedSubquery, Pattern pattern, Map<String, String> subqueries) {
