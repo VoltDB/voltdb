@@ -468,11 +468,21 @@ public class AsyncExportClient
             timer.cancel();
 
             if (config.usemigrateonly) {
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
                 log.info("triggering final migrate");
                 trigger_migrate(0);
                 Thread.sleep(7500);
+
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
             }
 
             shutdown.compareAndSet(false, true);
@@ -536,6 +546,7 @@ public class AsyncExportClient
                       // old & new on each update so either = total updates, not the sum of the 2
                       // +TransactionCounts.get(UPDATE_NEW)
                       );
+
                 long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
                 System.out.println("EXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
                 long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
@@ -579,6 +590,25 @@ public class AsyncExportClient
         if ( TrackingResults.get(0) == 0 ) {
             log.error("No successful transactions");
             System.exit(-1);
+        }
+    }
+
+    private static void log_migrating_counts(String table) {
+        try {
+            VoltTable[] results = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING").getResults();
+            long migrating = results[0].asScalarLong();
+            long not_migrating = results[1].asScalarLong();
+
+            log.info("row counts for " + table +
+                     ": migrating: " + migrating +
+                     ", not migrating: " + not_migrating +
+                     ", total: " + (migrating + not_migrating));
+        }
+        catch (Exception e) {
+            // log it and otherwise ignore it.  it's not fatal to fail if the
+            // SELECTS due to a migrate or some other exception
+            log.fatal("log_migrating_counts exception: " + e);
+            e.printStackTrace();
         }
     }
 
