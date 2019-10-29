@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 
@@ -120,7 +121,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
         if (m_subqueryNode != null) {
             if (m_subqueryNode.getPlanNodeId() != m_subqueryNodeId) {
-                throw new RuntimeException("ERROR: A subquery plan node id mismatch");
+                throw new ValidationError("A subquery plan node id mismatch");
             }
             m_subqueryNode.validate();
         }

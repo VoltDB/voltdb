@@ -23,14 +23,12 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
-/**
- *
- */
 public class TupleValueExpression extends AbstractValueExpression {
 
     private static class Members {
@@ -85,10 +83,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_differentiator = differentiator;
     }
 
-    public TupleValueExpression(String tableName,
-            String tableAlias,
-            Column catalogCol,
-            int columnIndex) {
+    public TupleValueExpression(String tableName, String tableAlias, Column catalogCol, int columnIndex) {
         this(tableName, tableAlias,
                 catalogCol.getName(), catalogCol.getName(),
                 columnIndex, -1);
@@ -113,16 +108,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         setTypeSizeAndInBytes(typeSource);
     }
 
-    public TupleValueExpression(String tableName,
-                                String tableAlias,
-                                String columnName,
-                                String columnAlias) {
+    public TupleValueExpression(String tableName, String tableAlias, String columnName, String columnAlias) {
         this(tableName, tableAlias, columnName, columnAlias, -1, -1);
     }
 
-    public TupleValueExpression(String tableName,
-                                String columnName,
-                                int columnIndex) {
+    public TupleValueExpression(String tableName, String columnName, int columnIndex) {
         this(tableName, null, columnName, null, columnIndex, -1);
     }
 
@@ -162,16 +152,13 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void validate() {
         super.validate();
 
-        if ((m_right != null) || (m_left != null))
-            throw new RuntimeException(
-                    "ERROR: A value expression has child expressions for '" +
-                    this + "'");
+        if (m_right != null || m_left != null) {
+            throw new ValidationError("A value expression has child expressions for '%s", toString());
+        }
 
         // Column Index
         if (m_columnIndex < 0) {
-            throw new RuntimeException(
-                    "ERROR: Invalid column index '" + m_columnIndex +
-                    "' for '" + this + "'");
+            throw new ValidationError("Invalid column index '%d' for '%s'", m_columnIndex, toString());
         }
     }
 
@@ -317,7 +304,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof TupleValueExpression == false) {
+        if (! (obj instanceof TupleValueExpression)) {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
@@ -337,7 +324,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             return false;
         }
         if (m_tableName != null) { // Implying both sides non-null
-            if (m_tableName.equals(expr.m_tableName) == false) {
+            if (! m_tableName.equals(expr.m_tableName)) {
                 return false;
             }
         }
@@ -345,14 +332,12 @@ public class TupleValueExpression extends AbstractValueExpression {
             // Implying both sides non-null
             // If one of the table aliases is NULL it is considered to be a wild card
             // matching any alias.
-            if (m_tableAlias.equals(expr.m_tableAlias) == false) {
+            if (! m_tableAlias.equals(expr.m_tableAlias)) {
                 return false;
             }
         }
         if (m_columnName != null) { // Implying both sides non-null
-            if (m_columnName.equals(expr.m_columnName) == false) {
-                return false;
-            }
+            return m_columnName.equals(expr.m_columnName);
         }
         // NOTE: m_ColumnIndex was ignored in comparison, because it might not get properly set
         // till end of planning, when query is made across several tables.
@@ -370,7 +355,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             result += m_columnName.hashCode();
         }
         // defer to the superclass, which factors in other attributes
-        return result += super.hashCode();
+        return result + super.hashCode();
     }
 
     @Override
@@ -481,8 +466,7 @@ public class TupleValueExpression extends AbstractValueExpression {
                 toJSONString(stringer);
                 stringer.endObject();
                 columnName += stringer.toString();
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 columnName += "CORRUPTED beyond the ability to format? " + e;
                 e.printStackTrace();
             }
@@ -495,11 +479,9 @@ public class TupleValueExpression extends AbstractValueExpression {
                 // This is join inner table
                 return "inner-table." + columnName;
             }
-        }
-        else if ( ! tableName.equals(impliedTableName)) {
+        } else if ( ! tableName.equals(impliedTableName)) {
             return tableName + "." + columnName;
-        }
-        else if (m_verboseExplainForDebugging) {
+        } else if (m_verboseExplainForDebugging) {
             // In verbose mode, always show an "implied' tableName that would normally be left off.
             return "{" + tableName + "}." + columnName;
         }
@@ -511,15 +493,14 @@ public class TupleValueExpression extends AbstractValueExpression {
             if (alias == null) {
                 return "<none>";
             }
-
             return "(" + alias + ")";
         }
 
         if (alias == null || name.equals(alias)) {
             return name;
+        } else {
+            return name + "(" + alias + ")";
         }
-
-        return name + "(" + alias + ")";
     }
 
     @Override

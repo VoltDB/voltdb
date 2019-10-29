@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {
@@ -163,27 +164,21 @@ public class FunctionExpression extends AbstractExpression {
         // Validate that there are no children other than the argument list (mandatory even if empty)
         //
         if (m_left != null) {
-            throw new RuntimeException("ERROR: The left child expression '" + m_left + "' for '" + this + "' is not NULL");
+            throw new ValidationError("The left child expression '%s' for '%s' is not NULL",
+                    m_left, toString());
+        } else if (m_right != null) {
+            throw new ValidationError("The right child expression '%s' for '%s' is not NULL",
+                    m_right, toString());
+        } else if (m_args == null) {
+            throw new ValidationError("The function argument list for '%s' is NULL",
+                    toString());
+        } else if (m_name == null) {
+            throw new ValidationError("The function name for '%s' is NULL", toString());
+        } else if (m_resultTypeParameterIndex != NOT_PARAMETERIZED &&
+                (m_resultTypeParameterIndex < 0 || m_resultTypeParameterIndex >= m_args.size())) {
+                throw new ValidationError("The function parameter argument index '%d' for '%s' is out of bounds",
+                        m_resultTypeParameterIndex, toString());
         }
-
-        if (m_right != null) {
-            throw new RuntimeException("ERROR: The right child expression '" + m_right + "' for '" + this + "' is not NULL");
-        }
-
-        if (m_args == null) {
-            throw new RuntimeException("ERROR: The function argument list for '" + this + "' is NULL");
-        }
-
-        if (m_name == null) {
-            throw new RuntimeException("ERROR: The function name for '" + this + "' is NULL");
-        }
-        if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
-            if (m_resultTypeParameterIndex < 0 || m_resultTypeParameterIndex >= m_args.size()) {
-                throw new RuntimeException("ERROR: The function parameter argument index '" +
-                        m_resultTypeParameterIndex + "' for '" + this + "' is out of bounds");
-            }
-        }
-
     }
 
     @Override

@@ -31,6 +31,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
@@ -169,22 +170,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         // Expression Type
         //
         if (m_type == null) {
-            throw new RuntimeException("ERROR: The ExpressionType for '" + this + "' is NULL");
+            throw new ValidationError("The ExpressionType for '%s' is NULL", toString());
         }
 
         if (m_type == ExpressionType.INVALID) {
-            throw new RuntimeException("ERROR: The ExpressionType for '" + this + "' is " + m_type);
+            throw new ValidationError("The ExpressionType for '%s' is %s", toString(), m_type);
         }
 
         //
         // Output Type
         //
         if (m_valueType == null) {
-            throw new RuntimeException("ERROR: The output VoltType for '" + this + "' is NULL");
+            throw new ValidationError("The output VoltType for '%s' is NULL", toString());
         }
 
         if (m_valueType == VoltType.INVALID) {
-            throw new RuntimeException("ERROR: The output VoltType for '" + this + "' is " + m_valueType);
+            throw new ValidationError("The output VoltType for '%s' is %s", toString(), m_valueType);
         }
 
         //
@@ -193,8 +194,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         //
         Class<?> check_class = m_type.getExpressionClass();
         if (!check_class.isInstance(this)) {
-            throw new RuntimeException("ERROR: Expression '" + this + "' is class type '" +
-                    getClass().getSimpleName() + "' but needs to be '" + check_class.getSimpleName() + "'");
+            throw new ValidationError("Expression '%s' is class type '%s' but needs to be '%s'", toString(),
+                    getClass().getSimpleName(), check_class.getSimpleName());
         }
     }
 

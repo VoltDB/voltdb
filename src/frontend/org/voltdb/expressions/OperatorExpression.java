@@ -151,8 +151,7 @@ public class OperatorExpression extends AbstractExpression {
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
             return;
-        }
-        if (type == ExpressionType.OPERATOR_CASE_WHEN || type == ExpressionType.OPERATOR_ALTERNATIVE) {
+        } else if (type == ExpressionType.OPERATOR_CASE_WHEN || type == ExpressionType.OPERATOR_ALTERNATIVE) {
             assert(m_valueType != null);
             m_valueSize = m_valueType.getMaxLengthInBytes();
             return;
