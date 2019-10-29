@@ -819,7 +819,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
-    public void testENG13840() throws Exception {
+    public void testENG13840() {
         final TestEnv env = new TestEnv(
                 "CREATE TABLE R1(i int);\nCREATE TABLE R2(i int);",
                 m_catalogJar, m_pathToDeployment, 2, 1, 0);
@@ -834,8 +834,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 // TODO: eventually we need to get it working
                 fail("Should have failed");
             } catch (Exception e) {
-                assertEquals(
-                        "ERROR: Invalid Aggregate ExpressionType or No Aggregate Expression types for PlanNode 'HASHAGGREGATE[11]'",
+                assertEquals("ValidationError: Projection plan node has empty output schema",
                         e.getMessage());
             }
         } finally {
