@@ -61,6 +61,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LocalClustersTestBase extends JUnit4LocalClusterTest {
@@ -173,6 +174,24 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     protected void cleanupAfterTest() {
         m_cleanupAfterTest = true;
+    }
+
+    /**
+     * Configure a clusters and corresponding client. A cluster will be created with the results of the constructed
+     * cluster and client are stored in {@link #CLUSTERS_AND_CLIENTS}
+     * <p>
+     * If cluster with {@code config} is already running it will be left running and just the schema will be added to
+     * the running clusters. The creation of clusters can be forced by calling {@link #shutdownAllClustersAndClients()}
+     * prior to calling this method.
+     *
+     * @param config                Cluster configuration
+     * @param partitionedTableCount number of partitioned tables to create
+     * @param replicatedTableCount  number of replicated tables to create
+     * @throws Exception if an error occurs
+     */
+    protected void configureClusterAndClient(ClusterConfiguration config, int partitionedTableCount,
+            int replicatedTableCount) throws Exception {
+        configureClustersAndClients(ImmutableList.of(config), partitionedTableCount, replicatedTableCount);
     }
 
     /**
