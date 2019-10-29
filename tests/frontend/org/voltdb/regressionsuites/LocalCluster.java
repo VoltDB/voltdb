@@ -65,6 +65,7 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -488,6 +489,9 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+            if (builder.getKiplingConfiguration().isEnabled()) {
+                templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
+            }
         }
         return m_compiled;
     }
@@ -650,6 +654,10 @@ public class LocalCluster extends VoltServerConfig {
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
+        if (cmdln.m_kiplingHostPort != null) {
+            cmdln.m_kiplingHostPort = cmdln.m_kiplingHostPort.withDefaultPort(portGenerator.nextKipling());
+        }
+
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
@@ -1161,6 +1169,10 @@ public class LocalCluster extends VoltServerConfig {
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
                 cmdln.enableAdd(true);
+            }
+
+            if (cmdln.m_kiplingHostPort != null) {
+                cmdln.m_kiplingHostPort = cmdln.m_kiplingHostPort.withDefaultPort(portGenerator.nextKipling());
             }
 
             // If local directories are being cleared

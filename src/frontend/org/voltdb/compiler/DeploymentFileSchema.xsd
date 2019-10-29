@@ -397,6 +397,14 @@
 
   <xs:complexType name="kiplingType">
     <xs:attribute name="enabled" type="xs:boolean" default="false" />
+    <xs:attribute name="port" default="9092">
+      <xs:simpleType>
+        <xs:restriction base="xs:int">
+          <xs:minInclusive value="1"/>
+          <xs:maxExclusive value="65536"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
     <xs:attribute name="threadCount" default="20">
       <xs:simpleType>
         <xs:restriction base="xs:int">
