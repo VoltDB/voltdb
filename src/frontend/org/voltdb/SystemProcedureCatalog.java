@@ -316,12 +316,12 @@ public class SystemProcedureCatalog {
         builder.put("@JStack",
                 new Config(null,
                         false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@Pause",
                 new Config("org.voltdb.sysprocs.Pause",
                         false, false, true,  0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@QueryStats",
                 new Config("org.voltdb.sysprocs.QueryStats",
@@ -331,7 +331,7 @@ public class SystemProcedureCatalog {
         builder.put("@Resume",
                 new Config("org.voltdb.sysprocs.Resume",
                         false, false, true,  0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@Quiesce",
                 new Config("org.voltdb.sysprocs.Quiesce",
@@ -347,22 +347,22 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.SnapshotRestore",
                         false, false, false, 0, VoltType.INVALID,
                         false, true,false, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE ));
+                        false, true, Restartability.NOT_APPLICABLE ));
         builder.put("@SnapshotStatus",
                 new Config("org.voltdb.sysprocs.SnapshotStatus",
                         false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SnapshotScan",
                 new Config("org.voltdb.sysprocs.SnapshotScan",
                         false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SnapshotDelete",
                 new Config("org.voltdb.sysprocs.SnapshotDelete",
                         false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@Shutdown",
                 new Config("org.voltdb.sysprocs.Shutdown",
                         false, false, false, 0, VoltType.INVALID,
@@ -376,18 +376,18 @@ public class SystemProcedureCatalog {
         builder.put("@Statistics",
                 new Config("org.voltdb.sysprocs.Statistics",
                         false, true, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        true, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        true, true, Restartability.NOT_APPLICABLE));
         builder.put("@SystemCatalog",
                 new Config("org.voltdb.sysprocs.SystemCatalog",
                         true, true, false, 0, VoltType.STRING,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SystemInformation",
                 new Config("org.voltdb.sysprocs.SystemInformation",
                         false, true, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@UpdateLogging",
                 new Config("org.voltdb.sysprocs.UpdateLogging",
                         false, false, true, 0, VoltType.INVALID,
@@ -435,7 +435,7 @@ public class SystemProcedureCatalog {
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ValidatePartitioning",
                 new Config("org.voltdb.sysprocs.ValidatePartitioning",
-                        false, false, false, 0, VoltType.INVALID,
+                        false, true, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@GetHashinatorConfig",
@@ -463,6 +463,8 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         true, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
+        // DR state is determined by state machine and pbd files, that's the reason why ResetDR
+        // neither commandlogged or restartable.
         builder.put("@ResetDR",
                 new Config("org.voltdb.sysprocs.ResetDR",
                         false, false, false, 0, VoltType.INVALID,
@@ -487,7 +489,7 @@ public class SystemProcedureCatalog {
         builder.put("@Ping",
                 new Config(null,
                         false, true,  false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@PingPartitions",
                 new Config("org.voltdb.sysprocs.PingPartitions",
@@ -527,12 +529,12 @@ public class SystemProcedureCatalog {
         builder.put("@StopNode",
                 new Config(null,
                         true,  false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@PrepareStopNode",
                 new Config(null,
                         true,  false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@Explain",
                 new Config("org.voltdb.sysprocs.Explain",
@@ -559,11 +561,6 @@ public class SystemProcedureCatalog {
                         false, true,  false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
-        builder.put("@SendSentinel",
-                new Config(null,
-                        true,  false, false, 0, VoltType.INVALID,
-                        true, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@PrepareShutdown",
                 new Config("org.voltdb.sysprocs.PrepareShutdown",
                         false, false, false, 0, VoltType.INVALID,
@@ -587,8 +584,8 @@ public class SystemProcedureCatalog {
         builder.put("@Trace",
                 new Config(null,
                         false, true,  false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@CheckUpgradePlanNT",
                 new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",
                         true,  false, false, 0, VoltType.INVALID,
