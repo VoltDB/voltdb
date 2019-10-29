@@ -1448,31 +1448,31 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         // Load data
         loadTableForSVNoCountTest();
 
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892 ORDER BY A;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,3}, {1,3}, {1,8}, {2,2}, {2,5}, {3,7}});
 
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892 ORDER BY X;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,14}, {2,7}, {3,7}});
         vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10,2}});
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892 ORDER BY A;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,3},{1,8},{2,2},{2,5},{3,7}});
 
         client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 1 AND B = 3;");
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892 ORDER BY A;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,2}, {2,5}, {3,7}});
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892 ORDER BY X;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,7}, {3,7}});
         vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{8,2}});
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892 ORDER BY A;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8},{2,2},{2,5},{3,7}});
 
         // test if single table view will delete the row if its hidden count(*) = 0.
         client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 3 AND B = 7;");
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892 ORDER BY A;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,2}, {2,5}});
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892 ORDER BY X;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,7}});
     }
 

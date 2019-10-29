@@ -1168,6 +1168,10 @@ public abstract class CatalogUtil {
             final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
             paths.setLargequeryswap(largequeryswap);
         }
+        if (paths.getExportcursor() == null) {
+            final PathsType.Exportcursor exportCursor = new PathsType.Exportcursor();
+            paths.setExportcursor(exportCursor);
+        }
 
         //Command log info
         if (deployment.getCommandlog() == null) {
@@ -1350,6 +1354,7 @@ public abstract class CatalogUtil {
                 .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
                 .put(NodeSettings.LARGE_QUERY_SWAP_PATH_KEY, paths.getLargequeryswap().getPath())
                 .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
+                .put(NodeSettings.EXPORT_CURSOR_PATH_KEY, paths.getExportcursor().getPath())
                 .build();
     }
 

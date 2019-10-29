@@ -18,7 +18,7 @@
 #pragma once
 
 #include <map>
-#include <pthread.h>
+#include <mutex>
 #include <atomic>
 
 #include "common/debuglog.h"
@@ -62,7 +62,7 @@ class SynchronizedThreadLock {
     static bool s_usingMpMemory;
 #endif
     static bool s_holdingReplicatedTableLock;
-    static pthread_mutex_t s_sharedEngineMutex;
+    static std::mutex s_sharedEngineMutex;
     static pthread_cond_t s_sharedEngineCondition;
     static pthread_cond_t s_wakeLowestEngineCondition;
     static int32_t s_globalTxnStartCountdownLatch;

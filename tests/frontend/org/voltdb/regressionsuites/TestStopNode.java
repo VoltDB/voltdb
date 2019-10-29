@@ -426,7 +426,7 @@ public class TestStopNode extends RegressionSuite
         assertTrue(success);
 
         // add this config to the set of tests to run
-        builder.addServerConfig(m_config, false);
+        builder.addServerConfig(m_config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
         return builder;
     }
 }

@@ -135,7 +135,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         /*
          * compile a catalog with an added table for add tests
