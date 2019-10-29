@@ -240,6 +240,8 @@ public class ExportKafkaOnServerVerifier {
 
                         Integer partition = Integer.parseInt(row[3].trim());
 
+                        // The rowTxnId is filled within the procedure context, which may be on MPI (if it's a MP procedure).
+                        // But replicated table stream is run on every partition so the validation doesn't apply to it.
                         if (TxnEgo.getPartitionId(rowTxnId) != partition && TxnEgo.getPartitionId(rowTxnId) != 16383) {
                             System.err.println("ERROR mismatched exported partition for txid " + rowTxnId +
                                     ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
