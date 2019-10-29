@@ -93,7 +93,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // assume constant cost. Most of the cost of the SQL-IN will be measured by the NLIJ that is always paired with this element
         m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
@@ -105,8 +106,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         assert(m_children.size() == 0);
         m_hasSignificantOutputSchema = true;
         // fill in the table schema if we haven't already

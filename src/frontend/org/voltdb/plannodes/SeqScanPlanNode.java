@@ -82,7 +82,9 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
 
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] paramHints) {
         if (m_isSubQuery) {
             // Get estimates from the sub-query
             // @TODO For the sub-query the cost estimates will be calculated separately
@@ -131,8 +133,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         if (m_isSubQuery) {
             assert(m_children.size() == 1);
             m_children.get(0).resolveColumnIndexes();
-        }
-        else {
+        } else {
             StmtCommonTableScan ctScan = getCommonTableScan();
             if (ctScan != null) {
                 ctScan.resolveColumnIndexes();
@@ -216,8 +217,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         super.loadFromJSONObject(jobj, db);
         if (jobj.has(Members.CTE_STMT_ID.name())) {
             m_CTEBaseStmtId = jobj.getInt(Members.CTE_STMT_ID.name());
-        }
-        else {
+        } else {
             m_CTEBaseStmtId = null;
         }
     }

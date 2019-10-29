@@ -86,13 +86,10 @@ public class SendPlanNode extends AbstractPlanNode {
             return "RETURN RESULTS TO STORED PROCEDURE";
         else
             return "SEND PARTITION RESULTS TO COORDINATOR";
-
-
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
     }
 

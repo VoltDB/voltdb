@@ -25,6 +25,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -43,8 +44,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // Important safety tip regarding this inlined
         // index scan and ITS inlined projection:
         // That projection is currently only used/usable as
@@ -108,22 +108,14 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // table (rather than the smaller schema from the inlined index scan's
         // inlined project node) because the inlined scan has no temp table,
         // so predicates will be accessing the index-scanned table directly.
-        resolvePredicate(inlineScan.getPredicate(),
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(inlineScan.getEndExpression(),
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(inlineScan.getInitialExpression(),
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(inlineScan.getSkipNullPredicate(),
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(inlineScan.getSearchKeyExpressions(),
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(m_preJoinPredicate,
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(m_joinPredicate,
-                outerSchema, completeInnerTableSchema);
-        resolvePredicate(m_wherePredicate,
-                outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getPredicate(), outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getEndExpression(), outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getInitialExpression(), outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getSkipNullPredicate(), outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getSearchKeyExpressions(), outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_preJoinPredicate, outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_joinPredicate, outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_wherePredicate, outerSchema, completeInnerTableSchema);
 
         // Resolve subquery expression indexes
         resolveSubqueryColumnIndexes();
@@ -144,8 +136,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index >= 0) {
                     tve.setColumnIndex(index);
                 }
-            }
-            else {
+            } else {
                 tableIdx = 1;   // 1 for inner table
                 index = tve.setColumnIndexUsingSchema(completeInnerTableSchema);
             }
@@ -188,9 +179,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
         // Check that we have an inline IndexScanPlanNode
         if (m_inlineNodes.isEmpty()) {
-            throw new RuntimeException("ERROR: No inline PlanNodes are set for " + this);
+            throw new ValidationError("No inline PlanNodes are set for %s", toString());
         } else if (!m_inlineNodes.containsKey(PlanNodeType.INDEXSCAN)) {
-            throw new RuntimeException("ERROR: No inline PlanNode with type '" + PlanNodeType.INDEXSCAN + "' was set for " + this);
+            throw new ValidationError("No inline PlanNode with type '%s' was set for %s",
+                    PlanNodeType.INDEXSCAN, toString());
         }
     }
 
@@ -201,11 +193,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
      */
     @Override
     public boolean isOrderDeterministic() {
-        if ( ! super.isOrderDeterministic()) {
+        if (! super.isOrderDeterministic()) {
             return false;
         }
         IndexScanPlanNode index_scan = getInlineIndexScan();
-        if ( ! index_scan.isOrderDeterministic()) {
+        if (! index_scan.isOrderDeterministic()) {
             m_nondeterminismDetail = index_scan.m_nondeterminismDetail;
             return false;
         }
@@ -234,7 +226,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
         m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
         // Discount outer child estimates based on the number of its filters
-        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + discountEstimatedProcessedTupleCount(m_children.get(0));
+        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() +
+                discountEstimatedProcessedTupleCount(m_children.get(0));
     }
 
     public IndexScanPlanNode getInlineIndexScan() {
@@ -261,8 +254,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         if ( ! jobj.isNull(Members.SORT_DIRECTION.name())) {
             m_sortDirection = SortDirectionType.get(

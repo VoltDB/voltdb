@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -110,9 +111,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // TargetTableId
         //
         if (m_targetTableName == null) {
-            throw new RuntimeException("ERROR: TargetTableName is null for PlanNode '" + toString() + "'");
+            throw new ValidationError("TargetTableName is null for PlanNode '%s'", toString());
         } else if (m_targetTableAlias == null) {
-            throw new RuntimeException("ERROR: TargetTableAlias is null for PlanNode '" + toString() + "'");
+            throw new ValidationError("TargetTableAlias is null for PlanNode '%s'", toString());
         }
         //
         // Filter Expression
@@ -124,9 +125,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // All the schema columns better reference this table
         for (SchemaColumn col : m_tableScanSchema) {
             if (!m_targetTableName.equals(col.getTableName())) {
-                throw new RuntimeException("ERROR: The scan column: " + col.getColumnName() +
-                                    " in table: " + m_targetTableName + " refers to " +
-                                    " table: " + col.getTableName());
+                throw new ValidationError("The scan column: %s in table: %s refers to table: %s",
+                        col.getColumnName(), m_targetTableName, col.getTableName());
             }
         }
     }

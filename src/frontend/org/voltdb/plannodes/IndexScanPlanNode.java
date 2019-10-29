@@ -303,9 +303,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         if (m_endExpression != null) {
             m_endExpression.validate();
         }
-        for (AbstractExpression exp : m_searchkeyExpressions) {
-            exp.validate();
-        }
+        m_searchkeyExpressions.forEach(AbstractExpression::validate);
     }
 
     /**

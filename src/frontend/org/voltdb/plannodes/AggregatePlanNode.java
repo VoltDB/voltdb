@@ -30,6 +30,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
@@ -119,9 +120,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 numAggDist == numAggExpr &&
                 numAggExpr == numAggOut;
         if (! eq) {
-            throw new RuntimeException("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
+            throw new ValidationError(
+                    "Mismatched number of aggregate expression column attributes for PlanNode '%s'",
+                    toString());
         } else if (mAggregateTypes.contains(ExpressionType.INVALID)) {
-            throw new RuntimeException("ERROR: Invalid Aggregate ExpressionType for PlanNode '" + this + "'");
+            throw new ValidationError("Invalid Aggregate ExpressionType for PlanNode '%s'", toString());
         }
         // NOTE: m_aggregateTypes can be empty, in queries such as from ENG-12105.
     }

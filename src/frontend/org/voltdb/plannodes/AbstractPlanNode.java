@@ -35,6 +35,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -264,8 +265,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         //
         for (AbstractPlanNode child : m_children) {
             if (!child.m_parents.contains(this)) {
-                throw new RuntimeException("ERROR: The child PlanNode '" + child.toString() + "' does not " +
-                        "have its parent PlanNode '" + toString() + "' in its parents list");
+                throw new ValidationError(
+                        "The child PlanNode '%s' does not have its parent PlanNode '%s' in its parents list",
+                        child.toString(), toString());
             }
             child.validate();
         }
@@ -277,11 +279,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             // Make sure that we're not attached to some kind of tree somewhere...
             //
             if (!node.m_children.isEmpty()) {
-                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has children inside of PlanNode '" + this + "'");
+                throw new ValidationError("The inline PlanNode '%s' has children inside of PlanNode '%s'",
+                        node, this);
             } else if (!node.m_parents.isEmpty()) {
-                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has parents inside of PlanNode '" + this + "'");
+                throw new ValidationError("The inline PlanNode '%s' has parents inside of PlanNode '%s'",
+                        node, this);
             } else if (!node.isInline()) {
-                throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
+                throw new ValidationError("The inline PlanNode '%s' was not marked as inline for PlanNode '%s'",
+                        node, this);
             } else if (!node.getInlinePlanNodes().isEmpty()) {
                 // NOTE: we support recursive inline nodes
                 //throw new RuntimeException("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
