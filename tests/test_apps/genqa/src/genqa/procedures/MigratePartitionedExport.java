@@ -42,17 +42,11 @@ public class MigratePartitionedExport extends VoltProcedure {
     public long run(int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
+        voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
         voltQueueSQL(migrate_rabbit, -seconds);
         voltQueueSQL(migrate_file, -seconds);
         voltQueueSQL(migrate_jdbc, -seconds);
-        voltExecuteSQL();
-        
-        // grab the count from the last "migrate". they should all be the same
-        // TODO prune to Kafka only; this really only runs in that context
-        voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
-        long migratedCount = voltExecuteSQL()[0].asScalarLong();
-
-        // Return to caller
-        return migratedCount;
+        VoltTable[] results = voltExecuteSQL();
+        return results[0].asScalarLong();
     }
 }
