@@ -198,7 +198,9 @@ public class JDBC4ClientConnection implements Closeable {
         this.config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
 
         if (enableSSL) {
-            config.setTrustStore(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+            if (sslConfig.trustStorePath != null && sslConfig.trustStorePath.trim().length() > 0) {
+                config.setTrustStore(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+            }
             config.enableSSL();
         }
 
