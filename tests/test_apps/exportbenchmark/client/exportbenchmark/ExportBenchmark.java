@@ -144,7 +144,7 @@ public class ExportBenchmark {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
-        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka|other)")
+        @Option(desc = "Export to socket or export to Kafka cluster or discarding (socket|kafka|discarding|other)")
         String target = "socket";
 
         @Option(desc = "if a socket target, act as a client only 'client', socket 'receiver', or default 'both' ")
@@ -165,12 +165,12 @@ public class ExportBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (count < 0) exitWithMessageAndUsage("count must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other")) {
-                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\"");
+            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other") && !target.equals("discarding")) {
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\" or \"discarding\"");
             }
             if (target.equals("socket")) {
                 if ( !socketmode.equals("client") && !socketmode.equals("receiver") && !socketmode.equals("both")) {
-                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"reciever\" or \"both\"");
+                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"receiver\" or \"both\"");
                 }
             }
             if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
@@ -600,7 +600,7 @@ public class ExportBenchmark {
             } else {
                 benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
             }
-            //If we are going by count turn of end by timestamp.
+            //If we are going by count turn off end by timestamp.
             if (config.count > 0) {
                 benchmarkEndTS = 0;
             } else {
