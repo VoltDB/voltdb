@@ -106,6 +106,17 @@ public class CorePlan {
     }
 
     public void validate() {
+        assert(aggregatorFragment != null);
+
+        // dml => !readonly
+        assert(! isReplicatedTableDML || ! readOnly);
+
+        // repdml => 2partplan
+        assert(! isReplicatedTableDML || collectorFragment != null);
+
+        // zero param types => null extracted params
+        // nonzero param types => param types and extracted params have same size
+        assert(parameterTypes != null);
         if (m_compiledPlan != null) {
             m_compiledPlan.validate();
         }
