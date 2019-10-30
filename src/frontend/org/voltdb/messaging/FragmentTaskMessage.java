@@ -642,6 +642,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     NPart Partition Count: byte : 1
      *     FragmentRestart Sequence: long : 8
      *     Last SP Unique ID : 8
+     *     max response size: int : 4
      *
      * Procedure name to load string (if any).
      *
@@ -678,7 +679,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8 + 4+ 8;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8 + 8 + 4;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
