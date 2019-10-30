@@ -78,7 +78,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context) {
 
         if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
-
             DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
             if (log.isInfoEnabled()) {
@@ -92,7 +91,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
             ZooKeeper zk = getHostMessenger().getZK();
             Stat stat = null;
             try {
@@ -111,7 +109,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
             ClusterSettings settings = ClusterSettings.create(settingsBytes);
             CatalogContext catalogContext =
                     getVoltDB().settingsUpdate(settings, version);
@@ -123,7 +120,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
-
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateSettings));
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsAggregate, result);
 

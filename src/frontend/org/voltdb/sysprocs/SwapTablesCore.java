@@ -27,6 +27,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -54,6 +55,16 @@ public class SwapTablesCore extends AdHocBase {
         if (fragmentId == SysProcFragmentId.PF_swapTables) {
             // issue the callback once on each node
             if (context.isLowestSiteId()) {
+                UndoAction undoSwapDR = new UndoAction() {
+                    @Override
+                    public void release() {}
+
+                    @Override
+                    public void undo() {
+                        VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
+                    }
+                };
+                registerUndoAction(undoSwapDR);
                 VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
             }
             return new TableDependencyPair(SysProcFragmentId.PF_swapTables, dummy);
