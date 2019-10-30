@@ -83,20 +83,10 @@ interface PBDSegmentReader<M> {
     public void rewindReadOffset(int byBytes);
 
     /**
-     * Reopen a previously closed reader. Re-opened reader still keeps the original read offset.
-     */
-    public void reopen() throws IOException;
-
-    /**
      * Close this reader and release any resources. {@link PBDSegment#getReader(String)} will still return this reader
      * until the segment is closed.
      */
     public void close() throws IOException;
-
-    /**
-     * Similar to {@link #close()} but this reader will not be returned from {@link PBDSegment#getReader(String)}
-     */
-    public void purge() throws IOException;
 
     /**
      * Has this reader been closed.

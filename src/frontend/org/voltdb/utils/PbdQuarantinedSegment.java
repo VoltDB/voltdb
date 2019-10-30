@@ -153,9 +153,6 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         public void rewindReadOffset(int byBytes) {}
 
         @Override
-        public void reopen() {}
-
-        @Override
         public long readOffset() {
             return 0;
         }
@@ -164,9 +161,6 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         public int readIndex() {
             return 0;
         }
-
-        @Override
-        public void purge() {}
 
         @Override
         public BBContainer poll(OutputContainerFactory factory) {
