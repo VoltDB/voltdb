@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.DuplicateCounter.HashResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -160,8 +161,8 @@ public class MpScheduler extends Scheduler
             List<Long> doneCounters = new LinkedList<Long>();
             for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
                 DuplicateCounter counter = entry.getValue();
-                int result = counter.updateReplicas(m_iv2Masters);
-                if (result == DuplicateCounter.DONE) {
+                HashResult result = counter.updateReplicas(m_iv2Masters);
+                if (result.isDone()) {
                     doneCounters.add(entry.getKey());
                 }
             }
@@ -324,7 +325,8 @@ public class MpScheduler extends Scheduler
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters,
-                    message);
+                    message,
+                    localId);
             safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
@@ -511,13 +513,13 @@ public class MpScheduler extends Scheduler
             return;
         }
         if (counter != null) {
-            int result = counter.offer(message);
-            if (result == DuplicateCounter.DONE) {
+            HashResult result = counter.offer(message);
+            if (result.isDone()) {
                 m_duplicateCounters.remove(message.getTxnId());
                 advanceRepairTruncationHandle(message);
                 m_outstandingTxns.remove(message.getTxnId());
                 m_mailbox.send(counter.m_destinationId, message);
-            } else if (result == DuplicateCounter.MISMATCH || result == DuplicateCounter.ABORT) {
+            } else if (result.isAbort() || result.isMismatch()) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
             }
         } else {
