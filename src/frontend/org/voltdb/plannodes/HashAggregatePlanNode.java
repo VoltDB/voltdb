@@ -44,9 +44,9 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
         for (AbstractExpression expr : origin.m_groupByExpressions) {
             addGroupByExpression(expr);
         }
-        List<ExpressionType> aggregateTypes = origin.mAggregateTypes;
-        List<Integer> aggregateDistinct = origin.mAggregateDistinct;
-        List<Integer> aggregateOutputColumns = origin.mAggregateOutputColumns;
+        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
+        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
+        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
         List<AbstractExpression> aggregateExpressions = origin.mAggregateExpressions;
         for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
             addAggregate(aggregateTypes.get(i),

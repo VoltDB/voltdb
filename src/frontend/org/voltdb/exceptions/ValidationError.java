@@ -23,7 +23,7 @@ package org.voltdb.exceptions;
  */
 public class ValidationError extends PlanningErrorException {
     public ValidationError(String msg) {
-        super("ValidationError: " + msg);
+        super(msg);
     }
     public ValidationError(Throwable e) {
         super(e);
@@ -36,4 +36,9 @@ public class ValidationError extends PlanningErrorException {
     }
     // Hides PlanningErrorException ctor with stack trace erased,
     // because we always need the stack trace to understand what is going on.
+
+    @Override
+    public String toString() {
+        return "ValidationError: " + super.toString();
+    }
 }

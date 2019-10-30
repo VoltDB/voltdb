@@ -31,6 +31,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -583,8 +584,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             toJSONString(stringer);
             stringer.endObject();
         } catch (JSONException e) {
-            e.printStackTrace();
-            return null;
+            throw new PlanningErrorException(e);
         }
         return stringer.toString();
     }
